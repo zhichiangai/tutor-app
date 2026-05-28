@@ -139,7 +139,7 @@ function setupEvents() {
   DOM.btnSaveSettings.addEventListener("click", saveSettings);
   DOM.btnTestConnection.addEventListener("click", testCloudConnection);
   DOM.recordForm.addEventListener("submit", handleAddRecord);
-  [DOM.recordStartTime, DOM.recordEndTime, DOM.recordRate].forEach(el => el.addEventListener("input", calculateFormSummary));
+  [DOM.recordStartTime, DOM.recordEndTime, DOM.recordPlannedStartTime, DOM.recordPlannedEndTime, DOM.recordRate].forEach(el => el.addEventListener("input", calculateFormSummary));
   DOM.roleSwitch.addEventListener("click", event => handleSegmentClick(event, "role"));
   DOM.viewSwitch.addEventListener("click", event => handleSegmentClick(event, "view"));
   DOM.recordModeSwitch.addEventListener("click", event => handleSegmentClick(event, "recordMode"));
@@ -330,7 +330,9 @@ function normalizeStatus(status) {
 }
 
 function calculateFormSummary() {
-  const hours = calculateHours(DOM.recordStartTime.value, DOM.recordEndTime.value);
+  const startTime = state.recordMode === "planned" ? DOM.recordPlannedStartTime.value : DOM.recordStartTime.value;
+  const endTime = state.recordMode === "planned" ? DOM.recordPlannedEndTime.value : DOM.recordEndTime.value;
+  const hours = calculateHours(startTime, endTime);
   const amount = Math.round(hours * (parseFloat(DOM.recordRate.value) || 0));
   DOM.calcHours.textContent = `${formatHours(hours)} 小時`;
   DOM.calcAmount.textContent = `$ ${amount.toLocaleString()}`;
@@ -339,6 +341,11 @@ function calculateFormSummary() {
 
 async function handleAddRecord(event) {
   event.preventDefault();
+  if (state.recordMode === "planned") {
+    await handleTeacherPlannedRecords();
+    return;
+  }
+
   const calc = calculateFormSummary();
   const record = buildRecord({
     id: `tutor_${Date.now()}`,
@@ -376,6 +383,12 @@ async function handleAddRecord(event) {
     DOM.btnSubmitRecord.disabled = false;
     render();
   }
+}
+
+async function handleTeacherPlannedRecords() {
+  const records = buildTeacherPlannedRecords();
+  await addRecords(records, "已加入預排");
+  resetFormAfterAdd();
 }
 
 function resetFormAfterAdd() {
@@ -999,6 +1012,89 @@ function buildScheduleRecords({ startDate, untilDate, weekdays, startTime, endTi
   return records;
 }
 
+function buildTeacherPlannedRecords() {
+  const startDate = DOM.recordDate.value;
+  const repeat = document.getElementById("record-repeat").value;
+  const repeatUntil = document.getElementById("record-repeat-until").value || startDate;
+  const weekdays = [...document.querySelectorAll("input[name='record-repeat-weekday']:checked")].map(input => Number(input.value));
+  const startTime = DOM.recordPlannedStartTime.value;
+  const endTime = DOM.recordPlannedEndTime.value;
+  const hourlyRate = parseInt(DOM.recordRate.value, 10) || 0;
+  const hours = calculateHours(startTime, endTime);
+  const totalAmount = Math.round(hours * hourlyRate);
+  const base = {
+    student: DOM.recordStudent.value.trim(),
+    subject: DOM.recordSubject.value.trim(),
+    startTime,
+    endTime,
+    hours,
+    hourlyRate,
+    totalAmount,
+    status: "未付款",
+    focusRating: parseInt(DOM.recordFocus.value, 10) || 5,
+    attitudeRating: parseInt(DOM.recordAttitude.value, 10) || 5,
+    remarks: buildRecordRemark()
+  };
+
+  if (!startDate || !startTime || !endTime) return [];
+  if (repeat !== "none" && repeatUntil < startDate) {
+    showToast("重複到日期不能早於預排日期", "warning");
+    return [];
+  }
+
+  if (repeat === "none") {
+    return [buildRecord({ ...base, id: `schedule_${Date.now()}_0`, date: startDate })];
+  }
+
+  if (repeat === "weekly" || repeat === "biweekly") {
+    if (!weekdays.length) {
+      showToast("請至少選一個每週上課日", "warning");
+      return [];
+    }
+    return buildTeacherWeeklyRecords({ startDate, untilDate: repeatUntil, weekdays, intervalWeeks: repeat === "biweekly" ? 2 : 1, base });
+  }
+
+  if (repeat === "monthly") {
+    return buildTeacherMonthlyRecords({ startDate, untilDate: repeatUntil, base });
+  }
+
+  return [];
+}
+
+function buildTeacherWeeklyRecords({ startDate, untilDate, weekdays, intervalWeeks, base }) {
+  const records = [];
+  const start = parseDate(startDate);
+  const end = parseDate(untilDate);
+  for (const date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
+    if (!weekdays.includes(date.getDay())) continue;
+    const weeksFromStart = Math.floor((date - start) / (7 * 24 * 60 * 60 * 1000));
+    if (weeksFromStart % intervalWeeks !== 0) continue;
+    records.push(buildRecord({
+      ...base,
+      id: `schedule_${Date.now()}_${records.length}`,
+      date: formatDate(date)
+    }));
+  }
+  return records;
+}
+
+function buildTeacherMonthlyRecords({ startDate, untilDate, base }) {
+  const records = [];
+  const start = parseDate(startDate);
+  const end = parseDate(untilDate);
+  const targetDay = start.getDate();
+  for (const date = new Date(start); date <= end; date.setMonth(date.getMonth() + 1)) {
+    const monthDate = new Date(date.getFullYear(), date.getMonth(), targetDay);
+    if (monthDate.getMonth() !== date.getMonth() || monthDate < start || monthDate > end) continue;
+    records.push(buildRecord({
+      ...base,
+      id: `schedule_${Date.now()}_${records.length}`,
+      date: formatDate(monthDate)
+    }));
+  }
+  return records;
+}
+
 async function addRecords(records, successMessage) {
   if (!records.length) {
     showToast("這個日期範圍沒有符合的上課日", "warning");
@@ -1058,6 +1154,7 @@ function updateRecordModeUI() {
   DOM.schedulePanel.classList.toggle("is-hidden", !isPlanned);
   DOM.recordDateLabel.textContent = isPlanned ? "預排日期" : "上課日期";
   DOM.btnSubmitRecord.textContent = isPlanned ? "加入預排" : "新增當日紀錄";
+  calculateFormSummary();
 }
 
 function getRepeatLabel(value) {

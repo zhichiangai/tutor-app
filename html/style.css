@@ -520,8 +520,8 @@ p { color: var(--muted); line-height: 1.75; }
   background: rgba(47, 143, 157, 0.08);
 }
 .calendar-day.has-unpaid {
-  border-color: rgba(201, 140, 44, 0.42);
-  background: rgba(201, 140, 44, 0.1);
+  border-color: rgba(47, 143, 157, 0.44);
+  background: rgba(47, 143, 157, 0.1);
 }
 .calendar-day.has-parent-paid {
   border-color: rgba(185, 130, 47, 0.4);
@@ -546,7 +546,7 @@ p { color: var(--muted); line-height: 1.75; }
 .day-summary strong { color: var(--primary-deep); font-size: 0.96rem; }
 .calendar-day.has-parent-paid .day-summary strong { color: var(--parent-paid); }
 .calendar-day.has-received .day-summary strong { color: var(--received); }
-.calendar-day.has-unpaid .day-summary strong { color: var(--warning); }
+.calendar-day.has-unpaid .day-summary strong { color: var(--primary-deep); }
 .leave-mark {
   color: var(--leave);
   font-weight: 800;
