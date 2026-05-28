@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>家教時數帳本</title>
+  <meta name="description" content="家教老師與家長共同使用的時數、付款與月曆對帳工具。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="家教時數帳本首頁">
+        <span class="brand-mark">時</span>
+        <span>
+          <strong>家教時數帳本</strong>
+          <small>Hours, payments, calendar</small>
+        </span>
+      </a>
+
+      <div class="topbar-actions">
+        <div class="segmented" id="role-switch" role="tablist" aria-label="切換使用者視圖">
+          <button type="button" class="is-active" data-role="teacher" role="tab" aria-selected="true">老師</button>
+          <button type="button" data-role="parent" role="tab" aria-selected="false">家長</button>
+        </div>
+        <button type="button" id="settings-toggle" class="icon-button" title="系統設定" aria-label="系統設定">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13.5c.1-.5.1-1 .1-1.5s0-1-.1-1.5l2-1.5-2-3.4-2.4 1a8 8 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.6A8 8 0 0 0 7 6.6l-2.4-1-2 3.4 2 1.5c-.1.5-.1 1-.1 1.5s0 1 .1 1.5l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 2.6 1.5l.4 2.6h4l.4-2.6A8 8 0 0 0 17 17.4l2.4 1 2-3.4-2-1.5ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <section class="hero-panel">
+      <div>
+        <span id="mode-badge" class="eyebrow">本機模式</span>
+        <h1>兆吾兆廷的家教行事曆</h1>
+        <p id="mode-copy">目前資料儲存在這台瀏覽器。設定 Google Apps Script URL 後即可讓老師與家長用同一網址同步操作。</p>
+      </div>
+      <div class="hero-metrics">
+        <article>
+          <span>本月上課時數統計</span>
+          <strong id="stat-total-hours">0.0 小時</strong>
+        </article>
+        <article>
+          <span>已付款項</span>
+          <strong id="stat-paid-amount">$ 0</strong>
+        </article>
+        <article>
+          <span>尚未付款時數</span>
+          <strong id="stat-unpaid-hours">0.0 小時</strong>
+        </article>
+      </div>
+    </section>
+
+    <section id="settings-panel" class="section-panel settings-panel is-hidden">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">System Settings</span>
+          <h2>系統設定</h2>
+        </div>
+        <button type="button" id="close-settings" class="text-button">關閉</button>
+      </div>
+      <div class="settings-tabs segmented compact" role="tablist" aria-label="系統設定分類">
+        <button type="button" class="is-active" data-settings-tab="students">學生與課程</button>
+        <button type="button" data-settings-tab="display">顯示指標</button>
+      </div>
+
+      <div class="settings-dashboard">
+        <section class="settings-card">
+          <div class="settings-card-head">
+            <span class="eyebrow">Teacher Setup</span>
+            <h3>學生資料庫</h3>
+          </div>
+          <div class="settings-list" id="student-settings-list">
+            <article class="student-setting-row">
+              <label class="field">
+                <span>學生姓名</span>
+                <input id="setting-student-1" type="text" value="兆吾" autocomplete="off">
+              </label>
+              <label class="field">
+                <span>常用科目</span>
+                <input id="setting-subjects-1" type="text" value="數學、英文、理化" autocomplete="off">
+              </label>
+            </article>
+            <article class="student-setting-row">
+              <label class="field">
+                <span>學生姓名</span>
+                <input id="setting-student-2" type="text" value="兆廷" autocomplete="off">
+              </label>
+              <label class="field">
+                <span>常用科目</span>
+                <input id="setting-subjects-2" type="text" value="數學、英文、自然" autocomplete="off">
+              </label>
+            </article>
+          </div>
+          <button type="button" id="btn-add-student-setting" class="button button-secondary">新增學生</button>
+        </section>
+
+        <section class="settings-card">
+          <div class="settings-card-head">
+            <span class="eyebrow">Metric Layout</span>
+            <h3>首頁重點指標</h3>
+          </div>
+          <div class="setting-note">老師與家長各自最多選 3 個，後續會連動最上方標題區。</div>
+          <div class="metric-config-grid">
+            <fieldset class="option-group">
+              <legend>老師視角</legend>
+              <label><input type="checkbox" name="teacher-hero-metric" value="monthHours" checked> 本月學生已上課時數</label>
+              <label><input type="checkbox" name="teacher-hero-metric" value="earnedAmount" checked> 本月累計學費</label>
+              <label><input type="checkbox" name="teacher-hero-metric" value="remainingPlanned" checked> 本月預計未上時數</label>
+              <label><input type="checkbox" name="teacher-hero-metric" value="unpaidAmount"> 尚未確認付款金額</label>
+              <label><input type="checkbox" name="teacher-hero-metric" value="nextLesson"> 下一堂課時間</label>
+            </fieldset>
+            <fieldset class="option-group">
+              <legend>家長視角</legend>
+              <label><input type="checkbox" name="parent-hero-metric" value="monthHours" checked> 本月孩子已上課時數</label>
+              <label><input type="checkbox" name="parent-hero-metric" value="tuitionAmount" checked> 本月目前學費</label>
+              <label><input type="checkbox" name="parent-hero-metric" value="remainingPlanned" checked> 本月預計未上時數</label>
+              <label><input type="checkbox" name="parent-hero-metric" value="paidStatus"> 付款確認狀態</label>
+              <label><input type="checkbox" name="parent-hero-metric" value="leaveCount"> 本月請假次數</label>
+            </fieldset>
+          </div>
+        </section>
+
+        <section class="settings-card">
+          <div class="settings-card-head">
+            <span class="eyebrow">Calendar Insights</span>
+            <h3>月曆資訊圖層</h3>
+          </div>
+          <div class="setting-note">專業名稱：月曆資訊圖層。用來控制月曆格子裡要顯示哪些資料。</div>
+          <div class="metric-config-grid">
+            <fieldset class="option-group">
+              <legend>老師月曆</legend>
+              <label><input type="checkbox" name="teacher-calendar-layer" value="subject" checked> 科目</label>
+              <label><input type="checkbox" name="teacher-calendar-layer" value="student" checked> 學生姓名</label>
+              <label><input type="checkbox" name="teacher-calendar-layer" value="hours" checked> 時數</label>
+              <label><input type="checkbox" name="teacher-calendar-layer" value="amount"> 金額</label>
+              <label><input type="checkbox" name="teacher-calendar-layer" value="payment"> 付款狀態</label>
+            </fieldset>
+            <fieldset class="option-group">
+              <legend>家長月曆</legend>
+              <label><input type="checkbox" name="parent-calendar-layer" value="subject" checked> 科目</label>
+              <label><input type="checkbox" name="parent-calendar-layer" value="hours" checked> 時數</label>
+              <label><input type="checkbox" name="parent-calendar-layer" value="amount" checked> 學費</label>
+              <label><input type="checkbox" name="parent-calendar-layer" value="teacherNote"> 老師備註</label>
+              <label><input type="checkbox" name="parent-calendar-layer" value="payment"> 付款狀態</label>
+            </fieldset>
+          </div>
+        </section>
+
+      </div>
+      <div class="is-hidden" aria-hidden="true">
+        <input id="setting-gas-url" type="url" autocomplete="off">
+        <input id="setting-default-rate" type="number" min="0" step="1" value="500">
+        <button type="button" id="btn-save-settings">儲存系統設定</button>
+        <button type="button" id="btn-test-connection">測試雲端連線</button>
+      </div>
+    </section>
+
+    <main class="workspace">
+      <section id="teacher-panel" class="entry-layout">
+        <section class="section-panel entry-panel">
+          <div class="section-head">
+            <div>
+              <span class="eyebrow">Teacher</span>
+              <h2>新增上課</h2>
+            </div>
+          </div>
+          <div class="segmented mode-tabs" id="record-mode-switch" role="tablist" aria-label="切換新增模式">
+            <button type="button" class="is-active" data-record-mode="actual" role="tab" aria-selected="true">當日紀錄</button>
+            <button type="button" data-record-mode="planned" role="tab" aria-selected="false">預排</button>
+          </div>
+          <form id="record-form" class="record-form">
+            <label class="field">
+              <span>學生</span>
+              <select id="record-student" required>
+                <option value="兆吾">兆吾</option>
+                <option value="兆廷">兆廷</option>
+                <option value="兆吾、兆廷">兆吾、兆廷</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>科目</span>
+              <select id="record-subject" required>
+                <option value="數學">數學</option>
+                <option value="英文">英文</option>
+                <option value="理化">理化</option>
+                <option value="國文">國文</option>
+                <option value="社會">社會</option>
+                <option value="自然">自然</option>
+                <option value="複習">複習</option>
+              </select>
+            </label>
+            <label class="field">
+              <span id="record-date-label">上課日期</span>
+              <input id="record-date" type="date" required>
+            </label>
+            <label class="field">
+              <span>當次時薪</span>
+              <input id="record-rate" type="number" min="0" step="1" required>
+            </label>
+            <label class="field">
+              <span>開始時間</span>
+              <input id="record-start-time" type="time" required>
+            </label>
+            <label class="field">
+              <span>結束時間</span>
+              <input id="record-end-time" type="time" required>
+            </label>
+            <label class="field">
+              <span>專注度</span>
+              <select id="record-focus">
+                <option value="5">★★★★★</option>
+                <option value="4">★★★★</option>
+                <option value="3">★★★</option>
+                <option value="2">★★</option>
+                <option value="1">★</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>學習態度</span>
+              <select id="record-attitude">
+                <option value="5">★★★★★</option>
+                <option value="4">★★★★</option>
+                <option value="3">★★★</option>
+                <option value="2">★★</option>
+                <option value="1">★</option>
+              </select>
+            </label>
+            <div class="calc-strip">
+              <span id="calc-hours">0 小時</span>
+              <strong id="calc-amount">$ 0</strong>
+            </div>
+            <label class="field wide">
+              <span>老師備註</span>
+              <textarea id="record-remarks" rows="3" placeholder="上課進度、作業、預排提醒"></textarea>
+            </label>
+            <div class="schedule-panel wide is-hidden" id="schedule-panel">
+              <div class="schedule-head">
+                <strong>預排設定</strong>
+                <span>像行事曆一樣設定固定上課規則。</span>
+              </div>
+              <div class="schedule-controls">
+                <label class="mini-field">
+                  <span>重複頻率</span>
+                  <select id="record-repeat">
+                    <option value="none">不重複</option>
+                    <option value="weekly">每週</option>
+                    <option value="biweekly">每兩週</option>
+                    <option value="monthly">每月</option>
+                  </select>
+                </label>
+                <label class="mini-field">
+                  <span>重複到</span>
+                  <input id="record-repeat-until" type="date">
+                </label>
+              </div>
+              <fieldset class="repeat-weekdays">
+                <legend>每週上課日</legend>
+                <label><input type="checkbox" name="record-repeat-weekday" value="1"> 一</label>
+                <label><input type="checkbox" name="record-repeat-weekday" value="2"> 二</label>
+                <label><input type="checkbox" name="record-repeat-weekday" value="3"> 三</label>
+                <label><input type="checkbox" name="record-repeat-weekday" value="4"> 四</label>
+                <label><input type="checkbox" name="record-repeat-weekday" value="5"> 五</label>
+                <label><input type="checkbox" name="record-repeat-weekday" value="6"> 六</label>
+                <label><input type="checkbox" name="record-repeat-weekday" value="0"> 日</label>
+              </fieldset>
+              <div class="schedule-time-block">
+                <div>
+                  <strong>預設上課時間</strong>
+                  <span>套用到上方選取的每一個上課日。</span>
+                </div>
+                <div class="schedule-time-controls">
+                  <label class="mini-field">
+                    <span>開始時間</span>
+                    <input id="record-planned-start-time" type="time" value="15:00">
+                  </label>
+                  <label class="mini-field">
+                    <span>結束時間</span>
+                    <input id="record-planned-end-time" type="time" value="17:00">
+                  </label>
+                </div>
+              </div>
+              <p class="schedule-example">範例：每週一、三 15:00-17:00，重複到 2026-08-31。</p>
+            </div>
+            <button type="submit" id="btn-submit-record" class="button button-primary wide">新增當日紀錄</button>
+          </form>
+        </section>
+        <section class="section-panel entry-panel">
+          <h3>請假日期</h3>
+          <p class="panel-hint">之後會改成直接在月曆按一下日期標記請假，再按一下同一天取消。</p>
+          <form id="teacher-leave-form" class="leave-form">
+            <input id="teacher-leave-start" type="hidden" value="00:00">
+            <input id="teacher-leave-end" type="hidden" value="23:59">
+            <label class="field">
+              <span>請假類型</span>
+              <select id="teacher-leave-source">
+                <option value="student">學生請假</option>
+                <option value="teacher">老師請假</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>開始日期</span>
+              <input id="teacher-leave-date" type="date" required>
+            </label>
+            <label class="field">
+              <span>結束日期</span>
+              <input id="teacher-leave-end-date" type="date" required>
+            </label>
+            <label class="field wide">
+              <span>原因</span>
+              <textarea id="teacher-leave-note" rows="2" placeholder="例如：學生請假、老師有事、改約其他日期"></textarea>
+            </label>
+            <button type="submit" class="button button-secondary wide">加入請假日期</button>
+          </form>
+          <div class="receive-summary">
+            <h3>收到款項確認</h3>
+            <div id="teacher-receive-list" class="parent-unpaid-list"></div>
+          </div>
+        </section>
+      </section>
+
+      <section id="parent-panel" class="entry-layout is-hidden">
+        <section class="section-panel entry-panel">
+          <div class="section-head">
+            <div>
+              <span class="eyebrow">Parent</span>
+              <h2>款項確認</h2>
+            </div>
+          </div>
+          <form id="parent-payment-form" class="payment-range-form">
+            <label class="field">
+              <span>開始日期</span>
+              <input id="parent-payment-start" type="date" required>
+            </label>
+            <label class="field">
+              <span>結束日期</span>
+              <input id="parent-payment-end" type="date" required>
+            </label>
+            <label class="field">
+              <span>付款日期</span>
+              <input id="parent-payment-date" type="date" required>
+            </label>
+            <label class="field wide">
+              <span>家長備註</span>
+              <textarea id="parent-payment-note" rows="3" placeholder="例如：已轉帳、末五碼、付款說明"></textarea>
+            </label>
+            <div class="calc-strip">
+              <span id="parent-payment-summary">0 小時</span>
+              <strong id="parent-payment-amount">$ 0</strong>
+            </div>
+            <button type="submit" class="button button-primary wide">確認區間金額付款</button>
+          </form>
+          <div class="unpaid-summary">
+            <h3>尚未確認付款</h3>
+            <div id="parent-unpaid-list" class="parent-unpaid-list"></div>
+          </div>
+        </section>
+        <section class="section-panel entry-panel">
+          <h3>請假日期</h3>
+          <p class="panel-hint">之後會改成直接在月曆按一下日期標記請假，再按一下同一天取消。</p>
+          <form id="parent-leave-form" class="leave-form">
+            <input id="parent-leave-start" type="hidden" value="00:00">
+            <input id="parent-leave-end" type="hidden" value="23:59">
+            <label class="field">
+              <span>開始日期</span>
+              <input id="parent-leave-date" type="date" required>
+            </label>
+            <label class="field">
+              <span>結束日期</span>
+              <input id="parent-leave-end-date" type="date" required>
+            </label>
+            <label class="field wide">
+              <span>原因</span>
+              <textarea id="parent-leave-note" rows="2" placeholder="例如：請假、補課另約、當天不能上課"></textarea>
+            </label>
+            <button type="submit" class="button button-secondary wide">加入請假日期</button>
+          </form>
+          <div class="parent-schedule-card">
+            <div class="schedule-head">
+              <strong>預排上課時間</strong>
+              <span>家長可先提出固定上課時段，後續會顯示在月曆。</span>
+            </div>
+            <form id="parent-schedule-form" class="parent-schedule-form">
+              <div class="schedule-controls">
+                <label class="mini-field">
+                  <span>開始日期</span>
+                  <input id="parent-schedule-start-date" type="date" required>
+                </label>
+                <label class="mini-field">
+                  <span>重複到</span>
+                  <input id="parent-schedule-until" type="date" required>
+                </label>
+              </div>
+              <fieldset class="repeat-weekdays">
+                <legend>每週上課日</legend>
+                <label><input type="checkbox" name="parent-schedule-weekday" value="1"> 一</label>
+                <label><input type="checkbox" name="parent-schedule-weekday" value="2"> 二</label>
+                <label><input type="checkbox" name="parent-schedule-weekday" value="3"> 三</label>
+                <label><input type="checkbox" name="parent-schedule-weekday" value="4"> 四</label>
+                <label><input type="checkbox" name="parent-schedule-weekday" value="5"> 五</label>
+                <label><input type="checkbox" name="parent-schedule-weekday" value="6"> 六</label>
+                <label><input type="checkbox" name="parent-schedule-weekday" value="0"> 日</label>
+              </fieldset>
+              <div class="schedule-time-block">
+                <div>
+                  <strong>預設上課時間</strong>
+                  <span>套用到上方選取的每一個上課日。</span>
+                </div>
+                <div class="schedule-time-controls">
+                  <label class="mini-field">
+                    <span>開始時間</span>
+                    <input id="parent-schedule-start-time" type="time" value="15:00" required>
+                  </label>
+                  <label class="mini-field">
+                    <span>結束時間</span>
+                    <input id="parent-schedule-end-time" type="time" value="17:00" required>
+                  </label>
+                </div>
+              </div>
+              <button type="submit" class="button button-primary wide">加入預排上課</button>
+            </form>
+          </div>
+        </section>
+      </section>
+
+      <section class="section-panel data-panel">
+        <div class="section-head">
+          <div>
+            <span id="record-count" class="eyebrow">0 筆紀錄</span>
+            <h2 id="data-title">月曆總覽</h2>
+          </div>
+          <div class="data-actions">
+            <div class="segmented compact" id="view-switch" role="tablist" aria-label="切換資料視圖">
+              <button type="button" class="is-active" data-view="calendar">日曆</button>
+              <button type="button" data-view="list">列表</button>
+            </div>
+            <div class="month-nav">
+              <button type="button" id="prev-month" class="icon-button" aria-label="上一月">‹</button>
+              <strong id="calendar-title">本月</strong>
+              <button type="button" id="next-month" class="icon-button" aria-label="下一月">›</button>
+            </div>
+          </div>
+        </div>
+        <div class="calendar-legend" aria-label="月曆顏色說明">
+          <span><i class="legend-dot lesson"></i>上課</span>
+          <span><i class="legend-dot unpaid"></i>尚未付款</span>
+          <span><i class="legend-dot parent-paid"></i>家長已付款</span>
+          <span><i class="legend-dot received"></i>老師已收到</span>
+          <span><i class="legend-dot leave"></i>× 請假</span>
+        </div>
+
+        <div id="loading-spinner" class="loading is-hidden">正在載入資料...</div>
+        <div id="empty-state" class="empty-state is-hidden">目前沒有符合條件的上課紀錄。</div>
+
+        <div id="calendar-view" class="calendar-view">
+          <div class="calendar-weekdays">
+            <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+          </div>
+          <div id="calendar-grid" class="calendar-grid"></div>
+          <div id="day-panel" class="day-panel is-hidden" aria-labelledby="day-panel-title">
+            <div class="day-panel-head">
+              <div>
+                <span class="eyebrow">Daily Schedule</span>
+                <h3 id="day-panel-title">日期行程面板</h3>
+              </div>
+              <button type="button" id="close-day-panel" class="text-button">收起</button>
+            </div>
+            <input id="day-panel-date" type="hidden">
+            <div class="day-panel-date" id="day-panel-date-label">YYYY-MM-DD</div>
+            <div id="day-panel-records" class="day-panel-records"></div>
+            <div class="day-action-grid">
+              <section class="day-action-card">
+                <h3>請假</h3>
+                <p>點選後會在這一天標記請假；如果已請假，可一鍵取消。</p>
+                <div class="button-row">
+                  <button type="button" id="btn-day-add-leave" class="button button-secondary">加入請假</button>
+                  <button type="button" id="btn-day-remove-leave" class="button button-secondary">取消請假</button>
+                </div>
+              </section>
+              <section class="day-action-card">
+                <h3>預約上課</h3>
+                <p>不選學生與科目，只快速放入當天上課時段。</p>
+                <div class="schedule-time-controls">
+                  <label class="mini-field">
+                    <span>開始時間</span>
+                    <input id="day-lesson-start-time" type="time" value="15:00">
+                  </label>
+                  <label class="mini-field">
+                    <span>結束時間</span>
+                    <input id="day-lesson-end-time" type="time" value="17:00">
+                  </label>
+                </div>
+                <button type="button" id="btn-day-add-lesson" class="button button-primary wide">加入上課</button>
+              </section>
+            </div>
+          </div>
+        </div>
+        <div id="list-view" class="list-view is-hidden">
+          <div id="record-list" class="record-list"></div>
+        </div>
+
+      </section>
+    </main>
+  </div>
+
+  <div id="payment-modal" class="modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="payment-modal-title">
+    <div class="modal-card">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">Parent note</span>
+          <h2 id="payment-modal-title">付款資訊</h2>
+        </div>
+        <button type="button" id="close-payment-modal" class="text-button">關閉</button>
+      </div>
+      <form id="payment-form" class="payment-form">
+        <input id="payment-record-id" type="hidden">
+        <label class="field">
+          <span>付款日期</span>
+          <input id="payment-date" type="date">
+        </label>
+        <label class="field">
+          <span>家長付款備註</span>
+          <textarea id="payment-note" rows="4" placeholder="例如：已轉帳末五碼、下次補課時間"></textarea>
+        </label>
+        <button type="submit" class="button button-primary">儲存付款資訊</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
