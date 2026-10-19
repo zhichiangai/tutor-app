@@ -348,33 +348,6 @@ async function reviewRequest(id,approve){
  });
  if(ok)toast(approve?"已同意申請":"已婉拒申請");
 }
-async function batchBilling(){
- const ls=monthLessons().filter(l=>l.type==="lesson");
- const selected=state.role==="teacher"?ls.filter(l=>l.status==="家長已付款"):ls.filter(l=>l.status==="未付款"&&!state.requests.some(r=>r.lesson_id===l.id&&r.kind==="payment"&&r.status==="pending"));
- if(!selected.length){toast("目前沒有需要批次處理的課程");return}
- if(state.role==="parent"&&selected.some(l=>!visibleStudents().some(s=>s.id===l.student_id))){toast("你沒有這些課程的存取權限");return}
- const amount=lessonSum(selected);
- const msg=state.role==="parent"?"確認你已支付這 "+selected.length+" 堂課，共 "+money(amount)+"？送出後仍需老師核對。":"確認銀行帳款已入帳，將這 "+selected.length+" 堂課（共 "+money(amount)+"）標記為老師已收到？";
- if(!confirm(msg))return;
- const ok=await persist(async()=>{
-  if(state.role==="teacher"){
-   if(state.mode==="demo")selected.forEach(l=>Object.assign(l,{status:"老師已收到",received_date:dateKey(tick())}));
-   else {
-    const result=await client.from("lesson_records").update({status:"老師已收到",received_date:dateKey(tick())}).in("id",selected.map(l=>l.id)).select("id");
-    const changed=assertResult(result)||[];
-    if(changed.length!==selected.length)throw Error("未能更新全部款項，請重新整理確認");
-   }
-  }else{
-   const rows=selected.map(l=>({lesson_id:l.id,student_id:l.student_id,teacher_id:l.owner_id,parent_id:activeUser?.id||"demo-parent",kind:"payment",note:"本月批次回報付款",status:"pending"}));
-   if(state.mode==="demo")state.requests.push(...rows.map(row=>({...row,id:uid(),created_at:new Date().toISOString()})));
-   else assertResult(await client.from("family_requests").insert(rows));
-  }
- });
- if(ok)toast(state.role==="teacher"?"已完成批次收款確認":"已送出批次付款回報");
-}
-
-
-
 function paymentBatchStatus(batch){return batch.status==="confirmed"?"老師已確認收款":batch.status==="declined"?"已退回":"等待老師確認"}
 function batchLessons(batch){
  return state.paymentBatchItems.filter(i=>i.batch_id===batch.id).map(i=>({item:i,lesson:state.lessons.find(l=>l.id===i.lesson_id)}));
