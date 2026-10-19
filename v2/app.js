@@ -1,5 +1,5 @@
 
-/* 好好上課 V2 · GitHub Pages + Supabase (live) / browser-only (preview).
+/* 好好上課 V3 · GitHub Pages/Vercel + Supabase (live) / browser-only (preview).
  * Only the public Supabase URL/publishable key appear here. Never store service_role keys.
  */
 import { expandSchedules, isVirtualOccurrence, findTimeConflicts, originalOccurrenceDate, matchesRecurrence } from "./scheduling.js";
@@ -146,8 +146,12 @@ function render(){
  $("#connection-status").classList.toggle("live",state.mode==="live"&&!!activeUser);
  $("#connection-status").innerHTML=state.mode==="demo"?"<i></i> 體驗模式":activeUser?"<i></i> 已安全連線":"<i></i> 尚未登入";
  $("#account-label").textContent=activeUser?.email?activeUser.email.split("@")[0]:"預覽使用者";
- $("#account-subtitle").textContent=state.mode==="demo"?"體驗模式":activeUser?.email||"尚未登入";
+ $("#account-subtitle").textContent=state.mode==="demo"?"體驗模式":
+  !activeUser?"尚未登入":state.role==="teacher"?
+    (myWorkspace()?.name||"尚未建立工作空間"):
+    ("家長 · "+new Set(state.guardians.filter(g=>g.guardian_id===activeUser.id).map(g=>g.teacher_id)).size+" 位授權老師");
  $("#avatar").textContent=activeUser?.email?.charAt(0).toUpperCase()||"好";
+ $("#account-current").textContent=activeUser?.email||"尚未使用 Google 登入";
  $("#role-teacher").classList.toggle("active",teacher);
  $("#role-parent").classList.toggle("active",!teacher);
  renderWorkspaceUI();
@@ -580,14 +584,28 @@ function visiblePaymentBatches(){
 function renderPaymentHistory(){
  $("#payment-batch-history").innerHTML=paymentHistoryHTML(visiblePaymentBatches());
 }
+function periodPreferenceKey(){
+ return "tutor_v3_period_"+(state.mode==="live"?activeUser?.id||"guest":"demo")+"_"+state.role;
+}
+function getPeriodPreference(){
+ try{const p=JSON.parse(localStorage.getItem(periodPreferenceKey())||"{}");
+  return p&&typeof p==="object"?p:{};}catch{return {}}
+}
+function rememberPeriodPreference(){
+ const p={studentId:$("#period-student").value,start:$("#period-start").value,end:$("#period-end").value};
+ if(!visibleStudents().some(x=>x.id===p.studentId)||!p.start||!p.end||p.start>p.end)return;
+ try{localStorage.setItem(periodPreferenceKey(),JSON.stringify(p))}catch{}
+}
 function openPeriodModal(studentId=null,start=null,end=null){
  const st=visibleStudents();if(!st.length){toast("目前沒有可結算的學生，請先完成學生與家長授權");return}
  $("#period-heading").textContent=state.role==="parent"?"回報指定期間已付款":"查詢指定期間收款";
  $("#period-help").textContent=state.role==="parent"?"選好學生與上課日期後，系統自動計算已完成且尚未結清的課程。":"選擇學生與日期，查看期間內的家長付款回報及收款狀態。";
+ const last=getPeriodPreference();
  $("#period-student").innerHTML=st.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join("");
- $("#period-student").value=studentId&&st.some(x=>x.id===studentId)?studentId:st[0].id;
- $("#period-start").value=start||dateKey(new Date(state.month.getFullYear(),state.month.getMonth(),1));
- $("#period-end").value=end||dateKey(new Date(state.month.getFullYear(),state.month.getMonth()+1,0));
+ $("#period-student").value=(studentId&&st.some(x=>x.id===studentId)?studentId:
+  (st.some(x=>x.id===last.studentId)?last.studentId:st[0].id));
+ $("#period-start").value=start||last.start||dateKey(new Date(state.month.getFullYear(),state.month.getMonth(),1));
+ $("#period-end").value=end||last.end||dateKey(new Date(state.month.getFullYear(),state.month.getMonth()+1,0));
  $("#period-paid-on").value=dateKey(tick());
  $("#period-paid-on").max=dateKey(tick());
  $("#period-note").value="";
@@ -616,6 +634,7 @@ function renderPeriodPreview(resetAmount=false){
   $("#period-overview").textContent=r.message;$("#period-lesson-list").innerHTML="";
   $("#period-submit").disabled=parent;return;
  }
+ rememberPeriodPreference();
  if(parent){
   const hours=r.rows.reduce((n,x)=>n+num(x.lesson.hours),0);
   $("#period-overview").innerHTML='<strong>'+money(r.total)+'</strong><div class="period-summary-metrics"><span>'+r.rows.length+' 堂可結算</span><span>'+hours.toFixed(1)+' 小時</span><span>'+esc(r.start)+' ～ '+esc(r.end)+'</span></div>';
