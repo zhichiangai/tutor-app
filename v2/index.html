@@ -46,9 +46,9 @@
           </div>
         </section>
         <section id="view-calendar" class="page-view hidden">
-          <div class="section-row page-head"><div><h2>課程月曆</h2><p class="section-sub">每個值得期待的日子，都在這裡</p></div><div class="month-controls"><button id="prev-month" aria-label="上個月">‹</button><strong id="calendar-month"></strong><button id="next-month" aria-label="下個月">›</button><button class="today-button" id="jump-today">今天</button></div></div>
+          <div class="section-row page-head"><div><h2>課程月曆</h2><p class="section-sub">每個值得期待的日子，都在這裡</p></div><div class="month-controls"><button id="manage-schedules" class="secondary-button" type="button">☷ 固定課表</button><button id="prev-month" aria-label="上個月">‹</button><strong id="calendar-month"></strong><button id="next-month" aria-label="下個月">›</button><button class="today-button" id="jump-today">今天</button></div></div>
           <div class="calendar-board"><div class="weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div><div class="calendar-grid" id="calendar-grid"></div></div>
-          <div class="card agenda-card"><div class="section-row"><h2 id="selected-date-title">當日課程</h2><button class="text-link" id="agenda-add">＋ 安排課程</button></div><div id="agenda-list"></div></div>
+          <div class="card agenda-card"><div class="section-row"><div><h2 id="selected-date-title">當日課程</h2><p class="section-sub">點選月曆任一天，可管理當日安排</p></div><button class="text-link" id="agenda-add">＋ 安排課程</button></div><div id="agenda-list"></div></div>
         </section>
         <section id="view-billing" class="page-view hidden">
           <div class="section-row page-head"><div><h2 id="billing-title">收付款整理</h2><p class="section-sub">清楚對帳，不再一筆一筆慢慢算</p></div><div class="month-controls"><button id="billing-prev" aria-label="上個月">‹</button><strong id="billing-month"></strong><button id="billing-next" aria-label="下個月">›</button></div></div>
@@ -66,6 +66,41 @@
     </main>
     <nav class="mobile-nav" aria-label="手機導覽"><button data-view="home" class="active"><span>⌂</span>今天</button><button data-view="calendar"><span>▦</span>月曆</button><button data-view="billing"><span>◈</span>帳務</button><button data-view="students"><span>♧</span>學生</button></nav>
   </div>
+
+
+  <dialog class="modal schedule-sheet" id="day-modal">
+    <div class="modal-inner">
+      <div class="modal-head"><div><p class="eyebrow">DAY PLANNER · 當日安排</p><h2 id="day-modal-title">當日課程</h2><p class="modal-description" id="day-modal-subtitle">選擇一堂課，快速記錄與調整。</p></div><button type="button" class="close-modal" data-close="day-modal" aria-label="關閉">×</button></div>
+      <div id="day-modal-lessons"></div>
+      <div class="day-shortcuts"><button id="day-add-lesson" class="secondary-button" type="button">＋ 單次加課</button><button id="day-add-rule" class="secondary-button" type="button">↻ 新增固定課表</button></div>
+      <p class="helper-note">沒有安排課程的日期保持空白；只有原本排定的課程才需要標記請假或停課。</p>
+    </div>
+  </dialog>
+  <dialog class="modal schedule-sheet" id="schedule-modal">
+    <form class="modal-inner" id="schedule-form">
+      <div class="modal-head"><div><p class="eyebrow">RECURRING LESSONS</p><h2 id="schedule-form-title">設定每週固定課表</h2><p class="modal-description">只設定一次，就能自動出現在未來月曆。</p></div><button type="button" class="close-modal" data-close="schedule-modal" aria-label="關閉">×</button></div>
+      <div id="schedule-rules-list"></div>
+      <label>學生<select id="schedule-student" required></select></label>
+      <label>上課科目<input id="schedule-subject" maxlength="80" required placeholder="例如：數學"></label>
+      <div><span class="form-label">每週上課日（可複選）</span><div class="weekday-selector" id="schedule-weekdays">
+        <label><input type="checkbox" value="1"><span>一</span></label><label><input type="checkbox" value="2"><span>二</span></label><label><input type="checkbox" value="3"><span>三</span></label><label><input type="checkbox" value="4"><span>四</span></label><label><input type="checkbox" value="5"><span>五</span></label><label><input type="checkbox" value="6"><span>六</span></label><label><input type="checkbox" value="7"><span>日</span></label>
+      </div></div>
+      <div class="form-row"><label>排課頻率<select id="schedule-frequency"><option value="1">每週</option><option value="2">每兩週</option></select></label><label>開始日期<input id="schedule-start" type="date" required></label></div>
+      <div class="form-row"><label>上課時間<input type="time" id="schedule-time-start" value="19:00" required></label><label>結束時間<input type="time" id="schedule-time-end" value="20:30" required></label></div>
+      <div class="form-row"><label>鐘點費（NT$／小時）<input id="schedule-rate" type="number" min="0" step="1" value="500" required></label><label>結束日期（可空白）<input id="schedule-end-date" type="date"></label></div>
+      <div id="schedule-scope" class="scope-choice hidden"><strong>修改固定課表的範圍</strong><label><input type="radio" name="schedule-scope" value="future" checked> 自指定日期起變更（保留過去課程）</label><label><input type="radio" name="schedule-scope" value="all"> 修改這組固定規則（已完成紀錄不變）</label></div>
+      <div class="form-actions"><button type="button" class="secondary-button" data-close="schedule-modal">取消</button><button type="submit" class="primary-button" id="schedule-save">儲存固定課表</button></div>
+    </form>
+  </dialog>
+  <dialog class="modal schedule-sheet" id="change-modal">
+    <form class="modal-inner" id="change-form">
+      <div class="modal-head"><div><p class="eyebrow">CHANGE THIS LESSON</p><h2 id="change-title">調整單堂課</h2><p class="modal-description" id="change-description">只會影響選取的這堂課，不會改動其他固定課程。</p></div><button type="button" class="close-modal" data-close="change-modal" aria-label="關閉">×</button></div>
+      <label>調整方式<select id="change-action"><option value="reschedule">改期／補課</option><option value="student_leave">學生請假</option><option value="teacher_leave">老師停課</option></select></label>
+      <div id="change-date-area"><label>新的上課日期<input id="change-new-date" type="date" required></label></div>
+      <label>備註（選填）<textarea id="change-note" rows="2" placeholder="例如：考試改期、臨時補課"></textarea></label>
+      <div class="form-actions"><button class="secondary-button" type="button" data-close="change-modal">取消</button><button class="primary-button" type="submit">確認調整</button></div>
+    </form>
+  </dialog>
 
   <dialog class="modal" id="record-modal"><form id="record-form" class="modal-inner"><div class="modal-head"><div><p class="eyebrow">LESSON DETAILS</p><h2 id="record-modal-title">新增一堂課</h2></div><button type="button" class="close-modal" data-close="record-modal" aria-label="關閉">×</button></div>
     <label>學生<select name="student_id" id="record-student" required></select></label>

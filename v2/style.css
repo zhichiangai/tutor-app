@@ -3,3 +3,55 @@
 @media(max-width:900px){.sidebar{display:none}.topbar{height:65px;padding:0 22px}.content-wrap{padding:29px 20px 90px}.home-grid{grid-template-columns:minmax(0,1fr) minmax(250px,.84fr)}.greeting h1{font-size:28px}.mobile-nav{display:flex;position:fixed;z-index:25;bottom:0;left:0;right:0;height:calc(65px + env(safe-area-inset-bottom));padding:6px 12px env(safe-area-inset-bottom);background:#fffcf9f7;border-top:1px solid #e9e5df;box-shadow:0 -4px 23px #38302809;justify-content:space-around;backdrop-filter:blur(16px)}.mobile-nav button{flex:1;border:0;background:transparent;color:#aaa59d;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;gap:3px}.mobile-nav button span{font-size:25px;line-height:1}.mobile-nav button.active{color:var(--rose);font-weight:700}.toast{bottom:90px}}
 @media(max-width:650px){.topbar{height:58px;padding:0 16px}.breadcrumb{font-size:11px}.top-actions{gap:8px}.status-pill{font-size:10px;padding:7px 9px}.round-icon{height:32px;width:32px}.content-wrap{padding:26px 15px 100px}.greeting{align-items:flex-end;margin-bottom:24px}.greeting h1{font-size:27px}.greeting p:not(.eyebrow){font-size:11px;max-width:270px}.greeting .eyebrow{font-size:9px}.greeting .primary-button{padding:10px 12px;font-size:0;border-radius:50%;height:42px;width:42px;box-shadow:0 7px 20px #e36e6050}.greeting .primary-button span{font-size:23px}.demo-banner{align-items:flex-start;line-height:1.55;flex-wrap:wrap;font-size:11px}.demo-banner button{margin-left:23px}.metrics-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin-bottom:13px}.metric-card{min-height:121px;padding:16px}.metric-card:nth-child(3){grid-column:1/-1;min-height:95px}.metric-card .metric-icon{top:14px;right:13px;font-size:14px;width:29px;height:29px}.metric-card .metric-label{font-size:10px}.metric-value{font-size:25px;margin-top:17px}.metric-card:nth-child(3) .metric-value{margin-top:5px}.metric-footer{font-size:10px}.home-grid{grid-template-columns:1fr;gap:13px}.column-stack{gap:13px}.card{padding:20px 17px;border-radius:16px}.next-card{min-height:196px}.next-heading{font-size:22px}.calendar-mini{min-height:unset}.money-card{min-height:175px}.page-head{align-items:flex-start;flex-direction:column;gap:18px}.page-head h2{font-size:23px}.month-controls{align-self:stretch;justify-content:space-between}.calendar-cell{min-height:62px;padding:5px 2px}.calendar-event{display:none}.calendar-cell .day-number{font-size:11px;width:25px;height:25px;margin:auto}.calendar-cell.has-events:after{content:"";display:block;width:4px;height:4px;border-radius:50%;background:var(--rose);margin:4px auto}.calendar-grid .calendar-cell.selected{border-radius:5px}.weekdays span{padding:11px 0}.billing-summary{grid-template-columns:repeat(2,1fr);gap:10px}.billing-summary .metric-card:nth-child(3){grid-column:1/-1}.student-grid{grid-template-columns:1fr;gap:10px}.student-card{padding:18px}.invite-form{grid-template-columns:1fr;gap:13px}.lesson-row,.bill-row,.request-row{gap:9px}.lesson-amount{font-size:12px}.site-footer{flex-direction:column;text-align:center;gap:5px;margin-top:28px}.form-row{grid-template-columns:1fr 1fr;gap:9px}.modal-inner{padding:22px 19px}.modal-head h2{font-size:21px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+/* V2.1: calm, accessible day management and recurring timetable */
+#manage-schedules{white-space:nowrap;min-height:34px;padding:8px 11px}
+.schedule-sheet{max-width:600px}
+.schedule-sheet .modal-inner{gap:17px}
+.schedule-sheet .modal-head h2{font-size:22px}
+.schedule-sheet .lesson-row{flex-wrap:wrap;align-items:flex-start}
+.schedule-sheet .row-actions{flex-wrap:wrap;justify-content:flex-start;width:100%;padding-left:18px}
+.schedule-sheet .row-actions .mini-action{min-height:37px;font-size:12px;padding:9px 12px}
+.schedule-sheet .row-actions .pill{align-self:center}
+.schedule-sheet #day-modal-lessons{max-height:46vh;overflow:auto;overscroll-behavior:contain}
+.day-shortcuts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.day-shortcuts .secondary-button{min-height:43px;font-size:12px}
+.helper-note{margin:2px 0 0;font-size:11px;color:#9c9388;line-height:1.85;background:#fdfaf6;padding:12px;border-radius:10px}
+.form-label{display:block;font-size:12px;font-weight:700;color:#79746d;margin-bottom:11px}
+.weekday-selector{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+.weekday-selector label{position:relative;display:block;cursor:pointer}
+.weekday-selector input{position:absolute;width:1px!important;height:1px!important;opacity:0;pointer-events:none}
+.weekday-selector span{display:grid;place-items:center;min-height:41px;background:#faf7f2;border:1px solid #eee8e2;border-radius:11px;font-weight:700;font-size:12px;color:#92867c;transition:background .16s,border-color .16s}
+.weekday-selector input:checked+span{background:#fbeae4;color:#b95143;border-color:#e6ad9f}
+.weekday-selector input:focus-visible+span{outline:3px solid #e8a195;outline-offset:2px}
+.scope-choice{border-radius:12px;padding:15px;background:#fbf6ef;display:flex;flex-direction:column;gap:12px}
+.scope-choice strong{font-size:12px}
+.scope-choice label{display:flex;flex-direction:row;align-items:flex-start;gap:9px;line-height:1.5;font-size:12px}
+.scope-choice input{width:auto!important;min-height:0!important;margin-top:2px}
+.schedule-rules-title{font-size:10px;letter-spacing:.1em;color:#a29a90;font-weight:700;margin-bottom:8px}
+#schedule-rules-list:not(.hidden){border-bottom:1px solid var(--border);padding:0 0 14px;max-height:170px;overflow:auto}
+.schedule-rule-row{display:flex;gap:9px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #f3efea;padding:10px 0}
+.schedule-rule-row:last-child{border-bottom:0}
+.schedule-rule-row div{flex:1;min-width:145px}
+.schedule-rule-row strong{font-size:11px;display:block;line-height:1.65}
+.schedule-rule-row small{font-size:10px;color:#aaa49d;display:block;margin-top:4px}
+.schedule-rule-row .mini-action{font-size:11px}
+.repeat-marker{font-size:15px;color:var(--sage);margin:0 2px}
+.calendar-cell{cursor:pointer}
+.calendar-cell:focus-visible{outline:3px solid #e8a195;outline-offset:-3px}
+#day-modal .modal-description{margin-top:8px}
+@media(max-width:650px){
+ .page-head .month-controls{display:flex;flex-wrap:wrap;justify-content:flex-end;width:100%;gap:6px}
+ .page-head #manage-schedules{margin-right:auto;flex:1;max-width:160px}
+ .schedule-sheet{position:fixed;top:auto;bottom:0;margin:0 auto;width:100%;max-width:100%;max-height:91dvh;border-radius:22px 22px 0 0}
+ .schedule-sheet .modal-inner{padding:24px 18px calc(24px + env(safe-area-inset-bottom))}
+ .schedule-sheet .row-actions{padding-left:0}
+ .schedule-sheet .lesson-row{padding:17px 0}
+ .schedule-sheet .mini-action{min-height:42px}
+ .weekday-selector{gap:5px}
+ .weekday-selector span{min-height:43px}
+ .day-shortcuts{gap:8px}
+ .day-shortcuts button{font-size:11px;padding:11px 7px}
+ #schedule-rules-list:not(.hidden){max-height:110px}
+}
+@media(prefers-reduced-motion:reduce){.weekday-selector span{transition:none}}
