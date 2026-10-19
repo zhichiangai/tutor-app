@@ -485,6 +485,101 @@ async function submitReceipt(ev){
  await reviewPeriodBatch(state.receiptBatch,true,date);
 }
 
+
+function lessonLocked(lesson){
+ return !isVirtualOccurrence(lesson)&&isPaymentLocked(lesson,state.paymentBatches,state.paymentBatchItems,state.requests);
+}
+function openLessonPopup(id){
+ const lesson=resolveLesson(id);
+ if(!lesson){toast("找不到這堂課，請重新整理月曆");return}
+ closeModal("day-modal");
+ state.activeLesson=id;
+ const d=actualDefaults(lesson);
+ const teacher=state.role==="teacher",locked=lessonLocked(lesson),inactive=lesson.type==="leave"||lesson.type==="moved";
+ $("#lesson-modal-heading").textContent=(studentFor(lesson)?.name||lesson.student||"學生")+" · "+(lesson.subject||"課程");
+ $("#lesson-modal-date").textContent=prettyDate(lesson.lesson_date)+" · "+statusLabel(lesson);
+ $("#lesson-planned-time").textContent=d.scheduledStart+" – "+d.scheduledEnd+"（"+(durationHours(d.scheduledStart,d.scheduledEnd)||0)+" 小時）";
+ $("#lesson-status-hint").textContent=lesson.type==="lesson"?"已完成上課，可查看實際紀錄":lesson.type==="leave"?"本堂已請假／停課":lesson.type==="moved"?"本堂已改期":"原本預定的課程";
+ $("#lesson-actual-start").value=d.actualStart;
+ $("#lesson-actual-end").value=d.actualEnd;
+ $("#lesson-actual-hours").value=String(d.actualHours);
+ state.actualHoursManual=false;
+ $("#lesson-lock-hint").classList.toggle("hidden",!locked);
+ $("#lesson-teacher-actions").classList.toggle("hidden",!teacher);
+ $("#lesson-parent-actions").classList.toggle("hidden",teacher);
+ $("#lesson-parent-note-wrap").classList.toggle("hidden",teacher||inactive);
+ $("#lesson-parent-note").value="";
+ $("#lesson-time-editor").classList.toggle("hidden",inactive||(state.role==="parent"&&lesson.type!=="lesson"));
+ $("#lesson-actual-heading").textContent=teacher?"實際上課時間":"實際時間更正建議";
+ $("#lesson-save").textContent=lesson.type==="leave"?"恢復原安排":lesson.type==="lesson"?"儲存實際上課紀錄":lesson.type==="moved"?"查看改期安排":"確認完成上課";
+ $("#lesson-save").disabled=locked||lesson.type==="moved";
+ $("#lesson-student-leave").classList.toggle("hidden",inactive||locked);
+ $("#lesson-teacher-leave").classList.toggle("hidden",inactive||locked);
+ $("#lesson-move").classList.toggle("hidden",inactive||locked);
+ $("#lesson-parent-correct").classList.toggle("hidden",inactive||locked||lesson.type!=="lesson"||isVirtualOccurrence(lesson));
+ $("#lesson-parent-leave").classList.toggle("hidden",inactive||locked);
+ ["lesson-actual-start","lesson-actual-end","lesson-actual-hours"].forEach(id=>$("#"+id).disabled=inactive||locked);
+ showModal("lesson-modal");
+}
+function lessonFormValues(){
+ const start=$("#lesson-actual-start").value,end=$("#lesson-actual-end").value,hours=$("#lesson-actual-hours").value;
+ return validateActual(start,end,hours);
+}
+function syncActualHoursFromTime(){
+ if(state.actualHoursManual)return;
+ const h=durationHours($("#lesson-actual-start").value,$("#lesson-actual-end").value);
+ if(h!==null)$("#lesson-actual-hours").value=String(h);
+}
+async function saveLessonOutcome(ev){
+ ev.preventDefault();
+ const lesson=resolveLesson(state.activeLesson);
+ if(!lesson||state.role!=="teacher")return;
+ if(lesson.type==="leave"){closeModal("lesson-modal");await restoreLesson(lesson.id);return}
+ if(lesson.type==="moved"||lessonLocked(lesson)){toast("請先處理已取消或已進入帳務流程的課程");return}
+ let values;try{values=lessonFormValues()}catch(e){toast(e.message);return}
+ const patch={type:"lesson",actual_start_time:values.actual_start_time,actual_end_time:values.actual_end_time,
+  actual_hours:values.actual_hours,hours:values.hours,total_amount:Math.round(values.hours*Number(lesson.hourly_rate)*100)/100};
+ const ok=await updateLesson(lesson.id,patch,lesson.type==="lesson"?"實際時數已更新":"已完成上課，費用會依實際計費時數計算");
+ if(ok!==false)closeModal("lesson-modal");
+}
+async function markLessonLeave(source){
+ const lesson=resolveLesson(state.activeLesson);
+ if(!lesson||state.role!=="teacher"||lesson.type==="moved"||lessonLocked(lesson))return;
+ const label=source==="teacher"?"老師停課":"學生請假";
+ if(!confirm("確認將 "+prettyDate(lesson.lesson_date)+" 的課程標記為「"+label+"」？本堂不再計入實際上課時數與應收費用，固定課表不受影響。"))return;
+ let ok=false;
+ if(isVirtualOccurrence(lesson)){
+  ok=await persist(async()=>{await upsertException(lesson,source==="teacher"?"teacher_leave":"student_leave",null,"課後補登 "+label)});
+ }else{
+  ok=await updateLesson(lesson.id,{type:"leave",leave_source:source,actual_start_time:null,actual_end_time:null,actual_hours:null,hours:0,total_amount:0},"已記錄"+label);
+ }
+ if(ok!==false)closeModal("lesson-modal");
+}
+async function submitParentLessonRequest(kind){
+ const lesson=resolveLesson(state.activeLesson);
+ if(!lesson||state.role!=="parent"||lessonLocked(lesson))return;
+ if(kind==="time_correction"&&(isVirtualOccurrence(lesson)||lesson.type!=="lesson")){toast("此課程尚未有實際上課紀錄");return}
+ let fields={};
+ if(kind==="time_correction"){
+  try{
+   const v=lessonFormValues();
+   fields={requested_actual_start_time:v.actual_start_time,requested_actual_end_time:v.actual_end_time,requested_actual_hours:v.actual_hours};
+  }catch(e){toast(e.message);return}
+ }
+ if(state.requests.some(r=>r.status==="pending"&&r.kind===kind
+   &&(r.lesson_id===lesson.id||(isVirtualOccurrence(lesson)&&r.schedule_id===lesson.schedule_id&&r.scheduled_date===lesson.scheduled_date)))){
+  toast("這堂課已有待老師確認的相同申請");return;
+ }
+ const data={kind,status:"pending",note:$("#lesson-parent-note").value.trim(),lesson_id:isVirtualOccurrence(lesson)?null:lesson.id,
+  schedule_id:isVirtualOccurrence(lesson)?lesson.schedule_id:null,scheduled_date:isVirtualOccurrence(lesson)?lesson.scheduled_date:null,
+  parent_id:activeUser?.id||"demo-parent",teacher_id:lesson.owner_id,student_id:lesson.student_id,...fields};
+ const ok=await persist(async()=>{
+  if(state.mode==="demo")state.requests.push({id:uid(),created_at:new Date().toISOString(),...data});
+  else assertResult(await client.from("family_requests").insert(data));
+ });
+ if(ok){closeModal("lesson-modal");toast("已提交"+(kind==="leave"?"請假":"時間更正")+"申請，等待老師確認")}
+}
+
 function refreshDaySheet(){
  if(!$("#day-modal").open)return;
  const date=state.selected,items=visibleLessons().filter(l=>l.lesson_date===date).sort((a,b)=>asText(a.start_time).localeCompare(asText(b.start_time)));
