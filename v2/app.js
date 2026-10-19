@@ -737,6 +737,8 @@ function bindEvents(){
    if(kind==="accept-invite")await acceptInvite(id);
    if(kind==="approve-request")await reviewRequest(id,true);
    if(kind==="decline-request")await reviewRequest(id,false);
+   if(kind==="confirm-batch")openReceiptModal(id);
+   if(kind==="decline-batch")if(confirm("確定退回這筆期間付款？這不會刪除紀錄，但可付款餘額會重新開放。"))await reviewPeriodBatch(id,false,null);
   }
  });
  document.addEventListener("keydown",ev=>{const el=ev.target.closest("[data-day]");if(el&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();openDay(el.dataset.day)}});
@@ -754,7 +756,16 @@ function bindEvents(){
  $("#record-student").onchange=()=>{if(state.editing)return;const s=visibleStudents().find(s=>s.id===$("#record-student").value);if(s){$("#record-subject").value=s.subject;$("#record-rate").value=s.hourly_rate}};
  $("#prev-month").onclick=()=>moveMonth(-1);$("#next-month").onclick=()=>moveMonth(1);
  $("#billing-prev").onclick=()=>moveMonth(-1);$("#billing-next").onclick=()=>moveMonth(1);
- $("#batch-action").onclick=batchBilling;
+ $("#batch-action").onclick=()=>openPeriodModal();
+ $("#period-form").addEventListener("submit",submitPeriod);
+ $("#receipt-form").addEventListener("submit",submitReceipt);
+ for(const id of ["period-student","period-start","period-end"]){
+  $("#"+id).addEventListener("change",()=>renderPeriodPreview(true));
+ }
+ $("#period-paid-amount").addEventListener("input",()=>{
+  const r=periodFormRows(),value=amount($("#period-paid-amount").value);
+  $("#period-submit").disabled=!r.valid||r.total<=0||!Number.isFinite(value)||value<=0||value>r.total+0.005;
+ });
  $("#jump-today").onclick=()=>{state.month=new Date(tick().getFullYear(),tick().getMonth(),1);state.selected=dateKey(tick());render()};
  $("#record-form").addEventListener("submit",saveRecord);$("#student-form").addEventListener("submit",saveStudent);
  $("#record-repeat").addEventListener("change",()=>$("#until-label").classList.toggle("hidden",$("#record-repeat").value==="none"));
