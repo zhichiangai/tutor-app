@@ -1,9 +1,40 @@
 {
-  "redirects": [
+  "rewrites": [
     {
       "source": "/",
-      "destination": "/v2/",
-      "permanent": false
+      "destination": "/v2/index.html"
+    },
+    {
+      "source": "/app.js",
+      "destination": "/v2/app.js"
+    },
+    {
+      "source": "/calendar-view.js",
+      "destination": "/v2/calendar-view.js"
+    },
+    {
+      "source": "/lesson-actual.js",
+      "destination": "/v2/lesson-actual.js"
+    },
+    {
+      "source": "/payment-ledger.js",
+      "destination": "/v2/payment-ledger.js"
+    },
+    {
+      "source": "/scheduling.js",
+      "destination": "/v2/scheduling.js"
+    },
+    {
+      "source": "/style.css",
+      "destination": "/v2/style.css"
+    },
+    {
+      "source": "/privacy.html",
+      "destination": "/v2/privacy.html"
+    },
+    {
+      "source": "/terms.html",
+      "destination": "/v2/terms.html"
     }
   ]
 }
