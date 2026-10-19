@@ -375,13 +375,13 @@ function openSchedule(rule=null){
  $("#schedule-rate").value=rule?.hourly_rate??student?.hourly_rate??500;
  $("#schedule-end-date").value=rule?.ends_on||"";
  const initWeekday=rule?.weekdays?.map(Number)||[((parseDate(state.selected).getDay()+6)%7)+1];
- $("#schedule-weekdays input").forEach(i=>i.checked=initWeekday.includes(Number(i.value)));
- $('input[name="schedule-scope"]').forEach(r=>r.checked=r.value==="future");
+ $$("#schedule-weekdays input").forEach(i=>i.checked=initWeekday.includes(Number(i.value)));
+ $$('input[name="schedule-scope"]').forEach(r=>r.checked=r.value==="future");
  renderScheduleRules();showModal("schedule-modal");
 }
 function getScheduleForm(){
  const student_id=$("#schedule-student").value,subject=$("#schedule-subject").value.trim();
- const weekdays=$("#schedule-weekdays input:checked").map(x=>Number(x.value)).sort((a,b)=>a-b);
+ const weekdays=$$("#schedule-weekdays input:checked").map(x=>Number(x.value)).sort((a,b)=>a-b);
  const every_weeks=Number($("#schedule-frequency").value),starts_on=$("#schedule-start").value;
  const ends_on=$("#schedule-end-date").value||null;
  const start_time=$("#schedule-time-start").value,end_time=$("#schedule-time-end").value;
