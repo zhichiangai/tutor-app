@@ -272,7 +272,7 @@ async function saveRecord(ev){
  });if(ok){closeModal("record-modal");closeModal("day-modal");toast("課程已更新")}return;
  }
  const dates=scheduleDates(date,$("#record-repeat").value,$("#record-until").value);
- const records=dates.map(day=>({...common,lesson_date:day,type:day<dateKey(tick())?"lesson":"planned",status:"未付款",owner_id:activeUser?.id||"demo-teacher"}));
+ const records=dates.map(day=>({...common,lesson_date:day,type:"planned",status:"未付款",owner_id:activeUser?.id||"demo-teacher"}));
  const ok=await persist(async()=>{if(state.mode==="demo"){state.lessons.push(...records.map(x=>({...x,id:uid()})))}else assertResult(await client.from("lesson_records").insert(records))});
  if(ok){closeModal("record-modal");toast("已新增 "+records.length+" 堂課")}
 }
@@ -337,7 +337,6 @@ async function reviewRequest(id,approve){
  const newStatus=approve?"approved":"declined";
  const ok=await persist(async()=>{
   if(state.mode==="demo"){
-   r.status=newStatus;r.reviewed_at=new Date().toISOString();
    if(approve&&r.lesson_id){
     const l=state.lessons.find(l=>l.id===r.lesson_id);
     if(!l)throw Error("找不到對應課程");
@@ -350,6 +349,7 @@ async function reviewRequest(id,approve){
     const prev=state.exceptions.find(e=>e.schedule_id===r.schedule_id&&e.original_date===r.scheduled_date);
     if(prev)Object.assign(prev,record);else state.exceptions.push({id:uid(),...record});
    }
+   r.status=newStatus;r.reviewed_at=new Date().toISOString();
   }else{
    assertResult(await client.rpc("review_family_request",{p_request_id:id,p_approve:approve}));
   }
@@ -825,7 +825,7 @@ function bindEvents(){
   }
   const day=ev.target.closest("[data-day]");if(day){openDay(day.dataset.day);return}
  });
- document.addEventListener("keydown",ev=>{const el=ev.target.closest("[data-day]");if(el&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();openDay(el.dataset.day)}});
+ document.addEventListener("keydown",ev=>{const el=ev.target.closest("[data-day]");if(el&&!ev.target.closest("[data-action]")&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();openDay(el.dataset.day)}});
  $("#lesson-form").addEventListener("submit",saveLessonOutcome);
  ["lesson-actual-start","lesson-actual-end"].forEach(id=>$("#"+id).addEventListener("change",syncActualHoursFromTime));
  $("#lesson-actual-hours").addEventListener("input",()=>{state.actualHoursManual=true});
