@@ -388,7 +388,7 @@ function openRecord(lesson=null){
  $("#record-until").value="";
  const weekday=((parseDate($("#record-date").value).getDay()+6)%7)+1;
  const saved=teacherPreferences.lastWeekdays||[weekday];
- $("#record-weekdays input").forEach(el=>el.checked=saved.includes(Number(el.value)));
+ $$("#record-weekdays input").forEach(el=>el.checked=saved.includes(Number(el.value)));
  updateRecordRepeatUI();
  showModal("record-modal");
 }
