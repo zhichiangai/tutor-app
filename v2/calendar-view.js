@@ -13,10 +13,10 @@ export function monthAgendaMarkup(lessons,helpers,{limit=0}={}){
    '<button type="button" class="text-link" data-day="'+esc(date)+'">管理當日 ↗</button></div>'+
    entries.map(l=>{
     const name=studentName(l),label=statusLabel(l),isDone=l.type==="lesson";
-    return '<div class="month-agenda-row"><div class="month-agenda-dot '+(isDone?'done':l.type==="leave"||l.type==="moved"?'exception':'')+'"></div>'+
+    return '<button type="button" class="month-agenda-row lesson-quick-trigger" data-action="open-lesson" data-id="'+esc(l.id)+'"><div class="month-agenda-dot '+(isDone?'done':l.type==="leave"||l.type==="moved"?'exception':'')+'"></div>'+
      '<div class="month-agenda-info"><strong>'+esc(name)+' · '+esc(l.subject||"課程")+'</strong>'+
      '<small>'+esc(timeLabel(l.start_time))+'–'+esc(timeLabel(l.end_time))+'</small></div>'+
-     '<span class="pill '+(isDone?'paid':l.type==="leave"||l.type==="moved"?'leave':'')+'">'+esc(label)+'</span></div>';
+     '<span class="pill '+(isDone?'paid':l.type==="leave"||l.type==="moved"?'leave':'')+'">'+esc(label)+'</span></button>';
    }).join("")+'</section>'
  ).join("");
 }
