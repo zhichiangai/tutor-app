@@ -155,8 +155,10 @@ function renderCalendarDisplay(){
   $("#month-lesson-preview").innerHTML=monthAgendaMarkup(preview,helpers);
  }
  // Mobile month cells remain compact while still revealing lesson counts and full entries below.
- $$(".calendar-cell").forEach(cell=>{
-  const n=visibleLessons().filter(l=>l.lesson_date===cell.dataset.day&&l.type!=="moved").length;
+ const counts=new Map();
+ for(const l of visibleLessons()){if(l.type!=="moved")counts.set(l.lesson_date,(counts.get(l.lesson_date)||0)+1)}
+ $(".calendar-cell").forEach(cell=>{
+  const n=counts.get(cell.dataset.day)||0;
   if(n){const mark=document.createElement("span");mark.className="mobile-lesson-count";mark.setAttribute("aria-hidden","true");mark.textContent=n+"堂";cell.appendChild(mark)}
  });
 }
