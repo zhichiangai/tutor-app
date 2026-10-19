@@ -12,8 +12,8 @@ export function lessonAllocation(lesson,batches=[],items=[],requests=[]){
  const total=cents(lesson.total_amount);
  if(!related.length&&lesson.status==="老師已收到")confirmed=total;
  else if(!related.length&&lesson.status==="家長已付款")pending=total;
- const legacyPending=!related.length&&requests.some(r=>r.lesson_id===lesson.id&&r.kind==="payment"&&r.status==="pending");
- if(legacyPending)pending=total;
+ const legacyPending=requests.some(r=>r.lesson_id===lesson.id&&r.kind==="payment"&&r.status==="pending");
+ if(legacyPending)pending=Math.max(pending,total-confirmed);
  confirmed=Math.min(total,confirmed);
  pending=Math.min(total-confirmed,pending);
  const available=Math.max(0,total-confirmed-pending);
