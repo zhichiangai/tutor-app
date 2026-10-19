@@ -32,6 +32,14 @@
       <div class="content-wrap">
         <section class="greeting" id="greeting"><div><p class="eyebrow">A LITTLE PROGRESS, EVERY DAY <span class="eyebrow-line"></span></p><h1 id="greeting-title">把每一堂課，<em>好好記下來。</em></h1><p id="greeting-copy">從課程到收款，讓重要的小事都有自己的位置。</p></div><button class="primary-button" id="top-add"><span>＋</span> 新增課程</button></section>
         <div class="demo-banner" id="demo-banner"><span>✦</span> 互動預覽資料只儲存在目前這台裝置；手機與電腦不會自動同步。正式登入後才會使用 Supabase 同步。<button id="go-live">使用 Google 登入</button></div>
+        <div id="workspace-setup" class="card onboarding-card hidden" aria-live="polite">
+          <div><h2>建立你的專屬家教空間</h2><p class="section-sub">每位老師都擁有獨立的學生、課程和帳務資料，不會和其他老師混在一起。</p></div>
+          <button type="button" class="primary-button" id="workspace-start">設定我的工作空間</button>
+        </div>
+        <div id="parent-teacher-bar" class="card parent-workspace-filter hidden">
+          <label for="parent-teacher-select">查看老師的課程</label>
+          <select id="parent-teacher-select" aria-label="選擇查看的老師"><option value="all">全部老師</option></select>
+        </div>
         <section id="view-home" class="page-view">
           <div class="metrics-grid" id="metrics"></div>
           <div class="home-grid">
@@ -199,6 +207,14 @@
     <p class="modal-description" id="login-description">登入後可同步你的專屬課程；也可以先使用不影響真實資料的互動預覽。</p>
     <div id="account-current"></div>
     <div class="account-role"><span>我的使用身分</span><div class="segment-control"><button id="role-teacher" type="button">我是老師</button><button id="role-parent" type="button">我是家長</button></div><small>切換畫面不會更改資料存取權限；實際權限由 Supabase 控制。</small></div>
+    <div id="workspace-account" class="workspace-account hidden">
+      <label for="workspace-name">我的家教空間名稱
+        <input id="workspace-name" type="text" maxlength="80" placeholder="例如：陳老師的數學教室" autocomplete="organization">
+      </label>
+      <p id="workspace-description" class="helper-note">第一次使用時，建立工作空間就能新增學生；家長不需要建立工作空間。</p>
+      <button type="button" class="primary-button" id="workspace-create">建立家教空間</button>
+      <button type="button" class="secondary-button hidden" id="workspace-rename">更新空間名稱</button>
+    </div>
     <button class="google-button" id="google-login" type="button"><span class="google-g">G</span>使用 Google 登入</button>
     <button class="secondary-button wide" id="demo-login" type="button">試用互動預覽（不需登入）</button>
     <button class="secondary-button wide" id="demo-reset" type="button">重置本機預覽資料</button>
