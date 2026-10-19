@@ -242,7 +242,7 @@ async function saveInvite(ev){
  const ok=await persist(async()=>{if(state.mode==="demo"){if(state.invites.some(i=>i.student_id===student_id&&i.email===email))throw Error("這位家長已在邀請清單中");state.invites.push({id:uid(),...data})}else assertResult(await client.from("guardian_invites").insert(data))});
  if(ok){$("#invite-email").value="";toast("已建立邀請，請家長登入後接受")}
 }
-async async function updateLesson(id,patch,msg){
+async function updateLesson(id,patch,msg){
  const item=resolveLesson(id);
  if(!item||state.role!=="teacher"||item.type==="moved")return;
  if(item.status==="老師已收到"&&(patch.type==="leave"||patch.lesson_date||patch.hourly_rate!==undefined)){toast("已結清課程不能直接取消或改期，請先處理帳務");return}
