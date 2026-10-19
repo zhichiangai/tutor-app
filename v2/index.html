@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#F9F7F3">
+  <meta name="description" content="好好上課：老師與家長都能輕鬆使用的課程月曆、請假與收付款管理工具。">
+  <title>好好上課 · 家教生活手帳 V2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主要導覽">
+      <a class="brand" href="./index.html"><span class="brand-symbol" aria-hidden="true">✳</span><span class="brand-copy"><strong>好好上課</strong><small>Lesson, made simple.</small></span></a>
+      <div class="workspace-label">MY WORKSPACE <span class="label-line"></span></div>
+      <nav class="side-nav" aria-label="功能導覽">
+        <button class="nav-item active" data-view="home"><span class="nav-icon">⌂</span>今天<span class="nav-active-dot"></span></button>
+        <button class="nav-item" data-view="calendar"><span class="nav-icon">▦</span>課程月曆</button>
+        <button class="nav-item" data-view="billing"><span class="nav-icon">◈</span>收付款</button>
+        <button class="nav-item" data-view="students"><span class="nav-icon">♧</span>學生與家長</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="side-note"><span class="side-note-sun">☼</span><p>每一堂小小的課，<br>都是值得記住的成長。</p></div>
+        <button class="profile-chip" id="profile-button"><span class="avatar" id="avatar">好</span><span><strong id="account-label">預覽使用者</strong><small id="account-subtitle">體驗模式</small></span><span class="arrow">›</span></button>
+      </div>
+    </aside>
+    <main class="main-content" id="main-content">
+      <div class="topbar"><div class="breadcrumb">我的工作空間 <span>/</span> <strong id="breadcrumb-name">今天</strong></div><div class="top-actions"><span id="connection-status" class="status-pill"><i></i> 體驗模式</span><button class="round-icon" id="account-action" title="帳號與設定" aria-label="帳號與設定">⚙</button></div></div>
+      <div class="content-wrap">
+        <section class="greeting" id="greeting"><div><p class="eyebrow">A LITTLE PROGRESS, EVERY DAY <span class="eyebrow-line"></span></p><h1 id="greeting-title">把每一堂課，<em>好好記下來。</em></h1><p id="greeting-copy">從課程到收款，讓重要的小事都有自己的位置。</p></div><button class="primary-button" id="top-add"><span>＋</span> 新增課程</button></section>
+        <div class="demo-banner" id="demo-banner"><span>✦</span> 目前是互動預覽，所有操作僅保存在這台瀏覽器，不會變更真實課程。<button id="go-live">使用 Google 登入</button></div>
+        <section id="view-home" class="page-view">
+          <div class="metrics-grid" id="metrics"></div>
+          <div class="home-grid">
+            <div class="column-stack">
+              <article class="card next-card"><div class="card-heading"><span class="mini-label">UP NEXT · 下一堂課</span><span class="tiny-sparkle">✳</span></div><div id="next-lesson"></div></article>
+              <article class="card"><div class="section-row"><div><h2>最近的課程</h2><p class="section-sub">讓日常有條不紊地前進</p></div><button class="text-link" data-view="calendar">查看月曆 ↗</button></div><div id="recent-lessons"></div></article>
+            </div>
+            <div class="column-stack">
+              <article class="card calendar-mini"><div class="section-row"><div><h2>本月小日曆</h2><p class="section-sub" id="mini-month"></p></div><button class="round-icon small" data-view="calendar" aria-label="查看完整月曆">↗</button></div><div id="mini-calendar"></div></article>
+              <article class="card money-card"><div class="mini-label">GENTLE REMINDER</div><div class="money-flower" aria-hidden="true">❋</div><h3>帳務也可以，<br>簡簡單單。</h3><p id="money-reminder">每一筆費用，都整理得剛剛好。</p><button class="button-outline" data-view="billing">查看收付款 ↗</button></article>
+            </div>
+          </div>
+        </section>
+        <section id="view-calendar" class="page-view hidden">
+          <div class="section-row page-head"><div><h2>課程月曆</h2><p class="section-sub">每個值得期待的日子，都在這裡</p></div><div class="month-controls"><button id="prev-month" aria-label="上個月">‹</button><strong id="calendar-month"></strong><button id="next-month" aria-label="下個月">›</button><button class="today-button" id="jump-today">今天</button></div></div>
+          <div class="calendar-board"><div class="weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div><div class="calendar-grid" id="calendar-grid"></div></div>
+          <div class="card agenda-card"><div class="section-row"><h2 id="selected-date-title">當日課程</h2><button class="text-link" id="agenda-add">＋ 安排課程</button></div><div id="agenda-list"></div></div>
+        </section>
+        <section id="view-billing" class="page-view hidden">
+          <div class="section-row page-head"><div><h2 id="billing-title">收付款整理</h2><p class="section-sub">清楚對帳，不再一筆一筆慢慢算</p></div><div class="month-controls"><button id="billing-prev" aria-label="上個月">‹</button><strong id="billing-month"></strong><button id="billing-next" aria-label="下個月">›</button></div></div>
+          <div class="billing-summary" id="billing-summary"></div>
+          <article class="card"><div class="section-row"><div><h2>課程與付款明細</h2><p class="section-sub">家長回報與老師收款分開紀錄</p></div></div><div id="billing-list"></div></article>
+          <article class="card requests-card"><div class="section-row"><h2>請假與付款申請</h2><span class="muted-small">待確認會優先顯示</span></div><div id="requests-list"></div></article>
+        </section>
+        <section id="view-students" class="page-view hidden">
+          <div class="section-row page-head"><div><h2>學生與家長</h2><p class="section-sub">把每位學生的安排都收好</p></div><button class="secondary-button" id="add-student">＋ 新增學生</button></div>
+          <div class="student-grid" id="student-grid"></div>
+          <article class="card invite-card"><div class="section-row"><div><h2 id="invite-title">邀請家長加入</h2><p class="section-sub" id="invite-description">使用家長的 Google 帳號 Email 連結課程資料</p></div></div><div id="invite-content"></div></article>
+        </section>
+        <footer class="site-footer"><span>好好上課 © 2026</span><span>Made with care, for every lesson. <span aria-hidden="true">✳</span></span></footer>
+      </div>
+    </main>
+    <nav class="mobile-nav" aria-label="手機導覽"><button data-view="home" class="active"><span>⌂</span>今天</button><button data-view="calendar"><span>▦</span>月曆</button><button data-view="billing"><span>◈</span>帳務</button><button data-view="students"><span>♧</span>學生</button></nav>
+  </div>
+
+  <dialog class="modal" id="record-modal"><form id="record-form" class="modal-inner"><div class="modal-head"><div><p class="eyebrow">LESSON DETAILS</p><h2 id="record-modal-title">新增一堂課</h2></div><button type="button" class="close-modal" data-close="record-modal" aria-label="關閉">×</button></div>
+    <label>學生<select name="student_id" id="record-student" required></select></label>
+    <label>科目<input name="subject" id="record-subject" required maxlength="80" placeholder="例如：數學"></label>
+    <div class="form-row"><label>日期<input type="date" name="date" id="record-date" required></label><label>鐘點費（NT$）<input type="number" name="rate" id="record-rate" min="0" step="1" required></label></div>
+    <div class="form-row"><label>開始時間<input type="time" name="start" id="record-start" required></label><label>結束時間<input type="time" name="end" id="record-end" required></label></div>
+    <label>課程備註（選填）<textarea name="remarks" id="record-remarks" rows="2" placeholder="今天上了哪些內容？"></textarea></label>
+    <label id="repeat-label">重複排課<select name="repeat" id="record-repeat"><option value="none">僅這一堂</option><option value="weekly">每週一次（未來 4 週）</option><option value="biweekly">每兩週一次（未來 8 週）</option><option value="monthly">每月一次（未來 4 個月）</option></select></label>
+    <div class="form-actions"><button type="button" class="secondary-button" data-close="record-modal">取消</button><button type="submit" class="primary-button" id="save-record">儲存課程</button></div>
+  </form></dialog>
+  <dialog class="modal" id="student-modal"><form id="student-form" class="modal-inner"><div class="modal-head"><div><p class="eyebrow">NEW STUDENT</p><h2>新增學生</h2></div><button type="button" class="close-modal" data-close="student-modal">×</button></div><label>學生稱呼<input id="student-name" name="name" maxlength="80" required placeholder="例如：小明"></label><label>常用科目<input name="subject" maxlength="80" value="數學" required></label><label>鐘點費（NT$）<input name="hourly_rate" type="number" min="0" value="500" step="1" required></label><div class="form-actions"><button type="button" class="secondary-button" data-close="student-modal">取消</button><button class="primary-button" type="submit">儲存學生</button></div></form></dialog>
+  <dialog class="modal" id="request-modal"><form id="request-form" class="modal-inner"><div class="modal-head"><div><p class="eyebrow">LET US KNOW</p><h2 id="request-heading">送出申請</h2></div><button type="button" class="close-modal" data-close="request-modal">×</button></div><p class="modal-description" id="request-description"></p><input id="request-lesson-id" type="hidden"><input id="request-kind" type="hidden"><label>想補充的話（選填）<textarea id="request-note" rows="3" placeholder="例如：已於今天轉帳／當天需要請假"></textarea></label><div class="form-actions"><button class="secondary-button" type="button" data-close="request-modal">取消</button><button class="primary-button" type="submit">送出申請</button></div></form></dialog>
+  <dialog class="modal account-modal" id="account-modal"><div class="modal-inner"><div class="modal-head"><div><p class="eyebrow">ACCOUNT & ACCESS</p><h2>帳號與使用模式</h2></div><button type="button" class="close-modal" data-close="account-modal">×</button></div>
+    <p class="modal-description" id="login-description">登入後可同步你的專屬課程；也可以先使用不影響真實資料的互動預覽。</p>
+    <div id="account-current"></div>
+    <div class="account-role"><span>我的使用身分</span><div class="segment-control"><button id="role-teacher" type="button">我是老師</button><button id="role-parent" type="button">我是家長</button></div><small>切換畫面不會更改資料存取權限；實際權限由 Supabase 控制。</small></div>
+    <button class="google-button" id="google-login" type="button"><span class="google-g">G</span>使用 Google 登入</button>
+    <button class="secondary-button wide" id="demo-login" type="button">試用互動預覽（不需登入）</button>
+    <button class="text-link signout" id="sign-out" type="button">登出</button>
+    <div class="smallprint">Google 登入需在 Supabase 與 Google Cloud 完成 OAuth 設定。</div>
+  </div></dialog>
+  <div id="toast" role="status" aria-live="polite" class="toast" hidden></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
