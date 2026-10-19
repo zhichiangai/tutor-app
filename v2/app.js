@@ -374,6 +374,138 @@ async function batchBilling(){
 }
 
 
+
+function paymentBatchStatus(batch){return batch.status==="confirmed"?"老師已確認收款":batch.status==="declined"?"已退回":"等待老師確認"}
+function batchLessons(batch){
+ return state.paymentBatchItems.filter(i=>i.batch_id===batch.id).map(i=>({item:i,lesson:state.lessons.find(l=>l.id===i.lesson_id)}));
+}
+function paymentHistoryHTML(batches){
+ if(!batches.length)return '<div class="empty">還沒有期間付款紀錄。家長可指定課程日期，回報整筆或部分款項。</div>';
+ return batches.map(batch=>{
+  const student=state.students.find(s=>s.id===batch.student_id),parts=batchLessons(batch),p=paymentBatchStatus(batch);
+  return '<section class="period-batch"><div class="period-batch-head"><div><strong>'+esc(student?.name||"學生")+' · '+esc(batch.period_start)+' ～ '+esc(batch.period_end)+'</strong>'+
+  '<small>家長實際付款：'+esc(batch.paid_on)+' · '+parts.length+' 堂課'+(batch.received_on?' · 老師實際收款：'+esc(batch.received_on):'')+'</small></div><div class="period-batch-amount">'+money(batch.paid_amount)+'</div></div>'+
+  '<div class="period-batch-rows"><span class="pill '+(batch.status==="confirmed"?"paid":batch.status==="pending"?"pending":"")+'">'+p+'</span>'+
+  (batch.note?'<span class="muted-small">'+esc(batch.note)+'</span>':"")+'</div>'+
+  '<details><summary class="text-link">查看各堂金額分配</summary>'+
+  parts.map(({item,lesson})=>'<div class="period-line"><div><strong>'+esc(lesson?.lesson_date||"")+' · '+esc(lesson?.subject||"課程")+'</strong><small>'+esc(timeLabel(lesson?.start_time||""))+'–'+esc(timeLabel(lesson?.end_time||""))+'</small></div><span>'+money(item.allocated_amount)+'</span></div>').join("")+'</details>'+
+  (state.role==="teacher"&&batch.status==="pending"?
+    '<div class="period-batch-actions"><button type="button" class="primary-button" data-action="confirm-batch" data-id="'+esc(batch.id)+'">確認這段期間已收款</button>'+
+    '<button type="button" class="secondary-button" data-action="decline-batch" data-id="'+esc(batch.id)+'">退回付款回報</button></div>':"")+'</section>';
+ }).join("");
+}
+function visiblePaymentBatches(){
+ return state.paymentBatches.filter(b=>state.mode==="demo"||(state.role==="teacher"?b.teacher_id===activeUser?.id:b.parent_id===activeUser?.id))
+  .sort((a,b)=>asText(b.created_at).localeCompare(asText(a.created_at)));
+}
+function renderPaymentHistory(){
+ $("#payment-batch-history").innerHTML=paymentHistoryHTML(visiblePaymentBatches());
+}
+function openPeriodModal(studentId=null,start=null,end=null){
+ const st=visibleStudents();if(!st.length){toast("目前沒有可結算的學生，請先完成學生與家長授權");return}
+ $("#period-heading").textContent=state.role==="parent"?"回報指定期間已付款":"查詢指定期間收款";
+ $("#period-help").textContent=state.role==="parent"?"選好學生與上課日期後，系統自動計算已完成且尚未結清的課程。":"選擇學生與日期，查看期間內的家長付款回報及收款狀態。";
+ $("#period-student").innerHTML=st.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join("");
+ $("#period-student").value=studentId&&st.some(x=>x.id===studentId)?studentId:st[0].id;
+ $("#period-start").value=start||dateKey(new Date(state.month.getFullYear(),state.month.getMonth(),1));
+ $("#period-end").value=end||dateKey(new Date(state.month.getFullYear(),state.month.getMonth()+1,0));
+ $("#period-paid-on").value=dateKey(tick());
+ $("#period-paid-on").max=dateKey(tick());
+ $("#period-note").value="";
+ const parent=state.role==="parent";
+ $("#parent-payment-fields").classList.toggle("hidden",!parent);
+ $("#period-submit").textContent=parent?"確認這段期間已付款":"關閉區間查詢";
+ $("#period-start").max="9999-12-31";
+ renderPeriodPreview(true);
+ showModal("period-modal");
+}
+function filteredBatches(studentId,start,end){
+ return visiblePaymentBatches().filter(b=>b.student_id===studentId&&b.period_start<=end&&b.period_end>=start);
+}
+function periodFormRows(){
+ const studentId=$("#period-student").value,start=$("#period-start").value,end=$("#period-end").value;
+ if(!start||!end||start>end)return {valid:false,message:"請選擇正確的課程起訖日期。",rows:[],total:0};
+ if((parseDate(end)-parseDate(start))/86400000>730)return {valid:false,message:"每次最多結算約兩年的課程，請縮小日期區間。",rows:[],total:0};
+ const rows=eligiblePeriodLessons({lessons:state.lessons,batches:state.paymentBatches,items:state.paymentBatchItems,requests:state.requests,studentId,start,end});
+ return {valid:true,studentId,start,end,rows,total:rows.reduce((sum,r)=>sum+r.allocation.available,0)};
+}
+function renderPeriodPreview(resetAmount=false){
+ const r=periodFormRows(),parent=state.role==="parent";
+ if(!r.valid){
+  $("#period-overview").textContent=r.message;$("#period-lesson-list").innerHTML="";
+  $("#period-submit").disabled=parent;return;
+ }
+ if(parent){
+  const hours=r.rows.reduce((n,x)=>n+num(x.lesson.hours),0);
+  $("#period-overview").innerHTML='<strong>'+money(r.total)+'</strong><div class="period-summary-metrics"><span>'+r.rows.length+' 堂可結算</span><span>'+hours.toFixed(1)+' 小時</span><span>'+esc(r.start)+' ～ '+esc(r.end)+'</span></div>';
+  $("#period-lesson-list").innerHTML=r.rows.length?r.rows.map(({lesson,allocation})=>
+    '<div class="period-line"><div><strong>'+esc(lesson.lesson_date)+' · '+esc(lesson.subject||"課程")+'</strong><small>'+esc(timeLabel(lesson.start_time))+'–'+esc(timeLabel(lesson.end_time))+' · 可付款餘額</small></div><span>'+money(allocation.available)+'</span></div>').join(""):'<div class="empty">這段期間沒有可付款的課程；已收款或待老師確認的款項不會重複列入。</div>';
+  if(resetAmount||!$("#period-paid-amount").value)$("#period-paid-amount").value=r.total>0?r.total.toFixed(2):"";
+  $("#period-submit").disabled=r.total<=0;
+ }else{
+  const batches=filteredBatches(r.studentId,r.start,r.end);
+  $("#period-overview").innerHTML='<strong>'+batches.length+' 筆付款紀錄</strong><div class="period-summary-metrics"><span>'+esc(r.start)+' ～ '+esc(r.end)+'</span><span>待確認 '+batches.filter(b=>b.status==="pending").length+' 筆</span></div>';
+  $("#period-lesson-list").innerHTML=paymentHistoryHTML(batches);
+  $("#period-submit").disabled=false;
+ }
+}
+async function submitPeriod(ev){
+ ev.preventDefault();
+ if(state.role==="teacher"){closeModal("period-modal");return}
+ const r=periodFormRows();if(!r.valid||r.total<=0){toast(r.message||"沒有可付款的課程");return}
+ const paid=amount($("#period-paid-amount").value),paidOn=$("#period-paid-on").value,note=$("#period-note").value.trim();
+ if(!Number.isFinite(paid)||paid<=0||paid>r.total+0.005){toast("請填寫大於零且不超過未付款餘額的金額");return}
+ if(!paidOn||paidOn>dateKey(tick())){toast("實際付款日期不能是未來日期");return}
+ if(!confirm("確認回報 "+r.start+" 至 "+r.end+" 的課程，實際在 "+paidOn+" 支付 "+money(paid)+"？老師仍需核對入帳。"))return;
+ const student=state.students.find(x=>x.id===r.studentId);if(!student){toast("找不到學生");return}
+ const assignments=allocateOldestFirst(r.rows,paid);
+ const ok=await persist(async()=>{
+  if(state.mode==="demo"){
+   const batchId=uid();state.paymentBatches.push({id:batchId,parent_id:"demo-parent",teacher_id:student.teacher_id,student_id:student.id,
+    period_start:r.start,period_end:r.end,paid_on:paidOn,paid_amount:paid,note,status:"pending",received_on:null,created_at:new Date().toISOString()});
+   state.paymentBatchItems.push(...assignments.map(i=>({batch_id:batchId,lesson_id:i.lesson_id,allocated_amount:i.allocated_amount})));
+  }else{
+   assertResult(await client.rpc("submit_range_payment",{
+    p_teacher_id:student.teacher_id,p_student_id:student.id,p_period_start:r.start,p_period_end:r.end,
+    p_paid_on:paidOn,p_paid_amount:paid,p_note:note
+   }));
+  }
+ });
+ if(ok){closeModal("period-modal");toast("已回報期間付款，等待老師核對收款")}
+}
+function openReceiptModal(id){
+ if(state.role!=="teacher")return;
+ const batch=visiblePaymentBatches().find(b=>b.id===id&&b.status==="pending");if(!batch){toast("找不到待核對的付款批次");return}
+ state.receiptBatch=id;
+ const student=state.students.find(s=>s.id===batch.student_id);
+ $("#receipt-details").innerHTML='<strong>'+money(batch.paid_amount)+'</strong><p>學生：'+esc(student?.name||"學生")+'</p>'+
+  '<p>課程期間：'+esc(batch.period_start)+' ～ '+esc(batch.period_end)+'</p>'+
+  '<p>家長實際付款日期：'+esc(batch.paid_on)+'</p>'+
+  '<p>核對課程：'+batchLessons(batch).length+' 堂</p>';
+ $("#receipt-date").value=dateKey(tick());$("#receipt-date").max=dateKey(tick());
+ closeModal("period-modal");showModal("receipt-modal");
+}
+async function reviewPeriodBatch(id,confirmPayment,receivedOn=null){
+ const batch=visiblePaymentBatches().find(b=>b.id===id&&b.status==="pending");
+ if(!batch||state.role!=="teacher"){toast("無法處理這筆付款");return}
+ const ok=await persist(async()=>{
+  if(state.mode==="demo"){
+   batch.status=confirmPayment?"confirmed":"declined";batch.received_on=confirmPayment?receivedOn:null;batch.confirmed_at=confirmPayment?new Date().toISOString():null;
+   for(const {lesson} of batchLessons(batch)){
+    if(!confirmPayment||!lesson)continue;
+    const l=lessonBalance(lesson);
+    if(l.confirmed>=l.total-0.005){lesson.status="老師已收到";lesson.received_date=receivedOn}
+   }
+  }else assertResult(await client.rpc("review_range_payment",{p_batch_id:id,p_confirm:confirmPayment,p_received_on:receivedOn}));
+ });
+ if(ok){closeModal("receipt-modal");toast(confirmPayment?"已確認這段期間收款":"已退回付款回報，課程餘額已恢復")}
+}
+async function submitReceipt(ev){
+ ev.preventDefault();const date=$("#receipt-date").value;
+ if(!date||date>dateKey(tick())){toast("請輸入真實收到款項的日期");return}
+ await reviewPeriodBatch(state.receiptBatch,true,date);
+}
+
 function refreshDaySheet(){
  if(!$("#day-modal").open)return;
  const date=state.selected,items=visibleLessons().filter(l=>l.lesson_date===date).sort((a,b)=>asText(a.start_time).localeCompare(asText(b.start_time)));
