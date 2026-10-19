@@ -998,7 +998,7 @@ async function fetchAllRows(table){
   let query=client.from(table).select("*");
   for(const column of orderColumns)query=query.order(column,{ascending:true});
   const {data,error}=await query.range(offset,offset+PAGE_SIZE-1);
-  if(error)throw Error(table+": "+error.message);
+  if(error)throw Error("資料同步失敗（"+table+"）："+error.message);
   const page=data||[];
   rows.push(...page);
   if(page.length<PAGE_SIZE)return rows;
