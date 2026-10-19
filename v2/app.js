@@ -5,6 +5,7 @@
 import { expandSchedules, isVirtualOccurrence, findTimeConflicts, originalOccurrenceDate, matchesRecurrence } from "./scheduling.js";
 import { monthAgendaMarkup, monthSummary } from "./calendar-view.js";
 import { lessonAllocation, eligiblePeriodLessons, allocateOldestFirst, amount } from "./payment-ledger.js";
+import { durationHours, actualDefaults, validateActual, isPaymentLocked } from "./lesson-actual.js";
 const SUPABASE_URL = "https://vctisuglfoxyuwlvyjee.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_QR8An_jEnMEZTPuTHebFDA_xg46FLit";
 const STORAGE = "tutor_v2_preview_data_20261019";
@@ -26,7 +27,7 @@ const timeLabel = (s) => asText(s).slice(0,5);
 const tick = ()=>new Date();
 const uid = ()=>crypto.randomUUID();
 let client=null, activeUser=null, loading=false;
-const state={mode:localStorage.getItem(MODE_STORAGE)==="live"?"live":"demo",role:localStorage.getItem(ROLE_STORAGE)==="parent"?"parent":"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",paymentBatches:[],paymentBatchItems:[],receiptBatch:null};
+const state={mode:localStorage.getItem(MODE_STORAGE)==="live"?"live":"demo",role:localStorage.getItem(ROLE_STORAGE)==="parent"?"parent":"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",paymentBatches:[],paymentBatchItems:[],receiptBatch:null,activeLesson:null,actualHoursManual:false};
 
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
@@ -113,7 +114,7 @@ function rowHTML(l,full=false){
   (full && l.type!=="moved"?'<button class="mini-action" data-action="edit" data-id="'+esc(l.id)+'">編輯</button><button class="mini-action" data-action="change-lesson" data-id="'+esc(l.id)+'">改期／請假</button>'+((l.type==="leave"||l.moved_from||(l.schedule_id&&l.scheduled_date&&l.lesson_date!==l.scheduled_date))?'<button class="mini-action" data-action="restore-lesson" data-id="'+esc(l.id)+'">恢復原安排</button>':""):(full&&l.type==="moved"?'<button class="mini-action" data-action="restore-lesson" data-id="'+esc(l.id)+'">還原原日期</button>':""))
  ):(l.type==="planned"||l.type==="lesson"?'<button class="mini-action" data-action="leave-request" data-id="'+esc(l.id)+'">請假</button>':"");
  const pay=state.role==="parent" && l.type==="lesson"&&lessonBalance(l).available>0?'<button class="mini-action" data-action="payment-period-single" data-id="'+esc(l.id)+'">我已付款</button>':"";
- return '<div class="lesson-row"><span class="lesson-color '+(p==="paid"?"sage":"")+'"></span><div class="lesson-main"><strong>'+esc(name)+' · '+esc(l.subject||s?.subject||"課程")+'</strong><small>'+prettyDate(l.lesson_date)+' · '+esc(timeLabel(l.start_time))+'–'+esc(timeLabel(l.end_time))+'</small></div><div class="row-actions"><span class="pill '+p+'">'+esc(statusLabel(l))+'</span>'+(full?'<span class="lesson-amount">'+money(l.type==="lesson"?l.total_amount:0)+'</span>':"")+(l.schedule_id?'<span class="repeat-marker" title="固定課表">↻</span>':"")+actions+pay+'</div></div>';
+ return '<div class="lesson-row"><span class="lesson-color '+(p==="paid"?"sage":"")+'"></span><div class="lesson-main"><button type="button" class="day-lesson-open" data-action="open-lesson" data-id="'+esc(l.id)+'">'+esc(name)+' · '+esc(l.subject||s?.subject||"課程")+'</button><small>'+prettyDate(l.lesson_date)+' · '+esc(timeLabel(l.start_time))+'–'+esc(timeLabel(l.end_time))+'</small></div><div class="row-actions"><span class="pill '+p+'">'+esc(statusLabel(l))+'</span>'+(full?'<span class="lesson-amount">'+money(l.type==="lesson"?l.total_amount:0)+'</span>':"")+(l.schedule_id?'<span class="repeat-marker" title="固定課表">↻</span>':"")+actions+pay+'</div></div>';
 }
 function renderNext(){
  const next=visibleLessons().filter(l=>l.type==="planned"&&l.lesson_date>=dateKey(tick())).sort((a,b)=>(a.lesson_date+" "+a.start_time).localeCompare(b.lesson_date+" "+b.start_time))[0];
@@ -136,7 +137,7 @@ function renderFullCalendar(){
  const ls=visibleLessons();
  $("#calendar-grid").innerHTML=daysForMonth(state.month).map(d=>{
   const day=dateKey(d),items=ls.filter(l=>l.lesson_date===day).sort((a,b)=>asText(a.start_time).localeCompare(asText(b.start_time)));
-  return '<div class="calendar-cell '+(d.getMonth()!==state.month.getMonth()?"outside ":"")+(state.selected===day?"selected ":"")+(items.length?"has-events":"")+'" data-day="'+day+'" role="button" tabindex="0" aria-label="'+prettyDate(day)+' '+items.length+'堂課"><div class="day-number '+(day===dateKey(tick())?"today":"")+'">'+d.getDate()+'</div>'+items.slice(0,2).map(l=>'<div class="calendar-event '+(l.type==="leave"||l.type==="moved"?"leave":l.type==="lesson"?"done":"")+'">'+esc(l.type==="moved"?"改期":l.type==="leave"?"請假":l.subject||"課程")+' '+esc(timeLabel(l.start_time))+'</div>').join("")+(items.length>2?'<div class="more-count">＋'+(items.length-2)+' 堂</div>':"")+'</div>';
+  return '<div class="calendar-cell '+(d.getMonth()!==state.month.getMonth()?"outside ":"")+(state.selected===day?"selected ":"")+(items.length?"has-events":"")+'" data-day="'+day+'" role="button" tabindex="0" aria-label="'+prettyDate(day)+' '+items.length+'堂課"><div class="day-number '+(day===dateKey(tick())?"today":"")+'">'+d.getDate()+'</div>'+items.slice(0,2).map(l=>'<button type="button" class="calendar-event lesson-event-click '+(l.type==="leave"||l.type==="moved"?"leave":l.type==="lesson"?"done":"")+'" data-action="open-lesson" data-id="'+esc(l.id)+'">'+esc(l.type==="moved"?"改期":l.type==="leave"?"請假":(studentFor(l)?.name||l.student||"學生"))+' '+esc(timeLabel(l.start_time))+'</button>').join("")+(items.length>2?'<div class="more-count">＋'+(items.length-2)+' 堂</div>':"")+'</div>';
  }).join("");
  $("#selected-date-title").textContent=prettyDate(state.selected)+" 的課程";
  const rows=ls.filter(l=>l.lesson_date===state.selected).sort((a,b)=>asText(a.start_time).localeCompare(asText(b.start_time)));
@@ -193,7 +194,7 @@ function renderBilling(){
  const reqs=state.requests.filter(r=>state.role==="teacher"?(state.mode==="demo"||r.teacher_id===activeUser?.id):(state.mode==="demo"||r.parent_id===activeUser?.id))
   .sort((a,b)=>(a.status==="pending"?0:1)-(b.status==="pending"?0:1)||(b.created_at||"").localeCompare(a.created_at||""));
  $("#requests-list").innerHTML=reqs.length?reqs.map(r=>{const student=state.students.find(s=>s.id===r.student_id),lesson=state.lessons.find(l=>l.id===r.lesson_id),tag=r.status==="pending"?"待確認":r.status==="approved"?"已同意":"未同意";
- return '<div class="request-row"><span class="lesson-color '+(r.status==="approved"?"sage":"")+'"></span><div class="lesson-main"><strong>'+esc(student?.name||"學生")+' · '+(r.kind==="leave"?"請假申請":"單堂付款回報")+'</strong><small>'+esc(lesson?.lesson_date||"")+' '+esc(r.note||"")+'</small></div><span class="pill '+(r.status==="approved"?"paid":r.status==="pending"?"pending":"")+'">'+tag+'</span>'+(state.role==="teacher"&&r.status==="pending"?'<button class="mini-action" data-action="approve-request" data-id="'+esc(r.id)+'">同意</button><button class="mini-action" data-action="decline-request" data-id="'+esc(r.id)+'">不接受</button>':"")+'</div>'}).join(""):'<div class="empty">目前沒有需要處理的單堂請假或付款申請。</div>';
+ return '<div class="request-row"><span class="lesson-color '+(r.status==="approved"?"sage":"")+'"></span><div class="lesson-main"><strong>'+esc(student?.name||"學生")+' · '+(r.kind==="leave"?"請假申請":r.kind==="time_correction"?"實際時間更正申請":"單堂付款回報")+'</strong><small>'+esc(lesson?.lesson_date||r.scheduled_date||"")+' '+(r.kind==="time_correction"?esc(r.requested_actual_start_time)+"–"+esc(r.requested_actual_end_time)+" · "+esc(r.requested_actual_hours)+" 小時 · ":"")+esc(r.note||"")+'</small></div><span class="pill '+(r.status==="approved"?"paid":r.status==="pending"?"pending":"")+'">'+tag+'</span>'+(state.role==="teacher"&&r.status==="pending"?'<button class="mini-action" data-action="approve-request" data-id="'+esc(r.id)+'">同意</button><button class="mini-action" data-action="decline-request" data-id="'+esc(r.id)+'">不接受</button>':"")+'</div>'}).join(""):'<div class="empty">目前沒有需要處理的單堂請假或付款申請。</div>';
 }
 function renderStudents(){
  const st=visibleStudents();
@@ -271,7 +272,7 @@ async function saveRecord(ev){
  });if(ok){closeModal("record-modal");closeModal("day-modal");toast("課程已更新")}return;
  }
  const dates=scheduleDates(date,$("#record-repeat").value,$("#record-until").value);
- const records=dates.map(day=>({...common,lesson_date:day,type:day<dateKey(tick())?"lesson":"planned",status:"未付款",owner_id:activeUser?.id||"demo-teacher"}));
+ const records=dates.map(day=>({...common,lesson_date:day,type:"planned",status:"未付款",owner_id:activeUser?.id||"demo-teacher"}));
  const ok=await persist(async()=>{if(state.mode==="demo"){state.lessons.push(...records.map(x=>({...x,id:uid()})))}else assertResult(await client.from("lesson_records").insert(records))});
  if(ok){closeModal("record-modal");toast("已新增 "+records.length+" 堂課")}
 }
@@ -307,6 +308,7 @@ async function updateLesson(id,patch,msg){
   else assertResult(await client.from("lesson_records").update(patch).eq("id",id).select("id").single());
  });
  if(ok){toast(msg);refreshDaySheet()}
+ return ok;
 }
 function openRequest(id,kind){
  const l=resolveLesson(id);if(!l||l.type==="moved")return;
@@ -335,16 +337,19 @@ async function reviewRequest(id,approve){
  const newStatus=approve?"approved":"declined";
  const ok=await persist(async()=>{
   if(state.mode==="demo"){
-   r.status=newStatus;r.reviewed_at=new Date().toISOString();
    if(approve&&r.lesson_id){
     const l=state.lessons.find(l=>l.id===r.lesson_id);
     if(!l)throw Error("找不到對應課程");
-    Object.assign(l,r.kind==="leave"?{type:"leave",leave_source:"student"}:{status:"家長已付款",payment_date:dateKey(tick())});
+    if((r.kind==="leave"||r.kind==="time_correction")&&lessonLocked(l))throw Error("課程已進入付款程序，請先處理帳務");
+    if(r.kind==="leave")Object.assign(l,{type:"leave",leave_source:"student",actual_hours:null,actual_start_time:null,actual_end_time:null,hours:0,total_amount:0});
+    else if(r.kind==="time_correction")Object.assign(l,{actual_start_time:r.requested_actual_start_time,actual_end_time:r.requested_actual_end_time,actual_hours:r.requested_actual_hours,hours:r.requested_actual_hours,total_amount:Math.round(Number(r.requested_actual_hours)*Number(l.hourly_rate)*100)/100});
+    else Object.assign(l,{status:"家長已付款",payment_date:dateKey(tick())});
    }else if(approve&&r.schedule_id&&r.scheduled_date&&r.kind==="leave"){
     const record={schedule_id:r.schedule_id,original_date:r.scheduled_date,teacher_id:r.teacher_id,action:"student_leave",moved_to:null,remarks:r.note};
     const prev=state.exceptions.find(e=>e.schedule_id===r.schedule_id&&e.original_date===r.scheduled_date);
     if(prev)Object.assign(prev,record);else state.exceptions.push({id:uid(),...record});
    }
+   r.status=newStatus;r.reviewed_at=new Date().toISOString();
   }else{
    assertResult(await client.rpc("review_family_request",{p_request_id:id,p_approve:approve}));
   }
@@ -484,6 +489,101 @@ async function submitReceipt(ev){
  await reviewPeriodBatch(state.receiptBatch,true,date);
 }
 
+
+function lessonLocked(lesson){
+ return !isVirtualOccurrence(lesson)&&isPaymentLocked(lesson,state.paymentBatches,state.paymentBatchItems,state.requests);
+}
+function openLessonPopup(id){
+ const lesson=resolveLesson(id);
+ if(!lesson){toast("找不到這堂課，請重新整理月曆");return}
+ closeModal("day-modal");
+ state.activeLesson=id;
+ const d=actualDefaults(lesson);
+ const teacher=state.role==="teacher",locked=lessonLocked(lesson),inactive=lesson.type==="leave"||lesson.type==="moved";
+ $("#lesson-modal-heading").textContent=(studentFor(lesson)?.name||lesson.student||"學生")+" · "+(lesson.subject||"課程");
+ $("#lesson-modal-date").textContent=prettyDate(lesson.lesson_date)+" · "+statusLabel(lesson);
+ $("#lesson-planned-time").textContent=d.scheduledStart+" – "+d.scheduledEnd+"（"+(durationHours(d.scheduledStart,d.scheduledEnd)||0)+" 小時）";
+ $("#lesson-status-hint").textContent=lesson.type==="lesson"?"已完成上課，可查看實際紀錄":lesson.type==="leave"?"本堂已請假／停課":lesson.type==="moved"?"本堂已改期":"原本預定的課程";
+ $("#lesson-actual-start").value=d.actualStart;
+ $("#lesson-actual-end").value=d.actualEnd;
+ $("#lesson-actual-hours").value=String(d.actualHours);
+ state.actualHoursManual=false;
+ $("#lesson-lock-hint").classList.toggle("hidden",!locked);
+ $("#lesson-teacher-actions").classList.toggle("hidden",!teacher);
+ $("#lesson-parent-actions").classList.toggle("hidden",teacher);
+ $("#lesson-parent-note-wrap").classList.toggle("hidden",teacher||inactive);
+ $("#lesson-parent-note").value="";
+ $("#lesson-time-editor").classList.toggle("hidden",inactive||(state.role==="parent"&&lesson.type!=="lesson"));
+ $("#lesson-actual-heading").textContent=teacher?"實際上課時間":"實際時間更正建議";
+ $("#lesson-save").textContent=lesson.type==="leave"?"恢復原安排":lesson.type==="lesson"?"儲存實際上課紀錄":lesson.type==="moved"?"查看改期安排":"確認完成上課";
+ $("#lesson-save").disabled=locked||lesson.type==="moved";
+ $("#lesson-student-leave").classList.toggle("hidden",inactive||locked);
+ $("#lesson-teacher-leave").classList.toggle("hidden",inactive||locked);
+ $("#lesson-move").classList.toggle("hidden",inactive||locked||lesson.type==="lesson");
+ $("#lesson-parent-correct").classList.toggle("hidden",inactive||locked||lesson.type!=="lesson"||isVirtualOccurrence(lesson));
+ $("#lesson-parent-leave").classList.toggle("hidden",inactive||locked);
+ ["lesson-actual-start","lesson-actual-end","lesson-actual-hours"].forEach(id=>$("#"+id).disabled=inactive||locked);
+ showModal("lesson-modal");
+}
+function lessonFormValues(){
+ const start=$("#lesson-actual-start").value,end=$("#lesson-actual-end").value,hours=$("#lesson-actual-hours").value;
+ return validateActual(start,end,hours);
+}
+function syncActualHoursFromTime(){
+ if(state.actualHoursManual)return;
+ const h=durationHours($("#lesson-actual-start").value,$("#lesson-actual-end").value);
+ if(h!==null)$("#lesson-actual-hours").value=String(h);
+}
+async function saveLessonOutcome(ev){
+ ev.preventDefault();
+ const lesson=resolveLesson(state.activeLesson);
+ if(!lesson||state.role!=="teacher")return;
+ if(lesson.type==="leave"){closeModal("lesson-modal");await restoreLesson(lesson.id);return}
+ if(lesson.type==="moved"||lessonLocked(lesson)){toast("請先處理已取消或已進入帳務流程的課程");return}
+ let values;try{values=lessonFormValues()}catch(e){toast(e.message);return}
+ const patch={type:"lesson",actual_start_time:values.actual_start_time,actual_end_time:values.actual_end_time,
+  actual_hours:values.actual_hours,hours:values.hours,total_amount:Math.round(values.hours*Number(lesson.hourly_rate)*100)/100};
+ const ok=await updateLesson(lesson.id,patch,lesson.type==="lesson"?"實際時數已更新":"已完成上課，費用會依實際計費時數計算");
+ if(ok)closeModal("lesson-modal");
+}
+async function markLessonLeave(source){
+ const lesson=resolveLesson(state.activeLesson);
+ if(!lesson||state.role!=="teacher"||lesson.type==="moved"||lessonLocked(lesson))return;
+ const label=source==="teacher"?"老師停課":"學生請假";
+ if(!confirm("確認將 "+prettyDate(lesson.lesson_date)+" 的課程標記為「"+label+"」？本堂不再計入實際上課時數與應收費用，固定課表不受影響。"))return;
+ let ok=false;
+ if(isVirtualOccurrence(lesson)){
+  ok=await persist(async()=>{await upsertException(lesson,source==="teacher"?"teacher_leave":"student_leave",null,"課後補登 "+label)});
+ }else{
+  ok=await updateLesson(lesson.id,{type:"leave",leave_source:source,actual_start_time:null,actual_end_time:null,actual_hours:null,hours:0,total_amount:0},"已記錄"+label);
+ }
+ if(ok!==false)closeModal("lesson-modal");
+}
+async function submitParentLessonRequest(kind){
+ const lesson=resolveLesson(state.activeLesson);
+ if(!lesson||state.role!=="parent"||lessonLocked(lesson))return;
+ if(kind==="time_correction"&&(isVirtualOccurrence(lesson)||lesson.type!=="lesson")){toast("此課程尚未有實際上課紀錄");return}
+ let fields={};
+ if(kind==="time_correction"){
+  try{
+   const v=lessonFormValues();
+   fields={requested_actual_start_time:v.actual_start_time,requested_actual_end_time:v.actual_end_time,requested_actual_hours:v.actual_hours};
+  }catch(e){toast(e.message);return}
+ }
+ if(state.requests.some(r=>r.status==="pending"&&r.kind===kind
+   &&(r.lesson_id===lesson.id||(isVirtualOccurrence(lesson)&&r.schedule_id===lesson.schedule_id&&r.scheduled_date===lesson.scheduled_date)))){
+  toast("這堂課已有待老師確認的相同申請");return;
+ }
+ const data={kind,status:"pending",note:$("#lesson-parent-note").value.trim(),lesson_id:isVirtualOccurrence(lesson)?null:lesson.id,
+  schedule_id:isVirtualOccurrence(lesson)?lesson.schedule_id:null,scheduled_date:isVirtualOccurrence(lesson)?lesson.scheduled_date:null,
+  parent_id:activeUser?.id||"demo-parent",teacher_id:lesson.owner_id,student_id:lesson.student_id,...fields};
+ const ok=await persist(async()=>{
+  if(state.mode==="demo")state.requests.push({id:uid(),created_at:new Date().toISOString(),...data});
+  else assertResult(await client.from("family_requests").insert(data));
+ });
+ if(ok){closeModal("lesson-modal");toast("已提交"+(kind==="leave"?"請假":"時間更正")+"申請，等待老師確認")}
+}
+
 function refreshDaySheet(){
  if(!$("#day-modal").open)return;
  const date=state.selected,items=visibleLessons().filter(l=>l.lesson_date===date).sort((a,b)=>asText(a.start_time).localeCompare(asText(b.start_time)));
@@ -495,7 +595,10 @@ function refreshDaySheet(){
 }
 function openDay(day){
  state.selected=day;state.month=new Date(parseDate(day).getFullYear(),parseDate(day).getMonth(),1);
- render();refreshDaySheet();showModal("day-modal");refreshDaySheet();
+ render();
+ const options=visibleLessons().filter(l=>l.lesson_date===day&&l.type!=="moved");
+ if(options.length===1){openLessonPopup(options[0].id);return}
+ refreshDaySheet();showModal("day-modal");refreshDaySheet();
 }
 function scheduleRuleLabel(rule){
  const days=(rule.weekdays||[]).map(d=>"週"+["","一","二","三","四","五","六","日"][d]).join("、");
@@ -606,7 +709,7 @@ async function stopSchedule(id){
 }
 function openChange(lesson){
  if(!lesson||lesson.type==="moved"||state.role!=="teacher")return;
- if(lesson.status==="老師已收到"){toast("已結清課程不能直接改期，請先處理帳務");return}
+ if(lessonLocked(lesson)){toast("已進入付款或收款程序，請先處理帳務");return}
  state.changingLesson=lesson.id;
  $("#change-title").textContent=(studentFor(lesson)?.name||"學生")+" · "+prettyDate(lesson.lesson_date);
  $("#change-description").textContent=lesson.schedule_id?"此操作只影響這一堂固定課，不會改掉其他週。":"這次調整只會影響選定的課程。";
@@ -636,7 +739,7 @@ async function submitChange(ev){
    await upsertException(lesson,action,action==="reschedule"?day:null,remarks);
   }else{
    const patch=action==="reschedule"?{lesson_date:day,remarks:remarks||lesson.remarks,type:"planned"}:
-     {type:"leave",leave_source:action==="teacher_leave"?"teacher":"student",remarks:remarks||lesson.remarks};
+     {type:"leave",leave_source:action==="teacher_leave"?"teacher":"student",remarks:remarks||lesson.remarks,actual_hours:null,actual_start_time:null,actual_end_time:null,hours:0,total_amount:0};
    if(state.mode==="demo")Object.assign(lesson,patch);
    else assertResult(await client.from("lesson_records").update(patch).eq("id",lesson.id).select("id").single());
   }
@@ -645,13 +748,16 @@ async function submitChange(ev){
 }
 async function restoreLesson(id){
  const lesson=resolveLesson(id);if(!lesson||state.role!=="teacher")return;
- if(lesson.status==="老師已收到"){toast("已完成收款的課程不能直接復原");return}
+ if(lessonLocked(lesson)){toast("課程已進入收付款程序，請先處理帳務");return}
  const ok=await persist(async()=>{
   if(isVirtualOccurrence(lesson)&&lesson.schedule_id){
    if(state.mode==="demo")state.exceptions=state.exceptions.filter(e=>!(e.schedule_id===lesson.schedule_id&&e.original_date===lesson.scheduled_date));
    else assertResult(await client.from("schedule_exceptions").delete().eq("schedule_id",lesson.schedule_id).eq("original_date",lesson.scheduled_date).select("id").single());
   }else{
-   const patch={type:"planned",leave_source:null,lesson_date:lesson.scheduled_date||lesson.lesson_date};
+   const plannedHours=durationHours(timeLabel(lesson.start_time),timeLabel(lesson.end_time))||Number(lesson.hours)||1;
+   const patch={type:"planned",leave_source:null,lesson_date:lesson.scheduled_date||lesson.lesson_date,
+     actual_start_time:null,actual_end_time:null,actual_hours:null,hours:plannedHours,
+     total_amount:Math.round(plannedHours*Number(lesson.hourly_rate)*100)/100};
    if(state.mode==="demo")Object.assign(lesson,patch);
    else assertResult(await client.from("lesson_records").update(patch).eq("id",lesson.id).select("id").single());
   }
@@ -699,18 +805,17 @@ function bindEvents(){
   const nav=ev.target.closest("[data-view]");if(nav){setView(nav.dataset.view);if(nav.dataset.date){state.selected=nav.dataset.date;state.month=parseDate(state.selected);render()}return}
   const close=ev.target.closest("[data-close]");if(close){closeModal(close.dataset.close);return}
   const switcher=ev.target.closest("[data-calendar-mode]");if(switcher){changeCalendarMode(switcher.dataset.calendarMode);return}
-  const day=ev.target.closest("[data-day]");if(day){openDay(day.dataset.day);return}
   const action=ev.target.closest("[data-action]");if(action){
    const id=action.dataset.id,kind=action.dataset.action;
-   if(kind==="complete")await updateLesson(id,{type:"lesson"},"已完成上課");
+   if(kind==="open-lesson"||kind==="complete"||kind==="edit"||kind==="leave-request"){openLessonPopup(id);return}
    if(kind==="received")await updateLesson(id,{status:"老師已收到",received_date:dateKey(tick())},"已確認收款");
-   if(kind==="edit"){closeModal("day-modal");openRecord(resolveLesson(id))}
+   
    if(kind==="cancel-lesson")openChange(resolveLesson(id));
    if(kind==="change-lesson")openChange(resolveLesson(id));
    if(kind==="restore-lesson")await restoreLesson(id);
    if(kind==="edit-rule")openSchedule(state.schedules.find(r=>r.id===id));
    if(kind==="stop-rule")await stopSchedule(id);
-   if(kind==="leave-request")openRequest(id,"leave");
+   
    if(kind==="payment-period-single"){const l=resolveLesson(id);if(l)openPeriodModal(l.student_id,l.lesson_date,l.lesson_date)}
    if(kind==="accept-invite")await acceptInvite(id);
    if(kind==="approve-request")await reviewRequest(id,true);
@@ -718,8 +823,17 @@ function bindEvents(){
    if(kind==="confirm-batch")openReceiptModal(id);
    if(kind==="decline-batch")if(confirm("確定退回這筆期間付款？這不會刪除紀錄，但可付款餘額會重新開放。"))await reviewPeriodBatch(id,false,null);
   }
+  const day=ev.target.closest("[data-day]");if(day){openDay(day.dataset.day);return}
  });
- document.addEventListener("keydown",ev=>{const el=ev.target.closest("[data-day]");if(el&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();openDay(el.dataset.day)}});
+ document.addEventListener("keydown",ev=>{const el=ev.target.closest("[data-day]");if(el&&!ev.target.closest("[data-action]")&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();openDay(el.dataset.day)}});
+ $("#lesson-form").addEventListener("submit",saveLessonOutcome);
+ ["lesson-actual-start","lesson-actual-end"].forEach(id=>$("#"+id).addEventListener("change",syncActualHoursFromTime));
+ $("#lesson-actual-hours").addEventListener("input",()=>{state.actualHoursManual=true});
+ $("#lesson-student-leave").onclick=()=>markLessonLeave("student");
+ $("#lesson-teacher-leave").onclick=()=>markLessonLeave("teacher");
+ $("#lesson-move").onclick=()=>{const lesson=resolveLesson(state.activeLesson);closeModal("lesson-modal");openChange(lesson)};
+ $("#lesson-parent-correct").onclick=()=>submitParentLessonRequest("time_correction");
+ $("#lesson-parent-leave").onclick=()=>submitParentLessonRequest("leave");
  $("#top-add").onclick=()=>openRecord();
  $("#agenda-add").onclick=()=>openRecord();
  $("#show-full-month").onclick=()=>changeCalendarMode("list");
