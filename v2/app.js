@@ -363,6 +363,7 @@ function updateRecordRepeatUI(){
  $("#repeat-label").classList.toggle("hidden",editing);
  $("#record-weekdays-wrap").classList.toggle("hidden",editing||!["weekly","biweekly"].includes(repeat));
  $("#until-label").classList.toggle("hidden",editing||repeat==="none");
+ $("#repeat-until-caption").textContent=repeat==="monthly"?"每月重複到（空白預設下個月，最多 52 堂）":"重複到日期（可留空，空白代表長期）";
 }
 
 function openRecord(lesson=null){
