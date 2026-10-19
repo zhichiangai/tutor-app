@@ -101,7 +101,7 @@ function rowHTML(l,full=false){
  const actions=state.role==="teacher"?(
   (l.type==="planned"?'<button class="mini-action" data-action="complete" data-id="'+esc(l.id)+'">完成上課</button>':"")+
   (l.type==="lesson"&&l.status!=="老師已收到"?'<button class="mini-action" data-action="received" data-id="'+esc(l.id)+'">確認收款</button>':"")+
-  (full && l.type!=="moved"?'<button class="mini-action" data-action="edit" data-id="'+esc(l.id)+'">編輯</button><button class="mini-action" data-action="change-lesson" data-id="'+esc(l.id)+'">改期／請假</button>'+((l.type==="leave"||l.moved_from)?'<button class="mini-action" data-action="restore-lesson" data-id="'+esc(l.id)+'">恢復原安排</button>':""):"")
+  (full && l.type!=="moved"?'<button class="mini-action" data-action="edit" data-id="'+esc(l.id)+'">編輯</button><button class="mini-action" data-action="change-lesson" data-id="'+esc(l.id)+'">改期／請假</button>'+((l.type==="leave"||l.moved_from)?'<button class="mini-action" data-action="restore-lesson" data-id="'+esc(l.id)+'">恢復原安排</button>':""):(full&&l.type==="moved"?'<button class="mini-action" data-action="restore-lesson" data-id="'+esc(l.id)+'">還原原日期</button>':""))
  ):(l.type==="planned"||l.type==="lesson"?'<button class="mini-action" data-action="leave-request" data-id="'+esc(l.id)+'">請假</button>':"");
  const pay=state.role==="parent" && l.type==="lesson"&&l.status==="未付款"?'<button class="mini-action" data-action="payment-request" data-id="'+esc(l.id)+'">我已付款</button>':"";
  return '<div class="lesson-row"><span class="lesson-color '+(p==="paid"?"sage":"")+'"></span><div class="lesson-main"><strong>'+esc(name)+' · '+esc(l.subject||s?.subject||"課程")+'</strong><small>'+prettyDate(l.lesson_date)+' · '+esc(timeLabel(l.start_time))+'–'+esc(timeLabel(l.end_time))+'</small></div><div class="row-actions"><span class="pill '+p+'">'+esc(statusLabel(l))+'</span>'+(full?'<span class="lesson-amount">'+money(l.type==="lesson"?l.total_amount:0)+'</span>':"")+(l.schedule_id?'<span class="repeat-marker" title="固定課表">↻</span>':"")+actions+pay+'</div></div>';
@@ -473,6 +473,7 @@ async function submitChange(ev){
  ev.preventDefault();
  const lesson=resolveLesson(state.changingLesson);if(!lesson||state.role!=="teacher")return;
  const action=$("#change-action").value,day=$("#change-new-date").value,remarks=$("#change-note").value.trim();
+ if(!isVirtualOccurrence(lesson)&&lesson.type==="lesson"){toast("已完成課程請使用「編輯」修正紀錄，不應直接標記停課");return}
  if(action==="reschedule"&&(!day||day===lesson.lesson_date)){toast("請選擇不同的補課日期");return}
  if(action==="reschedule"){
   const overlap=findTimeConflicts(visibleLessons(),{...lesson,lesson_date:day},lesson.id);
