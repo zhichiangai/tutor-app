@@ -4,6 +4,7 @@
  */
 import { expandSchedules, isVirtualOccurrence, findTimeConflicts, originalOccurrenceDate, matchesRecurrence } from "./scheduling.js";
 import { monthAgendaMarkup, monthSummary } from "./calendar-view.js";
+import { lessonAllocation, eligiblePeriodLessons, allocateOldestFirst, amount } from "./payment-ledger.js";
 const SUPABASE_URL = "https://vctisuglfoxyuwlvyjee.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_QR8An_jEnMEZTPuTHebFDA_xg46FLit";
 const STORAGE = "tutor_v2_preview_data_20261019";
@@ -25,7 +26,7 @@ const timeLabel = (s) => asText(s).slice(0,5);
 const tick = ()=>new Date();
 const uid = ()=>crypto.randomUUID();
 let client=null, activeUser=null, loading=false;
-const state={mode:localStorage.getItem(MODE_STORAGE)==="live"?"live":"demo",role:localStorage.getItem(ROLE_STORAGE)==="parent"?"parent":"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month"};
+const state={mode:localStorage.getItem(MODE_STORAGE)==="live"?"live":"demo",role:localStorage.getItem(ROLE_STORAGE)==="parent"?"parent":"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",paymentBatches:[],paymentBatchItems:[],receiptBatch:null};
 
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
@@ -37,15 +38,17 @@ function seed(){
  const lessons=[]; let counter=1;
  for(let i=0;i<27;i+=3){const d=new Date(base.getFullYear(),base.getMonth(),i+2);if(d.getMonth()!==base.getMonth())break;
   const st=demoStudents[(i/3)%3],passed=dateKey(d)<dateKey(today);
-  lessons.push({id:"demo-l"+counter++,owner_id:"demo-teacher",student_id:st.id,student:st.name,subject:st.subject,lesson_date:dateKey(d),start_time:((i%2)?"18:00":"19:00"),end_time:((i%2)?"19:30":"20:30"),hours:1.5,hourly_rate:st.hourly_rate,total_amount:st.hourly_rate*1.5,type:passed?"lesson":"planned",status:passed?(i%3===0?"老師已收到":"未付款"):"未付款",remarks:passed?"今日複習重點觀念，進度很穩定。":"",focus_rating:4,attitude_rating:5});
+  lessons.push({id:"demo-l"+counter++,owner_id:"demo-teacher",student_id:st.id,student:st.name,subject:st.subject,lesson_date:dateKey(d),start_time:((i%2)?"18:00":"19:00"),end_time:((i%2)?"19:30":"20:30"),hours:1.5,hourly_rate:st.hourly_rate,total_amount:st.hourly_rate*1.5,type:passed?"lesson":"planned",status:passed?(i%4===0?"老師已收到":"未付款"):"未付款",remarks:passed?"今日複習重點觀念，進度很穩定。":"",focus_rating:4,attitude_rating:5});
  }
  const upcoming=[1,3,6].map((offset,i)=>{const d=new Date(today.getFullYear(),today.getMonth(),today.getDate()+offset),st=demoStudents[i];return {id:"demo-f"+i,owner_id:"demo-teacher",student_id:st.id,student:st.name,subject:st.subject,lesson_date:dateKey(d),start_time:i===0?"19:00":"18:00",end_time:i===0?"20:30":"19:30",hours:1.5,hourly_rate:st.hourly_rate,total_amount:st.hourly_rate*1.5,type:"planned",status:"未付款",remarks:""}});
- return {students:demoStudents,lessons:[...lessons,...upcoming],invites:[],guardians:demoStudents.map(s=>({student_id:s.id,guardian_id:"demo-parent",teacher_id:"demo-teacher"})),requests:[],
+ const prev=new Date(today.getFullYear(),today.getMonth()-1,23);
+ const previousLesson={id:"demo-prev-unpaid",owner_id:"demo-teacher",student_id:"demo-s1",student:"小明",subject:"數學",lesson_date:dateKey(prev),start_time:"19:00",end_time:"20:30",hours:1.5,hourly_rate:500,total_amount:750,type:"lesson",status:"未付款",remarks:"跨月付款測試課程"};
+ return {students:demoStudents,lessons:[...lessons,...upcoming,previousLesson],invites:[],guardians:demoStudents.map(s=>({student_id:s.id,guardian_id:"demo-parent",teacher_id:"demo-teacher"})),requests:[],
   schedules:[{id:"demo-rule-1",teacher_id:"demo-teacher",student_id:"demo-s3",subject:"理化",weekdays:[3,6],every_weeks:1,starts_on:dateKey(today),ends_on:dateKey(new Date(today.getFullYear(),today.getMonth()+3,today.getDate())),start_time:"16:00",end_time:"17:30",hourly_rate:550}],
-  exceptions:[]};
+  exceptions:[],paymentBatches:[],paymentBatchItems:[]};
 }
-function saveDemo(){if(state.mode==="demo")localStorage.setItem(STORAGE,JSON.stringify({students:state.students,lessons:state.lessons,invites:state.invites,guardians:state.guardians,requests:state.requests,schedules:state.schedules,exceptions:state.exceptions}))}
-function loadDemo(){try{const o=JSON.parse(localStorage.getItem(STORAGE)||"null")||seed();for(const k of ["students","lessons","invites","guardians","requests","schedules","exceptions"])state[k]=Array.isArray(o[k])?o[k]:(k==="schedules"?seed().schedules:[]);}catch{Object.assign(state,seed());}saveDemo();}
+function saveDemo(){if(state.mode==="demo")localStorage.setItem(STORAGE,JSON.stringify({students:state.students,lessons:state.lessons,invites:state.invites,guardians:state.guardians,requests:state.requests,schedules:state.schedules,exceptions:state.exceptions,paymentBatches:state.paymentBatches,paymentBatchItems:state.paymentBatchItems}))}
+function loadDemo(){try{const o=JSON.parse(localStorage.getItem(STORAGE)||"null")||seed();for(const k of ["students","lessons","invites","guardians","requests","schedules","exceptions","paymentBatches","paymentBatchItems"])state[k]=Array.isArray(o[k])?o[k]:(k==="schedules"?seed().schedules:[]);}catch{Object.assign(state,seed());}saveDemo();}
 function visibleStudents(){
  if(state.role==="teacher")return state.students.filter(s=>state.mode==="demo"||s.teacher_id===activeUser?.id);
  const allowed=new Set(state.guardians.filter(g=>state.mode==="demo"||g.guardian_id===activeUser?.id).map(g=>g.student_id));
@@ -61,8 +64,9 @@ function resolveLesson(id){return visibleLessons().find(l=>l.id===id)}
 function studentFor(lesson){return state.students.find(s=>s.id===lesson.student_id)}
 function isPast(s){return s<dateKey(tick())}
 function typeLabel(l){return l.type==="leave"?"已請假":l.type==="planned"?"預排課程":"已上課"}
-function statusLabel(l){return l.type==="moved"?"已改期":l.type==="leave"?(l.leave_source==="teacher"?"老師停課":"學生請假"):l.type==="planned"?"預計上課":l.status||"未付款"}
-function pillClass(l){return l.type==="moved"?"pending":l.type==="leave"?"leave":l.type==="planned"?"":l.status==="老師已收到"?"paid":l.status==="家長已付款"?"pending":""}
+function statusLabel(l){if(l.type==="lesson"){const balance=lessonBalance(l);if(balance.pending>0&&balance.confirmed>0)return "部分已收／待確認";if(balance.pending>0)return balance.pending>=balance.total-0.005?"家長已付款":"部分付款待確認";if(balance.confirmed>0)return balance.confirmed>=balance.total-0.005?"老師已收到":"部分已收款"}return l.type==="moved"?"已改期":l.type==="leave"?(l.leave_source==="teacher"?"老師停課":"學生請假"):l.type==="planned"?"預計上課":l.status||"未付款"}
+function pillClass(l){if(l.type==="lesson"){const b=lessonBalance(l);if(b.pending>0)return "pending";if(b.confirmed>=b.total-0.005&&b.total>0)return "paid"}return l.type==="moved"?"pending":l.type==="leave"?"leave":l.type==="planned"?"":l.status==="老師已收到"?"paid":l.status==="家長已付款"?"pending":""}
+function lessonBalance(l){return lessonAllocation(l,state.paymentBatches,state.paymentBatchItems,state.requests)}
 function lessonSum(list){return list.filter(l=>l.type==="lesson").reduce((v,l)=>v+num(l.total_amount),0)}
 function monthLessons(){return visibleLessons().filter(l=>sameMonth(l.lesson_date,state.month))}
 function hourTotal(list){return list.filter(l=>l.type==="lesson").reduce((v,l)=>v+num(l.hours),0)}
@@ -78,6 +82,7 @@ function render(){
  $("#greeting-copy").textContent=teacher?"從課程到收款，讓重要的小事都有自己的位置。":"孩子的上課安排、請假和付款，打開就能看見。";
  $("#top-add").style.display=teacher?"":"none";
  $("#demo-banner").classList.toggle("hidden",state.mode!=="demo");
+ $("#demo-reset").classList.toggle("hidden",state.mode!=="demo");
  $("#connection-status").classList.toggle("live",state.mode==="live"&&!!activeUser);
  $("#connection-status").innerHTML=state.mode==="demo"?"<i></i> 體驗模式":activeUser?"<i></i> 已安全連線":"<i></i> 尚未登入";
  $("#account-label").textContent=activeUser?.email?activeUser.email.split("@")[0]:"預覽使用者";
@@ -85,27 +90,29 @@ function render(){
  $("#avatar").textContent=activeUser?.email?.charAt(0).toUpperCase()||"好";
  $("#role-teacher").classList.toggle("active",teacher);
  $("#role-parent").classList.toggle("active",!teacher);
- const ls=monthLessons(),done=ls.filter(l=>l.type==="lesson"),pending=done.filter(l=>l.status!=="老師已收到");
- const completed=done.filter(l=>l.status==="老師已收到");
+ const ls=monthLessons(),done=ls.filter(l=>l.type==="lesson"),pending=done.filter(l=>lessonBalance(l).confirmed < lessonBalance(l).total-0.005);
+ const completed=done.filter(l=>lessonBalance(l).confirmed>=lessonBalance(l).total-0.005);
+ const unreceived=done.reduce((sum,l)=>sum+lessonBalance(l).total-lessonBalance(l).confirmed,0);
+ const received=done.reduce((sum,l)=>sum+lessonBalance(l).confirmed,0);
  const metrics=teacher?[
  ["本月已完成","◷",String(done.length),"<small>堂課</small>","繼續累積每一份努力"],
  ["本月上課時數","☷",hourTotal(ls).toFixed(1),"<small>小時</small>","依已完成課程計算"],
- ["尚待收款","◈",money(lessonSum(pending)),"","未完成收款的課程"]]:[
+ ["尚待收款","◈",money(unreceived),"","未完成收款的課程"]]:[
  ["本月已完成","◷",String(done.length),"<small>堂課</small>","查看孩子的學習足跡"],
  ["本月上課時數","☷",hourTotal(ls).toFixed(1),"<small>小時</small>","依已完成課程計算"],
  ["待確認費用","◈",money(lessonSum(pending)),"","依課程付款狀態計算"]];
  $("#metrics").innerHTML=metrics.map(([label,icon,value,unit,foot])=>'<article class="metric-card"><div class="metric-label">'+label+'</div><div class="metric-icon">'+icon+'</div><div class="metric-value">'+esc(value)+(unit||"")+'</div><div class="metric-footer">'+foot+'</div></article>').join("");
- $("#money-reminder").textContent=teacher?"本月已確認收到 "+money(lessonSum(completed))+"。":"目前有 "+pending.length+" 筆課程等待付款或收款確認。";
+ $("#money-reminder").textContent=teacher?"本月已確認收到 "+money(received)+"。":"目前有 "+pending.length+" 筆課程等待付款或收款確認。";
  renderNext();renderRecent();renderMiniCalendar();renderFullCalendar();renderBilling();renderStudents();refreshDaySheet();
 }
 function rowHTML(l,full=false){
  const s=studentFor(l),name=s?.name||l.student||"學生",p=pillClass(l);
  const actions=state.role==="teacher"?(
   (l.type==="planned"?'<button class="mini-action" data-action="complete" data-id="'+esc(l.id)+'">完成上課</button>':"")+
-  (l.type==="lesson"&&l.status!=="老師已收到"?'<button class="mini-action" data-action="received" data-id="'+esc(l.id)+'">確認收款</button>':"")+
+  (l.type==="lesson"&&l.status==="家長已付款"&&!state.paymentBatchItems.some(i=>i.lesson_id===l.id)?'<button class="mini-action" data-action="received" data-id="'+esc(l.id)+'">確認單堂收款</button>':"")+
   (full && l.type!=="moved"?'<button class="mini-action" data-action="edit" data-id="'+esc(l.id)+'">編輯</button><button class="mini-action" data-action="change-lesson" data-id="'+esc(l.id)+'">改期／請假</button>'+((l.type==="leave"||l.moved_from||(l.schedule_id&&l.scheduled_date&&l.lesson_date!==l.scheduled_date))?'<button class="mini-action" data-action="restore-lesson" data-id="'+esc(l.id)+'">恢復原安排</button>':""):(full&&l.type==="moved"?'<button class="mini-action" data-action="restore-lesson" data-id="'+esc(l.id)+'">還原原日期</button>':""))
  ):(l.type==="planned"||l.type==="lesson"?'<button class="mini-action" data-action="leave-request" data-id="'+esc(l.id)+'">請假</button>':"");
- const pay=state.role==="parent" && l.type==="lesson"&&l.status==="未付款"?'<button class="mini-action" data-action="payment-request" data-id="'+esc(l.id)+'">我已付款</button>':"";
+ const pay=state.role==="parent" && l.type==="lesson"&&lessonBalance(l).available>0?'<button class="mini-action" data-action="payment-period-single" data-id="'+esc(l.id)+'">我已付款</button>':"";
  return '<div class="lesson-row"><span class="lesson-color '+(p==="paid"?"sage":"")+'"></span><div class="lesson-main"><strong>'+esc(name)+' · '+esc(l.subject||s?.subject||"課程")+'</strong><small>'+prettyDate(l.lesson_date)+' · '+esc(timeLabel(l.start_time))+'–'+esc(timeLabel(l.end_time))+'</small></div><div class="row-actions"><span class="pill '+p+'">'+esc(statusLabel(l))+'</span>'+(full?'<span class="lesson-amount">'+money(l.type==="lesson"?l.total_amount:0)+'</span>':"")+(l.schedule_id?'<span class="repeat-marker" title="固定課表">↻</span>':"")+actions+pay+'</div></div>';
 }
 function renderNext(){
@@ -168,20 +175,25 @@ function changeCalendarMode(mode){
 }
 
 function renderBilling(){
- const ls=monthLessons().filter(l=>l.type==="lesson"),unpaid=ls.filter(l=>l.status!=="老師已收到"),paid=ls.filter(l=>l.status==="老師已收到");
+ const ls=monthLessons().filter(l=>l.type==="lesson").sort((a,b)=>a.lesson_date.localeCompare(b.lesson_date));
+ const billed=ls.reduce((sum,l)=>sum+lessonBalance(l).total,0);
+ const confirmed=ls.reduce((sum,l)=>sum+lessonBalance(l).confirmed,0);
+ const pending=ls.reduce((sum,l)=>sum+lessonBalance(l).pending,0);
  $("#billing-title").textContent=state.role==="teacher"?"收付款整理":"付款與對帳";
  $("#billing-month").textContent=state.month.getFullYear()+"年 "+(state.month.getMonth()+1)+"月";
  $("#billing-summary").innerHTML=[
-  ["本月應收","◈",money(lessonSum(ls))],["已確認收款","✓",money(lessonSum(paid))],["待確認","◷",money(lessonSum(unpaid))]
+  ["本月課程費用","◈",money(billed)],
+  ["老師已確認收款","✓",money(confirmed)],
+  ["尚未確認收款","◷",money(Math.max(0,billed-confirmed))]
  ].map(([label,icon,value])=>'<div class="metric-card"><span class="metric-label">'+label+'</span><span class="metric-icon">'+icon+'</span><div class="metric-value">'+value+'</div></div>').join("");
- const batchItems=state.role==="teacher"?ls.filter(l=>l.status==="家長已付款"):ls.filter(l=>l.status==="未付款"&&!state.requests.some(r=>r.lesson_id===l.id&&r.kind==="payment"&&r.status==="pending"));
- $("#batch-action").classList.toggle("hidden",batchItems.length===0);
- $("#batch-action").textContent=state.role==="teacher"?"確認 "+batchItems.length+" 筆收款":"回報 "+batchItems.length+" 筆已付款";
- $("#billing-list").innerHTML=ls.length?ls.sort((a,b)=>a.lesson_date.localeCompare(b.lesson_date)).map(l=>rowHTML(l,true)).join(""):'<div class="empty">這個月份還沒有已完成的課程費用。</div>';
+ $("#batch-action").classList.remove("hidden");
+ $("#batch-action").textContent=state.role==="teacher"?"查看指定期間收款":"選擇期間回報已付款";
+ $("#billing-list").innerHTML=ls.length?ls.map(l=>rowHTML(l,true)).join(""):'<div class="empty">這個月還沒有已完成的課程。排定的未上課時段不會算入費用。</div>';
+ renderPaymentHistory();
  const reqs=state.requests.filter(r=>state.role==="teacher"?(state.mode==="demo"||r.teacher_id===activeUser?.id):(state.mode==="demo"||r.parent_id===activeUser?.id))
   .sort((a,b)=>(a.status==="pending"?0:1)-(b.status==="pending"?0:1)||(b.created_at||"").localeCompare(a.created_at||""));
  $("#requests-list").innerHTML=reqs.length?reqs.map(r=>{const student=state.students.find(s=>s.id===r.student_id),lesson=state.lessons.find(l=>l.id===r.lesson_id),tag=r.status==="pending"?"待確認":r.status==="approved"?"已同意":"未同意";
- return '<div class="request-row"><span class="lesson-color '+(r.status==="approved"?"sage":"")+'"></span><div class="lesson-main"><strong>'+esc(student?.name||"學生")+' · '+(r.kind==="leave"?"請假申請":"付款回報")+'</strong><small>'+esc(lesson?.lesson_date||"")+' '+esc(r.note||"")+'</small></div><span class="pill '+(r.status==="approved"?"paid":r.status==="pending"?"pending":"")+'">'+tag+'</span>'+(state.role==="teacher"&&r.status==="pending"?'<button class="mini-action" data-action="approve-request" data-id="'+esc(r.id)+'">同意</button><button class="mini-action" data-action="decline-request" data-id="'+esc(r.id)+'">不接受</button>':"")+'</div>'}).join(""):'<div class="empty">目前沒有需要處理的申請。</div>';
+ return '<div class="request-row"><span class="lesson-color '+(r.status==="approved"?"sage":"")+'"></span><div class="lesson-main"><strong>'+esc(student?.name||"學生")+' · '+(r.kind==="leave"?"請假申請":"單堂付款回報")+'</strong><small>'+esc(lesson?.lesson_date||"")+' '+esc(r.note||"")+'</small></div><span class="pill '+(r.status==="approved"?"paid":r.status==="pending"?"pending":"")+'">'+tag+'</span>'+(state.role==="teacher"&&r.status==="pending"?'<button class="mini-action" data-action="approve-request" data-id="'+esc(r.id)+'">同意</button><button class="mini-action" data-action="decline-request" data-id="'+esc(r.id)+'">不接受</button>':"")+'</div>'}).join(""):'<div class="empty">目前沒有需要處理的單堂請假或付款申請。</div>';
 }
 function renderStudents(){
  const st=visibleStudents();
@@ -339,31 +351,138 @@ async function reviewRequest(id,approve){
  });
  if(ok)toast(approve?"已同意申請":"已婉拒申請");
 }
-async function batchBilling(){
- const ls=monthLessons().filter(l=>l.type==="lesson");
- const selected=state.role==="teacher"?ls.filter(l=>l.status==="家長已付款"):ls.filter(l=>l.status==="未付款"&&!state.requests.some(r=>r.lesson_id===l.id&&r.kind==="payment"&&r.status==="pending"));
- if(!selected.length){toast("目前沒有需要批次處理的課程");return}
- if(state.role==="parent"&&selected.some(l=>!visibleStudents().some(s=>s.id===l.student_id))){toast("你沒有這些課程的存取權限");return}
- const amount=lessonSum(selected);
- const msg=state.role==="parent"?"確認你已支付這 "+selected.length+" 堂課，共 "+money(amount)+"？送出後仍需老師核對。":"確認銀行帳款已入帳，將這 "+selected.length+" 堂課（共 "+money(amount)+"）標記為老師已收到？";
- if(!confirm(msg))return;
+function paymentBatchStatus(batch){return batch.status==="confirmed"?"老師已確認收款":batch.status==="declined"?"已退回":"等待老師確認"}
+function batchLessons(batch){
+ return state.paymentBatchItems.filter(i=>i.batch_id===batch.id).map(i=>({item:i,lesson:state.lessons.find(l=>l.id===i.lesson_id)}));
+}
+function paymentHistoryHTML(batches){
+ if(!batches.length)return '<div class="empty">還沒有期間付款紀錄。家長可指定課程日期，回報整筆或部分款項。</div>';
+ return batches.map(batch=>{
+  const student=state.students.find(s=>s.id===batch.student_id),parts=batchLessons(batch),p=paymentBatchStatus(batch);
+  return '<section class="period-batch"><div class="period-batch-head"><div><strong>'+esc(student?.name||"學生")+' · '+esc(batch.period_start)+' ～ '+esc(batch.period_end)+'</strong>'+
+  '<small>家長實際付款：'+esc(batch.paid_on)+' · '+parts.length+' 堂課'+(batch.received_on?' · 老師實際收款：'+esc(batch.received_on):'')+'</small></div><div class="period-batch-amount">'+money(batch.paid_amount)+'</div></div>'+
+  '<div class="period-batch-rows"><span class="pill '+(batch.status==="confirmed"?"paid":batch.status==="pending"?"pending":"")+'">'+p+'</span>'+
+  (batch.note?'<span class="muted-small">'+esc(batch.note)+'</span>':"")+'</div>'+
+  '<details><summary class="text-link">查看各堂金額分配</summary>'+
+  parts.map(({item,lesson})=>'<div class="period-line"><div><strong>'+esc(lesson?.lesson_date||"")+' · '+esc(lesson?.subject||"課程")+'</strong><small>'+esc(timeLabel(lesson?.start_time||""))+'–'+esc(timeLabel(lesson?.end_time||""))+'</small></div><span>'+money(item.allocated_amount)+'</span></div>').join("")+'</details>'+
+  (state.role==="teacher"&&batch.status==="pending"?
+    '<div class="period-batch-actions"><button type="button" class="primary-button" data-action="confirm-batch" data-id="'+esc(batch.id)+'">確認這段期間已收款</button>'+
+    '<button type="button" class="secondary-button" data-action="decline-batch" data-id="'+esc(batch.id)+'">退回付款回報</button></div>':"")+'</section>';
+ }).join("");
+}
+function visiblePaymentBatches(){
+ return state.paymentBatches.filter(b=>state.mode==="demo"||(state.role==="teacher"?b.teacher_id===activeUser?.id:b.parent_id===activeUser?.id))
+  .sort((a,b)=>asText(b.created_at).localeCompare(asText(a.created_at)));
+}
+function renderPaymentHistory(){
+ $("#payment-batch-history").innerHTML=paymentHistoryHTML(visiblePaymentBatches());
+}
+function openPeriodModal(studentId=null,start=null,end=null){
+ const st=visibleStudents();if(!st.length){toast("目前沒有可結算的學生，請先完成學生與家長授權");return}
+ $("#period-heading").textContent=state.role==="parent"?"回報指定期間已付款":"查詢指定期間收款";
+ $("#period-help").textContent=state.role==="parent"?"選好學生與上課日期後，系統自動計算已完成且尚未結清的課程。":"選擇學生與日期，查看期間內的家長付款回報及收款狀態。";
+ $("#period-student").innerHTML=st.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join("");
+ $("#period-student").value=studentId&&st.some(x=>x.id===studentId)?studentId:st[0].id;
+ $("#period-start").value=start||dateKey(new Date(state.month.getFullYear(),state.month.getMonth(),1));
+ $("#period-end").value=end||dateKey(new Date(state.month.getFullYear(),state.month.getMonth()+1,0));
+ $("#period-paid-on").value=dateKey(tick());
+ $("#period-paid-on").max=dateKey(tick());
+ $("#period-note").value="";
+ const parent=state.role==="parent";
+ $("#parent-payment-fields").classList.toggle("hidden",!parent);
+ $("#period-paid-on").required=parent;
+ $("#period-paid-amount").required=parent;
+ $("#period-submit").textContent=parent?"確認這段期間已付款":"關閉區間查詢";
+ $("#period-start").max="9999-12-31";
+ renderPeriodPreview(true);
+ showModal("period-modal");
+}
+function filteredBatches(studentId,start,end){
+ return visiblePaymentBatches().filter(b=>b.student_id===studentId&&b.period_start<=end&&b.period_end>=start);
+}
+function periodFormRows(){
+ const studentId=$("#period-student").value,start=$("#period-start").value,end=$("#period-end").value;
+ if(!start||!end||start>end)return {valid:false,message:"請選擇正確的課程起訖日期。",rows:[],total:0};
+ if((parseDate(end)-parseDate(start))/86400000>730)return {valid:false,message:"每次最多結算約兩年的課程，請縮小日期區間。",rows:[],total:0};
+ const rows=eligiblePeriodLessons({lessons:state.lessons,batches:state.paymentBatches,items:state.paymentBatchItems,requests:state.requests,studentId,start,end});
+ return {valid:true,studentId,start,end,rows,total:rows.reduce((sum,r)=>sum+r.allocation.available,0)};
+}
+function renderPeriodPreview(resetAmount=false){
+ const r=periodFormRows(),parent=state.role==="parent";
+ if(!r.valid){
+  $("#period-overview").textContent=r.message;$("#period-lesson-list").innerHTML="";
+  $("#period-submit").disabled=parent;return;
+ }
+ if(parent){
+  const hours=r.rows.reduce((n,x)=>n+num(x.lesson.hours),0);
+  $("#period-overview").innerHTML='<strong>'+money(r.total)+'</strong><div class="period-summary-metrics"><span>'+r.rows.length+' 堂可結算</span><span>'+hours.toFixed(1)+' 小時</span><span>'+esc(r.start)+' ～ '+esc(r.end)+'</span></div>';
+  $("#period-lesson-list").innerHTML=r.rows.length?r.rows.map(({lesson,allocation})=>
+    '<div class="period-line"><div><strong>'+esc(lesson.lesson_date)+' · '+esc(lesson.subject||"課程")+'</strong><small>'+esc(timeLabel(lesson.start_time))+'–'+esc(timeLabel(lesson.end_time))+' · 可付款餘額</small></div><span>'+money(allocation.available)+'</span></div>').join(""):'<div class="empty">這段期間沒有可付款的課程；已收款或待老師確認的款項不會重複列入。</div>';
+  if(resetAmount||!$("#period-paid-amount").value)$("#period-paid-amount").value=r.total>0?r.total.toFixed(2):"";
+  $("#period-submit").disabled=r.total<=0;
+ }else{
+  const batches=filteredBatches(r.studentId,r.start,r.end);
+  $("#period-overview").innerHTML='<strong>'+batches.length+' 筆付款紀錄</strong><div class="period-summary-metrics"><span>'+esc(r.start)+' ～ '+esc(r.end)+'</span><span>待確認 '+batches.filter(b=>b.status==="pending").length+' 筆</span></div>';
+  $("#period-lesson-list").innerHTML=paymentHistoryHTML(batches);
+  $("#period-submit").disabled=false;
+ }
+}
+async function submitPeriod(ev){
+ ev.preventDefault();
+ if(state.role==="teacher"){closeModal("period-modal");return}
+ const r=periodFormRows();if(!r.valid||r.total<=0){toast(r.message||"沒有可付款的課程");return}
+ const paid=amount($("#period-paid-amount").value),paidOn=$("#period-paid-on").value,note=$("#period-note").value.trim();
+ if(!Number.isFinite(paid)||paid<=0||paid>r.total+0.005){toast("請填寫大於零且不超過未付款餘額的金額");return}
+ if(!paidOn||paidOn>dateKey(tick())){toast("實際付款日期不能是未來日期");return}
+ if(!confirm("確認回報 "+r.start+" 至 "+r.end+" 的課程，實際在 "+paidOn+" 支付 "+money(paid)+"？老師仍需核對入帳。"))return;
+ const student=state.students.find(x=>x.id===r.studentId);if(!student){toast("找不到學生");return}
+ const assignments=allocateOldestFirst(r.rows,paid);
  const ok=await persist(async()=>{
-  if(state.role==="teacher"){
-   if(state.mode==="demo")selected.forEach(l=>Object.assign(l,{status:"老師已收到",received_date:dateKey(tick())}));
-   else {
-    const result=await client.from("lesson_records").update({status:"老師已收到",received_date:dateKey(tick())}).in("id",selected.map(l=>l.id)).select("id");
-    const changed=assertResult(result)||[];
-    if(changed.length!==selected.length)throw Error("未能更新全部款項，請重新整理確認");
-   }
+  if(state.mode==="demo"){
+   const batchId=uid();state.paymentBatches.push({id:batchId,parent_id:"demo-parent",teacher_id:student.teacher_id,student_id:student.id,
+    period_start:r.start,period_end:r.end,paid_on:paidOn,paid_amount:paid,note,status:"pending",received_on:null,created_at:new Date().toISOString()});
+   state.paymentBatchItems.push(...assignments.map(i=>({batch_id:batchId,lesson_id:i.lesson_id,allocated_amount:i.allocated_amount})));
   }else{
-   const rows=selected.map(l=>({lesson_id:l.id,student_id:l.student_id,teacher_id:l.owner_id,parent_id:activeUser?.id||"demo-parent",kind:"payment",note:"本月批次回報付款",status:"pending"}));
-   if(state.mode==="demo")state.requests.push(...rows.map(row=>({...row,id:uid(),created_at:new Date().toISOString()})));
-   else assertResult(await client.from("family_requests").insert(rows));
+   assertResult(await client.rpc("submit_range_payment",{
+    p_teacher_id:student.teacher_id,p_student_id:student.id,p_period_start:r.start,p_period_end:r.end,
+    p_paid_on:paidOn,p_paid_amount:paid,p_note:note
+   }));
   }
  });
- if(ok)toast(state.role==="teacher"?"已完成批次收款確認":"已送出批次付款回報");
+ if(ok){closeModal("period-modal");toast("已回報期間付款，等待老師核對收款")}
 }
-
+function openReceiptModal(id){
+ if(state.role!=="teacher")return;
+ const batch=visiblePaymentBatches().find(b=>b.id===id&&b.status==="pending");if(!batch){toast("找不到待核對的付款批次");return}
+ state.receiptBatch=id;
+ const student=state.students.find(s=>s.id===batch.student_id);
+ $("#receipt-details").innerHTML='<strong>'+money(batch.paid_amount)+'</strong><p>學生：'+esc(student?.name||"學生")+'</p>'+
+  '<p>課程期間：'+esc(batch.period_start)+' ～ '+esc(batch.period_end)+'</p>'+
+  '<p>家長實際付款日期：'+esc(batch.paid_on)+'</p>'+
+  '<p>核對課程：'+batchLessons(batch).length+' 堂</p>';
+ $("#receipt-date").value=dateKey(tick());$("#receipt-date").max=dateKey(tick());
+ closeModal("period-modal");showModal("receipt-modal");
+}
+async function reviewPeriodBatch(id,confirmPayment,receivedOn=null){
+ const batch=visiblePaymentBatches().find(b=>b.id===id&&b.status==="pending");
+ if(!batch||state.role!=="teacher"){toast("無法處理這筆付款");return}
+ const ok=await persist(async()=>{
+  if(state.mode==="demo"){
+   batch.status=confirmPayment?"confirmed":"declined";batch.received_on=confirmPayment?receivedOn:null;batch.confirmed_at=confirmPayment?new Date().toISOString():null;
+   for(const {lesson} of batchLessons(batch)){
+    if(!confirmPayment||!lesson)continue;
+    const l=lessonBalance(lesson);
+    if(l.confirmed>=l.total-0.005){lesson.status="老師已收到";lesson.received_date=receivedOn}
+   }
+  }else assertResult(await client.rpc("review_range_payment",{p_batch_id:id,p_confirm:confirmPayment,p_received_on:receivedOn}));
+ });
+ if(ok){closeModal("receipt-modal");toast(confirmPayment?"已確認這段期間收款":"已退回付款回報，課程餘額已恢復")}
+}
+async function submitReceipt(ev){
+ ev.preventDefault();const date=$("#receipt-date").value;
+ if(!date||date>dateKey(tick())){toast("請輸入真實收到款項的日期");return}
+ await reviewPeriodBatch(state.receiptBatch,true,date);
+}
 
 function refreshDaySheet(){
  if(!$("#day-modal").open)return;
@@ -542,10 +661,10 @@ async function restoreLesson(id){
 
 async function refreshLive(){
  if(!client||!activeUser)return;
- const tables=["students","lesson_records","guardian_invites","student_guardians","family_requests","recurring_schedules","schedule_exceptions"];
+ const tables=["students","lesson_records","guardian_invites","student_guardians","family_requests","recurring_schedules","schedule_exceptions","payment_batches","payment_batch_items"];
  const results=await Promise.all(tables.map(t=>client.from(t).select("*").limit(1000)));
  results.forEach((res,i)=>{if(res.error)throw Error(tables[i]+": "+res.error.message);});
- [state.students,state.lessons,state.invites,state.guardians,state.requests,state.schedules,state.exceptions]=results.map(r=>r.data||[]);
+ [state.students,state.lessons,state.invites,state.guardians,state.requests,state.schedules,state.exceptions,state.paymentBatches,state.paymentBatchItems]=results.map(r=>r.data||[]);
 }
 async function ensureClient(){
  if(client)return client;
@@ -557,7 +676,7 @@ async function ensureClient(){
 async function initializeLive(){
  try{
   await ensureClient();const {data,error}=await client.auth.getSession();if(error)throw error;
-  activeUser=data.session?.user||null;if(activeUser){await refreshLive();toast("已登入並同步課程")}else{for(const k of ["students","lessons","invites","guardians","requests","schedules","exceptions"])state[k]=[];}
+  activeUser=data.session?.user||null;if(activeUser){await refreshLive();toast("已登入並同步課程")}else{for(const k of ["students","lessons","invites","guardians","requests","schedules","exceptions","paymentBatches","paymentBatchItems"])state[k]=[];}
   render();
  }catch(err){console.error(err);toast("Supabase 連線失敗："+err.message);showModal("account-modal")}
 }
@@ -592,10 +711,12 @@ function bindEvents(){
    if(kind==="edit-rule")openSchedule(state.schedules.find(r=>r.id===id));
    if(kind==="stop-rule")await stopSchedule(id);
    if(kind==="leave-request")openRequest(id,"leave");
-   if(kind==="payment-request")openRequest(id,"payment");
+   if(kind==="payment-period-single"){const l=resolveLesson(id);if(l)openPeriodModal(l.student_id,l.lesson_date,l.lesson_date)}
    if(kind==="accept-invite")await acceptInvite(id);
    if(kind==="approve-request")await reviewRequest(id,true);
    if(kind==="decline-request")await reviewRequest(id,false);
+   if(kind==="confirm-batch")openReceiptModal(id);
+   if(kind==="decline-batch")if(confirm("確定退回這筆期間付款？這不會刪除紀錄，但可付款餘額會重新開放。"))await reviewPeriodBatch(id,false,null);
   }
  });
  document.addEventListener("keydown",ev=>{const el=ev.target.closest("[data-day]");if(el&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();openDay(el.dataset.day)}});
@@ -613,7 +734,16 @@ function bindEvents(){
  $("#record-student").onchange=()=>{if(state.editing)return;const s=visibleStudents().find(s=>s.id===$("#record-student").value);if(s){$("#record-subject").value=s.subject;$("#record-rate").value=s.hourly_rate}};
  $("#prev-month").onclick=()=>moveMonth(-1);$("#next-month").onclick=()=>moveMonth(1);
  $("#billing-prev").onclick=()=>moveMonth(-1);$("#billing-next").onclick=()=>moveMonth(1);
- $("#batch-action").onclick=batchBilling;
+ $("#batch-action").onclick=()=>openPeriodModal();
+ $("#period-form").addEventListener("submit",submitPeriod);
+ $("#receipt-form").addEventListener("submit",submitReceipt);
+ for(const id of ["period-student","period-start","period-end"]){
+  $("#"+id).addEventListener("change",()=>renderPeriodPreview(true));
+ }
+ $("#period-paid-amount").addEventListener("input",()=>{
+  const r=periodFormRows(),value=amount($("#period-paid-amount").value);
+  $("#period-submit").disabled=!r.valid||r.total<=0||!Number.isFinite(value)||value<=0||value>r.total+0.005;
+ });
  $("#jump-today").onclick=()=>{state.month=new Date(tick().getFullYear(),tick().getMonth(),1);state.selected=dateKey(tick());render()};
  $("#record-form").addEventListener("submit",saveRecord);$("#student-form").addEventListener("submit",saveStudent);
  $("#record-repeat").addEventListener("change",()=>$("#until-label").classList.toggle("hidden",$("#record-repeat").value==="none"));
@@ -623,6 +753,9 @@ function bindEvents(){
  $("#account-action").onclick=()=>showModal("account-modal");
  $("#go-live").onclick=()=>showModal("account-modal");
  $("#google-login").onclick=googleLogin;$("#demo-login").onclick=toggleDemo;$("#sign-out").onclick=signOut;
+ $("#demo-reset").onclick=()=>{if(state.mode!=="demo")return;if(!confirm("將清除這台瀏覽器的 V2 測試課程與測試付款紀錄，重新載入範例資料。確定？"))return;
+  localStorage.removeItem(STORAGE);loadDemo();render();closeModal("account-modal");toast("預覽已重置，可以測試跨月與部分付款");
+ };
  $("#role-teacher").onclick=()=>setRole("teacher");$("#role-parent").onclick=()=>setRole("parent");
  $$(".modal").forEach(d=>d.addEventListener("click",e=>{if(e.target===d)d.close()}));
 }

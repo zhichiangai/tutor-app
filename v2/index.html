@@ -67,7 +67,8 @@
         <section id="view-billing" class="page-view hidden">
           <div class="section-row page-head"><div><h2 id="billing-title">收付款整理</h2><p class="section-sub">清楚對帳，不再一筆一筆慢慢算</p></div><div class="month-controls"><button id="billing-prev" aria-label="上個月">‹</button><strong id="billing-month"></strong><button id="billing-next" aria-label="下個月">›</button></div></div>
           <div class="billing-summary" id="billing-summary"></div>
-          <article class="card"><div class="section-row"><div><h2>課程與付款明細</h2><p class="section-sub">家長回報與老師收款分開紀錄</p></div><button class="secondary-button" id="batch-action" type="button">批次處理</button></div><div id="billing-list"></div></article>
+          <article class="card period-records-card"><div class="section-row"><div><h2>期間付款／收款紀錄</h2><p class="section-sub">保留每筆課程期間、付款日期與老師確認日期</p></div></div><div id="payment-batch-history"></div></article>
+          <article class="card"><div class="section-row"><div><h2>課程與付款明細</h2><p class="section-sub">家長回報與老師收款分開紀錄</p></div><button class="secondary-button" id="batch-action" type="button">選擇付款期間</button></div><div id="billing-list"></div></article>
           <article class="card requests-card"><div class="section-row"><h2>請假與付款申請</h2><span class="muted-small">待確認會優先顯示</span></div><div id="requests-list"></div></article>
         </section>
         <section id="view-students" class="page-view hidden">
@@ -75,12 +76,38 @@
           <div class="student-grid" id="student-grid"></div>
           <article class="card invite-card"><div class="section-row"><div><h2 id="invite-title">邀請家長加入</h2><p class="section-sub" id="invite-description">使用家長的 Google 帳號 Email 連結課程資料</p></div></div><div id="invite-content"></div></article>
         </section>
-        <footer class="site-footer"><span>好好上課 © 2026</span><span>V2.2 · Made with care. <span aria-hidden="true">✳</span></span></footer>
+        <footer class="site-footer"><span>好好上課 © 2026</span><span>V2.3 · Made with care. <span aria-hidden="true">✳</span></span></footer>
       </div>
     </main>
     <nav class="mobile-nav" aria-label="手機導覽"><button data-view="home" class="active"><span>⌂</span>今天</button><button data-view="calendar"><span>▦</span>月曆</button><button data-view="billing"><span>◈</span>帳務</button><button data-view="students"><span>♧</span>學生</button></nav>
   </div>
 
+
+
+  <dialog class="modal schedule-sheet" id="period-modal">
+    <form id="period-form" class="modal-inner">
+      <div class="modal-head"><div><p class="eyebrow">PAYMENT PERIOD</p><h2 id="period-heading">回報期間付款</h2><p class="modal-description" id="period-help">選擇上課日期，系統會自動計算已完成且尚未結清的課程。</p></div><button type="button" class="close-modal" data-close="period-modal" aria-label="關閉">×</button></div>
+      <label>學生<select id="period-student" required></select></label>
+      <div class="form-row"><label>課程開始日期<input type="date" id="period-start" required></label><label>課程結束日期<input type="date" id="period-end" required></label></div>
+      <div id="period-overview" class="period-summary" aria-live="polite">請選擇日期區間。</div>
+      <div id="period-lesson-list" class="period-lesson-list"></div>
+      <div id="parent-payment-fields">
+        <label>實際付款日期<input type="date" id="period-paid-on" required></label>
+        <label>實際支付金額（NT$）<input type="number" id="period-paid-amount" min="0.01" step="0.01" required></label>
+        <p class="helper-note">支援部分付款。系統依課程日期由舊到新分配金額，未支付部分不會標為已結清。</p>
+        <label>備註（選填）<textarea id="period-note" rows="2" maxlength="500" placeholder="例如：轉帳末五碼（不要填寫完整帳號）"></textarea></label>
+      </div>
+      <div class="form-actions"><button type="button" class="secondary-button" data-close="period-modal">關閉</button><button class="primary-button" type="submit" id="period-submit">確認這段期間已付款</button></div>
+    </form>
+  </dialog>
+  <dialog class="modal schedule-sheet" id="receipt-modal">
+    <form id="receipt-form" class="modal-inner">
+      <div class="modal-head"><div><p class="eyebrow">RECEIPT CONFIRMATION</p><h2>確認期間收款</h2><p class="modal-description">請先核對銀行入帳，確認後將記入正式收款紀錄。</p></div><button type="button" class="close-modal" data-close="receipt-modal" aria-label="關閉">×</button></div>
+      <div id="receipt-details" class="period-summary"></div>
+      <label>實際收到款項日期<input type="date" id="receipt-date" required></label>
+      <div class="form-actions"><button type="button" class="secondary-button" data-close="receipt-modal">取消</button><button type="submit" class="primary-button">確認已收款</button></div>
+    </form>
+  </dialog>
 
   <dialog class="modal schedule-sheet" id="day-modal">
     <div class="modal-inner">
@@ -133,6 +160,7 @@
     <div class="account-role"><span>我的使用身分</span><div class="segment-control"><button id="role-teacher" type="button">我是老師</button><button id="role-parent" type="button">我是家長</button></div><small>切換畫面不會更改資料存取權限；實際權限由 Supabase 控制。</small></div>
     <button class="google-button" id="google-login" type="button"><span class="google-g">G</span>使用 Google 登入</button>
     <button class="secondary-button wide" id="demo-login" type="button">試用互動預覽（不需登入）</button>
+    <button class="secondary-button wide" id="demo-reset" type="button">重置本機預覽資料</button>
     <button class="text-link signout" id="sign-out" type="button">登出</button>
     <div class="smallprint">Google 登入需在 Supabase 與 Google Cloud 完成 OAuth 設定。</div>
   </div></dialog>
