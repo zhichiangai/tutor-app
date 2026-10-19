@@ -774,7 +774,8 @@ async function refreshLive(){
 }
 async function ensureClient(){
  if(client)return client;
- const {createClient}=await import("https://esm.sh/@supabase/supabase-js@2.76.1");
+ const createClient=window.supabase?.createClient;
+ if(!createClient)throw Error("登入元件載入失敗，請重新整理頁面後再試");
  client=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
  client.auth.onAuthStateChange((event,session)=>{activeUser=session?.user||null;if(event==="SIGNED_OUT"){state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();}});
  return client;
