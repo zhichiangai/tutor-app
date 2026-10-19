@@ -3,11 +3,13 @@
  * Only the public Supabase URL/publishable key appear here. Never store service_role keys.
  */
 import { expandSchedules, isVirtualOccurrence, findTimeConflicts, originalOccurrenceDate, matchesRecurrence } from "./scheduling.js";
+import { monthAgendaMarkup, monthSummary } from "./calendar-view.js";
 const SUPABASE_URL = "https://vctisuglfoxyuwlvyjee.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_QR8An_jEnMEZTPuTHebFDA_xg46FLit";
 const STORAGE = "tutor_v2_preview_data_20261019";
 const ROLE_STORAGE = "tutor_v2_role";
 const MODE_STORAGE = "tutor_v2_mode";
+const CALENDAR_MODE_STORAGE = "tutor_v22_calendar_mode";
 const NAMES = ["日","一","二","三","四","五","六"];
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -23,7 +25,7 @@ const timeLabel = (s) => asText(s).slice(0,5);
 const tick = ()=>new Date();
 const uid = ()=>crypto.randomUUID();
 let client=null, activeUser=null, loading=false;
-const state={mode:localStorage.getItem(MODE_STORAGE)==="live"?"live":"demo",role:localStorage.getItem(ROLE_STORAGE)==="parent"?"parent":"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null};
+const state={mode:localStorage.getItem(MODE_STORAGE)==="live"?"live":"demo",role:localStorage.getItem(ROLE_STORAGE)==="parent"?"parent":"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month"};
 
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
@@ -134,7 +136,35 @@ function renderFullCalendar(){
  $("#agenda-list").innerHTML=rows.length?rows.map(l=>rowHTML(l,true)).join(""):'<div class="empty">這天目前還沒有課程，可以好好休息一下。</div>';
  $("#agenda-add").style.display=state.role==="teacher"?"":"none";
  $("#manage-schedules").style.display=state.role==="teacher"?"":"none";
+ renderCalendarDisplay();
 }
+function renderCalendarDisplay(){
+ const lessons=visibleLessons().filter(l=>sameMonth(l.lesson_date,state.month))
+  .sort((a,b)=>(a.lesson_date+" "+asText(a.start_time)).localeCompare(b.lesson_date+" "+asText(b.start_time)));
+ const helpers={studentName:l=>studentFor(l)?.name||l.student||"學生",prettyDate,timeLabel,statusLabel,esc};
+ const listed=state.calendarMode==="list";
+ $("#month-overview").textContent=monthSummary(lessons)+" · 點日期管理當日安排";
+ $("#calendar-month-view").classList.toggle("hidden",listed);
+ $("#calendar-month-preview").classList.toggle("hidden",listed);
+ $("#calendar-list-view").classList.toggle("hidden",!listed);
+ $$("[data-calendar-mode]").forEach(b=>{const active=b.dataset.calendarMode===state.calendarMode;b.classList.toggle("active",active);b.setAttribute("aria-pressed",String(active))});
+ if(listed)$("#month-lesson-list").innerHTML=monthAgendaMarkup(lessons,helpers);
+ else{
+  const upcoming=lessons.filter(l=>l.lesson_date>=dateKey(tick()));
+  const preview=(upcoming.length?upcoming:lessons.slice(-5)).slice(0,5);
+  $("#month-lesson-preview").innerHTML=monthAgendaMarkup(preview,helpers);
+ }
+ // Mobile month cells remain compact while still revealing lesson counts and full entries below.
+ $$(".calendar-cell").forEach(cell=>{
+  const n=visibleLessons().filter(l=>l.lesson_date===cell.dataset.day&&l.type!=="moved").length;
+  if(n){const mark=document.createElement("span");mark.className="mobile-lesson-count";mark.setAttribute("aria-hidden","true");mark.textContent=n+"堂";cell.appendChild(mark)}
+ });
+}
+function changeCalendarMode(mode){
+ if(mode!=="month"&&mode!=="list")return;
+ state.calendarMode=mode;localStorage.setItem(CALENDAR_MODE_STORAGE,mode);renderFullCalendar();
+}
+
 function renderBilling(){
  const ls=monthLessons().filter(l=>l.type==="lesson"),unpaid=ls.filter(l=>l.status!=="老師已收到"),paid=ls.filter(l=>l.status==="老師已收到");
  $("#billing-title").textContent=state.role==="teacher"?"收付款整理":"付款與對帳";
@@ -547,6 +577,7 @@ function bindEvents(){
  document.addEventListener("click",async ev=>{
   const nav=ev.target.closest("[data-view]");if(nav){setView(nav.dataset.view);if(nav.dataset.date){state.selected=nav.dataset.date;state.month=parseDate(state.selected);render()}return}
   const close=ev.target.closest("[data-close]");if(close){closeModal(close.dataset.close);return}
+  const switcher=ev.target.closest("[data-calendar-mode]");if(switcher){changeCalendarMode(switcher.dataset.calendarMode);return}
   const day=ev.target.closest("[data-day]");if(day){openDay(day.dataset.day);return}
   const action=ev.target.closest("[data-action]");if(action){
    const id=action.dataset.id,kind=action.dataset.action;
@@ -568,6 +599,7 @@ function bindEvents(){
  document.addEventListener("keydown",ev=>{const el=ev.target.closest("[data-day]");if(el&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();openDay(el.dataset.day)}});
  $("#top-add").onclick=()=>openRecord();
  $("#agenda-add").onclick=()=>openRecord();
+ $("#show-full-month").onclick=()=>changeCalendarMode("list");
  $("#manage-schedules").onclick=()=>openSchedule();
  $("#day-add-lesson").onclick=()=>{closeModal("day-modal");openRecord()};
  $("#day-add-rule").onclick=()=>openSchedule();
