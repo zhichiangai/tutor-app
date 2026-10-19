@@ -109,3 +109,40 @@
  .calendar-month-list .month-agenda-heading .text-link{min-height:40px}
  .calendar-month-preview .section-sub{max-width:235px;line-height:1.7}
 }
+
+
+/* V2.3 date-range ledger: a calm reconciliation view for both roles */
+.period-records-card{margin:0 0 20px}
+.period-batch{border-bottom:1px solid #f0ebe6;padding:17px 0}
+.period-batch:last-child{border:0;padding-bottom:0}
+.period-batch-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.period-batch-head strong{font-size:14px;line-height:1.6}
+.period-batch-head small{display:block;font-size:11px;color:#968e86;margin-top:5px;line-height:1.7}
+.period-batch-amount{font-size:17px;font-weight:750;letter-spacing:-.03em;white-space:nowrap}
+.period-batch-rows{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:11px 0}
+.period-batch-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+.period-batch-actions button{min-height:41px}
+.period-summary{background:#faf6f0;border:1px solid #f1e7db;border-radius:14px;padding:15px;color:#534b45;line-height:1.8;font-size:12px}
+.period-summary strong{font-size:18px;font-weight:700}
+.period-summary .period-summary-metrics{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px}
+.period-summary .period-summary-metrics span{border-right:1px solid #e8ddd1;padding-right:14px}
+.period-summary .period-summary-metrics span:last-child{border:0;padding:0}
+.period-lesson-list{max-height:220px;overflow:auto;border:1px solid #f0ebe5;border-radius:12px;padding:0 12px}
+.period-line{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid #f4efea;padding:12px 1px}
+.period-line:last-child{border-bottom:0}
+.period-line strong{display:block;font-size:12px;line-height:1.6}
+.period-line small{color:#968b82;font-size:11px;display:block;margin-top:4px}
+.period-line span:last-child{font-size:12px;font-weight:700;white-space:nowrap}
+#parent-payment-fields{display:flex;flex-direction:column;gap:15px}
+#period-modal .form-row label{min-width:0}
+@media(max-width:650px){
+ .period-batch-head{gap:10px}
+ .period-batch-amount{font-size:15px}
+ .period-lesson-list{max-height:175px}
+ .period-records-card .section-row{margin-bottom:12px}
+ .period-summary .period-summary-metrics{gap:9px}
+ .period-summary .period-summary-metrics span{padding-right:9px}
+ #period-modal .modal-inner,#receipt-modal .modal-inner{gap:15px}
+ #period-form .form-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #period-form .form-row input{font-size:12px;padding:10px 7px}
+}
