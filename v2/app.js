@@ -255,14 +255,18 @@ async function reviewRequest(id,approve){
  const r=state.requests.find(x=>x.id===id);if(!r||state.role!=="teacher")return;
  const newStatus=approve?"approved":"declined";
  const ok=await persist(async()=>{
-  if(state.mode==="demo"){r.status=newStatus;r.reviewed_at=new Date().toISOString()}
-  else assertResult(await client.from("family_requests").update({status:newStatus,reviewed_at:new Date().toISOString()}).eq("id",id).select("id").single());
-  if(approve&&r.lesson_id){
-   const patch=r.kind==="leave"?{type:"leave"}:{status:"家長已付款",payment_date:dateKey(tick())};
-   if(state.mode==="demo")Object.assign(state.lessons.find(l=>l.id===r.lesson_id)||{},patch);
-   else assertResult(await client.from("lesson_records").update(patch).eq("id",r.lesson_id).select("id").single());
+  if(state.mode==="demo"){
+   r.status=newStatus;r.reviewed_at=new Date().toISOString();
+   if(approve&&r.lesson_id){
+    const l=state.lessons.find(l=>l.id===r.lesson_id);
+    if(!l)throw Error("找不到對應課程");
+    Object.assign(l,r.kind==="leave"?{type:"leave"}:{status:"家長已付款",payment_date:dateKey(tick())});
+   }
+  }else{
+   assertResult(await client.rpc("review_family_request",{p_request_id:id,p_approve:approve}));
   }
- });if(ok)toast(approve?"已同意申請":"已婉拒申請");
+ });
+ if(ok)toast(approve?"已同意申請":"已婉拒申請");
 }
 async function refreshLive(){
  if(!client||!activeUser)return;
