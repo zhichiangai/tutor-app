@@ -199,7 +199,7 @@ function scheduleDates(day,repeat,until){
 }
 async function persist(op){
  if(loading)return false;setBusy(true);
- try{await op();if(state.mode==="demo")saveDemo();else await refreshLive();render();return true}
+ try{if(state.mode==="live"&&!activeUser)throw Error("請先登入再修改課程");await op();if(state.mode==="demo")saveDemo();else await refreshLive();render();return true}
  catch(err){console.error(err);toast("操作未完成："+(err.message||"請稍後再試"));return false}
  finally{setBusy(false)}
 }
@@ -242,24 +242,41 @@ async function saveInvite(ev){
  const ok=await persist(async()=>{if(state.mode==="demo"){if(state.invites.some(i=>i.student_id===student_id&&i.email===email))throw Error("這位家長已在邀請清單中");state.invites.push({id:uid(),...data})}else assertResult(await client.from("guardian_invites").insert(data))});
  if(ok){$("#invite-email").value="";toast("已建立邀請，請家長登入後接受")}
 }
-async function updateLesson(id,patch,msg){
- const item=state.lessons.find(l=>l.id===id);if(!item)return;
- const ok=await persist(async()=>{if(state.mode==="demo")Object.assign(item,patch);else assertResult(await client.from("lesson_records").update(patch).eq("id",id).select("id").single())});
- if(ok)toast(msg);
+async async function updateLesson(id,patch,msg){
+ const item=resolveLesson(id);
+ if(!item||state.role!=="teacher"||item.type==="moved")return;
+ if(item.status==="老師已收到"&&(patch.type==="leave"||patch.lesson_date||patch.hourly_rate!==undefined)){toast("已結清課程不能直接取消或改期，請先處理帳務");return}
+ const ok=await persist(async()=>{
+  if(isVirtualOccurrence(item)){
+   // An occurrence becomes an explicit lesson only when someone edits or completes it.
+   const payload={
+    owner_id:item.owner_id,student_id:item.student_id,student:studentFor(item)?.name||"",
+    subject:item.subject,lesson_date:item.lesson_date,schedule_id:item.schedule_id,
+    scheduled_date:item.scheduled_date,start_time:item.start_time,end_time:item.end_time,
+    hours:item.hours,hourly_rate:item.hourly_rate,total_amount:item.total_amount,
+    type:item.type==="leave"?"planned":item.type,status:"未付款",...patch
+   };
+   if(state.mode==="demo")state.lessons.push({id:uid(),...payload});
+   else assertResult(await client.from("lesson_records").insert(payload));
+  }else if(state.mode==="demo")Object.assign(item,patch);
+  else assertResult(await client.from("lesson_records").update(patch).eq("id",id).select("id").single());
+ });
+ if(ok){toast(msg);refreshDaySheet()}
 }
 function openRequest(id,kind){
- const l=state.lessons.find(x=>x.id===id);if(!l)return;
+ const l=resolveLesson(id);if(!l||l.type==="moved")return;
+ if(isVirtualOccurrence(l)&&kind!=="leave"){toast("預排課程尚未上課，不能回報付款");return}
  $("#request-lesson-id").value=l.id;$("#request-kind").value=kind;$("#request-note").value="";
  $("#request-heading").textContent=kind==="leave"?"提出請假":"回報已付款";
  $("#request-description").textContent=(studentFor(l)?.name||"學生")+" · "+prettyDate(l.lesson_date)+"｜"+(kind==="leave"?"請假需要老師確認，不會立即取消課程。":"確認付款後，還需要老師核對收款。");
  showModal("request-modal");
 }
 async function submitRequest(ev){
- ev.preventDefault();const id=$("#request-lesson-id").value,l=state.lessons.find(x=>x.id===id);if(!l)return;
+ ev.preventDefault();const id=$("#request-lesson-id").value,l=resolveLesson(id);if(!l)return;
  if(state.role!=="parent"){toast("切換家長模式後才能申請");return}
  const kind=$("#request-kind").value;
- if(state.requests.some(r=>r.lesson_id===id&&r.kind===kind&&r.status==="pending")){toast("這堂課已經有待確認的申請");return}
- const data={lesson_id:l.id,student_id:l.student_id,teacher_id:l.owner_id,parent_id:activeUser?.id||"demo-parent",kind,note:$("#request-note").value.trim(),status:"pending"};
+ if(state.requests.some(r=>r.kind===kind&&r.status==="pending"&&(r.lesson_id===id||(isVirtualOccurrence(l)&&r.schedule_id===l.schedule_id&&r.scheduled_date===l.scheduled_date)))){toast("這堂課已經有待確認的申請");return}
+ const data={lesson_id:isVirtualOccurrence(l)?null:l.id,schedule_id:isVirtualOccurrence(l)?l.schedule_id:null,scheduled_date:isVirtualOccurrence(l)?l.scheduled_date:null,student_id:l.student_id,teacher_id:l.owner_id,parent_id:activeUser?.id||"demo-parent",kind,note:$("#request-note").value.trim(),status:"pending"};
  const ok=await persist(async()=>{if(state.mode==="demo")state.requests.push({id:uid(),...data,created_at:new Date().toISOString()});else assertResult(await client.from("family_requests").insert(data))});
  if(ok){closeModal("request-modal");toast("已送出，等待老師確認")}
 }
@@ -277,7 +294,11 @@ async function reviewRequest(id,approve){
    if(approve&&r.lesson_id){
     const l=state.lessons.find(l=>l.id===r.lesson_id);
     if(!l)throw Error("找不到對應課程");
-    Object.assign(l,r.kind==="leave"?{type:"leave"}:{status:"家長已付款",payment_date:dateKey(tick())});
+    Object.assign(l,r.kind==="leave"?{type:"leave",leave_source:"student"}:{status:"家長已付款",payment_date:dateKey(tick())});
+   }else if(approve&&r.schedule_id&&r.scheduled_date&&r.kind==="leave"){
+    const record={schedule_id:r.schedule_id,original_date:r.scheduled_date,teacher_id:r.teacher_id,action:"student_leave",moved_to:null,remarks:r.note};
+    const prev=state.exceptions.find(e=>e.schedule_id===r.schedule_id&&e.original_date===r.scheduled_date);
+    if(prev)Object.assign(prev,record);else state.exceptions.push({id:uid(),...record});
    }
   }else{
    assertResult(await client.rpc("review_family_request",{p_request_id:id,p_approve:approve}));
