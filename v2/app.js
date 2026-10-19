@@ -62,8 +62,9 @@ function resolveLesson(id){return visibleLessons().find(l=>l.id===id)}
 function studentFor(lesson){return state.students.find(s=>s.id===lesson.student_id)}
 function isPast(s){return s<dateKey(tick())}
 function typeLabel(l){return l.type==="leave"?"已請假":l.type==="planned"?"預排課程":"已上課"}
-function statusLabel(l){return l.type==="moved"?"已改期":l.type==="leave"?(l.leave_source==="teacher"?"老師停課":"學生請假"):l.type==="planned"?"預計上課":l.status||"未付款"}
-function pillClass(l){return l.type==="moved"?"pending":l.type==="leave"?"leave":l.type==="planned"?"":l.status==="老師已收到"?"paid":l.status==="家長已付款"?"pending":""}
+function statusLabel(l){if(l.type==="lesson"){const balance=lessonBalance(l);if(balance.pending>0&&balance.confirmed>0)return "部分已收／待確認";if(balance.pending>0)return balance.pending>=balance.total-0.005?"家長已付款":"部分付款待確認";if(balance.confirmed>0)return balance.confirmed>=balance.total-0.005?"老師已收到":"部分已收款"}return l.type==="moved"?"已改期":l.type==="leave"?(l.leave_source==="teacher"?"老師停課":"學生請假"):l.type==="planned"?"預計上課":l.status||"未付款"}
+function pillClass(l){if(l.type==="lesson"){const b=lessonBalance(l);if(b.pending>0)return "pending";if(b.confirmed>=b.total-0.005&&b.total>0)return "paid"}return l.type==="moved"?"pending":l.type==="leave"?"leave":l.type==="planned"?"":l.status==="老師已收到"?"paid":l.status==="家長已付款"?"pending":""}
+function lessonBalance(l){return lessonAllocation(l,state.paymentBatches,state.paymentBatchItems,state.requests)}
 function lessonSum(list){return list.filter(l=>l.type==="lesson").reduce((v,l)=>v+num(l.total_amount),0)}
 function monthLessons(){return visibleLessons().filter(l=>sameMonth(l.lesson_date,state.month))}
 function hourTotal(list){return list.filter(l=>l.type==="lesson").reduce((v,l)=>v+num(l.hours),0)}
@@ -86,27 +87,29 @@ function render(){
  $("#avatar").textContent=activeUser?.email?.charAt(0).toUpperCase()||"好";
  $("#role-teacher").classList.toggle("active",teacher);
  $("#role-parent").classList.toggle("active",!teacher);
- const ls=monthLessons(),done=ls.filter(l=>l.type==="lesson"),pending=done.filter(l=>l.status!=="老師已收到");
- const completed=done.filter(l=>l.status==="老師已收到");
+ const ls=monthLessons(),done=ls.filter(l=>l.type==="lesson"),pending=done.filter(l=>lessonBalance(l).confirmed < lessonBalance(l).total-0.005);
+ const completed=done.filter(l=>lessonBalance(l).confirmed>=lessonBalance(l).total-0.005);
+ const unreceived=done.reduce((sum,l)=>sum+lessonBalance(l).total-lessonBalance(l).confirmed,0);
+ const received=done.reduce((sum,l)=>sum+lessonBalance(l).confirmed,0);
  const metrics=teacher?[
  ["本月已完成","◷",String(done.length),"<small>堂課</small>","繼續累積每一份努力"],
  ["本月上課時數","☷",hourTotal(ls).toFixed(1),"<small>小時</small>","依已完成課程計算"],
- ["尚待收款","◈",money(lessonSum(pending)),"","未完成收款的課程"]]:[
+ ["尚待收款","◈",money(unreceived),"","未完成收款的課程"]]:[
  ["本月已完成","◷",String(done.length),"<small>堂課</small>","查看孩子的學習足跡"],
  ["本月上課時數","☷",hourTotal(ls).toFixed(1),"<small>小時</small>","依已完成課程計算"],
  ["待確認費用","◈",money(lessonSum(pending)),"","依課程付款狀態計算"]];
  $("#metrics").innerHTML=metrics.map(([label,icon,value,unit,foot])=>'<article class="metric-card"><div class="metric-label">'+label+'</div><div class="metric-icon">'+icon+'</div><div class="metric-value">'+esc(value)+(unit||"")+'</div><div class="metric-footer">'+foot+'</div></article>').join("");
- $("#money-reminder").textContent=teacher?"本月已確認收到 "+money(lessonSum(completed))+"。":"目前有 "+pending.length+" 筆課程等待付款或收款確認。";
+ $("#money-reminder").textContent=teacher?"本月已確認收到 "+money(received)+"。":"目前有 "+pending.length+" 筆課程等待付款或收款確認。";
  renderNext();renderRecent();renderMiniCalendar();renderFullCalendar();renderBilling();renderStudents();refreshDaySheet();
 }
 function rowHTML(l,full=false){
  const s=studentFor(l),name=s?.name||l.student||"學生",p=pillClass(l);
  const actions=state.role==="teacher"?(
   (l.type==="planned"?'<button class="mini-action" data-action="complete" data-id="'+esc(l.id)+'">完成上課</button>':"")+
-  (l.type==="lesson"&&l.status!=="老師已收到"?'<button class="mini-action" data-action="received" data-id="'+esc(l.id)+'">確認收款</button>':"")+
+  (l.type==="lesson"&&l.status==="家長已付款"&&!state.paymentBatchItems.some(i=>i.lesson_id===l.id)?'<button class="mini-action" data-action="received" data-id="'+esc(l.id)+'">確認單堂收款</button>':"")+
   (full && l.type!=="moved"?'<button class="mini-action" data-action="edit" data-id="'+esc(l.id)+'">編輯</button><button class="mini-action" data-action="change-lesson" data-id="'+esc(l.id)+'">改期／請假</button>'+((l.type==="leave"||l.moved_from||(l.schedule_id&&l.scheduled_date&&l.lesson_date!==l.scheduled_date))?'<button class="mini-action" data-action="restore-lesson" data-id="'+esc(l.id)+'">恢復原安排</button>':""):(full&&l.type==="moved"?'<button class="mini-action" data-action="restore-lesson" data-id="'+esc(l.id)+'">還原原日期</button>':""))
  ):(l.type==="planned"||l.type==="lesson"?'<button class="mini-action" data-action="leave-request" data-id="'+esc(l.id)+'">請假</button>':"");
- const pay=state.role==="parent" && l.type==="lesson"&&l.status==="未付款"?'<button class="mini-action" data-action="payment-request" data-id="'+esc(l.id)+'">我已付款</button>':"";
+ const pay=state.role==="parent" && l.type==="lesson"&&lessonBalance(l).available>0?'<button class="mini-action" data-action="payment-period-single" data-id="'+esc(l.id)+'">我已付款</button>':"";
  return '<div class="lesson-row"><span class="lesson-color '+(p==="paid"?"sage":"")+'"></span><div class="lesson-main"><strong>'+esc(name)+' · '+esc(l.subject||s?.subject||"課程")+'</strong><small>'+prettyDate(l.lesson_date)+' · '+esc(timeLabel(l.start_time))+'–'+esc(timeLabel(l.end_time))+'</small></div><div class="row-actions"><span class="pill '+p+'">'+esc(statusLabel(l))+'</span>'+(full?'<span class="lesson-amount">'+money(l.type==="lesson"?l.total_amount:0)+'</span>':"")+(l.schedule_id?'<span class="repeat-marker" title="固定課表">↻</span>':"")+actions+pay+'</div></div>';
 }
 function renderNext(){
@@ -169,20 +172,25 @@ function changeCalendarMode(mode){
 }
 
 function renderBilling(){
- const ls=monthLessons().filter(l=>l.type==="lesson"),unpaid=ls.filter(l=>l.status!=="老師已收到"),paid=ls.filter(l=>l.status==="老師已收到");
+ const ls=monthLessons().filter(l=>l.type==="lesson").sort((a,b)=>a.lesson_date.localeCompare(b.lesson_date));
+ const billed=ls.reduce((sum,l)=>sum+lessonBalance(l).total,0);
+ const confirmed=ls.reduce((sum,l)=>sum+lessonBalance(l).confirmed,0);
+ const pending=ls.reduce((sum,l)=>sum+lessonBalance(l).pending,0);
  $("#billing-title").textContent=state.role==="teacher"?"收付款整理":"付款與對帳";
  $("#billing-month").textContent=state.month.getFullYear()+"年 "+(state.month.getMonth()+1)+"月";
  $("#billing-summary").innerHTML=[
-  ["本月應收","◈",money(lessonSum(ls))],["已確認收款","✓",money(lessonSum(paid))],["待確認","◷",money(lessonSum(unpaid))]
+  ["本月課程費用","◈",money(billed)],
+  ["老師已確認收款","✓",money(confirmed)],
+  ["尚未確認收款","◷",money(Math.max(0,billed-confirmed))]
  ].map(([label,icon,value])=>'<div class="metric-card"><span class="metric-label">'+label+'</span><span class="metric-icon">'+icon+'</span><div class="metric-value">'+value+'</div></div>').join("");
- const batchItems=state.role==="teacher"?ls.filter(l=>l.status==="家長已付款"):ls.filter(l=>l.status==="未付款"&&!state.requests.some(r=>r.lesson_id===l.id&&r.kind==="payment"&&r.status==="pending"));
- $("#batch-action").classList.toggle("hidden",batchItems.length===0);
- $("#batch-action").textContent=state.role==="teacher"?"確認 "+batchItems.length+" 筆收款":"回報 "+batchItems.length+" 筆已付款";
- $("#billing-list").innerHTML=ls.length?ls.sort((a,b)=>a.lesson_date.localeCompare(b.lesson_date)).map(l=>rowHTML(l,true)).join(""):'<div class="empty">這個月份還沒有已完成的課程費用。</div>';
+ $("#batch-action").classList.remove("hidden");
+ $("#batch-action").textContent=state.role==="teacher"?"查看指定期間收款":"選擇期間回報已付款";
+ $("#billing-list").innerHTML=ls.length?ls.map(l=>rowHTML(l,true)).join(""):'<div class="empty">這個月還沒有已完成的課程。排定的未上課時段不會算入費用。</div>';
+ renderPaymentHistory();
  const reqs=state.requests.filter(r=>state.role==="teacher"?(state.mode==="demo"||r.teacher_id===activeUser?.id):(state.mode==="demo"||r.parent_id===activeUser?.id))
   .sort((a,b)=>(a.status==="pending"?0:1)-(b.status==="pending"?0:1)||(b.created_at||"").localeCompare(a.created_at||""));
  $("#requests-list").innerHTML=reqs.length?reqs.map(r=>{const student=state.students.find(s=>s.id===r.student_id),lesson=state.lessons.find(l=>l.id===r.lesson_id),tag=r.status==="pending"?"待確認":r.status==="approved"?"已同意":"未同意";
- return '<div class="request-row"><span class="lesson-color '+(r.status==="approved"?"sage":"")+'"></span><div class="lesson-main"><strong>'+esc(student?.name||"學生")+' · '+(r.kind==="leave"?"請假申請":"付款回報")+'</strong><small>'+esc(lesson?.lesson_date||"")+' '+esc(r.note||"")+'</small></div><span class="pill '+(r.status==="approved"?"paid":r.status==="pending"?"pending":"")+'">'+tag+'</span>'+(state.role==="teacher"&&r.status==="pending"?'<button class="mini-action" data-action="approve-request" data-id="'+esc(r.id)+'">同意</button><button class="mini-action" data-action="decline-request" data-id="'+esc(r.id)+'">不接受</button>':"")+'</div>'}).join(""):'<div class="empty">目前沒有需要處理的申請。</div>';
+ return '<div class="request-row"><span class="lesson-color '+(r.status==="approved"?"sage":"")+'"></span><div class="lesson-main"><strong>'+esc(student?.name||"學生")+' · '+(r.kind==="leave"?"請假申請":"單堂付款回報")+'</strong><small>'+esc(lesson?.lesson_date||"")+' '+esc(r.note||"")+'</small></div><span class="pill '+(r.status==="approved"?"paid":r.status==="pending"?"pending":"")+'">'+tag+'</span>'+(state.role==="teacher"&&r.status==="pending"?'<button class="mini-action" data-action="approve-request" data-id="'+esc(r.id)+'">同意</button><button class="mini-action" data-action="decline-request" data-id="'+esc(r.id)+'">不接受</button>':"")+'</div>'}).join(""):'<div class="empty">目前沒有需要處理的單堂請假或付款申請。</div>';
 }
 function renderStudents(){
  const st=visibleStudents();
@@ -593,7 +601,7 @@ function bindEvents(){
    if(kind==="edit-rule")openSchedule(state.schedules.find(r=>r.id===id));
    if(kind==="stop-rule")await stopSchedule(id);
    if(kind==="leave-request")openRequest(id,"leave");
-   if(kind==="payment-request")openRequest(id,"payment");
+   if(kind==="payment-period-single"){const l=resolveLesson(id);if(l)openPeriodModal(l.student_id,l.lesson_date,l.lesson_date)}
    if(kind==="accept-invite")await acceptInvite(id);
    if(kind==="approve-request")await reviewRequest(id,true);
    if(kind==="decline-request")await reviewRequest(id,false);
