@@ -168,3 +168,22 @@
 /* The lower duplicate day-action list is hidden; course edits open in the in-page dialog. */
 #view-calendar>.agenda-card{display:none}
 .lesson-dialog .lesson-actions.hidden,.lesson-dialog .lesson-time-editor.hidden{display:none}
+
+
+/* V2.7 personal workspace onboarding; keep existing teaching dialogs unchanged. */
+.onboarding-card{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:22px;background:#fff9f0;border:1px solid #f2e4d2}
+.onboarding-card h2{margin:0 0 6px;font-size:17px}
+.onboarding-card .primary-button{flex-shrink:0}
+.workspace-account{display:flex;flex-direction:column;gap:12px;border-top:1px solid #ece6de;margin-top:14px;padding-top:16px}
+.workspace-account label{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:700}
+.workspace-account input,.parent-workspace-filter select{width:100%;background:white;border:1px solid #e6dcd1;border-radius:11px;padding:11px 12px;font:inherit}
+.workspace-account button{width:100%;justify-content:center}
+.parent-workspace-filter{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.parent-workspace-filter label{white-space:nowrap;font-size:13px;font-weight:700}
+.parent-workspace-filter select{max-width:360px}
+.onboarding-card.hidden,.workspace-account.hidden,.parent-workspace-filter.hidden{display:none}
+@media(max-width:650px){
+ .onboarding-card{flex-direction:column;align-items:stretch}
+ .parent-workspace-filter{flex-direction:column;align-items:stretch}
+ .parent-workspace-filter select{max-width:none}
+}
