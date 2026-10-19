@@ -414,6 +414,8 @@ function openPeriodModal(studentId=null,start=null,end=null){
  $("#period-note").value="";
  const parent=state.role==="parent";
  $("#parent-payment-fields").classList.toggle("hidden",!parent);
+ $("#period-paid-on").required=parent;
+ $("#period-paid-amount").required=parent;
  $("#period-submit").textContent=parent?"確認這段期間已付款":"關閉區間查詢";
  $("#period-start").max="9999-12-31";
  renderPeriodPreview(true);
