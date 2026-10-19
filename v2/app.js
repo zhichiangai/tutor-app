@@ -341,7 +341,10 @@ async function reviewRequest(id,approve){
    if(approve&&r.lesson_id){
     const l=state.lessons.find(l=>l.id===r.lesson_id);
     if(!l)throw Error("找不到對應課程");
-    Object.assign(l,r.kind==="leave"?{type:"leave",leave_source:"student"}:{status:"家長已付款",payment_date:dateKey(tick())});
+    if((r.kind==="leave"||r.kind==="time_correction")&&lessonLocked(l))throw Error("課程已進入付款程序，請先處理帳務");
+    if(r.kind==="leave")Object.assign(l,{type:"leave",leave_source:"student",actual_hours:null,actual_start_time:null,actual_end_time:null,hours:0,total_amount:0});
+    else if(r.kind==="time_correction")Object.assign(l,{actual_start_time:r.requested_actual_start_time,actual_end_time:r.requested_actual_end_time,actual_hours:r.requested_actual_hours,hours:r.requested_actual_hours,total_amount:Math.round(Number(r.requested_actual_hours)*Number(l.hourly_rate)*100)/100});
+    else Object.assign(l,{status:"家長已付款",payment_date:dateKey(tick())});
    }else if(approve&&r.schedule_id&&r.scheduled_date&&r.kind==="leave"){
     const record={schedule_id:r.schedule_id,original_date:r.scheduled_date,teacher_id:r.teacher_id,action:"student_leave",moved_to:null,remarks:r.note};
     const prev=state.exceptions.find(e=>e.schedule_id===r.schedule_id&&e.original_date===r.scheduled_date);
@@ -516,7 +519,7 @@ function openLessonPopup(id){
  $("#lesson-save").disabled=locked||lesson.type==="moved";
  $("#lesson-student-leave").classList.toggle("hidden",inactive||locked);
  $("#lesson-teacher-leave").classList.toggle("hidden",inactive||locked);
- $("#lesson-move").classList.toggle("hidden",inactive||locked);
+ $("#lesson-move").classList.toggle("hidden",inactive||locked||lesson.type==="lesson");
  $("#lesson-parent-correct").classList.toggle("hidden",inactive||locked||lesson.type!=="lesson"||isVirtualOccurrence(lesson));
  $("#lesson-parent-leave").classList.toggle("hidden",inactive||locked);
  ["lesson-actual-start","lesson-actual-end","lesson-actual-hours"].forEach(id=>$("#"+id).disabled=inactive||locked);
@@ -706,7 +709,7 @@ async function stopSchedule(id){
 }
 function openChange(lesson){
  if(!lesson||lesson.type==="moved"||state.role!=="teacher")return;
- if(lesson.status==="老師已收到"){toast("已結清課程不能直接改期，請先處理帳務");return}
+ if(lessonLocked(lesson)){toast("已進入付款或收款程序，請先處理帳務");return}
  state.changingLesson=lesson.id;
  $("#change-title").textContent=(studentFor(lesson)?.name||"學生")+" · "+prettyDate(lesson.lesson_date);
  $("#change-description").textContent=lesson.schedule_id?"此操作只影響這一堂固定課，不會改掉其他週。":"這次調整只會影響選定的課程。";
@@ -736,7 +739,7 @@ async function submitChange(ev){
    await upsertException(lesson,action,action==="reschedule"?day:null,remarks);
   }else{
    const patch=action==="reschedule"?{lesson_date:day,remarks:remarks||lesson.remarks,type:"planned"}:
-     {type:"leave",leave_source:action==="teacher_leave"?"teacher":"student",remarks:remarks||lesson.remarks};
+     {type:"leave",leave_source:action==="teacher_leave"?"teacher":"student",remarks:remarks||lesson.remarks,actual_hours:null,actual_start_time:null,actual_end_time:null,hours:0,total_amount:0};
    if(state.mode==="demo")Object.assign(lesson,patch);
    else assertResult(await client.from("lesson_records").update(patch).eq("id",lesson.id).select("id").single());
   }
@@ -745,13 +748,16 @@ async function submitChange(ev){
 }
 async function restoreLesson(id){
  const lesson=resolveLesson(id);if(!lesson||state.role!=="teacher")return;
- if(lesson.status==="老師已收到"){toast("已完成收款的課程不能直接復原");return}
+ if(lessonLocked(lesson)){toast("課程已進入收付款程序，請先處理帳務");return}
  const ok=await persist(async()=>{
   if(isVirtualOccurrence(lesson)&&lesson.schedule_id){
    if(state.mode==="demo")state.exceptions=state.exceptions.filter(e=>!(e.schedule_id===lesson.schedule_id&&e.original_date===lesson.scheduled_date));
    else assertResult(await client.from("schedule_exceptions").delete().eq("schedule_id",lesson.schedule_id).eq("original_date",lesson.scheduled_date).select("id").single());
   }else{
-   const patch={type:"planned",leave_source:null,lesson_date:lesson.scheduled_date||lesson.lesson_date};
+   const plannedHours=durationHours(timeLabel(lesson.start_time),timeLabel(lesson.end_time))||Number(lesson.hours)||1;
+   const patch={type:"planned",leave_source:null,lesson_date:lesson.scheduled_date||lesson.lesson_date,
+     actual_start_time:null,actual_end_time:null,actual_hours:null,hours:plannedHours,
+     total_amount:Math.round(plannedHours*Number(lesson.hourly_rate)*100)/100};
    if(state.mode==="demo")Object.assign(lesson,patch);
    else assertResult(await client.from("lesson_records").update(patch).eq("id",lesson.id).select("id").single());
   }
