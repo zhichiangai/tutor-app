@@ -18,7 +18,7 @@ export function actualDefaults(lesson){
 export function validateActual(start,end,hours){
  const derived=durationHours(start,end),h=Number(hours);
  if(derived===null)throw Error("實際結束時間必須晚於開始時間，且在同一天內");
- if(!Number.isFinite(h)||h<=0||h>16||Math.round(h*100)!==h*100)throw Error("計費時數請輸入 0.01～16 小時，最多兩位小數");
+ if(!Number.isFinite(h)||h<=0||h>16||Math.abs(Math.round(h*100)-h*100)>1e-7)throw Error("計費時數請輸入 0.01～16 小時，最多兩位小數");
  return {actual_start_time:start,actual_end_time:end,actual_hours:h,hours:h};
 }
 export function isPaymentLocked(lesson,batches=[],items=[],requests=[]){
