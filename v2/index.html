@@ -62,7 +62,7 @@
             <div class="section-row"><div><h2>本月課程一覽</h2><p class="section-sub">手機與電腦都能直接看到學生、時間與課程狀態</p></div><button class="text-link" id="show-full-month" type="button">查看全部 ↗</button></div>
             <div id="month-lesson-preview"></div>
           </div>
-          <div class="card agenda-card"><div class="section-row"><div><h2 id="selected-date-title">當日課程</h2><p class="section-sub">點選月曆任一天，可管理當日安排</p></div><button class="text-link" id="agenda-add">＋ 安排課程</button></div><div id="agenda-list"></div></div>
+          <div class="card agenda-card"><div class="section-row"><div><h2 id="selected-date-title">當日課程</h2><p class="section-sub">點月曆中的課程直接開啟編輯方框；空白日期可安排新課</p></div><button class="text-link" id="agenda-add">＋ 安排課程</button></div><div id="agenda-list"></div></div>
         </section>
         <section id="view-billing" class="page-view hidden">
           <div class="section-row page-head"><div><h2 id="billing-title">收付款整理</h2><p class="section-sub">清楚對帳，不再一筆一筆慢慢算</p></div><div class="month-controls"><button id="billing-prev" aria-label="上個月">‹</button><strong id="billing-month"></strong><button id="billing-next" aria-label="下個月">›</button></div></div>
@@ -76,7 +76,7 @@
           <div class="student-grid" id="student-grid"></div>
           <article class="card invite-card"><div class="section-row"><div><h2 id="invite-title">邀請家長加入</h2><p class="section-sub" id="invite-description">使用家長的 Google 帳號 Email 連結課程資料</p></div></div><div id="invite-content"></div></article>
         </section>
-        <footer class="site-footer"><span>好好上課 © 2026</span><span>V2.3 · Made with care. <span aria-hidden="true">✳</span></span></footer>
+        <footer class="site-footer"><span>好好上課 © 2026</span><span>V2.5 · Made with care. <span aria-hidden="true">✳</span></span></footer>
       </div>
     </main>
     <nav class="mobile-nav" aria-label="手機導覽"><button data-view="home" class="active"><span>⌂</span>今天</button><button data-view="calendar"><span>▦</span>月曆</button><button data-view="billing"><span>◈</span>帳務</button><button data-view="students"><span>♧</span>學生</button></nav>
@@ -106,6 +106,47 @@
       <div id="receipt-details" class="period-summary"></div>
       <label>實際收到款項日期<input type="date" id="receipt-date" required></label>
       <div class="form-actions"><button type="button" class="secondary-button" data-close="receipt-modal">取消</button><button type="submit" class="primary-button">確認已收款</button></div>
+    </form>
+  </dialog>
+
+
+  <dialog class="modal lesson-dialog" id="lesson-modal" aria-labelledby="lesson-modal-heading">
+    <form id="lesson-form" class="modal-inner">
+      <div class="modal-head"><div><p class="eyebrow">LESSON · 課程紀錄</p>
+        <h2 id="lesson-modal-heading">課程詳細資料</h2>
+        <p class="modal-description" id="lesson-modal-date"></p></div>
+        <button type="button" class="close-modal" data-close="lesson-modal" aria-label="關閉">×</button>
+      </div>
+      <div class="scheduled-time-box">
+        <span>原本預定上課時間</span>
+        <strong id="lesson-planned-time">17:00 – 19:00</strong>
+        <small id="lesson-status-hint">未確認上課</small>
+      </div>
+      <div id="lesson-time-editor" class="lesson-time-editor">
+        <div class="section-row"><div><h3 id="lesson-actual-heading">實際上課時間</h3>
+          <p class="section-sub">沒有變動就保留預定時間；有變動可以直接修改。</p></div></div>
+        <div class="form-row"><label>實際開始<input id="lesson-actual-start" type="time" required></label>
+          <label>實際結束<input id="lesson-actual-end" type="time" required></label></div>
+        <label>實際計費時數（小時，可自行修改）<input id="lesson-actual-hours" type="number" min="0.01" max="16" step="0.01" inputmode="decimal" required></label>
+        <p class="helper-note">修改開始或結束時間會先自動換算時數；也可直接填 1.2、1.5、2.5 小時。1.2 小時等於 72 分鐘。</p>
+      </div>
+      <label id="lesson-parent-note-wrap" class="hidden">說明（選填）
+        <textarea id="lesson-parent-note" rows="2" maxlength="500" placeholder="例如：當天沒有上課，或只上了 1.5 小時"></textarea>
+      </label>
+      <div id="lesson-lock-hint" class="helper-note hidden">這堂課已進入付款或收款流程，若要更正請先由老師處理相關帳務。</div>
+      <div id="lesson-teacher-actions" class="lesson-actions">
+        <button type="submit" class="primary-button" id="lesson-save">完成上課</button>
+        <div class="lesson-secondary-actions">
+          <button type="button" class="secondary-button" id="lesson-student-leave">學生請假</button>
+          <button type="button" class="secondary-button" id="lesson-teacher-leave">老師停課</button>
+          <button type="button" class="text-link" id="lesson-move">改期／補課 ↗</button>
+        </div>
+      </div>
+      <div id="lesson-parent-actions" class="lesson-actions hidden">
+        <button type="button" class="primary-button" id="lesson-parent-correct">提出時間更正</button>
+        <button type="button" class="secondary-button" id="lesson-parent-leave">提出請假申請</button>
+        <p class="helper-note">家長提出申請後，需由老師確認才會正式修改課程紀錄。</p>
+      </div>
     </form>
   </dialog>
 
