@@ -443,18 +443,36 @@ async function saveRecord(ev){
      else assertResult(await client.from("lesson_records").insert(row));
    }else if(state.mode==="demo")Object.assign(edited,item);
    else assertResult(await client.from("lesson_records").update(item).eq("id",edited.id).select("id").single());
- });if(ok){closeModal("record-modal");closeModal("day-modal");toast("課程已更新")}return;
+ });if(ok){await rememberTeacherForm({studentId:s.id,subject:common.subject,rate,start,end});closeModal("record-modal");closeModal("day-modal");toast("課程已更新")}return;
  }
- const dates=scheduleDates(date,$("#record-repeat").value,$("#record-until").value);
+ const repeat=$("#record-repeat").value;
+ if(["weekly","biweekly"].includes(repeat)){
+  const weekdays=$("#record-weekdays input:checked").map(el=>Number(el.value)).sort((a,b)=>a-b);
+  if(!weekdays.length){toast("請至少選擇一個固定上課星期");return}
+  const rule={teacher_id:activeUser?.id||"demo-teacher",student_id:s.id,subject:common.subject,
+   weekdays,every_weeks:repeat==="biweekly"?2:1,starts_on:date,
+   ends_on:$("#record-until").value||null,start_time:start,end_time:end,hourly_rate:rate};
+  if(rule.ends_on&&rule.ends_on<date){toast("結束日期不能早於開始日期");return}
+  const conflict=scheduleConflicts(rule);
+  if(conflict.length&&!confirm("有 "+conflict.length+" 個可能重疊的時段，仍要建立嗎？"))return;
+  const ok=await persist(async()=>{
+   if(state.mode==="demo")state.schedules.push({id:uid(),...rule});
+   else assertResult(await client.from("recurring_schedules").insert(rule));
+  });
+  if(ok){await rememberTeacherForm({studentId:s.id,subject:common.subject,rate,start,end,repeat,weekdays});
+   closeModal("record-modal");toast("已建立固定課表：每"+(rule.every_weeks===2?"兩週":"週")+" "+weekdays.map(n=>["","一","二","三","四","五","六","日"][n]).join("、"))}
+  return;
+ }
+ const dates=scheduleDates(date,repeat,$("#record-until").value);
  const records=dates.map(day=>({...common,lesson_date:day,type:"planned",status:"未付款",owner_id:activeUser?.id||"demo-teacher"}));
  const ok=await persist(async()=>{if(state.mode==="demo"){state.lessons.push(...records.map(x=>({...x,id:uid()})))}else assertResult(await client.from("lesson_records").insert(records))});
- if(ok){closeModal("record-modal");toast("已新增 "+records.length+" 堂課")}
+ if(ok){await rememberTeacherForm({studentId:s.id,subject:common.subject,rate,start,end,repeat});closeModal("record-modal");toast("已新增 "+records.length+" 堂課")}
 }
 async function saveStudent(ev){
  ev.preventDefault();if(state.role!=="teacher"||!requireTeacherWorkspace())return;
  const form=new FormData(ev.target),name=asText(form.get("name")).trim(),subject=asText(form.get("subject")).trim(),rate=num(form.get("hourly_rate"));
  if(!name)return;const data={name,subject,hourly_rate:rate,teacher_id:activeUser?.id||"demo-teacher"};
- const ok=await persist(async()=>{if(state.mode==="demo")state.students.push({id:uid(),...data});else assertResult(await client.from("students").insert(data))});if(ok){closeModal("student-modal");ev.target.reset();toast("已新增學生")}
+ const ok=await persist(async()=>{if(state.mode==="demo")state.students.push({id:uid(),...data});else assertResult(await client.from("students").insert(data))});if(ok){await rememberTeacherForm({subject,rate});closeModal("student-modal");ev.target.reset();toast("已新增學生")}
 }
 async function saveInvite(ev){
  ev.preventDefault();if(state.role!=="teacher"||!requireTeacherWorkspace())return;
@@ -794,16 +812,20 @@ function openSchedule(rule=null){
  $("#schedule-rules-list").classList.toggle("hidden",!!rule);
  $("#schedule-scope").classList.toggle("hidden",!rule);
  $("#schedule-student").innerHTML=st.map(o=>'<option value="'+esc(o.id)+'">'+esc(o.name)+'</option>').join("");
- $("#schedule-student").value=rule?.student_id||st[0].id;
- const student=st.find(x=>x.id===$("#schedule-student").value);
- $("#schedule-subject").value=rule?.subject||student?.subject||"數學";
- $("#schedule-frequency").value=String(rule?.every_weeks||1);
+ $("#schedule-student").value=rule?.student_id||
+  (st.some(x=>x.id===teacherPreferences.lastStudentId)?teacherPreferences.lastStudentId:st[0].id);
+ const d=teacherStudentDefaults($("#schedule-student").value);
+ $("#schedule-subject").value=rule?.subject||d.subject;
+ refreshFormOptions($("#schedule-student").value);
+ $("#schedule-frequency").value=String(rule?.every_weeks||Number(teacherPreferences.lastRepeat==="biweekly"?2:1));
  $("#schedule-start").value=rule? (rule.starts_on>dateKey(tick())?rule.starts_on:dateKey(tick())):state.selected;
- $("#schedule-time-start").value=timeLabel(rule?.start_time||"19:00");
- $("#schedule-time-end").value=timeLabel(rule?.end_time||"20:30");
- $("#schedule-rate").value=rule?.hourly_rate??student?.hourly_rate??500;
+ $("#schedule-time-start").value=timeLabel(rule?.start_time||d.start);
+ $("#schedule-time-end").value=timeLabel(rule?.end_time||d.end);
+ $("#schedule-rate").value=rule?.hourly_rate??d.rate;
  $("#schedule-end-date").value=rule?.ends_on||"";
- const initWeekday=rule?.weekdays?.map(Number)||[((parseDate(state.selected).getDay()+6)%7)+1];
+ const initWeekday=rule?.weekdays?.map(Number)||
+  (Array.isArray(teacherPreferences.lastWeekdays)&&teacherPreferences.lastWeekdays.length
+   ?teacherPreferences.lastWeekdays:[((parseDate(state.selected).getDay()+6)%7)+1]);
  $$("#schedule-weekdays input").forEach(i=>i.checked=initWeekday.includes(Number(i.value)));
  $$('input[name="schedule-scope"]').forEach(r=>r.checked=r.value==="future");
  renderScheduleRules();showModal("schedule-modal");
@@ -863,7 +885,9 @@ async function submitSchedule(event){
    else assertResult(await client.from("recurring_schedules").insert(row));
   }
  });
- if(ok){closeModal("schedule-modal");toast("固定課表已儲存；未來日期會自動顯示")}
+ if(ok){await rememberTeacherForm({studentId:data.student_id,subject:data.subject,rate:data.hourly_rate,
+   start:data.start_time,end:data.end_time,repeat:data.every_weeks===2?"biweekly":"weekly",weekdays:data.weekdays});
+  closeModal("schedule-modal");toast("固定課表已儲存；未來日期會自動顯示")}
 }
 async function stopSchedule(id){
  const rule=state.schedules.find(x=>x.id===id);if(!rule||state.role!=="teacher")return;
