@@ -187,3 +187,38 @@
  .parent-workspace-filter{flex-direction:column;align-items:stretch}
  .parent-workspace-filter select{max-width:none}
 }
+/* V3 desktop calendar: group controls as stable flex items and never overlap titles. */
+#view-calendar>.page-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:18px}
+#view-calendar>.page-head>div:first-child{min-width:0}
+#view-calendar .calendar-toolbar{width:auto;min-width:0;display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:12px}
+#view-calendar .calendar-toolbar #manage-schedules{flex:0 0 auto;width:auto;max-width:none;min-width:max-content;margin:0;white-space:nowrap}
+#view-calendar .calendar-date-controls{display:inline-flex;align-items:center;justify-content:center;gap:9px;flex:0 0 auto;min-width:max-content}
+#view-calendar .calendar-date-controls strong{display:block;min-width:105px;white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums}
+#view-calendar .calendar-date-controls button{flex:0 0 auto}
+#view-calendar .calendar-overview-head{display:flex;align-items:center;justify-content:space-between;gap:16px;min-width:0}
+#view-calendar .calendar-overview-label{min-width:0}
+#view-calendar .calendar-mode-switch{flex:0 0 auto}
+#view-calendar .record-weekdays.hidden{display:none}
+#record-modal .record-weekdays{display:flex;flex-direction:column;gap:9px}
+#record-modal .record-weekdays .weekday-selector{margin:0}
+#record-modal .helper-note{display:block;margin-top:5px;line-height:1.55}
+@media(max-width:1020px){
+ #view-calendar>.page-head{grid-template-columns:1fr}
+ #view-calendar .calendar-toolbar{justify-content:space-between;width:100%}
+}
+@media(max-width:650px){
+ #view-calendar>.page-head{gap:14px}
+ #view-calendar .calendar-toolbar{width:100%;gap:10px}
+ #view-calendar .calendar-toolbar #manage-schedules{flex:0 0 auto;width:auto;min-width:0;max-width:none}
+ #view-calendar .calendar-date-controls{gap:5px}
+ #view-calendar .calendar-date-controls strong{min-width:82px;font-size:12px}
+ #view-calendar .calendar-date-controls button{width:31px;height:34px}
+ #view-calendar .calendar-overview-head{align-items:stretch;flex-direction:column}
+ #view-calendar .calendar-mode-switch{width:100%}
+ #record-modal .weekday-selector{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+}
+@media(max-width:430px){
+ #view-calendar .calendar-toolbar{flex-direction:column;align-items:stretch}
+ #view-calendar .calendar-toolbar #manage-schedules{align-self:start}
+ #view-calendar .calendar-date-controls{justify-content:space-between}
+}
