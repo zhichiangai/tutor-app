@@ -451,7 +451,7 @@ async function saveRecord(ev){
  }
  const repeat=$("#record-repeat").value;
  if(["weekly","biweekly"].includes(repeat)){
-  const weekdays=$("#record-weekdays input:checked").map(el=>Number(el.value)).sort((a,b)=>a-b);
+  const weekdays=$$("#record-weekdays input:checked").map(el=>Number(el.value)).sort((a,b)=>a-b);
   if(!weekdays.length){toast("請至少選擇一個固定上課星期");return}
   const rule={teacher_id:activeUser?.id||"demo-teacher",student_id:s.id,subject:common.subject,
    weekdays,every_weeks:repeat==="biweekly"?2:1,starts_on:date,
@@ -1106,8 +1106,8 @@ function bindEvents(){
  $("#record-date").addEventListener("change",()=>{
   if(state.editing)return;
   const day=((parseDate($("#record-date").value).getDay()+6)%7)+1;
-  if(!$("#record-weekdays input:checked").length)
-   $("#record-weekdays input").forEach(el=>el.checked=Number(el.value)===day);
+  if(!$$("#record-weekdays input:checked").length)
+   $$("#record-weekdays input").forEach(el=>el.checked=Number(el.value)===day);
  });
  $("#request-form").addEventListener("submit",submitRequest);
  document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e)});
