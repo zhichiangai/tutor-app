@@ -146,3 +146,21 @@
  #period-form .form-row{grid-template-columns:repeat(2,minmax(0,1fr))}
  #period-form .form-row input{font-size:12px;padding:10px 7px}
 }
+
+
+/* V2.5 lesson quick editor */
+.lesson-dialog{max-width:530px;width:calc(100% - 26px);max-height:90dvh;border-radius:21px}
+.lesson-dialog .modal-inner{gap:18px}
+.scheduled-time-box{display:flex;flex-direction:column;gap:7px;background:#fbf6f0;border:1px solid #f2e7da;border-radius:14px;padding:16px}
+.scheduled-time-box span,.scheduled-time-box small{color:#9c8577;font-size:11px}
+.scheduled-time-box strong{font-size:22px;letter-spacing:.02em}
+.lesson-time-editor,.lesson-actions{display:flex;flex-direction:column;gap:13px}
+.lesson-time-editor h3{margin:0;font-size:15px}
+.lesson-time-editor .section-row{margin-bottom:0}
+.lesson-actions>.primary-button{min-height:45px}
+.lesson-secondary-actions{display:flex;flex-wrap:wrap;gap:9px}
+.lesson-secondary-actions button{min-height:41px}
+.calendar-event.lesson-event-click{display:block;width:100%;border:0;text-align:left;cursor:pointer;font:inherit}
+.day-lesson-open{background:transparent;border:0;font-weight:700;cursor:pointer;text-align:left}
+.day-lesson-open:hover{text-decoration:underline}
+@media(max-width:650px){.lesson-dialog{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);margin:0;width:calc(100% - 28px);max-height:88dvh;border-radius:19px}.lesson-dialog .modal-inner{padding:23px 18px;gap:15px}.lesson-secondary-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.lesson-secondary-actions .text-link{grid-column:1/-1;text-align:center}}
