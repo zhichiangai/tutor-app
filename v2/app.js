@@ -308,6 +308,7 @@ async function updateLesson(id,patch,msg){
   else assertResult(await client.from("lesson_records").update(patch).eq("id",id).select("id").single());
  });
  if(ok){toast(msg);refreshDaySheet()}
+ return ok;
 }
 function openRequest(id,kind){
  const l=resolveLesson(id);if(!l||l.type==="moved")return;
@@ -540,7 +541,7 @@ async function saveLessonOutcome(ev){
  const patch={type:"lesson",actual_start_time:values.actual_start_time,actual_end_time:values.actual_end_time,
   actual_hours:values.actual_hours,hours:values.hours,total_amount:Math.round(values.hours*Number(lesson.hourly_rate)*100)/100};
  const ok=await updateLesson(lesson.id,patch,lesson.type==="lesson"?"實際時數已更新":"已完成上課，費用會依實際計費時數計算");
- if(ok!==false)closeModal("lesson-modal");
+ if(ok)closeModal("lesson-modal");
 }
 async function markLessonLeave(source){
  const lesson=resolveLesson(state.activeLesson);
@@ -591,7 +592,10 @@ function refreshDaySheet(){
 }
 function openDay(day){
  state.selected=day;state.month=new Date(parseDate(day).getFullYear(),parseDate(day).getMonth(),1);
- render();refreshDaySheet();showModal("day-modal");refreshDaySheet();
+ render();
+ const options=visibleLessons().filter(l=>l.lesson_date===day&&l.type!=="moved");
+ if(options.length===1){openLessonPopup(options[0].id);return}
+ refreshDaySheet();showModal("day-modal");refreshDaySheet();
 }
 function scheduleRuleLabel(rule){
  const days=(rule.weekdays||[]).map(d=>"週"+["","一","二","三","四","五","六","日"][d]).join("、");
@@ -795,18 +799,17 @@ function bindEvents(){
   const nav=ev.target.closest("[data-view]");if(nav){setView(nav.dataset.view);if(nav.dataset.date){state.selected=nav.dataset.date;state.month=parseDate(state.selected);render()}return}
   const close=ev.target.closest("[data-close]");if(close){closeModal(close.dataset.close);return}
   const switcher=ev.target.closest("[data-calendar-mode]");if(switcher){changeCalendarMode(switcher.dataset.calendarMode);return}
-  const day=ev.target.closest("[data-day]");if(day){openDay(day.dataset.day);return}
   const action=ev.target.closest("[data-action]");if(action){
    const id=action.dataset.id,kind=action.dataset.action;
-   if(kind==="complete")await updateLesson(id,{type:"lesson"},"已完成上課");
+   if(kind==="open-lesson"||kind==="complete"||kind==="edit"||kind==="leave-request"){openLessonPopup(id);return}
    if(kind==="received")await updateLesson(id,{status:"老師已收到",received_date:dateKey(tick())},"已確認收款");
-   if(kind==="edit"){closeModal("day-modal");openRecord(resolveLesson(id))}
+   
    if(kind==="cancel-lesson")openChange(resolveLesson(id));
    if(kind==="change-lesson")openChange(resolveLesson(id));
    if(kind==="restore-lesson")await restoreLesson(id);
    if(kind==="edit-rule")openSchedule(state.schedules.find(r=>r.id===id));
    if(kind==="stop-rule")await stopSchedule(id);
-   if(kind==="leave-request")openRequest(id,"leave");
+   
    if(kind==="payment-period-single"){const l=resolveLesson(id);if(l)openPeriodModal(l.student_id,l.lesson_date,l.lesson_date)}
    if(kind==="accept-invite")await acceptInvite(id);
    if(kind==="approve-request")await reviewRequest(id,true);
@@ -814,8 +817,17 @@ function bindEvents(){
    if(kind==="confirm-batch")openReceiptModal(id);
    if(kind==="decline-batch")if(confirm("確定退回這筆期間付款？這不會刪除紀錄，但可付款餘額會重新開放。"))await reviewPeriodBatch(id,false,null);
   }
+  const day=ev.target.closest("[data-day]");if(day){openDay(day.dataset.day);return}
  });
  document.addEventListener("keydown",ev=>{const el=ev.target.closest("[data-day]");if(el&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();openDay(el.dataset.day)}});
+ $("#lesson-form").addEventListener("submit",saveLessonOutcome);
+ ["lesson-actual-start","lesson-actual-end"].forEach(id=>$("#"+id).addEventListener("change",syncActualHoursFromTime));
+ $("#lesson-actual-hours").addEventListener("input",()=>{state.actualHoursManual=true});
+ $("#lesson-student-leave").onclick=()=>markLessonLeave("student");
+ $("#lesson-teacher-leave").onclick=()=>markLessonLeave("teacher");
+ $("#lesson-move").onclick=()=>{const lesson=resolveLesson(state.activeLesson);closeModal("lesson-modal");openChange(lesson)};
+ $("#lesson-parent-correct").onclick=()=>submitParentLessonRequest("time_correction");
+ $("#lesson-parent-leave").onclick=()=>submitParentLessonRequest("leave");
  $("#top-add").onclick=()=>openRecord();
  $("#agenda-add").onclick=()=>openRecord();
  $("#show-full-month").onclick=()=>changeCalendarMode("list");
