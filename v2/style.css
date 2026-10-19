@@ -164,3 +164,7 @@
 .day-lesson-open{background:transparent;border:0;font-weight:700;cursor:pointer;text-align:left}
 .day-lesson-open:hover{text-decoration:underline}
 @media(max-width:650px){.lesson-dialog{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);margin:0;width:calc(100% - 28px);max-height:88dvh;border-radius:19px}.lesson-dialog .modal-inner{padding:23px 18px;gap:15px}.lesson-secondary-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.lesson-secondary-actions .text-link{grid-column:1/-1;text-align:center}}
+
+/* The lower duplicate day-action list is hidden; course edits open in the in-page dialog. */
+#view-calendar>.agenda-card{display:none}
+.lesson-dialog .lesson-actions.hidden,.lesson-dialog .lesson-time-editor.hidden{display:none}
