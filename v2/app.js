@@ -2,6 +2,7 @@
 /* 好好上課 V2 · GitHub Pages + Supabase (live) / browser-only (preview).
  * Only the public Supabase URL/publishable key appear here. Never store service_role keys.
  */
+import { expandSchedules, isVirtualOccurrence, findTimeConflicts, originalOccurrenceDate, matchesRecurrence } from "./scheduling.js";
 const SUPABASE_URL = "https://vctisuglfoxyuwlvyjee.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_QR8An_jEnMEZTPuTHebFDA_xg46FLit";
 const STORAGE = "tutor_v2_preview_data_20261019";
@@ -22,7 +23,7 @@ const timeLabel = (s) => asText(s).slice(0,5);
 const tick = ()=>new Date();
 const uid = ()=>crypto.randomUUID();
 let client=null, activeUser=null, loading=false;
-const state={mode:localStorage.getItem(MODE_STORAGE)==="live"?"live":"demo",role:localStorage.getItem(ROLE_STORAGE)==="parent"?"parent":"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],editing:null};
+const state={mode:localStorage.getItem(MODE_STORAGE)==="live"?"live":"demo",role:localStorage.getItem(ROLE_STORAGE)==="parent"?"parent":"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null};
 
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
@@ -37,10 +38,12 @@ function seed(){
   lessons.push({id:"demo-l"+counter++,owner_id:"demo-teacher",student_id:st.id,student:st.name,subject:st.subject,lesson_date:dateKey(d),start_time:((i%2)?"18:00":"19:00"),end_time:((i%2)?"19:30":"20:30"),hours:1.5,hourly_rate:st.hourly_rate,total_amount:st.hourly_rate*1.5,type:passed?"lesson":"planned",status:passed?(i%3===0?"老師已收到":"未付款"):"未付款",remarks:passed?"今日複習重點觀念，進度很穩定。":"",focus_rating:4,attitude_rating:5});
  }
  const upcoming=[1,3,6].map((offset,i)=>{const d=new Date(today.getFullYear(),today.getMonth(),today.getDate()+offset),st=demoStudents[i];return {id:"demo-f"+i,owner_id:"demo-teacher",student_id:st.id,student:st.name,subject:st.subject,lesson_date:dateKey(d),start_time:i===0?"19:00":"18:00",end_time:i===0?"20:30":"19:30",hours:1.5,hourly_rate:st.hourly_rate,total_amount:st.hourly_rate*1.5,type:"planned",status:"未付款",remarks:""}});
- return {students:demoStudents,lessons:[...lessons,...upcoming],invites:[],guardians:demoStudents.map(s=>({student_id:s.id,guardian_id:"demo-parent",teacher_id:"demo-teacher"})),requests:[]};
+ return {students:demoStudents,lessons:[...lessons,...upcoming],invites:[],guardians:demoStudents.map(s=>({student_id:s.id,guardian_id:"demo-parent",teacher_id:"demo-teacher"})),requests:[],
+  schedules:[{id:"demo-rule-1",teacher_id:"demo-teacher",student_id:"demo-s3",subject:"理化",weekdays:[3,6],every_weeks:1,starts_on:dateKey(today),ends_on:dateKey(new Date(today.getFullYear(),today.getMonth()+3,today.getDate())),start_time:"16:00",end_time:"17:30",hourly_rate:550}],
+  exceptions:[]};
 }
-function saveDemo(){if(state.mode==="demo")localStorage.setItem(STORAGE,JSON.stringify({students:state.students,lessons:state.lessons,invites:state.invites,guardians:state.guardians,requests:state.requests}))}
-function loadDemo(){try{const o=JSON.parse(localStorage.getItem(STORAGE)||"null")||seed();for(const k of ["students","lessons","invites","guardians","requests"])state[k]=Array.isArray(o[k])?o[k]:[];}catch{Object.assign(state,seed());}saveDemo();}
+function saveDemo(){if(state.mode==="demo")localStorage.setItem(STORAGE,JSON.stringify({students:state.students,lessons:state.lessons,invites:state.invites,guardians:state.guardians,requests:state.requests,schedules:state.schedules,exceptions:state.exceptions}))}
+function loadDemo(){try{const o=JSON.parse(localStorage.getItem(STORAGE)||"null")||seed();for(const k of ["students","lessons","invites","guardians","requests","schedules","exceptions"])state[k]=Array.isArray(o[k])?o[k]:(k==="schedules"?seed().schedules:[]);}catch{Object.assign(state,seed());}saveDemo();}
 function visibleStudents(){
  if(state.role==="teacher")return state.students.filter(s=>state.mode==="demo"||s.teacher_id===activeUser?.id);
  const allowed=new Set(state.guardians.filter(g=>state.mode==="demo"||g.guardian_id===activeUser?.id).map(g=>g.student_id));
@@ -48,13 +51,16 @@ function visibleStudents(){
 }
 function visibleLessons(){
  const allowed=new Set(visibleStudents().map(s=>s.id));
- return state.lessons.filter(l=>allowed.has(l.student_id) && (state.role==="parent"||state.mode==="demo"||l.owner_id===activeUser?.id));
+ const real=state.lessons.filter(l=>allowed.has(l.student_id) && (state.role==="parent"||state.mode==="demo"||l.owner_id===activeUser?.id));
+ const virtual=expandSchedules({schedules:state.schedules,exceptions:state.exceptions,lessons:real,allowedStudents:[...allowed],month:state.month,today:dateKey(tick())});
+ return [...real,...virtual];
 }
+function resolveLesson(id){return visibleLessons().find(l=>l.id===id)}
 function studentFor(lesson){return state.students.find(s=>s.id===lesson.student_id)}
 function isPast(s){return s<dateKey(tick())}
 function typeLabel(l){return l.type==="leave"?"已請假":l.type==="planned"?"預排課程":"已上課"}
-function statusLabel(l){return l.type==="leave"?"請假":l.type==="planned"?"尚未上課":l.status||"未付款"}
-function pillClass(l){return l.type==="leave"?"leave":l.type==="planned"?"":l.status==="老師已收到"?"paid":l.status==="家長已付款"?"pending":""}
+function statusLabel(l){return l.type==="moved"?"已改期":l.type==="leave"?(l.leave_source==="teacher"?"老師停課":"學生請假"):l.type==="planned"?"預計上課":l.status||"未付款"}
+function pillClass(l){return l.type==="moved"?"pending":l.type==="leave"?"leave":l.type==="planned"?"":l.status==="老師已收到"?"paid":l.status==="家長已付款"?"pending":""}
 function lessonSum(list){return list.filter(l=>l.type==="lesson").reduce((v,l)=>v+num(l.total_amount),0)}
 function monthLessons(){return visibleLessons().filter(l=>sameMonth(l.lesson_date,state.month))}
 function hourTotal(list){return list.filter(l=>l.type==="lesson").reduce((v,l)=>v+num(l.hours),0)}
@@ -95,17 +101,17 @@ function rowHTML(l,full=false){
  const actions=state.role==="teacher"?(
   (l.type==="planned"?'<button class="mini-action" data-action="complete" data-id="'+esc(l.id)+'">完成上課</button>':"")+
   (l.type==="lesson"&&l.status!=="老師已收到"?'<button class="mini-action" data-action="received" data-id="'+esc(l.id)+'">確認收款</button>':"")+
-  (full?'<button class="mini-action" data-action="edit" data-id="'+esc(l.id)+'">編輯</button><button class="mini-action" data-action="cancel-lesson" data-id="'+esc(l.id)+'">請假</button>':"")
+  (full && l.type!=="moved"?'<button class="mini-action" data-action="edit" data-id="'+esc(l.id)+'">編輯</button><button class="mini-action" data-action="change-lesson" data-id="'+esc(l.id)+'">改期／請假</button>'+((l.type==="leave"||l.moved_from)?'<button class="mini-action" data-action="restore-lesson" data-id="'+esc(l.id)+'">恢復原安排</button>':""):"")
  ):(l.type==="planned"||l.type==="lesson"?'<button class="mini-action" data-action="leave-request" data-id="'+esc(l.id)+'">請假</button>':"");
  const pay=state.role==="parent" && l.type==="lesson"&&l.status==="未付款"?'<button class="mini-action" data-action="payment-request" data-id="'+esc(l.id)+'">我已付款</button>':"";
- return '<div class="lesson-row"><span class="lesson-color '+(p==="paid"?"sage":"")+'"></span><div class="lesson-main"><strong>'+esc(name)+' · '+esc(l.subject||s?.subject||"課程")+'</strong><small>'+prettyDate(l.lesson_date)+' · '+esc(timeLabel(l.start_time))+'–'+esc(timeLabel(l.end_time))+'</small></div><div class="row-actions"><span class="pill '+p+'">'+esc(statusLabel(l))+'</span>'+(full?'<span class="lesson-amount">'+money(l.type==="lesson"?l.total_amount:0)+'</span>':"")+actions+pay+'</div></div>';
+ return '<div class="lesson-row"><span class="lesson-color '+(p==="paid"?"sage":"")+'"></span><div class="lesson-main"><strong>'+esc(name)+' · '+esc(l.subject||s?.subject||"課程")+'</strong><small>'+prettyDate(l.lesson_date)+' · '+esc(timeLabel(l.start_time))+'–'+esc(timeLabel(l.end_time))+'</small></div><div class="row-actions"><span class="pill '+p+'">'+esc(statusLabel(l))+'</span>'+(full?'<span class="lesson-amount">'+money(l.type==="lesson"?l.total_amount:0)+'</span>':"")+(l.schedule_id?'<span class="repeat-marker" title="固定課表">↻</span>':"")+actions+pay+'</div></div>';
 }
 function renderNext(){
  const next=visibleLessons().filter(l=>l.type==="planned"&&l.lesson_date>=dateKey(tick())).sort((a,b)=>(a.lesson_date+" "+a.start_time).localeCompare(b.lesson_date+" "+b.start_time))[0];
  $("#next-lesson").innerHTML=next?'<h2 class="next-heading">'+esc((studentFor(next)?.name||next.student||"學生")+' · '+next.subject)+'</h2><div class="next-meta"><span class="date-tag">'+prettyDate(next.lesson_date)+'</span><span>'+esc(timeLabel(next.start_time))+' – '+esc(timeLabel(next.end_time))+'</span></div><div class="next-actions"><button class="button-outline" data-view="calendar" data-date="'+esc(next.lesson_date)+'">查看這一天 ↗</button>'+(state.role==="teacher"?'<button class="text-link" data-action="complete" data-id="'+esc(next.id)+'">完成上課</button>':'<button class="text-link" data-action="leave-request" data-id="'+esc(next.id)+'">我要請假</button>')+'</div>':'<div class="empty">目前沒有即將開始的課程。<br>慢慢來，也是一種很好的節奏。</div>';
 }
 function renderRecent(){
- const rows=visibleLessons().filter(l=>l.type!=="leave").sort((a,b)=>(b.lesson_date+" "+b.start_time).localeCompare(a.lesson_date+" "+a.start_time)).slice(0,4);
+ const rows=visibleLessons().filter(l=>l.type!=="leave"&&l.type!=="moved").sort((a,b)=>(b.lesson_date+" "+b.start_time).localeCompare(a.lesson_date+" "+a.start_time)).slice(0,4);
  $("#recent-lessons").innerHTML=rows.length?rows.map(l=>rowHTML(l)).join(""):'<div class="empty">還沒有課程紀錄。新增第一堂課，開始累積吧。</div>';
 }
 function daysForMonth(month){
@@ -127,6 +133,7 @@ function renderFullCalendar(){
  const rows=ls.filter(l=>l.lesson_date===state.selected).sort((a,b)=>asText(a.start_time).localeCompare(asText(b.start_time)));
  $("#agenda-list").innerHTML=rows.length?rows.map(l=>rowHTML(l,true)).join(""):'<div class="empty">這天目前還沒有課程，可以好好休息一下。</div>';
  $("#agenda-add").style.display=state.role==="teacher"?"":"none";
+ $("#manage-schedules").style.display=state.role==="teacher"?"":"none";
 }
 function renderBilling(){
  const ls=monthLessons().filter(l=>l.type==="lesson"),unpaid=ls.filter(l=>l.status!=="老師已收到"),paid=ls.filter(l=>l.status==="老師已收到");
@@ -206,10 +213,17 @@ async function saveRecord(ev){
  if(hours<=0||hours>16){toast("請確認上課結束時間晚於開始時間");return}
  const common={student_id:s.id,student:s.name,subject:$("#record-subject").value.trim(),start_time:start,end_time:end,hours:Math.round(hours*100)/100,hourly_rate:rate,total_amount:Math.round(hours*rate*100)/100,remarks:$("#record-remarks").value.trim(),focus_rating:$("#record-focus").value?num($("#record-focus").value):null,attitude_rating:$("#record-attitude").value?num($("#record-attitude").value):null};
  if(!common.subject){toast("請填寫科目");return}
- const edited=state.lessons.find(l=>l.id===state.editing);
+ const edited=resolveLesson(state.editing);
  if(edited){
   const item={...common,lesson_date:date};
-  const ok=await persist(async()=>{if(state.mode==="demo")Object.assign(edited,item);else assertResult(await client.from("lesson_records").update(item).eq("id",edited.id).select("id").single())});if(ok){closeModal("record-modal");toast("課程已更新")}return;
+  const ok=await persist(async()=>{
+   if(isVirtualOccurrence(edited)){
+     const row={...item,owner_id:edited.owner_id,schedule_id:edited.schedule_id,scheduled_date:edited.scheduled_date,type:"planned",status:"未付款"};
+     if(state.mode==="demo")state.lessons.push({id:uid(),...row});
+     else assertResult(await client.from("lesson_records").insert(row));
+   }else if(state.mode==="demo")Object.assign(edited,item);
+   else assertResult(await client.from("lesson_records").update(item).eq("id",edited.id).select("id").single());
+ });if(ok){closeModal("record-modal");closeModal("day-modal");toast("課程已更新")}return;
  }
  const dates=scheduleDates(date,$("#record-repeat").value,$("#record-until").value);
  const records=dates.map(day=>({...common,lesson_date:day,type:day<dateKey(tick())?"lesson":"planned",status:"未付款",owner_id:activeUser?.id||"demo-teacher"}));
@@ -298,10 +312,10 @@ async function batchBilling(){
 
 async function refreshLive(){
  if(!client||!activeUser)return;
- const tables=["students","lesson_records","guardian_invites","student_guardians","family_requests"];
+ const tables=["students","lesson_records","guardian_invites","student_guardians","family_requests","recurring_schedules","schedule_exceptions"];
  const results=await Promise.all(tables.map(t=>client.from(t).select("*").limit(1000)));
  results.forEach((res,i)=>{if(res.error)throw Error(tables[i]+": "+res.error.message);});
- [state.students,state.lessons,state.invites,state.guardians,state.requests]=results.map(r=>r.data||[]);
+ [state.students,state.lessons,state.invites,state.guardians,state.requests,state.schedules,state.exceptions]=results.map(r=>r.data||[]);
 }
 async function ensureClient(){
  if(client)return client;
@@ -313,7 +327,7 @@ async function ensureClient(){
 async function initializeLive(){
  try{
   await ensureClient();const {data,error}=await client.auth.getSession();if(error)throw error;
-  activeUser=data.session?.user||null;if(activeUser){await refreshLive();toast("已登入並同步課程")}else{for(const k of ["students","lessons","invites","guardians","requests"])state[k]=[];}
+  activeUser=data.session?.user||null;if(activeUser){await refreshLive();toast("已登入並同步課程")}else{for(const k of ["students","lessons","invites","guardians","requests","schedules","exceptions"])state[k]=[];}
   render();
  }catch(err){console.error(err);toast("Supabase 連線失敗："+err.message);showModal("account-modal")}
 }
@@ -370,5 +384,5 @@ function bindEvents(){
  $$(".modal").forEach(d=>d.addEventListener("click",e=>{if(e.target===d)d.close()}));
 }
 function moveMonth(offset){state.month=new Date(state.month.getFullYear(),state.month.getMonth()+offset,1);render()}
-function main(){if(state.mode==="demo")loadDemo();else for(const k of ["students","lessons","invites","guardians","requests"])state[k]=[];bindEvents();render();if(state.mode==="live")initializeLive();else showModal("account-modal")}
+function main(){if(state.mode==="demo")loadDemo();else for(const k of ["students","lessons","invites","guardians","requests","schedules","exceptions"])state[k]=[];bindEvents();render();if(state.mode==="live")initializeLive();else showModal("account-modal")}
 main();
