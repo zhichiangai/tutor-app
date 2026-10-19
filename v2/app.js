@@ -1,5 +1,5 @@
 
-/* 好好上課 V2 · GitHub Pages + Supabase (live) / browser-only (preview).
+/* 好好上課 V3 · GitHub Pages/Vercel + Supabase (live) / browser-only (preview).
  * Only the public Supabase URL/publishable key appear here. Never store service_role keys.
  */
 import { expandSchedules, isVirtualOccurrence, findTimeConflicts, originalOccurrenceDate, matchesRecurrence } from "./scheduling.js";
@@ -26,7 +26,7 @@ const prettyDate = (s) => {const d=parseDate(s);return (d.getMonth()+1)+"月"+d.
 const timeLabel = (s) => asText(s).slice(0,5);
 const tick = ()=>new Date();
 const uid = ()=>crypto.randomUUID();
-let client=null, activeUser=null, loading=false;
+let client=null, activeUser=null, loading=false, teacherPreferences={};
 const state={mode:localStorage.getItem(MODE_STORAGE)==="live"?"live":"demo",role:localStorage.getItem(ROLE_STORAGE)==="parent"?"parent":"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",paymentBatches:[],paymentBatchItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",receiptBatch:null,activeLesson:null,actualHoursManual:false};
 
 function seed(){
@@ -83,7 +83,11 @@ function setBusy(yes){
 function showModal(id){const dialog=$("#"+id);if(dialog&&!dialog.open)dialog.showModal()}
 function closeModal(id){const dialog=$("#"+id);if(dialog?.open)dialog.close()}
 function setView(view){state.view=view;$$(".page-view").forEach(x=>x.classList.toggle("hidden",x.id!=="view-"+view));$$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));$("#breadcrumb-name").textContent=({home:"今天",calendar:"課程月曆",billing:"收付款",students:"學生與家長"})[view];render()}
-function setRole(role){state.role=role;localStorage.setItem(ROLE_STORAGE,role);setView("home");toast(role==="teacher"?"已切換到老師檢視":"已切換到家長檢視")}
+function setRole(role){
+ state.role=role;
+ localStorage.setItem(state.mode==="live"&&activeUser?ROLE_STORAGE+"_"+activeUser.id:ROLE_STORAGE,role);
+ setView("home");toast(role==="teacher"?"已切換到老師檢視":"已切換到家長檢視");
+}
 function myWorkspace(){return state.mode==="live"&&activeUser?state.workspaces.find(w=>w.owner_id===activeUser.id):null}
 function requireTeacherWorkspace(){
  if(state.mode==="live"&&(!activeUser||!myWorkspace())){
@@ -130,7 +134,7 @@ async function saveMyWorkspace(rename=false){
   if(rename)assertResult(await client.from("workspaces").update({name}).eq("id",ws.id).select("id").single());
   else assertResult(await client.from("workspaces").insert({owner_id:activeUser.id,kind:"individual",name}).select("id").single());
  });
- if(ok){closeModal("account-modal");toast(rename?"空間名稱已更新":"家教空間已建立，現在可以新增學生")}
+ if(ok){await loadTeacherPreferences();closeModal("account-modal");toast(rename?"空間名稱已更新":"家教空間已建立，現在可以新增學生")}
 }
 function render(){
  const role=state.role,teacher=role==="teacher";
@@ -142,8 +146,12 @@ function render(){
  $("#connection-status").classList.toggle("live",state.mode==="live"&&!!activeUser);
  $("#connection-status").innerHTML=state.mode==="demo"?"<i></i> 體驗模式":activeUser?"<i></i> 已安全連線":"<i></i> 尚未登入";
  $("#account-label").textContent=activeUser?.email?activeUser.email.split("@")[0]:"預覽使用者";
- $("#account-subtitle").textContent=state.mode==="demo"?"體驗模式":activeUser?.email||"尚未登入";
+ $("#account-subtitle").textContent=state.mode==="demo"?"體驗模式":
+  !activeUser?"尚未登入":state.role==="teacher"?
+    (myWorkspace()?.name||"尚未建立工作空間"):
+    ("家長 · "+new Set(state.guardians.filter(g=>g.guardian_id===activeUser.id).map(g=>g.teacher_id)).size+" 位授權老師");
  $("#avatar").textContent=activeUser?.email?.charAt(0).toUpperCase()||"好";
+ $("#account-current").textContent=activeUser?.email||"尚未使用 Google 登入";
  $("#role-teacher").classList.toggle("active",teacher);
  $("#role-parent").classList.toggle("active",!teacher);
  renderWorkspaceUI();
@@ -266,6 +274,102 @@ function renderStudents(){
   $("#invite-content").innerHTML=st.length?'<form class="invite-form" id="invite-form"><label>選擇學生<select id="invite-student">'+st.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.name)+'</option>').join("")+'</select></label><label>家長的 Google Email<input id="invite-email" type="email" required placeholder="parent@gmail.com" autocomplete="email"></label><button type="submit" class="primary-button">建立邀請</button></form><div class="invite-list">'+state.invites.filter(i=>state.mode==="demo"||i.teacher_id===activeUser?.id).map(i=>'<div class="lesson-row"><div class="lesson-main"><strong>'+esc(i.email)+'</strong><small>'+esc(st.find(s=>s.id===i.student_id)?.name||"學生")+'</small></div><span class="pill">已建立邀請</span></div>').join("")+'</div>':'<div class="empty">新增學生後，就可以邀請家長共同查看課程。</div>';
  }
 }
+// V3: Only teacher-owned, non-sensitive form defaults are synchronized across devices.
+function recentCourseForStudent(studentId){
+ return state.lessons.filter(l=>l.student_id===studentId&&l.type!=="leave"&&l.type!=="moved"
+   &&(state.mode==="demo"||l.owner_id===activeUser?.id))
+  .sort((a,b)=>String(b.updated_at||b.created_at||b.lesson_date||"").localeCompare(String(a.updated_at||a.created_at||a.lesson_date||"")))[0]||null;
+}
+function teacherStudentDefaults(studentId){
+ const student=visibleStudents().find(s=>s.id===studentId);
+ const prev=teacherPreferences.byStudent?.[studentId]||{};
+ const course=recentCourseForStudent(studentId);
+ return {
+  subject:prev.subject||course?.subject||student?.subject||teacherPreferences.lastSubject||"數學",
+  rate:prev.rate??course?.hourly_rate??student?.hourly_rate??teacherPreferences.lastRate??500,
+  start:prev.start||course?.start_time||teacherPreferences.lastStart||"19:00",
+  end:prev.end||course?.end_time||teacherPreferences.lastEnd||"20:30"
+ };
+}
+function optionValues(studentId){
+ const student=visibleStudents().find(s=>s.id===studentId),prev=teacherPreferences.byStudent?.[studentId];
+ const lessons=state.lessons.filter(l=>state.mode==="demo"||l.owner_id===activeUser?.id);
+ const rates=[prev?.rate,student?.hourly_rate,teacherPreferences.lastRate,...(teacherPreferences.recentRates||[]),...lessons.map(l=>l.hourly_rate)]
+  .map(Number).filter(n=>Number.isFinite(n)&&n>=0);
+ const subjects=[prev?.subject,student?.subject,teacherPreferences.lastSubject,...(teacherPreferences.recentSubjects||[]),...lessons.map(l=>l.subject)]
+  .filter(x=>typeof x==="string"&&x.trim());
+ return {rates:[...new Set(rates)].slice(0,15),subjects:[...new Set(subjects)].slice(0,15)};
+}
+function setDatalist(id,values){
+ const el=$("#"+id);if(el)el.innerHTML=values.map(v=>'<option value="'+esc(v)+'"></option>').join("");
+}
+function refreshFormOptions(studentId){
+ const options=optionValues(studentId);
+ ["record-rate-options","schedule-rate-options","student-rate-options"].forEach(id=>setDatalist(id,options.rates));
+ ["record-subject-options","schedule-subject-options","student-subject-options"].forEach(id=>setDatalist(id,options.subjects));
+}
+function selectStudentDefaults(prefix,studentId){
+ const d=teacherStudentDefaults(studentId);
+ const fields=prefix==="record"?
+  {subject:"record-subject",rate:"record-rate",start:"record-start",end:"record-end"}:
+  {subject:"schedule-subject",rate:"schedule-rate",start:"schedule-time-start",end:"schedule-time-end"};
+ $("#"+fields.subject).value=d.subject;$("#"+fields.rate).value=d.rate;
+ $("#"+fields.start).value=timeLabel(d.start);$("#"+fields.end).value=timeLabel(d.end);
+ refreshFormOptions(studentId);
+}
+async function loadTeacherPreferences(){
+ teacherPreferences={};
+ if(state.mode==="demo"){
+  try{teacherPreferences=JSON.parse(localStorage.getItem("tutor_v3_demo_form_preferences")||"{}")||{}}catch{}
+  return;
+ }
+ if(!client||!activeUser||!myWorkspace())return;
+ const {data,error}=await client.from("teacher_preferences").select("settings").eq("owner_id",activeUser.id).maybeSingle();
+ if(error)throw error;
+ teacherPreferences=data?.settings&&typeof data.settings==="object"?data.settings:{};
+}
+async function rememberTeacherForm(values){
+ if(state.role!=="teacher")return;
+ const prefs={...teacherPreferences,byStudent:{...(teacherPreferences.byStudent||{})}};
+ if(values.studentId){
+  prefs.lastStudentId=values.studentId;
+  const old=prefs.byStudent[values.studentId]||{};
+  prefs.byStudent[values.studentId]={...old,
+   ...(values.subject?{subject:values.subject}:{}),
+   ...(values.rate!==undefined?{rate:values.rate}:{}),
+   ...(values.start?{start:values.start}:{}),
+   ...(values.end?{end:values.end}:{})
+  };
+  // Keep the preference payload bounded, never accumulate all student records.
+  const ids=[values.studentId,...Object.keys(prefs.byStudent).filter(id=>id!==values.studentId)].slice(0,16);
+  prefs.byStudent=Object.fromEntries(ids.map(id=>[id,prefs.byStudent[id]]));
+ }
+ if(values.subject){prefs.lastSubject=values.subject;prefs.recentSubjects=[...new Set([values.subject,...(prefs.recentSubjects||[])])].slice(0,10)}
+ if(values.rate!==undefined&&Number.isFinite(Number(values.rate))){
+  prefs.lastRate=Number(values.rate);
+  prefs.recentRates=[...new Set([Number(values.rate),...(prefs.recentRates||[])])].slice(0,10);
+ }
+ if(values.start)prefs.lastStart=values.start;
+ if(values.end)prefs.lastEnd=values.end;
+ if(values.repeat)prefs.lastRepeat=values.repeat;
+ if(values.weekdays?.length)prefs.lastWeekdays=values.weekdays;
+ teacherPreferences=prefs;
+ try{
+  if(state.mode==="demo")localStorage.setItem("tutor_v3_demo_form_preferences",JSON.stringify(prefs));
+  else if(client&&activeUser&&myWorkspace()){
+   const {error}=await client.from("teacher_preferences").upsert({owner_id:activeUser.id,settings:prefs,updated_at:new Date().toISOString()},{onConflict:"owner_id"});
+   if(error)throw error;
+  }
+ }catch(err){console.warn("已儲存課程，但常用選項未能同步",err);toast("課程已儲存；常用選項同步未完成")}
+}
+function updateRecordRepeatUI(){
+ const repeat=$("#record-repeat").value,editing=Boolean(state.editing);
+ $("#repeat-label").classList.toggle("hidden",editing);
+ $("#record-weekdays-wrap").classList.toggle("hidden",editing||!["weekly","biweekly"].includes(repeat));
+ $("#until-label").classList.toggle("hidden",editing||repeat==="none");
+ $("#repeat-until-caption").textContent=repeat==="monthly"?"每月重複到（空白預設下個月，最多 52 堂）":"重複到日期（可留空，空白代表長期）";
+}
+
 function openRecord(lesson=null){
  if(state.role!=="teacher"){toast("只有老師能安排課程");return}
  if(!requireTeacherWorkspace())return;
@@ -273,20 +377,24 @@ function openRecord(lesson=null){
  state.editing=lesson?.id||null;
  $("#record-modal-title").textContent=lesson?"編輯課程":"新增一堂課";
  $("#record-student").innerHTML=st.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.name)+'</option>').join("");
- $("#record-student").value=lesson?.student_id||st[0].id;
- const s=st.find(s=>s.id===$("#record-student").value);
- $("#record-subject").value=lesson?.subject||s?.subject||"數學";
- $("#record-rate").value=lesson?.hourly_rate??s?.hourly_rate??500;
+ $("#record-student").value=lesson?.student_id||
+  (st.some(s=>s.id===teacherPreferences.lastStudentId)?teacherPreferences.lastStudentId:st[0].id);
+ const d=teacherStudentDefaults($("#record-student").value);
+ $("#record-subject").value=lesson?.subject||d.subject;
+ $("#record-rate").value=lesson?.hourly_rate??d.rate;
+ refreshFormOptions($("#record-student").value);
  $("#record-date").value=lesson?.lesson_date||state.selected;
- $("#record-start").value=timeLabel(lesson?.start_time||"19:00");
- $("#record-end").value=timeLabel(lesson?.end_time||"20:30");
+ $("#record-start").value=timeLabel(lesson?.start_time||d.start);
+ $("#record-end").value=timeLabel(lesson?.end_time||d.end);
  $("#record-remarks").value=lesson?.remarks||"";
  $("#record-focus").value=lesson?.focus_rating??"";
  $("#record-attitude").value=lesson?.attitude_rating??"";
- $("#record-repeat").value="none";
- $("#record-until").value=dateKey(new Date(parseDate($("#record-date").value).getFullYear(),parseDate($("#record-date").value).getMonth()+1,parseDate($("#record-date").value).getDate()));
- $("#until-label").classList.add("hidden");
- $("#repeat-label").classList.toggle("hidden",!!lesson);
+ $("#record-repeat").value="none"; // Explicit opt-in avoids accidental bulk scheduling.
+ $("#record-until").value="";
+ const weekday=((parseDate($("#record-date").value).getDay()+6)%7)+1;
+ const saved=teacherPreferences.lastWeekdays||[weekday];
+ $$("#record-weekdays input").forEach(el=>el.checked=saved.includes(Number(el.value)));
+ updateRecordRepeatUI();
  showModal("record-modal");
 }
 function scheduleDates(day,repeat,until){
@@ -344,18 +452,36 @@ async function saveRecord(ev){
      else assertResult(await client.from("lesson_records").insert(row));
    }else if(state.mode==="demo")Object.assign(edited,item);
    else assertResult(await client.from("lesson_records").update(item).eq("id",edited.id).select("id").single());
- });if(ok){closeModal("record-modal");closeModal("day-modal");toast("課程已更新")}return;
+ });if(ok){await rememberTeacherForm({studentId:s.id,subject:common.subject,rate,start,end});closeModal("record-modal");closeModal("day-modal");toast("課程已更新")}return;
  }
- const dates=scheduleDates(date,$("#record-repeat").value,$("#record-until").value);
+ const repeat=$("#record-repeat").value;
+ if(["weekly","biweekly"].includes(repeat)){
+  const weekdays=$$("#record-weekdays input:checked").map(el=>Number(el.value)).sort((a,b)=>a-b);
+  if(!weekdays.length){toast("請至少選擇一個固定上課星期");return}
+  const rule={teacher_id:activeUser?.id||"demo-teacher",student_id:s.id,subject:common.subject,
+   weekdays,every_weeks:repeat==="biweekly"?2:1,starts_on:date,
+   ends_on:$("#record-until").value||null,start_time:start,end_time:end,hourly_rate:rate};
+  if(rule.ends_on&&rule.ends_on<date){toast("結束日期不能早於開始日期");return}
+  const conflict=scheduleConflicts(rule);
+  if(conflict.length&&!confirm("有 "+conflict.length+" 個可能重疊的時段，仍要建立嗎？"))return;
+  const ok=await persist(async()=>{
+   if(state.mode==="demo")state.schedules.push({id:uid(),...rule});
+   else assertResult(await client.from("recurring_schedules").insert(rule));
+  });
+  if(ok){await rememberTeacherForm({studentId:s.id,subject:common.subject,rate,start,end,repeat,weekdays});
+   closeModal("record-modal");toast("已建立固定課表：每"+(rule.every_weeks===2?"兩週":"週")+" "+weekdays.map(n=>["","一","二","三","四","五","六","日"][n]).join("、"))}
+  return;
+ }
+ const dates=scheduleDates(date,repeat,$("#record-until").value);
  const records=dates.map(day=>({...common,lesson_date:day,type:"planned",status:"未付款",owner_id:activeUser?.id||"demo-teacher"}));
  const ok=await persist(async()=>{if(state.mode==="demo"){state.lessons.push(...records.map(x=>({...x,id:uid()})))}else assertResult(await client.from("lesson_records").insert(records))});
- if(ok){closeModal("record-modal");toast("已新增 "+records.length+" 堂課")}
+ if(ok){await rememberTeacherForm({studentId:s.id,subject:common.subject,rate,start,end,repeat});closeModal("record-modal");toast("已新增 "+records.length+" 堂課")}
 }
 async function saveStudent(ev){
  ev.preventDefault();if(state.role!=="teacher"||!requireTeacherWorkspace())return;
  const form=new FormData(ev.target),name=asText(form.get("name")).trim(),subject=asText(form.get("subject")).trim(),rate=num(form.get("hourly_rate"));
  if(!name)return;const data={name,subject,hourly_rate:rate,teacher_id:activeUser?.id||"demo-teacher"};
- const ok=await persist(async()=>{if(state.mode==="demo")state.students.push({id:uid(),...data});else assertResult(await client.from("students").insert(data))});if(ok){closeModal("student-modal");ev.target.reset();toast("已新增學生")}
+ const ok=await persist(async()=>{if(state.mode==="demo")state.students.push({id:uid(),...data});else assertResult(await client.from("students").insert(data))});if(ok){await rememberTeacherForm({subject,rate});closeModal("student-modal");ev.target.reset();toast("已新增學生")}
 }
 async function saveInvite(ev){
  ev.preventDefault();if(state.role!=="teacher"||!requireTeacherWorkspace())return;
@@ -458,14 +584,28 @@ function visiblePaymentBatches(){
 function renderPaymentHistory(){
  $("#payment-batch-history").innerHTML=paymentHistoryHTML(visiblePaymentBatches());
 }
+function periodPreferenceKey(){
+ return "tutor_v3_period_"+(state.mode==="live"?activeUser?.id||"guest":"demo")+"_"+state.role;
+}
+function getPeriodPreference(){
+ try{const p=JSON.parse(localStorage.getItem(periodPreferenceKey())||"{}");
+  return p&&typeof p==="object"?p:{};}catch{return {}}
+}
+function rememberPeriodPreference(){
+ const p={studentId:$("#period-student").value,start:$("#period-start").value,end:$("#period-end").value};
+ if(!visibleStudents().some(x=>x.id===p.studentId)||!p.start||!p.end||p.start>p.end)return;
+ try{localStorage.setItem(periodPreferenceKey(),JSON.stringify(p))}catch{}
+}
 function openPeriodModal(studentId=null,start=null,end=null){
  const st=visibleStudents();if(!st.length){toast("目前沒有可結算的學生，請先完成學生與家長授權");return}
  $("#period-heading").textContent=state.role==="parent"?"回報指定期間已付款":"查詢指定期間收款";
  $("#period-help").textContent=state.role==="parent"?"選好學生與上課日期後，系統自動計算已完成且尚未結清的課程。":"選擇學生與日期，查看期間內的家長付款回報及收款狀態。";
+ const last=getPeriodPreference();
  $("#period-student").innerHTML=st.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join("");
- $("#period-student").value=studentId&&st.some(x=>x.id===studentId)?studentId:st[0].id;
- $("#period-start").value=start||dateKey(new Date(state.month.getFullYear(),state.month.getMonth(),1));
- $("#period-end").value=end||dateKey(new Date(state.month.getFullYear(),state.month.getMonth()+1,0));
+ $("#period-student").value=(studentId&&st.some(x=>x.id===studentId)?studentId:
+  (st.some(x=>x.id===last.studentId)?last.studentId:st[0].id));
+ $("#period-start").value=start||last.start||dateKey(new Date(state.month.getFullYear(),state.month.getMonth(),1));
+ $("#period-end").value=end||last.end||dateKey(new Date(state.month.getFullYear(),state.month.getMonth()+1,0));
  $("#period-paid-on").value=dateKey(tick());
  $("#period-paid-on").max=dateKey(tick());
  $("#period-note").value="";
@@ -494,6 +634,7 @@ function renderPeriodPreview(resetAmount=false){
   $("#period-overview").textContent=r.message;$("#period-lesson-list").innerHTML="";
   $("#period-submit").disabled=parent;return;
  }
+ rememberPeriodPreference();
  if(parent){
   const hours=r.rows.reduce((n,x)=>n+num(x.lesson.hours),0);
   $("#period-overview").innerHTML='<strong>'+money(r.total)+'</strong><div class="period-summary-metrics"><span>'+r.rows.length+' 堂可結算</span><span>'+hours.toFixed(1)+' 小時</span><span>'+esc(r.start)+' ～ '+esc(r.end)+'</span></div>';
@@ -695,16 +836,20 @@ function openSchedule(rule=null){
  $("#schedule-rules-list").classList.toggle("hidden",!!rule);
  $("#schedule-scope").classList.toggle("hidden",!rule);
  $("#schedule-student").innerHTML=st.map(o=>'<option value="'+esc(o.id)+'">'+esc(o.name)+'</option>').join("");
- $("#schedule-student").value=rule?.student_id||st[0].id;
- const student=st.find(x=>x.id===$("#schedule-student").value);
- $("#schedule-subject").value=rule?.subject||student?.subject||"數學";
- $("#schedule-frequency").value=String(rule?.every_weeks||1);
+ $("#schedule-student").value=rule?.student_id||
+  (st.some(x=>x.id===teacherPreferences.lastStudentId)?teacherPreferences.lastStudentId:st[0].id);
+ const d=teacherStudentDefaults($("#schedule-student").value);
+ $("#schedule-subject").value=rule?.subject||d.subject;
+ refreshFormOptions($("#schedule-student").value);
+ $("#schedule-frequency").value=String(rule?.every_weeks||Number(teacherPreferences.lastRepeat==="biweekly"?2:1));
  $("#schedule-start").value=rule? (rule.starts_on>dateKey(tick())?rule.starts_on:dateKey(tick())):state.selected;
- $("#schedule-time-start").value=timeLabel(rule?.start_time||"19:00");
- $("#schedule-time-end").value=timeLabel(rule?.end_time||"20:30");
- $("#schedule-rate").value=rule?.hourly_rate??student?.hourly_rate??500;
+ $("#schedule-time-start").value=timeLabel(rule?.start_time||d.start);
+ $("#schedule-time-end").value=timeLabel(rule?.end_time||d.end);
+ $("#schedule-rate").value=rule?.hourly_rate??d.rate;
  $("#schedule-end-date").value=rule?.ends_on||"";
- const initWeekday=rule?.weekdays?.map(Number)||[((parseDate(state.selected).getDay()+6)%7)+1];
+ const initWeekday=rule?.weekdays?.map(Number)||
+  (Array.isArray(teacherPreferences.lastWeekdays)&&teacherPreferences.lastWeekdays.length
+   ?teacherPreferences.lastWeekdays:[((parseDate(state.selected).getDay()+6)%7)+1]);
  $$("#schedule-weekdays input").forEach(i=>i.checked=initWeekday.includes(Number(i.value)));
  $$('input[name="schedule-scope"]').forEach(r=>r.checked=r.value==="future");
  renderScheduleRules();showModal("schedule-modal");
@@ -764,7 +909,9 @@ async function submitSchedule(event){
    else assertResult(await client.from("recurring_schedules").insert(row));
   }
  });
- if(ok){closeModal("schedule-modal");toast("固定課表已儲存；未來日期會自動顯示")}
+ if(ok){await rememberTeacherForm({studentId:data.student_id,subject:data.subject,rate:data.hourly_rate,
+   start:data.start_time,end:data.end_time,repeat:data.every_weeks===2?"biweekly":"weekly",weekdays:data.weekdays});
+  closeModal("schedule-modal");toast("固定課表已儲存；未來日期會自動顯示")}
 }
 async function stopSchedule(id){
  const rule=state.schedules.find(x=>x.id===id);if(!rule||state.role!=="teacher")return;
@@ -870,7 +1017,7 @@ async function ensureClient(){
  const createClient=window.supabase?.createClient;
  if(!createClient)throw Error("登入元件載入失敗，請重新整理頁面後再試");
  client=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
- client.auth.onAuthStateChange((event,session)=>{activeUser=session?.user||null;if(event==="SIGNED_OUT"){activeUser=null;state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();}});
+ client.auth.onAuthStateChange((event,session)=>{activeUser=session?.user||null;if(event==="SIGNED_OUT"){activeUser=null;teacherPreferences={};state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();}});
  return client;
 }
 async function initializeLive(){
@@ -878,12 +1025,18 @@ async function initializeLive(){
   await ensureClient();const {data,error}=await client.auth.getSession();if(error)throw error;
   activeUser=data.session?.user||null;
   if(activeUser){
-   await ensureMyProfile();await refreshLive();
-   if(!myWorkspace()&&state.invites.some(i=>i.email===activeUser.email?.toLowerCase())&&state.role==="teacher"){
-    state.role="parent";localStorage.setItem(ROLE_STORAGE,"parent");
-   }
+   // Role is a display preference scoped to each account; authorization stays in RLS.
+   await ensureMyProfile();
+   await refreshLive();
+   const priorRole=localStorage.getItem(ROLE_STORAGE+"_"+activeUser.id);
+   const guardian=state.guardians.some(g=>g.guardian_id===activeUser.id);
+   const invited=state.invites.some(i=>i.email===activeUser.email?.toLowerCase());
+   state.role=priorRole==="parent"||priorRole==="teacher"?priorRole:
+    (!myWorkspace()&&(guardian||invited)?"parent":"teacher");
+   localStorage.setItem(ROLE_STORAGE+"_"+activeUser.id,state.role);
+   await loadTeacherPreferences();
    toast("已登入並同步課程");
-  }else{for(const k of LIVE_FIELDS)state[k]=[];}
+  }else{for(const k of LIVE_FIELDS)state[k]=[];teacherPreferences={};}
   render();
  }catch(err){console.error(err);toast("Supabase 連線失敗："+err.message);showModal("account-modal")}
 }
@@ -896,10 +1049,10 @@ async function googleLogin(){
 }
 async function signOut(){
  if(client){const {error}=await client.auth.signOut();if(error){toast(error.message);return;}}
- activeUser=null;state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();closeModal("account-modal");toast("已登出，目前使用預覽模式");
+ activeUser=null;teacherPreferences={};state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();closeModal("account-modal");toast("已登出，目前使用預覽模式");
 }
 function toggleDemo(){
- activeUser=null;state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();closeModal("account-modal");toast("現在可以自由試用，不影響正式資料");
+ teacherPreferences={};activeUser=null;state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();closeModal("account-modal");toast("現在可以自由試用，不影響正式資料");
 }
 function bindEvents(){
  document.addEventListener("click",async ev=>{
@@ -944,9 +1097,17 @@ function bindEvents(){
  $("#schedule-form").addEventListener("submit",submitSchedule);
  $("#change-form").addEventListener("submit",submitChange);
  $("#change-action").onchange=()=>$("#change-date-area").classList.toggle("hidden",$("#change-action").value!=="reschedule");
- $("#schedule-student").onchange=()=>{if(state.editingSchedule)return;const student=visibleStudents().find(x=>x.id===$("#schedule-student").value);if(student){$("#schedule-subject").value=student.subject;$("#schedule-rate").value=student.hourly_rate}};
- $("#add-student").onclick=()=>{if(requireTeacherWorkspace())showModal("student-modal")};
- $("#record-student").onchange=()=>{if(state.editing)return;const s=visibleStudents().find(s=>s.id===$("#record-student").value);if(s){$("#record-subject").value=s.subject;$("#record-rate").value=s.hourly_rate}};
+ $("#schedule-student").onchange=()=>{if(!state.editingSchedule)selectStudentDefaults("schedule",$("#schedule-student").value)};
+ $("#add-student").onclick=()=>{
+  if(!requireTeacherWorkspace())return;
+  refreshFormOptions(teacherPreferences.lastStudentId||"");
+  const form=$("#student-form");
+  const subject=form.querySelector('[name="subject"]'),rate=form.querySelector('[name="hourly_rate"]');
+  subject.value=teacherPreferences.lastSubject||"數學";
+  rate.value=teacherPreferences.lastRate??500;
+  showModal("student-modal");
+ };
+ $("#record-student").onchange=()=>{if(!state.editing)selectStudentDefaults("record",$("#record-student").value)};
  $("#prev-month").onclick=()=>moveMonth(-1);$("#next-month").onclick=()=>moveMonth(1);
  $("#billing-prev").onclick=()=>moveMonth(-1);$("#billing-next").onclick=()=>moveMonth(1);
  $("#batch-action").onclick=()=>openPeriodModal();
@@ -961,7 +1122,13 @@ function bindEvents(){
  });
  $("#jump-today").onclick=()=>{state.month=new Date(tick().getFullYear(),tick().getMonth(),1);state.selected=dateKey(tick());render()};
  $("#record-form").addEventListener("submit",saveRecord);$("#student-form").addEventListener("submit",saveStudent);
- $("#record-repeat").addEventListener("change",()=>$("#until-label").classList.toggle("hidden",$("#record-repeat").value==="none"));
+ $("#record-repeat").addEventListener("change",updateRecordRepeatUI);
+ $("#record-date").addEventListener("change",()=>{
+  if(state.editing)return;
+  const day=((parseDate($("#record-date").value).getDay()+6)%7)+1;
+  if(!$$("#record-weekdays input:checked").length)
+   $$("#record-weekdays input").forEach(el=>el.checked=Number(el.value)===day);
+ });
  $("#request-form").addEventListener("submit",submitRequest);
  document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e)});
  $("#workspace-start").onclick=()=>showModal("account-modal");
@@ -979,5 +1146,5 @@ function bindEvents(){
  $$(".modal").forEach(d=>d.addEventListener("click",e=>{if(e.target===d)d.close()}));
 }
 function moveMonth(offset){state.month=new Date(state.month.getFullYear(),state.month.getMonth()+offset,1);render()}
-function main(){if(state.mode==="demo")loadDemo();else for(const k of LIVE_FIELDS)state[k]=[];bindEvents();render();if(state.mode==="live")initializeLive();else showModal("account-modal")}
+function main(){if(state.mode==="demo"){loadDemo();loadTeacherPreferences()}else for(const k of LIVE_FIELDS)state[k]=[];bindEvents();render();if(state.mode==="live")initializeLive();else showModal("account-modal")}
 main();

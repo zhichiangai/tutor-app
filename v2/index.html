@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#F9F7F3">
   <meta name="description" content="好好上課：老師與家長都能輕鬆使用的課程月曆、請假與收付款管理工具。">
-  <title>好好上課 · 家教生活手帳 V2</title>
+  <title>好好上課 · V3 多人家教管理</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -54,7 +54,7 @@
           </div>
         </section>
         <section id="view-calendar" class="page-view hidden">
-          <div class="section-row page-head"><div><h2>課程月曆</h2><p class="section-sub">每個值得期待的日子，都在這裡</p></div><div class="month-controls"><button id="manage-schedules" class="secondary-button" type="button">☷ 固定課表</button><button id="prev-month" aria-label="上個月">‹</button><strong id="calendar-month"></strong><button id="next-month" aria-label="下個月">›</button><button class="today-button" id="jump-today">今天</button></div></div>
+          <div class="section-row page-head"><div><h2>課程月曆</h2><p class="section-sub">每個值得期待的日子，都在這裡</p></div><div class="month-controls calendar-toolbar"><button id="manage-schedules" class="secondary-button" type="button">☷ 固定課表</button><div class="calendar-date-controls"><button id="prev-month" aria-label="上個月" type="button">‹</button><strong id="calendar-month"></strong><button id="next-month" aria-label="下個月" type="button">›</button><button class="today-button" id="jump-today" type="button">今天</button></div></div></div>
           <div class="calendar-overview-head">
             <div class="calendar-overview-label"><span class="eyebrow">YOUR LESSONS · 課程總覽</span><p id="month-overview" aria-live="polite">本月課程整理中</p></div>
             <div class="calendar-mode-switch" role="group" aria-label="月曆顯示方式">
@@ -84,7 +84,7 @@
           <div class="student-grid" id="student-grid"></div>
           <article class="card invite-card"><div class="section-row"><div><h2 id="invite-title">邀請家長加入</h2><p class="section-sub" id="invite-description">使用家長的 Google 帳號 Email 連結課程資料</p></div></div><div id="invite-content"></div></article>
         </section>
-        <footer class="site-footer"><span>好好上課 © 2026</span><span><a href="./privacy.html">隱私權政策</a> · <a href="./terms.html">服務條款</a> · V2.5 · Made with care. <span aria-hidden="true">✳</span></span></footer>
+        <footer class="site-footer"><span>好好上課 © 2026</span><span><a href="./privacy.html">隱私權政策</a> · <a href="./terms.html">服務條款</a> · V3 · Made with care. <span aria-hidden="true">✳</span></span></footer>
       </div>
     </main>
     <nav class="mobile-nav" aria-label="手機導覽"><button data-view="home" class="active"><span>⌂</span>今天</button><button data-view="calendar"><span>▦</span>月曆</button><button data-view="billing"><span>◈</span>帳務</button><button data-view="students"><span>♧</span>學生</button></nav>
@@ -171,13 +171,13 @@
       <div class="modal-head"><div><p class="eyebrow">RECURRING LESSONS</p><h2 id="schedule-form-title">設定每週固定課表</h2><p class="modal-description">只設定一次，就能自動出現在未來月曆。</p></div><button type="button" class="close-modal" data-close="schedule-modal" aria-label="關閉">×</button></div>
       <div id="schedule-rules-list"></div>
       <label>學生<select id="schedule-student" required></select></label>
-      <label>上課科目<input id="schedule-subject" maxlength="80" required placeholder="例如：數學"></label>
+      <label>上課科目<input id="schedule-subject" maxlength="80" list="schedule-subject-options" required placeholder="例如：數學"><datalist id="schedule-subject-options"></datalist></label>
       <div><span class="form-label">每週上課日（可複選）</span><div class="weekday-selector" id="schedule-weekdays">
         <label><input type="checkbox" value="1"><span>一</span></label><label><input type="checkbox" value="2"><span>二</span></label><label><input type="checkbox" value="3"><span>三</span></label><label><input type="checkbox" value="4"><span>四</span></label><label><input type="checkbox" value="5"><span>五</span></label><label><input type="checkbox" value="6"><span>六</span></label><label><input type="checkbox" value="7"><span>日</span></label>
       </div></div>
       <div class="form-row"><label>排課頻率<select id="schedule-frequency"><option value="1">每週</option><option value="2">每兩週</option></select></label><label>開始日期<input id="schedule-start" type="date" required></label></div>
       <div class="form-row"><label>上課時間<input type="time" id="schedule-time-start" value="19:00" required></label><label>結束時間<input type="time" id="schedule-time-end" value="20:30" required></label></div>
-      <div class="form-row"><label>鐘點費（NT$／小時）<input id="schedule-rate" type="number" min="0" step="1" value="500" required></label><label>結束日期（可空白）<input id="schedule-end-date" type="date"></label></div>
+      <div class="form-row"><label>鐘點費（NT$／小時）<input id="schedule-rate" type="number" min="0" step="1" value="500" list="schedule-rate-options" required><datalist id="schedule-rate-options"></datalist></label><label>結束日期（可空白）<input id="schedule-end-date" type="date"></label></div>
       <div id="schedule-scope" class="scope-choice hidden"><strong>修改固定課表的範圍</strong><label><input type="radio" name="schedule-scope" value="future" checked> 自指定日期起變更（保留過去課程）</label><label><input type="radio" name="schedule-scope" value="all"> 修改這組固定規則（已完成紀錄不變）</label></div>
       <div class="form-actions"><button type="button" class="secondary-button" data-close="schedule-modal">取消</button><button type="submit" class="primary-button" id="schedule-save">儲存固定課表</button></div>
     </form>
@@ -194,14 +194,18 @@
 
   <dialog class="modal" id="record-modal"><form id="record-form" class="modal-inner"><div class="modal-head"><div><p class="eyebrow">LESSON DETAILS</p><h2 id="record-modal-title">新增一堂課</h2></div><button type="button" class="close-modal" data-close="record-modal" aria-label="關閉">×</button></div>
     <label>學生<select name="student_id" id="record-student" required></select></label>
-    <label>科目<input name="subject" id="record-subject" required maxlength="80" placeholder="例如：數學"></label>
-    <div class="form-row"><label>日期<input type="date" name="date" id="record-date" required></label><label>鐘點費（NT$）<input type="number" name="rate" id="record-rate" min="0" step="1" required></label></div>
+    <label>科目<input name="subject" id="record-subject" required maxlength="80" list="record-subject-options" placeholder="例如：數學"><datalist id="record-subject-options"></datalist></label>
+    <div class="form-row"><label>日期<input type="date" name="date" id="record-date" required></label><label>鐘點費（NT$）<input type="number" name="rate" id="record-rate" min="0" step="1" list="record-rate-options" required><datalist id="record-rate-options"></datalist><small class="helper-note">可直接輸入，或選擇這位學生最近使用的金額。</small></label></div>
     <div class="form-row"><label>開始時間<input type="time" name="start" id="record-start" required></label><label>結束時間<input type="time" name="end" id="record-end" required></label></div>
     <div class="form-row"><label>專注程度（選填）<select id="record-focus"><option value="">不填寫</option><option value="5">★★★★★ 非常投入</option><option value="4">★★★★☆ 不錯</option><option value="3">★★★☆☆ 普通</option><option value="2">★★☆☆☆ 待加強</option><option value="1">★☆☆☆☆ 需協助</option></select></label><label>學習態度（選填）<select id="record-attitude"><option value="">不填寫</option><option value="5">★★★★★ 非常積極</option><option value="4">★★★★☆ 不錯</option><option value="3">★★★☆☆ 普通</option><option value="2">★★☆☆☆ 待加強</option><option value="1">★☆☆☆☆ 需協助</option></select></label></div><label>課程備註（選填）<textarea name="remarks" id="record-remarks" rows="2" placeholder="今天上了哪些內容？"></textarea></label>
-    <label id="repeat-label">重複排課<select name="repeat" id="record-repeat"><option value="none">僅這一堂</option><option value="weekly">每週一次</option><option value="biweekly">每兩週一次</option><option value="monthly">每月一次</option></select></label><label id="until-label" class="hidden">重複到日期（最多 52 堂）<input type="date" id="record-until"></label>
+    <label id="repeat-label">重複排課<select name="repeat" id="record-repeat"><option value="none">僅這一堂</option><option value="weekly">每週（可複選星期）</option><option value="biweekly">每兩週（可複選星期）</option><option value="monthly">每月（依當月日期）</option></select></label>
+    <div class="record-weekdays hidden" id="record-weekdays-wrap"><span class="form-label">上課星期（可複選）</span><div class="weekday-selector" id="record-weekdays">
+      <label><input type="checkbox" value="1"><span>一</span></label><label><input type="checkbox" value="2"><span>二</span></label><label><input type="checkbox" value="3"><span>三</span></label><label><input type="checkbox" value="4"><span>四</span></label><label><input type="checkbox" value="5"><span>五</span></label><label><input type="checkbox" value="6"><span>六</span></label><label><input type="checkbox" value="7"><span>日</span></label>
+    </div><small class="helper-note">星期一、三、五可以一次設定；時間相同的課程會共用一組固定規則。</small></div>
+    <label id="until-label" class="hidden"><span id="repeat-until-caption">重複到日期（可留空，空白代表長期）</span><input type="date" id="record-until"></label>
     <div class="form-actions"><button type="button" class="secondary-button" data-close="record-modal">取消</button><button type="submit" class="primary-button" id="save-record">儲存課程</button></div>
   </form></dialog>
-  <dialog class="modal" id="student-modal"><form id="student-form" class="modal-inner"><div class="modal-head"><div><p class="eyebrow">NEW STUDENT</p><h2>新增學生</h2></div><button type="button" class="close-modal" data-close="student-modal">×</button></div><label>學生稱呼<input id="student-name" name="name" maxlength="80" required placeholder="例如：小明"></label><label>常用科目<input name="subject" maxlength="80" value="數學" required></label><label>鐘點費（NT$）<input name="hourly_rate" type="number" min="0" value="500" step="1" required></label><div class="form-actions"><button type="button" class="secondary-button" data-close="student-modal">取消</button><button class="primary-button" type="submit">儲存學生</button></div></form></dialog>
+  <dialog class="modal" id="student-modal"><form id="student-form" class="modal-inner"><div class="modal-head"><div><p class="eyebrow">NEW STUDENT</p><h2>新增學生</h2></div><button type="button" class="close-modal" data-close="student-modal">×</button></div><label>學生稱呼<input id="student-name" name="name" maxlength="80" required placeholder="例如：小明"></label><label>常用科目<input name="subject" maxlength="80" value="數學" list="student-subject-options" required><datalist id="student-subject-options"></datalist></label><label>鐘點費（NT$）<input name="hourly_rate" type="number" min="0" value="500" step="1" list="student-rate-options" required><datalist id="student-rate-options"></datalist></label><div class="form-actions"><button type="button" class="secondary-button" data-close="student-modal">取消</button><button class="primary-button" type="submit">儲存學生</button></div></form></dialog>
   <dialog class="modal" id="request-modal"><form id="request-form" class="modal-inner"><div class="modal-head"><div><p class="eyebrow">LET US KNOW</p><h2 id="request-heading">送出申請</h2></div><button type="button" class="close-modal" data-close="request-modal">×</button></div><p class="modal-description" id="request-description"></p><input id="request-lesson-id" type="hidden"><input id="request-kind" type="hidden"><label>想補充的話（選填）<textarea id="request-note" rows="3" placeholder="例如：已於今天轉帳／當天需要請假"></textarea></label><div class="form-actions"><button class="secondary-button" type="button" data-close="request-modal">取消</button><button class="primary-button" type="submit">送出申請</button></div></form></dialog>
   <dialog class="modal account-modal" id="account-modal"><div class="modal-inner"><div class="modal-head"><div><p class="eyebrow">ACCOUNT & ACCESS</p><h2>帳號與使用模式</h2></div><button type="button" class="close-modal" data-close="account-modal">×</button></div>
     <p class="modal-description" id="login-description">登入後可同步你的專屬課程；也可以先使用不影響真實資料的互動預覽。</p>
