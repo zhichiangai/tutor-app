@@ -168,16 +168,21 @@ function openRecord(lesson=null){
  $("#record-start").value=timeLabel(lesson?.start_time||"19:00");
  $("#record-end").value=timeLabel(lesson?.end_time||"20:30");
  $("#record-remarks").value=lesson?.remarks||"";
+ $("#record-focus").value=lesson?.focus_rating??"";
+ $("#record-attitude").value=lesson?.attitude_rating??"";
  $("#record-repeat").value="none";
+ $("#record-until").value=dateKey(new Date(parseDate($("#record-date").value).getFullYear(),parseDate($("#record-date").value).getMonth()+1,parseDate($("#record-date").value).getDate()));
+ $("#until-label").classList.add("hidden");
  $("#repeat-label").classList.toggle("hidden",!!lesson);
  showModal("record-modal");
 }
-function scheduleDates(day,repeat){
- const first=parseDate(day),out=[day],limit=4;
- for(let i=1;i<limit&&repeat!=="none";i++){
+function scheduleDates(day,repeat,until){
+ const first=parseDate(day),out=[day],end=until||dateKey(new Date(first.getFullYear(),first.getMonth()+1,first.getDate()));
+ for(let i=1;i<52&&repeat!=="none";i++){
   let d;
   if(repeat==="monthly"){const wanted=first.getDate(),last=new Date(first.getFullYear(),first.getMonth()+i+1,0).getDate();d=new Date(first.getFullYear(),first.getMonth()+i,Math.min(wanted,last))}
   else d=new Date(first.getFullYear(),first.getMonth(),first.getDate()+(repeat==="weekly"?7:14)*i);
+  if(dateKey(d)>end)break;
   out.push(dateKey(d));
  }
  return out;
@@ -196,14 +201,14 @@ async function saveRecord(ev){
  const date=$("#record-date").value,start=$("#record-start").value,end=$("#record-end").value,rate=num($("#record-rate").value);
  const hours=(Number(end.slice(0,2))*60+Number(end.slice(3)) - Number(start.slice(0,2))*60-Number(start.slice(3)))/60;
  if(hours<=0||hours>16){toast("請確認上課結束時間晚於開始時間");return}
- const common={student_id:s.id,student:s.name,subject:$("#record-subject").value.trim(),start_time:start,end_time:end,hours:Math.round(hours*100)/100,hourly_rate:rate,total_amount:Math.round(hours*rate*100)/100,remarks:$("#record-remarks").value.trim()};
+ const common={student_id:s.id,student:s.name,subject:$("#record-subject").value.trim(),start_time:start,end_time:end,hours:Math.round(hours*100)/100,hourly_rate:rate,total_amount:Math.round(hours*rate*100)/100,remarks:$("#record-remarks").value.trim(),focus_rating:$("#record-focus").value?num($("#record-focus").value):null,attitude_rating:$("#record-attitude").value?num($("#record-attitude").value):null};
  if(!common.subject){toast("請填寫科目");return}
  const edited=state.lessons.find(l=>l.id===state.editing);
  if(edited){
   const item={...common,lesson_date:date};
-  const ok=await persist(async()=>{if(state.mode==="demo")Object.assign(edited,item);else assertResult(await client.from("lesson_records").update(item).eq("id",edited.id))});if(ok){closeModal("record-modal");toast("課程已更新")}return;
+  const ok=await persist(async()=>{if(state.mode==="demo")Object.assign(edited,item);else assertResult(await client.from("lesson_records").update(item).eq("id",edited.id).select("id").single())});if(ok){closeModal("record-modal");toast("課程已更新")}return;
  }
- const dates=scheduleDates(date,$("#record-repeat").value);
+ const dates=scheduleDates(date,$("#record-repeat").value,$("#record-until").value);
  const records=dates.map(day=>({...common,lesson_date:day,type:day<dateKey(tick())?"lesson":"planned",status:"未付款",owner_id:activeUser?.id||"demo-teacher"}));
  const ok=await persist(async()=>{if(state.mode==="demo"){state.lessons.push(...records.map(x=>({...x,id:uid()})))}else assertResult(await client.from("lesson_records").insert(records))});
  if(ok){closeModal("record-modal");toast("已新增 "+records.length+" 堂課")}
@@ -222,7 +227,7 @@ async function saveInvite(ev){
 }
 async function updateLesson(id,patch,msg){
  const item=state.lessons.find(l=>l.id===id);if(!item)return;
- const ok=await persist(async()=>{if(state.mode==="demo")Object.assign(item,patch);else assertResult(await client.from("lesson_records").update(patch).eq("id",id))});
+ const ok=await persist(async()=>{if(state.mode==="demo")Object.assign(item,patch);else assertResult(await client.from("lesson_records").update(patch).eq("id",id).select("id").single())});
  if(ok)toast(msg);
 }
 function openRequest(id,kind){
@@ -251,11 +256,11 @@ async function reviewRequest(id,approve){
  const newStatus=approve?"approved":"declined";
  const ok=await persist(async()=>{
   if(state.mode==="demo"){r.status=newStatus;r.reviewed_at=new Date().toISOString()}
-  else assertResult(await client.from("family_requests").update({status:newStatus,reviewed_at:new Date().toISOString()}).eq("id",id));
+  else assertResult(await client.from("family_requests").update({status:newStatus,reviewed_at:new Date().toISOString()}).eq("id",id).select("id").single());
   if(approve&&r.lesson_id){
    const patch=r.kind==="leave"?{type:"leave"}:{status:"家長已付款",payment_date:dateKey(tick())};
    if(state.mode==="demo")Object.assign(state.lessons.find(l=>l.id===r.lesson_id)||{},patch);
-   else assertResult(await client.from("lesson_records").update(patch).eq("id",r.lesson_id));
+   else assertResult(await client.from("lesson_records").update(patch).eq("id",r.lesson_id).select("id").single());
   }
  });if(ok)toast(approve?"已同意申請":"已婉拒申請");
 }
@@ -321,6 +326,7 @@ function bindEvents(){
  $("#billing-prev").onclick=()=>moveMonth(-1);$("#billing-next").onclick=()=>moveMonth(1);
  $("#jump-today").onclick=()=>{state.month=new Date(tick().getFullYear(),tick().getMonth(),1);state.selected=dateKey(tick());render()};
  $("#record-form").addEventListener("submit",saveRecord);$("#student-form").addEventListener("submit",saveStudent);
+ $("#record-repeat").addEventListener("change",()=>$("#until-label").classList.toggle("hidden",$("#record-repeat").value==="none"));
  $("#request-form").addEventListener("submit",submitRequest);
  document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e)});
  $("#profile-button").onclick=()=>showModal("account-modal");
@@ -331,5 +337,5 @@ function bindEvents(){
  $$(".modal").forEach(d=>d.addEventListener("click",e=>{if(e.target===d)d.close()}));
 }
 function moveMonth(offset){state.month=new Date(state.month.getFullYear(),state.month.getMonth()+offset,1);render()}
-function main(){loadDemo();bindEvents();render();if(state.mode==="live")initializeLive();else showModal("account-modal")}
+function main(){if(state.mode==="demo")loadDemo();else for(const k of ["students","lessons","invites","guardians","requests"])state[k]=[];bindEvents();render();if(state.mode==="live")initializeLive();else showModal("account-modal")}
 main();
