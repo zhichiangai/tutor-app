@@ -94,7 +94,7 @@ function render(){
  ["待確認費用","◈",money(lessonSum(pending)),"","依課程付款狀態計算"]];
  $("#metrics").innerHTML=metrics.map(([label,icon,value,unit,foot])=>'<article class="metric-card"><div class="metric-label">'+label+'</div><div class="metric-icon">'+icon+'</div><div class="metric-value">'+esc(value)+(unit||"")+'</div><div class="metric-footer">'+foot+'</div></article>').join("");
  $("#money-reminder").textContent=teacher?"本月已確認收到 "+money(lessonSum(completed))+"。":"目前有 "+pending.length+" 筆課程等待付款或收款確認。";
- renderNext();renderRecent();renderMiniCalendar();renderFullCalendar();renderBilling();renderStudents();
+ renderNext();renderRecent();renderMiniCalendar();renderFullCalendar();renderBilling();renderStudents();refreshDaySheet();
 }
 function rowHTML(l,full=false){
  const s=studentFor(l),name=s?.name||l.student||"學生",p=pillClass(l);
@@ -403,6 +403,9 @@ async function submitSchedule(event){
  const old=state.schedules.find(s=>s.id===state.editingSchedule);
  const choice=$('input[name="schedule-scope"]:checked')?.value||"future";
  const effective=data.starts_on;
+ if(old&&choice==="all")data.starts_on=old.starts_on;
+ if(old&&choice==="future"&&effective<dateKey(tick())&&effective!==old.starts_on){toast("從這堂以後修改只能選今天或未來的日期");return}
+ if(data.ends_on&&data.ends_on<data.starts_on){toast("結束日期不可早於開始日期");return}
  const conflict=scheduleConflicts(data,old);
  if(conflict.length&&!confirm("這組固定課表有 "+conflict.length+" 個可能重疊的時段（例如 "+prettyDate(conflict[0].day)+"）。仍要建立嗎？"))return;
  if(old&&choice==="future"&&effective<old.starts_on){toast("生效日期不能早於原課表的開始日期");return}
@@ -542,13 +545,17 @@ function bindEvents(){
  document.addEventListener("click",async ev=>{
   const nav=ev.target.closest("[data-view]");if(nav){setView(nav.dataset.view);if(nav.dataset.date){state.selected=nav.dataset.date;state.month=parseDate(state.selected);render()}return}
   const close=ev.target.closest("[data-close]");if(close){closeModal(close.dataset.close);return}
-  const day=ev.target.closest("[data-day]");if(day){state.selected=day.dataset.day;renderFullCalendar();return}
+  const day=ev.target.closest("[data-day]");if(day){openDay(day.dataset.day);return}
   const action=ev.target.closest("[data-action]");if(action){
    const id=action.dataset.id,kind=action.dataset.action;
    if(kind==="complete")await updateLesson(id,{type:"lesson"},"已完成上課");
    if(kind==="received")await updateLesson(id,{status:"老師已收到",received_date:dateKey(tick())},"已確認收款");
-   if(kind==="edit")openRecord(state.lessons.find(l=>l.id===id));
-   if(kind==="cancel-lesson")if(confirm("確認將這堂課標記為請假？"))await updateLesson(id,{type:"leave",leave_source:"teacher"},"已標記為請假");
+   if(kind==="edit"){closeModal("day-modal");openRecord(resolveLesson(id))}
+   if(kind==="cancel-lesson")openChange(resolveLesson(id));
+   if(kind==="change-lesson")openChange(resolveLesson(id));
+   if(kind==="restore-lesson")await restoreLesson(id);
+   if(kind==="edit-rule")openSchedule(state.schedules.find(r=>r.id===id));
+   if(kind==="stop-rule")await stopSchedule(id);
    if(kind==="leave-request")openRequest(id,"leave");
    if(kind==="payment-request")openRequest(id,"payment");
    if(kind==="accept-invite")await acceptInvite(id);
@@ -556,9 +563,16 @@ function bindEvents(){
    if(kind==="decline-request")await reviewRequest(id,false);
   }
  });
- document.addEventListener("keydown",ev=>{const el=ev.target.closest("[data-day]");if(el&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();state.selected=el.dataset.day;renderFullCalendar()}});
+ document.addEventListener("keydown",ev=>{const el=ev.target.closest("[data-day]");if(el&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();openDay(el.dataset.day)}});
  $("#top-add").onclick=()=>openRecord();
  $("#agenda-add").onclick=()=>openRecord();
+ $("#manage-schedules").onclick=()=>openSchedule();
+ $("#day-add-lesson").onclick=()=>{closeModal("day-modal");openRecord()};
+ $("#day-add-rule").onclick=()=>openSchedule();
+ $("#schedule-form").addEventListener("submit",submitSchedule);
+ $("#change-form").addEventListener("submit",submitChange);
+ $("#change-action").onchange=()=>$("#change-date-area").classList.toggle("hidden",$("#change-action").value!=="reschedule");
+ $("#schedule-student").onchange=()=>{if(state.editingSchedule)return;const student=visibleStudents().find(x=>x.id===$("#schedule-student").value);if(student){$("#schedule-subject").value=student.subject;$("#schedule-rate").value=student.hourly_rate}};
  $("#add-student").onclick=()=>showModal("student-modal");
  $("#record-student").onchange=()=>{if(state.editing)return;const s=visibleStudents().find(s=>s.id===$("#record-student").value);if(s){$("#record-subject").value=s.subject;$("#record-rate").value=s.hourly_rate}};
  $("#prev-month").onclick=()=>moveMonth(-1);$("#next-month").onclick=()=>moveMonth(1);
