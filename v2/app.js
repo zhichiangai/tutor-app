@@ -993,7 +993,7 @@ const LIVE_FIELDS=["students","lessons","invites","guardians","requests","schedu
 const PAGE_SIZE=500;
 async function fetchAllRows(table){
  const rows=[];
- const orderColumns=table==="payment_batch_items"?["batch_id","lesson_id"]:["id"];
+ const orderColumns=table==="payment_batch_items"?["batch_id","lesson_id"]:table==="workspace_members"?["workspace_id","user_id"]:table==="teacher_preferences"?["owner_id"]:["id"];
  for(let offset=0;offset<50000;offset+=PAGE_SIZE){
   let query=client.from(table).select("*");
   for(const column of orderColumns)query=query.order(column,{ascending:true});
