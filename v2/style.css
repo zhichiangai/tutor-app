@@ -55,3 +55,57 @@
  #schedule-rules-list:not(.hidden){max-height:110px}
 }
 @media(prefers-reduced-motion:reduce){.weekday-selector span{transition:none}}
+
+
+/* V2.2 Shared calendar experience: same information, adaptive arrangement. */
+.calendar-overview-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:7px 0 18px}
+.calendar-overview-label .eyebrow{margin:0 0 7px}
+.calendar-overview-label p{margin:0;color:#99938c;font-size:12px;line-height:1.6}
+.calendar-mode-switch{display:inline-flex;flex-shrink:0;padding:4px;border:1px solid #ece6de;border-radius:12px;background:#fff;gap:3px}
+.calendar-mode-switch button{border:0;background:transparent;border-radius:9px;color:#85807a;font-size:12px;font-weight:600;padding:9px 13px;white-space:nowrap}
+.calendar-mode-switch button.active{color:#b75749;background:#fbece5;box-shadow:0 1px 5px #bfb3aa22}
+.calendar-month-preview{margin-top:17px}
+.calendar-month-preview .section-row{margin-bottom:9px}
+.month-agenda-group{border-bottom:1px solid #f0ebe5;padding:9px 0 12px}
+.month-agenda-group:last-child{border-bottom:0;padding-bottom:0}
+.month-agenda-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 4px}
+.month-agenda-heading strong{font-size:12px;font-weight:700;letter-spacing:.015em;color:#655b53}
+.month-agenda-heading .text-link{font-size:11px;min-height:36px;padding:6px 2px}
+.month-agenda-row{display:flex;align-items:center;gap:12px;padding:10px 4px}
+.month-agenda-row+.month-agenda-row{border-top:1px dashed #f4f0ed}
+.month-agenda-dot{width:5px;height:32px;border-radius:5px;background:#db927a;flex:none}
+.month-agenda-dot.done{background:#79a38c}
+.month-agenda-dot.exception{background:#b1a5a1}
+.month-agenda-info{flex:1;min-width:0}
+.month-agenda-info strong{display:block;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.month-agenda-info small{display:block;margin-top:5px;color:#9e988f;font-size:11px}
+.month-agenda-row .pill{flex:none}
+.calendar-month-list{border:1px solid var(--border);border-radius:18px;background:#fff;padding:15px 24px;box-shadow:var(--shadow)}
+.calendar-month-list .month-agenda-group{padding-top:12px}
+.mobile-lesson-count{display:none}
+.calendar-cell .calendar-event{font-size:10px}
+@media(max-width:900px){
+ .calendar-month-list{padding:12px 18px}
+}
+@media(max-width:650px){
+ .calendar-overview-head{align-items:flex-start;flex-direction:column;gap:12px;margin:6px 0 13px}
+ .calendar-overview-label .eyebrow{font-size:9px}
+ .calendar-overview-label p{font-size:11px}
+ .calendar-mode-switch{width:100%;justify-content:stretch}
+ .calendar-mode-switch button{flex:1;min-height:40px;font-size:12px}
+ .calendar-cell{min-height:70px}
+ .calendar-cell .calendar-event{display:none}
+ .calendar-cell .mobile-lesson-count{display:block;font-size:9px;font-weight:700;color:#aa7562;text-align:center;line-height:1.2;margin:5px auto 0;white-space:nowrap}
+ .calendar-cell.has-events:after{display:none}
+ .calendar-month-preview{margin-top:12px}
+ .calendar-month-preview .section-row{align-items:flex-start}
+ .calendar-month-preview .text-link{white-space:nowrap}
+ .month-agenda-row{padding:11px 0;gap:9px}
+ .month-agenda-info strong{font-size:12px}
+ .month-agenda-info small{font-size:11px}
+ .calendar-month-list{padding:10px 14px}
+ .calendar-month-list .month-agenda-group{padding-top:12px}
+ .calendar-month-list .month-agenda-heading strong{font-size:13px}
+ .calendar-month-list .month-agenda-heading .text-link{min-height:40px}
+ .calendar-month-preview .section-sub{max-width:235px;line-height:1.7}
+}
