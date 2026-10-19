@@ -4,6 +4,7 @@
  */
 import { expandSchedules, isVirtualOccurrence, findTimeConflicts, originalOccurrenceDate, matchesRecurrence } from "./scheduling.js";
 import { monthAgendaMarkup, monthSummary } from "./calendar-view.js";
+import { lessonAllocation, eligiblePeriodLessons, allocateOldestFirst, amount } from "./payment-ledger.js";
 const SUPABASE_URL = "https://vctisuglfoxyuwlvyjee.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_QR8An_jEnMEZTPuTHebFDA_xg46FLit";
 const STORAGE = "tutor_v2_preview_data_20261019";
@@ -25,7 +26,7 @@ const timeLabel = (s) => asText(s).slice(0,5);
 const tick = ()=>new Date();
 const uid = ()=>crypto.randomUUID();
 let client=null, activeUser=null, loading=false;
-const state={mode:localStorage.getItem(MODE_STORAGE)==="live"?"live":"demo",role:localStorage.getItem(ROLE_STORAGE)==="parent"?"parent":"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month"};
+const state={mode:localStorage.getItem(MODE_STORAGE)==="live"?"live":"demo",role:localStorage.getItem(ROLE_STORAGE)==="parent"?"parent":"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",paymentBatches:[],paymentBatchItems:[],receiptBatch:null};
 
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
@@ -42,10 +43,10 @@ function seed(){
  const upcoming=[1,3,6].map((offset,i)=>{const d=new Date(today.getFullYear(),today.getMonth(),today.getDate()+offset),st=demoStudents[i];return {id:"demo-f"+i,owner_id:"demo-teacher",student_id:st.id,student:st.name,subject:st.subject,lesson_date:dateKey(d),start_time:i===0?"19:00":"18:00",end_time:i===0?"20:30":"19:30",hours:1.5,hourly_rate:st.hourly_rate,total_amount:st.hourly_rate*1.5,type:"planned",status:"未付款",remarks:""}});
  return {students:demoStudents,lessons:[...lessons,...upcoming],invites:[],guardians:demoStudents.map(s=>({student_id:s.id,guardian_id:"demo-parent",teacher_id:"demo-teacher"})),requests:[],
   schedules:[{id:"demo-rule-1",teacher_id:"demo-teacher",student_id:"demo-s3",subject:"理化",weekdays:[3,6],every_weeks:1,starts_on:dateKey(today),ends_on:dateKey(new Date(today.getFullYear(),today.getMonth()+3,today.getDate())),start_time:"16:00",end_time:"17:30",hourly_rate:550}],
-  exceptions:[]};
+  exceptions:[],paymentBatches:[],paymentBatchItems:[]};
 }
-function saveDemo(){if(state.mode==="demo")localStorage.setItem(STORAGE,JSON.stringify({students:state.students,lessons:state.lessons,invites:state.invites,guardians:state.guardians,requests:state.requests,schedules:state.schedules,exceptions:state.exceptions}))}
-function loadDemo(){try{const o=JSON.parse(localStorage.getItem(STORAGE)||"null")||seed();for(const k of ["students","lessons","invites","guardians","requests","schedules","exceptions"])state[k]=Array.isArray(o[k])?o[k]:(k==="schedules"?seed().schedules:[]);}catch{Object.assign(state,seed());}saveDemo();}
+function saveDemo(){if(state.mode==="demo")localStorage.setItem(STORAGE,JSON.stringify({students:state.students,lessons:state.lessons,invites:state.invites,guardians:state.guardians,requests:state.requests,schedules:state.schedules,exceptions:state.exceptions,paymentBatches:state.paymentBatches,paymentBatchItems:state.paymentBatchItems}))}
+function loadDemo(){try{const o=JSON.parse(localStorage.getItem(STORAGE)||"null")||seed();for(const k of ["students","lessons","invites","guardians","requests","schedules","exceptions","paymentBatches","paymentBatchItems"])state[k]=Array.isArray(o[k])?o[k]:(k==="schedules"?seed().schedules:[]);}catch{Object.assign(state,seed());}saveDemo();}
 function visibleStudents(){
  if(state.role==="teacher")return state.students.filter(s=>state.mode==="demo"||s.teacher_id===activeUser?.id);
  const allowed=new Set(state.guardians.filter(g=>state.mode==="demo"||g.guardian_id===activeUser?.id).map(g=>g.student_id));
@@ -542,10 +543,10 @@ async function restoreLesson(id){
 
 async function refreshLive(){
  if(!client||!activeUser)return;
- const tables=["students","lesson_records","guardian_invites","student_guardians","family_requests","recurring_schedules","schedule_exceptions"];
+ const tables=["students","lesson_records","guardian_invites","student_guardians","family_requests","recurring_schedules","schedule_exceptions","payment_batches","payment_batch_items"];
  const results=await Promise.all(tables.map(t=>client.from(t).select("*").limit(1000)));
  results.forEach((res,i)=>{if(res.error)throw Error(tables[i]+": "+res.error.message);});
- [state.students,state.lessons,state.invites,state.guardians,state.requests,state.schedules,state.exceptions]=results.map(r=>r.data||[]);
+ [state.students,state.lessons,state.invites,state.guardians,state.requests,state.schedules,state.exceptions,state.paymentBatches,state.paymentBatchItems]=results.map(r=>r.data||[]);
 }
 async function ensureClient(){
  if(client)return client;
@@ -557,7 +558,7 @@ async function ensureClient(){
 async function initializeLive(){
  try{
   await ensureClient();const {data,error}=await client.auth.getSession();if(error)throw error;
-  activeUser=data.session?.user||null;if(activeUser){await refreshLive();toast("已登入並同步課程")}else{for(const k of ["students","lessons","invites","guardians","requests","schedules","exceptions"])state[k]=[];}
+  activeUser=data.session?.user||null;if(activeUser){await refreshLive();toast("已登入並同步課程")}else{for(const k of ["students","lessons","invites","guardians","requests","schedules","exceptions","paymentBatches","paymentBatchItems"])state[k]=[];}
   render();
  }catch(err){console.error(err);toast("Supabase 連線失敗："+err.message);showModal("account-modal")}
 }
