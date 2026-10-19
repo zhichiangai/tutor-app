@@ -26,7 +26,7 @@ const prettyDate = (s) => {const d=parseDate(s);return (d.getMonth()+1)+"月"+d.
 const timeLabel = (s) => asText(s).slice(0,5);
 const tick = ()=>new Date();
 const uid = ()=>crypto.randomUUID();
-let client=null, activeUser=null, loading=false;
+let client=null, activeUser=null, loading=false, teacherPreferences={};
 const state={mode:localStorage.getItem(MODE_STORAGE)==="live"?"live":"demo",role:localStorage.getItem(ROLE_STORAGE)==="parent"?"parent":"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",paymentBatches:[],paymentBatchItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",receiptBatch:null,activeLesson:null,actualHoursManual:false};
 
 function seed(){
@@ -266,6 +266,101 @@ function renderStudents(){
   $("#invite-content").innerHTML=st.length?'<form class="invite-form" id="invite-form"><label>選擇學生<select id="invite-student">'+st.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.name)+'</option>').join("")+'</select></label><label>家長的 Google Email<input id="invite-email" type="email" required placeholder="parent@gmail.com" autocomplete="email"></label><button type="submit" class="primary-button">建立邀請</button></form><div class="invite-list">'+state.invites.filter(i=>state.mode==="demo"||i.teacher_id===activeUser?.id).map(i=>'<div class="lesson-row"><div class="lesson-main"><strong>'+esc(i.email)+'</strong><small>'+esc(st.find(s=>s.id===i.student_id)?.name||"學生")+'</small></div><span class="pill">已建立邀請</span></div>').join("")+'</div>':'<div class="empty">新增學生後，就可以邀請家長共同查看課程。</div>';
  }
 }
+// V3: Only teacher-owned, non-sensitive form defaults are synchronized across devices.
+function recentCourseForStudent(studentId){
+ return state.lessons.filter(l=>l.student_id===studentId&&l.type!=="leave"&&l.type!=="moved"
+   &&(state.mode==="demo"||l.owner_id===activeUser?.id))
+  .sort((a,b)=>String(b.updated_at||b.created_at||b.lesson_date||"").localeCompare(String(a.updated_at||a.created_at||a.lesson_date||"")))[0]||null;
+}
+function teacherStudentDefaults(studentId){
+ const student=visibleStudents().find(s=>s.id===studentId);
+ const prev=teacherPreferences.byStudent?.[studentId]||{};
+ const course=recentCourseForStudent(studentId);
+ return {
+  subject:prev.subject||course?.subject||student?.subject||teacherPreferences.lastSubject||"數學",
+  rate:prev.rate??course?.hourly_rate??student?.hourly_rate??teacherPreferences.lastRate??500,
+  start:prev.start||course?.start_time||teacherPreferences.lastStart||"19:00",
+  end:prev.end||course?.end_time||teacherPreferences.lastEnd||"20:30"
+ };
+}
+function optionValues(studentId){
+ const student=visibleStudents().find(s=>s.id===studentId),prev=teacherPreferences.byStudent?.[studentId];
+ const lessons=state.lessons.filter(l=>state.mode==="demo"||l.owner_id===activeUser?.id);
+ const rates=[prev?.rate,student?.hourly_rate,teacherPreferences.lastRate,...(teacherPreferences.recentRates||[]),...lessons.map(l=>l.hourly_rate)]
+  .map(Number).filter(n=>Number.isFinite(n)&&n>=0);
+ const subjects=[prev?.subject,student?.subject,teacherPreferences.lastSubject,...(teacherPreferences.recentSubjects||[]),...lessons.map(l=>l.subject)]
+  .filter(x=>typeof x==="string"&&x.trim());
+ return {rates:[...new Set(rates)].slice(0,15),subjects:[...new Set(subjects)].slice(0,15)};
+}
+function setDatalist(id,values){
+ const el=$("#"+id);if(el)el.innerHTML=values.map(v=>'<option value="'+esc(v)+'"></option>').join("");
+}
+function refreshFormOptions(studentId){
+ const options=optionValues(studentId);
+ ["record-rate-options","schedule-rate-options","student-rate-options"].forEach(id=>setDatalist(id,options.rates));
+ ["record-subject-options","schedule-subject-options","student-subject-options"].forEach(id=>setDatalist(id,options.subjects));
+}
+function selectStudentDefaults(prefix,studentId){
+ const d=teacherStudentDefaults(studentId);
+ const fields=prefix==="record"?
+  {subject:"record-subject",rate:"record-rate",start:"record-start",end:"record-end"}:
+  {subject:"schedule-subject",rate:"schedule-rate",start:"schedule-time-start",end:"schedule-time-end"};
+ $("#"+fields.subject).value=d.subject;$("#"+fields.rate).value=d.rate;
+ $("#"+fields.start).value=timeLabel(d.start);$("#"+fields.end).value=timeLabel(d.end);
+ refreshFormOptions(studentId);
+}
+async function loadTeacherPreferences(){
+ teacherPreferences={};
+ if(state.mode==="demo"){
+  try{teacherPreferences=JSON.parse(localStorage.getItem("tutor_v3_demo_form_preferences")||"{}")||{}}catch{}
+  return;
+ }
+ if(!client||!activeUser||!myWorkspace())return;
+ const {data,error}=await client.from("teacher_preferences").select("settings").eq("owner_id",activeUser.id).maybeSingle();
+ if(error)throw error;
+ teacherPreferences=data?.settings&&typeof data.settings==="object"?data.settings:{};
+}
+async function rememberTeacherForm(values){
+ if(state.role!=="teacher")return;
+ const prefs={...teacherPreferences,byStudent:{...(teacherPreferences.byStudent||{})}};
+ if(values.studentId){
+  prefs.lastStudentId=values.studentId;
+  const old=prefs.byStudent[values.studentId]||{};
+  prefs.byStudent[values.studentId]={...old,
+   ...(values.subject?{subject:values.subject}:{}),
+   ...(values.rate!==undefined?{rate:values.rate}:{}),
+   ...(values.start?{start:values.start}:{}),
+   ...(values.end?{end:values.end}:{})
+  };
+  // Keep the preference payload bounded, never accumulate all student records.
+  const ids=[values.studentId,...Object.keys(prefs.byStudent).filter(id=>id!==values.studentId)].slice(0,16);
+  prefs.byStudent=Object.fromEntries(ids.map(id=>[id,prefs.byStudent[id]]));
+ }
+ if(values.subject){prefs.lastSubject=values.subject;prefs.recentSubjects=[...new Set([values.subject,...(prefs.recentSubjects||[])])].slice(0,10)}
+ if(values.rate!==undefined&&Number.isFinite(Number(values.rate))){
+  prefs.lastRate=Number(values.rate);
+  prefs.recentRates=[...new Set([Number(values.rate),...(prefs.recentRates||[])])].slice(0,10);
+ }
+ if(values.start)prefs.lastStart=values.start;
+ if(values.end)prefs.lastEnd=values.end;
+ if(values.repeat)prefs.lastRepeat=values.repeat;
+ if(values.weekdays?.length)prefs.lastWeekdays=values.weekdays;
+ teacherPreferences=prefs;
+ try{
+  if(state.mode==="demo")localStorage.setItem("tutor_v3_demo_form_preferences",JSON.stringify(prefs));
+  else if(client&&activeUser&&myWorkspace()){
+   const {error}=await client.from("teacher_preferences").upsert({owner_id:activeUser.id,settings:prefs,updated_at:new Date().toISOString()},{onConflict:"owner_id"});
+   if(error)throw error;
+  }
+ }catch(err){console.warn("已儲存課程，但常用選項未能同步",err);toast("課程已儲存；常用選項同步未完成")}
+}
+function updateRecordRepeatUI(){
+ const repeat=$("#record-repeat").value,editing=Boolean(state.editing);
+ $("#repeat-label").classList.toggle("hidden",editing);
+ $("#record-weekdays-wrap").classList.toggle("hidden",editing||!["weekly","biweekly"].includes(repeat));
+ $("#until-label").classList.toggle("hidden",editing||repeat==="none");
+}
+
 function openRecord(lesson=null){
  if(state.role!=="teacher"){toast("只有老師能安排課程");return}
  if(!requireTeacherWorkspace())return;
@@ -273,20 +368,24 @@ function openRecord(lesson=null){
  state.editing=lesson?.id||null;
  $("#record-modal-title").textContent=lesson?"編輯課程":"新增一堂課";
  $("#record-student").innerHTML=st.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.name)+'</option>').join("");
- $("#record-student").value=lesson?.student_id||st[0].id;
- const s=st.find(s=>s.id===$("#record-student").value);
- $("#record-subject").value=lesson?.subject||s?.subject||"數學";
- $("#record-rate").value=lesson?.hourly_rate??s?.hourly_rate??500;
+ $("#record-student").value=lesson?.student_id||
+  (st.some(s=>s.id===teacherPreferences.lastStudentId)?teacherPreferences.lastStudentId:st[0].id);
+ const d=teacherStudentDefaults($("#record-student").value);
+ $("#record-subject").value=lesson?.subject||d.subject;
+ $("#record-rate").value=lesson?.hourly_rate??d.rate;
+ refreshFormOptions($("#record-student").value);
  $("#record-date").value=lesson?.lesson_date||state.selected;
- $("#record-start").value=timeLabel(lesson?.start_time||"19:00");
- $("#record-end").value=timeLabel(lesson?.end_time||"20:30");
+ $("#record-start").value=timeLabel(lesson?.start_time||d.start);
+ $("#record-end").value=timeLabel(lesson?.end_time||d.end);
  $("#record-remarks").value=lesson?.remarks||"";
  $("#record-focus").value=lesson?.focus_rating??"";
  $("#record-attitude").value=lesson?.attitude_rating??"";
- $("#record-repeat").value="none";
- $("#record-until").value=dateKey(new Date(parseDate($("#record-date").value).getFullYear(),parseDate($("#record-date").value).getMonth()+1,parseDate($("#record-date").value).getDate()));
- $("#until-label").classList.add("hidden");
- $("#repeat-label").classList.toggle("hidden",!!lesson);
+ $("#record-repeat").value="none"; // Explicit opt-in avoids accidental bulk scheduling.
+ $("#record-until").value="";
+ const weekday=((parseDate($("#record-date").value).getDay()+6)%7)+1;
+ const saved=teacherPreferences.lastWeekdays||[weekday];
+ $("#record-weekdays input").forEach(el=>el.checked=saved.includes(Number(el.value)));
+ updateRecordRepeatUI();
  showModal("record-modal");
 }
 function scheduleDates(day,repeat,until){
