@@ -83,7 +83,11 @@ function setBusy(yes){
 function showModal(id){const dialog=$("#"+id);if(dialog&&!dialog.open)dialog.showModal()}
 function closeModal(id){const dialog=$("#"+id);if(dialog?.open)dialog.close()}
 function setView(view){state.view=view;$$(".page-view").forEach(x=>x.classList.toggle("hidden",x.id!=="view-"+view));$$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));$("#breadcrumb-name").textContent=({home:"今天",calendar:"課程月曆",billing:"收付款",students:"學生與家長"})[view];render()}
-function setRole(role){state.role=role;localStorage.setItem(ROLE_STORAGE,role);setView("home");toast(role==="teacher"?"已切換到老師檢視":"已切換到家長檢視")}
+function setRole(role){
+ state.role=role;
+ localStorage.setItem(state.mode==="live"&&activeUser?ROLE_STORAGE+"_"+activeUser.id:ROLE_STORAGE,role);
+ setView("home");toast(role==="teacher"?"已切換到老師檢視":"已切換到家長檢視");
+}
 function myWorkspace(){return state.mode==="live"&&activeUser?state.workspaces.find(w=>w.owner_id===activeUser.id):null}
 function requireTeacherWorkspace(){
  if(state.mode==="live"&&(!activeUser||!myWorkspace())){
@@ -130,7 +134,7 @@ async function saveMyWorkspace(rename=false){
   if(rename)assertResult(await client.from("workspaces").update({name}).eq("id",ws.id).select("id").single());
   else assertResult(await client.from("workspaces").insert({owner_id:activeUser.id,kind:"individual",name}).select("id").single());
  });
- if(ok){closeModal("account-modal");toast(rename?"空間名稱已更新":"家教空間已建立，現在可以新增學生")}
+ if(ok){await loadTeacherPreferences();closeModal("account-modal");toast(rename?"空間名稱已更新":"家教空間已建立，現在可以新增學生")}
 }
 function render(){
  const role=state.role,teacher=role==="teacher";
@@ -993,7 +997,7 @@ async function ensureClient(){
  const createClient=window.supabase?.createClient;
  if(!createClient)throw Error("登入元件載入失敗，請重新整理頁面後再試");
  client=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
- client.auth.onAuthStateChange((event,session)=>{activeUser=session?.user||null;if(event==="SIGNED_OUT"){activeUser=null;state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();}});
+ client.auth.onAuthStateChange((event,session)=>{activeUser=session?.user||null;if(event==="SIGNED_OUT"){activeUser=null;teacherPreferences={};state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();}});
  return client;
 }
 async function initializeLive(){
@@ -1001,12 +1005,18 @@ async function initializeLive(){
   await ensureClient();const {data,error}=await client.auth.getSession();if(error)throw error;
   activeUser=data.session?.user||null;
   if(activeUser){
-   await ensureMyProfile();await refreshLive();
-   if(!myWorkspace()&&state.invites.some(i=>i.email===activeUser.email?.toLowerCase())&&state.role==="teacher"){
-    state.role="parent";localStorage.setItem(ROLE_STORAGE,"parent");
-   }
+   // Role is a display preference scoped to each account; authorization stays in RLS.
+   await ensureMyProfile();
+   await refreshLive();
+   const priorRole=localStorage.getItem(ROLE_STORAGE+"_"+activeUser.id);
+   const guardian=state.guardians.some(g=>g.guardian_id===activeUser.id);
+   const invited=state.invites.some(i=>i.email===activeUser.email?.toLowerCase());
+   state.role=priorRole==="parent"||priorRole==="teacher"?priorRole:
+    (!myWorkspace()&&(guardian||invited)?"parent":"teacher");
+   localStorage.setItem(ROLE_STORAGE+"_"+activeUser.id,state.role);
+   await loadTeacherPreferences();
    toast("已登入並同步課程");
-  }else{for(const k of LIVE_FIELDS)state[k]=[];}
+  }else{for(const k of LIVE_FIELDS)state[k]=[];teacherPreferences={};}
   render();
  }catch(err){console.error(err);toast("Supabase 連線失敗："+err.message);showModal("account-modal")}
 }
@@ -1019,10 +1029,10 @@ async function googleLogin(){
 }
 async function signOut(){
  if(client){const {error}=await client.auth.signOut();if(error){toast(error.message);return;}}
- activeUser=null;state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();closeModal("account-modal");toast("已登出，目前使用預覽模式");
+ activeUser=null;teacherPreferences={};state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();closeModal("account-modal");toast("已登出，目前使用預覽模式");
 }
 function toggleDemo(){
- activeUser=null;state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();closeModal("account-modal");toast("現在可以自由試用，不影響正式資料");
+ teacherPreferences={};activeUser=null;state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();closeModal("account-modal");toast("現在可以自由試用，不影響正式資料");
 }
 function bindEvents(){
  document.addEventListener("click",async ev=>{
@@ -1067,9 +1077,17 @@ function bindEvents(){
  $("#schedule-form").addEventListener("submit",submitSchedule);
  $("#change-form").addEventListener("submit",submitChange);
  $("#change-action").onchange=()=>$("#change-date-area").classList.toggle("hidden",$("#change-action").value!=="reschedule");
- $("#schedule-student").onchange=()=>{if(state.editingSchedule)return;const student=visibleStudents().find(x=>x.id===$("#schedule-student").value);if(student){$("#schedule-subject").value=student.subject;$("#schedule-rate").value=student.hourly_rate}};
- $("#add-student").onclick=()=>{if(requireTeacherWorkspace())showModal("student-modal")};
- $("#record-student").onchange=()=>{if(state.editing)return;const s=visibleStudents().find(s=>s.id===$("#record-student").value);if(s){$("#record-subject").value=s.subject;$("#record-rate").value=s.hourly_rate}};
+ $("#schedule-student").onchange=()=>{if(!state.editingSchedule)selectStudentDefaults("schedule",$("#schedule-student").value)};
+ $("#add-student").onclick=()=>{
+  if(!requireTeacherWorkspace())return;
+  refreshFormOptions(teacherPreferences.lastStudentId||"");
+  const form=$("#student-form");
+  const subject=form.querySelector('[name="subject"]'),rate=form.querySelector('[name="hourly_rate"]');
+  subject.value=teacherPreferences.lastSubject||"數學";
+  rate.value=teacherPreferences.lastRate??500;
+  showModal("student-modal");
+ };
+ $("#record-student").onchange=()=>{if(!state.editing)selectStudentDefaults("record",$("#record-student").value)};
  $("#prev-month").onclick=()=>moveMonth(-1);$("#next-month").onclick=()=>moveMonth(1);
  $("#billing-prev").onclick=()=>moveMonth(-1);$("#billing-next").onclick=()=>moveMonth(1);
  $("#batch-action").onclick=()=>openPeriodModal();
@@ -1084,7 +1102,13 @@ function bindEvents(){
  });
  $("#jump-today").onclick=()=>{state.month=new Date(tick().getFullYear(),tick().getMonth(),1);state.selected=dateKey(tick());render()};
  $("#record-form").addEventListener("submit",saveRecord);$("#student-form").addEventListener("submit",saveStudent);
- $("#record-repeat").addEventListener("change",()=>$("#until-label").classList.toggle("hidden",$("#record-repeat").value==="none"));
+ $("#record-repeat").addEventListener("change",updateRecordRepeatUI);
+ $("#record-date").addEventListener("change",()=>{
+  if(state.editing)return;
+  const day=((parseDate($("#record-date").value).getDay()+6)%7)+1;
+  if(!$("#record-weekdays input:checked").length)
+   $("#record-weekdays input").forEach(el=>el.checked=Number(el.value)===day);
+ });
  $("#request-form").addEventListener("submit",submitRequest);
  document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e)});
  $("#workspace-start").onclick=()=>showModal("account-modal");
