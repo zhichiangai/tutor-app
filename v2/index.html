@@ -31,7 +31,7 @@
       <div class="topbar"><div class="breadcrumb">我的工作空間 <span>/</span> <strong id="breadcrumb-name">今天</strong></div><div class="top-actions"><span id="connection-status" class="status-pill"><i></i> 體驗模式</span><button class="round-icon" id="account-action" title="帳號與設定" aria-label="帳號與設定">⚙</button></div></div>
       <div class="content-wrap">
         <section class="greeting" id="greeting"><div><p class="eyebrow">A LITTLE PROGRESS, EVERY DAY <span class="eyebrow-line"></span></p><h1 id="greeting-title">把每一堂課，<em>好好記下來。</em></h1><p id="greeting-copy">從課程到收款，讓重要的小事都有自己的位置。</p></div><button class="primary-button" id="top-add"><span>＋</span> 新增課程</button></section>
-        <div class="demo-banner" id="demo-banner"><span>✦</span> 目前是互動預覽，所有操作僅保存在這台瀏覽器，不會變更真實課程。<button id="go-live">使用 Google 登入</button></div>
+        <div class="demo-banner" id="demo-banner"><span>✦</span> 互動預覽資料只儲存在目前這台裝置；手機與電腦不會自動同步。正式登入後才會使用 Supabase 同步。<button id="go-live">使用 Google 登入</button></div>
         <section id="view-home" class="page-view">
           <div class="metrics-grid" id="metrics"></div>
           <div class="home-grid">
@@ -47,7 +47,21 @@
         </section>
         <section id="view-calendar" class="page-view hidden">
           <div class="section-row page-head"><div><h2>課程月曆</h2><p class="section-sub">每個值得期待的日子，都在這裡</p></div><div class="month-controls"><button id="manage-schedules" class="secondary-button" type="button">☷ 固定課表</button><button id="prev-month" aria-label="上個月">‹</button><strong id="calendar-month"></strong><button id="next-month" aria-label="下個月">›</button><button class="today-button" id="jump-today">今天</button></div></div>
-          <div class="calendar-board"><div class="weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div><div class="calendar-grid" id="calendar-grid"></div></div>
+          <div class="calendar-overview-head">
+            <div class="calendar-overview-label"><span class="eyebrow">YOUR LESSONS · 課程總覽</span><p id="month-overview" aria-live="polite">本月課程整理中</p></div>
+            <div class="calendar-mode-switch" role="group" aria-label="月曆顯示方式">
+              <button type="button" data-calendar-mode="month" class="active" aria-pressed="true">▦ 月曆</button>
+              <button type="button" data-calendar-mode="list" aria-pressed="false">☷ 課程清單</button>
+            </div>
+          </div>
+          <div class="calendar-board" id="calendar-month-view"><div class="weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div><div class="calendar-grid" id="calendar-grid"></div></div>
+          <div class="calendar-month-list hidden" id="calendar-list-view">
+            <div id="month-lesson-list" aria-live="polite"></div>
+          </div>
+          <div class="calendar-month-preview card" id="calendar-month-preview">
+            <div class="section-row"><div><h2>本月課程一覽</h2><p class="section-sub">手機與電腦都能直接看到學生、時間與課程狀態</p></div><button class="text-link" id="show-full-month" type="button">查看全部 ↗</button></div>
+            <div id="month-lesson-preview"></div>
+          </div>
           <div class="card agenda-card"><div class="section-row"><div><h2 id="selected-date-title">當日課程</h2><p class="section-sub">點選月曆任一天，可管理當日安排</p></div><button class="text-link" id="agenda-add">＋ 安排課程</button></div><div id="agenda-list"></div></div>
         </section>
         <section id="view-billing" class="page-view hidden">
@@ -61,7 +75,7 @@
           <div class="student-grid" id="student-grid"></div>
           <article class="card invite-card"><div class="section-row"><div><h2 id="invite-title">邀請家長加入</h2><p class="section-sub" id="invite-description">使用家長的 Google 帳號 Email 連結課程資料</p></div></div><div id="invite-content"></div></article>
         </section>
-        <footer class="site-footer"><span>好好上課 © 2026</span><span>Made with care, for every lesson. <span aria-hidden="true">✳</span></span></footer>
+        <footer class="site-footer"><span>好好上課 © 2026</span><span>V2.2 · Made with care. <span aria-hidden="true">✳</span></span></footer>
       </div>
     </main>
     <nav class="mobile-nav" aria-label="手機導覽"><button data-view="home" class="active"><span>⌂</span>今天</button><button data-view="calendar"><span>▦</span>月曆</button><button data-view="billing"><span>◈</span>帳務</button><button data-view="students"><span>♧</span>學生</button></nav>

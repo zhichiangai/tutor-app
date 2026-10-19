@@ -1,5 +1,26 @@
 # 好好上課 V2 — 使用與部署說明
 
+## V2.2：手機與電腦一致性（2026-10-19）
+
+- **同一個月曆資料來源**：手機和電腦均支援「▦ 月曆／☷ 課程清單」切換。兩種顯示都使用相同的學生、課程日期、上課時間、狀態與 RLS 權限。
+- **月曆模式**：電腦日期格顯示課程標籤；手機日期格顯示課程堂數，並在下方「本月課程一覽」直接顯示學生名稱、上課時段與課程狀態，不用逐日點開。
+- **清單模式**：手機和電腦皆可以按日期查看整個月份的課程，點「管理當日」開啟相同的操作面板。老師、家長功能仍依帳號權限顯示。
+- **固定課表修正**：修復原本週一～週日複選框，以及修改課表範圍的元素查詢錯誤。
+- **預覽資料的限制**：互動預覽使用瀏覽器本機的 localStorage，不會跨手機、電腦同步，且兩台裝置可能各自保留不同的老師／家長檢視選擇。這並非 Supabase 資料同步故障。正式跨裝置同步需完成 Google OAuth 並以相同登入帳號進行實測。
+- **版本**：V2.2 仍放在 GitHub Pages `/tutor-app/v2/`，原 V1 的 GAS + Google Sheets 不變。無須使用 Vercel。
+
+### 尚需使用者手動完成的設定
+
+| 項目 | 說明 |
+| --- | --- |
+| Google Cloud OAuth | 建立 Web application 類型 OAuth Client ID；JavaScript origin：`https://zhichiangai.github.io`；Authorized redirect URI：`https://vctisuglfoxyuwlvyjee.supabase.co/auth/v1/callback` |
+| Google 同意畫面 | 設定應用名稱、Audience 與必要的 `openid`、email、profile 權限；若測試狀態，加入老師與家長測試 Gmail 帳號 |
+| Supabase Google Provider | 到 Supabase Dashboard 的 Auth → Providers → Google 啟用，填入 Client ID 與 Client Secret（**絕不能將 Secret 提交至公開 GitHub**） |
+| Supabase Redirect URLs | Auth → URL Configuration 設定 Site URL 及 Redirect allowlist：`https://zhichiangai.github.io/tutor-app/v2/` |
+| 多帳號權限驗收 | 用兩個真實 Google 帳號驗證：老師新增課程→邀請家長→家長登入接受邀請→請假／付款申請→老師審核。Google 登入在完成這些設定前不可視為已正常運作 |
+| 舊資料遷移 | 未執行，只有確認所有新流程安全且備份後才能規劃切換；不要在測試期間刪掉 GAS 舊資料 |
+
+
 > 狀態：**獨立 V2 版本／可互動預覽**。不要誤認為舊站已轉移；舊站仍然由 GitHub Pages + GAS + Google Sheets 運作。
 
 ## 網站
