@@ -82,6 +82,7 @@ function render(){
  $("#greeting-copy").textContent=teacher?"從課程到收款，讓重要的小事都有自己的位置。":"孩子的上課安排、請假和付款，打開就能看見。";
  $("#top-add").style.display=teacher?"":"none";
  $("#demo-banner").classList.toggle("hidden",state.mode!=="demo");
+ $("#demo-reset").classList.toggle("hidden",state.mode!=="demo");
  $("#connection-status").classList.toggle("live",state.mode==="live"&&!!activeUser);
  $("#connection-status").innerHTML=state.mode==="demo"?"<i></i> 體驗模式":activeUser?"<i></i> 已安全連線":"<i></i> 尚未登入";
  $("#account-label").textContent=activeUser?.email?activeUser.email.split("@")[0]:"預覽使用者";
@@ -752,6 +753,9 @@ function bindEvents(){
  $("#account-action").onclick=()=>showModal("account-modal");
  $("#go-live").onclick=()=>showModal("account-modal");
  $("#google-login").onclick=googleLogin;$("#demo-login").onclick=toggleDemo;$("#sign-out").onclick=signOut;
+ $("#demo-reset").onclick=()=>{if(state.mode!=="demo")return;if(!confirm("將清除這台瀏覽器的 V2 測試課程與測試付款紀錄，重新載入範例資料。確定？"))return;
+  localStorage.removeItem(STORAGE);loadDemo();render();closeModal("account-modal");toast("預覽已重置，可以測試跨月與部分付款");
+ };
  $("#role-teacher").onclick=()=>setRole("teacher");$("#role-parent").onclick=()=>setRole("parent");
  $$(".modal").forEach(d=>d.addEventListener("click",e=>{if(e.target===d)d.close()}));
 }
