@@ -72,7 +72,13 @@ function lessonSum(list){return list.filter(l=>l.type==="lesson").reduce((v,l)=>
 function monthLessons(){return visibleLessons().filter(l=>sameMonth(l.lesson_date,state.month))}
 function hourTotal(list){return list.filter(l=>l.type==="lesson").reduce((v,l)=>v+num(l.hours),0)}
 function toast(message){const box=$("#toast");box.textContent=message;box.hidden=false;clearTimeout(toast.timer);toast.timer=setTimeout(()=>box.hidden=true,3500)}
-function setBusy(yes){loading=yes;$$("button[type=submit]").forEach(el=>el.disabled=yes)}
+function setBusy(yes){
+ loading=yes;
+ $$("button[type=submit]").forEach(el=>{
+  if(yes){el.dataset.wasDisabled=el.disabled?"1":"0";el.disabled=true;}
+  else{el.disabled=el.dataset.wasDisabled==="1";delete el.dataset.wasDisabled;}
+ });
+}
 function showModal(id){const dialog=$("#"+id);if(dialog&&!dialog.open)dialog.showModal()}
 function closeModal(id){const dialog=$("#"+id);if(dialog?.open)dialog.close()}
 function setView(view){state.view=view;$$(".page-view").forEach(x=>x.classList.toggle("hidden",x.id!=="view-"+view));$$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));$("#breadcrumb-name").textContent=({home:"今天",calendar:"課程月曆",billing:"收付款",students:"學生與家長"})[view];render()}
@@ -243,10 +249,27 @@ function scheduleDates(day,repeat,until){
  return out;
 }
 async function persist(op){
- if(loading)return false;setBusy(true);
- try{if(state.mode==="live"&&!activeUser)throw Error("請先登入再修改課程");await op();if(state.mode==="demo")saveDemo();else await refreshLive();render();return true}
- catch(err){console.error(err);toast("操作未完成："+(err.message||"請稍後再試"));return false}
- finally{setBusy(false)}
+ if(loading)return false;
+ setBusy(true);
+ try{
+  if(state.mode==="live"&&!activeUser)throw Error("請先登入再修改課程");
+  await op();
+  if(state.mode==="demo")saveDemo();
+ }catch(err){
+  console.error(err);
+  toast("儲存未完成："+(err.message||"請稍後再試"));
+  setBusy(false);
+  return false;
+ }
+ // A successful mutation must not be reported as a failed write solely because rendering fails.
+ try{
+  if(state.mode==="live")await refreshLive();
+  render();
+ }catch(err){
+  console.error("資料已儲存但同步／畫面更新失敗",err);
+  toast("資料已儲存，但畫面更新失敗；請重新整理確認");
+ }finally{setBusy(false)}
+ return true;
 }
 function assertResult({error,data}){if(error)throw error;return data}
 async function saveRecord(ev){
@@ -765,12 +788,29 @@ async function restoreLesson(id){
  if(ok){toast("已恢復原本的課程安排");refreshDaySheet()}
 }
 
+const LIVE_TABLES=["students","lesson_records","guardian_invites","student_guardians","family_requests","recurring_schedules","schedule_exceptions","payment_batches","payment_batch_items"];
+const LIVE_FIELDS=["students","lessons","invites","guardians","requests","schedules","exceptions","paymentBatches","paymentBatchItems"];
+const PAGE_SIZE=500;
+async function fetchAllRows(table){
+ const rows=[];
+ const orderColumns=table==="payment_batch_items"?["batch_id","lesson_id"]:["id"];
+ for(let offset=0;offset<50000;offset+=PAGE_SIZE){
+  let query=client.from(table).select("*");
+  for(const column of orderColumns)query=query.order(column,{ascending:true});
+  const {data,error}=await query.range(offset,offset+PAGE_SIZE-1);
+  if(error)throw Error(table+": "+error.message);
+  const page=data||[];
+  rows.push(...page);
+  if(page.length<PAGE_SIZE)return rows;
+ }
+ throw Error(table+" 的資料超過單次安全載入上限，請改用日期範圍查詢");
+}
 async function refreshLive(){
  if(!client||!activeUser)return;
- const tables=["students","lesson_records","guardian_invites","student_guardians","family_requests","recurring_schedules","schedule_exceptions","payment_batches","payment_batch_items"];
- const results=await Promise.all(tables.map(t=>client.from(t).select("*").limit(1000)));
- results.forEach((res,i)=>{if(res.error)throw Error(tables[i]+": "+res.error.message);});
- [state.students,state.lessons,state.invites,state.guardians,state.requests,state.schedules,state.exceptions,state.paymentBatches,state.paymentBatchItems]=results.map(r=>r.data||[]);
+ const userId=activeUser.id;
+ const results=await Promise.all(LIVE_TABLES.map(fetchAllRows));
+ if(state.mode!=="live"||activeUser?.id!==userId)return;
+ LIVE_FIELDS.forEach((key,i)=>{state[key]=results[i]});
 }
 async function ensureClient(){
  if(client)return client;
