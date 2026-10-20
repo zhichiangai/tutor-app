@@ -841,6 +841,7 @@ function openLessonPopup(id){
  $("#lesson-student-leave").classList.toggle("hidden",inactive||locked);
  $("#lesson-teacher-leave").classList.toggle("hidden",inactive||locked);
  $("#lesson-move").classList.toggle("hidden",inactive||locked||lesson.type==="lesson");
+ $("#lesson-cancel").classList.toggle("hidden",!teacher||inactive||locked||(lesson.type==="lesson"&&!lesson.schedule_id));
  $("#lesson-parent-correct").classList.toggle("hidden",inactive||locked||lesson.type!=="lesson"||isVirtualOccurrence(lesson));
  $("#lesson-parent-leave").classList.toggle("hidden",inactive||locked);
  ["lesson-actual-start","lesson-actual-end","lesson-actual-hours"].forEach(id=>$("#"+id).disabled=inactive||locked);
@@ -1231,6 +1232,11 @@ function toggleDemo(){
 }
 function bindEvents(){
  document.addEventListener("click",async ev=>{
+  const choice=ev.target.closest("[data-role-choice]");
+  if(choice){setRole(choice.dataset.roleChoice);return}
+  const trigger=ev.target.closest("#role-indicator");
+  if(trigger){const menu=$("#role-menu");const open=!menu.classList.toggle("hidden");trigger.setAttribute("aria-expanded",String(open));return}
+  if(!ev.target.closest("#role-menu")){$("#role-menu").classList.add("hidden");$("#role-indicator").setAttribute("aria-expanded","false")}
   const nav=ev.target.closest("[data-view]");if(nav){setView(nav.dataset.view);if(nav.dataset.date){state.selected=nav.dataset.date;state.month=parseDate(state.selected);render()}return}
   const close=ev.target.closest("[data-close]");if(close){closeModal(close.dataset.close);return}
   const switcher=ev.target.closest("[data-calendar-mode]");if(switcher){changeCalendarMode(switcher.dataset.calendarMode);return}
@@ -1247,6 +1253,8 @@ function bindEvents(){
    
    if(kind==="payment-period-single"){const l=resolveLesson(id);if(l)openPeriodModal(l.student_id,l.lesson_date,l.lesson_date)}
    if(kind==="accept-invite")await acceptInvite(id);
+   if(kind==="edit-invite")editInvite(id);
+   if(kind==="revoke-invite")await revokeInvite(id);
    if(kind==="approve-request")await reviewRequest(id,true);
    if(kind==="decline-request")await reviewRequest(id,false);
    if(kind==="confirm-batch")openReceiptModal(id);
@@ -1309,6 +1317,7 @@ function bindEvents(){
  });
  $("#request-form").addEventListener("submit",submitRequest);
  document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e)});
+ $("#invite-edit-form").addEventListener("submit",submitInviteEdit);
  $("#workspace-start").onclick=()=>showModal("account-modal");
  $("#workspace-create").onclick=()=>saveMyWorkspace(false);
  $("#workspace-rename").onclick=()=>saveMyWorkspace(true);
