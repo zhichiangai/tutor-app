@@ -27,7 +27,7 @@ const timeLabel = (s) => asText(s).slice(0,5);
 const tick = ()=>new Date();
 const uid = ()=>crypto.randomUUID();
 let client=null, activeUser=null, loading=false, teacherPreferences={};
-const state={mode:localStorage.getItem(MODE_STORAGE)==="live"?"live":"demo",role:localStorage.getItem(ROLE_STORAGE)==="parent"?"parent":"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",paymentBatches:[],paymentBatchItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",receiptBatch:null,activeLesson:null,actualHoursManual:false};
+const state={mode:localStorage.getItem(MODE_STORAGE)==="live"?"live":"demo",role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",paymentBatches:[],paymentBatchItems:[],profiles:[],workspaces:[],workspaceMembers:[],studentInvitations:[],studentLinks:[],studentPortal:{students:[],lessons:[],schedules:[],exceptions:[]},parentTeacherFilter:"all",receiptBatch:null,activeLesson:null,actualHoursManual:false};
 
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
@@ -51,6 +51,7 @@ function seed(){
 function saveDemo(){if(state.mode==="demo")localStorage.setItem(STORAGE,JSON.stringify({students:state.students,lessons:state.lessons,invites:state.invites,guardians:state.guardians,requests:state.requests,schedules:state.schedules,exceptions:state.exceptions,paymentBatches:state.paymentBatches,paymentBatchItems:state.paymentBatchItems}))}
 function loadDemo(){try{const o=JSON.parse(localStorage.getItem(STORAGE)||"null")||seed();for(const k of ["students","lessons","invites","guardians","requests","schedules","exceptions","paymentBatches","paymentBatchItems"])state[k]=Array.isArray(o[k])?o[k]:(k==="schedules"?seed().schedules:[]);}catch{Object.assign(state,seed());}saveDemo();}
 function visibleStudents(){
+ if(state.role==="student")return state.mode==="demo"?state.students.slice(0,1):state.studentPortal.students||[];
  if(state.role==="teacher")return state.students.filter(s=>state.mode==="demo"||s.teacher_id===activeUser?.id);
  const allowed=new Set(state.guardians.filter(g=>(state.mode==="demo"||g.guardian_id===activeUser?.id)
  &&(state.mode==="demo"||state.parentTeacherFilter==="all"||g.teacher_id===state.parentTeacherFilter)).map(g=>g.student_id));
@@ -58,21 +59,24 @@ function visibleStudents(){
 }
 function visibleLessons(){
  const allowed=new Set(visibleStudents().map(s=>s.id));
- const stopped=new Map(state.schedules.filter(r=>r.cancelled_from).map(r=>[r.id,r.cancelled_from]));
- // A stopped recurring calendar shows no unfinished future sessions. Keep every original row in storage for audit.
- const real=state.lessons.filter(l=>allowed.has(l.student_id)
-  && (state.role==="parent"||state.mode==="demo"||l.owner_id===activeUser?.id)
+ const portal=state.role==="student"&&state.mode==="live";
+ const records=portal?state.studentPortal.lessons:state.lessons;
+ const schedules=portal?state.studentPortal.schedules:state.schedules;
+ const exceptions=portal?state.studentPortal.exceptions:state.exceptions;
+ const stopped=new Map(schedules.filter(r=>r.cancelled_from).map(r=>[r.id,r.cancelled_from]));
+ const real=records.filter(l=>allowed.has(l.student_id)
+  && (state.role!=="teacher"||state.mode==="demo"||l.owner_id===activeUser?.id)
   && !(l.schedule_id&&l.type!=="lesson"&&l.scheduled_date&&stopped.has(l.schedule_id)
     && l.scheduled_date>=stopped.get(l.schedule_id)));
- const virtual=expandSchedules({schedules:state.schedules,exceptions:state.exceptions,lessons:real,allowedStudents:[...allowed],month:state.month,today:dateKey(tick())});
+ const virtual=expandSchedules({schedules,exceptions,lessons:real,allowedStudents:[...allowed],month:state.month,today:dateKey(tick())});
  return [...real,...virtual];
 }
 function resolveLesson(id){return visibleLessons().find(l=>l.id===id)}
-function studentFor(lesson){return state.students.find(s=>s.id===lesson.student_id)}
+function studentFor(lesson){return visibleStudents().find(s=>s.id===lesson.student_id)}
 function isPast(s){return s<dateKey(tick())}
 function typeLabel(l){return l.type==="leave"?"已請假":l.type==="planned"?"預排課程":"已上課"}
-function statusLabel(l){if(l.type==="lesson"){const balance=lessonBalance(l);if(balance.pending>0&&balance.confirmed>0)return "部分已收／待確認";if(balance.pending>0)return balance.pending>=balance.total-0.005?"家長已付款":"部分付款待確認";if(balance.confirmed>0)return balance.confirmed>=balance.total-0.005?"老師已收到":"部分已收款"}return l.type==="moved"?"已改期":l.type==="leave"?(l.leave_source==="teacher"?"老師停課":"學生請假"):l.type==="planned"?"預計上課":l.status||"未付款"}
-function pillClass(l){if(l.type==="lesson"){const b=lessonBalance(l);if(b.pending>0)return "pending";if(b.confirmed>=b.total-0.005&&b.total>0)return "paid"}return l.type==="moved"?"pending":l.type==="leave"?"leave":l.type==="planned"?"":l.status==="老師已收到"?"paid":l.status==="家長已付款"?"pending":""}
+function statusLabel(l){if(state.role==="student")return l.type==="lesson"?"已完成":l.type==="planned"?"預計上課":l.type==="leave"?"已取消／請假":"已改期";if(l.type==="lesson"){const balance=lessonBalance(l);if(balance.pending>0&&balance.confirmed>0)return "部分已收／待確認";if(balance.pending>0)return balance.pending>=balance.total-0.005?"家長已付款":"部分付款待確認";if(balance.confirmed>0)return balance.confirmed>=balance.total-0.005?"老師已收到":"部分已收款"}return l.type==="moved"?"已改期":l.type==="leave"?(l.leave_source==="teacher"?"老師停課":"學生請假"):l.type==="planned"?"預計上課":l.status||"未付款"}
+function pillClass(l){if(state.role==="student")return l.type==="lesson"?"paid":"";if(l.type==="lesson"){const b=lessonBalance(l);if(b.pending>0)return "pending";if(b.confirmed>=b.total-0.005&&b.total>0)return "paid"}return l.type==="moved"?"pending":l.type==="leave"?"leave":l.type==="planned"?"":l.status==="老師已收到"?"paid":l.status==="家長已付款"?"pending":""}
 function lessonBalance(l){return lessonAllocation(l,state.paymentBatches,state.paymentBatchItems,state.requests)}
 function lessonSum(list){return list.filter(l=>l.type==="lesson").reduce((v,l)=>v+num(l.total_amount),0)}
 function monthLessons(){return visibleLessons().filter(l=>sameMonth(l.lesson_date,state.month))}
@@ -1169,8 +1173,8 @@ async function restoreLesson(id){
  if(ok){toast("已恢復原本的課程安排");refreshDaySheet()}
 }
 
-const LIVE_TABLES=["students","lesson_records","guardian_invites","student_guardians","family_requests","recurring_schedules","schedule_exceptions","payment_batches","payment_batch_items","profiles","workspaces","workspace_members"];
-const LIVE_FIELDS=["students","lessons","invites","guardians","requests","schedules","exceptions","paymentBatches","paymentBatchItems","profiles","workspaces","workspaceMembers"];
+const LIVE_TABLES=["students","lesson_records","guardian_invites","student_guardians","family_requests","recurring_schedules","schedule_exceptions","payment_batches","payment_batch_items","profiles","workspaces","workspace_members","student_invitations","student_links"];
+const LIVE_FIELDS=["students","lessons","invites","guardians","requests","schedules","exceptions","paymentBatches","paymentBatchItems","profiles","workspaces","workspaceMembers","studentInvitations","studentLinks"];
 const PAGE_SIZE=500;
 async function fetchAllRows(table){
  const rows=[];
@@ -1186,19 +1190,34 @@ async function fetchAllRows(table){
  }
  throw Error(table+" 的資料超過單次安全載入上限，請改用日期範圍查詢");
 }
+async function refreshStudentPortal(){
+ if(state.mode!=="live"||!client||!activeUser||state.role!=="student")return;
+ const userId=activeUser.id;
+ const {data,error}=await client.rpc("student_portal_snapshot");
+ if(error)throw Error("學生課程同步失敗："+error.message);
+ if(activeUser?.id!==userId||state.role!=="student")return;
+ const value=data&&typeof data==="object"?data:{};
+ state.studentPortal={
+  students:Array.isArray(value.students)?value.students:[],
+  lessons:Array.isArray(value.lessons)?value.lessons:[],
+  schedules:Array.isArray(value.schedules)?value.schedules:[],
+  exceptions:Array.isArray(value.exceptions)?value.exceptions:[]
+ };
+}
 async function refreshLive(){
  if(!client||!activeUser)return;
  const userId=activeUser.id;
  const results=await Promise.all(LIVE_TABLES.map(fetchAllRows));
  if(state.mode!=="live"||activeUser?.id!==userId)return;
  LIVE_FIELDS.forEach((key,i)=>{state[key]=results[i]});
+ if(state.role==="student")await refreshStudentPortal();
 }
 async function ensureClient(){
  if(client)return client;
  const createClient=window.supabase?.createClient;
  if(!createClient)throw Error("登入元件載入失敗，請重新整理頁面後再試");
  client=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
- client.auth.onAuthStateChange((event,session)=>{activeUser=session?.user||null;if(event==="SIGNED_OUT"){activeUser=null;teacherPreferences={};state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();}});
+ client.auth.onAuthStateChange((event,session)=>{activeUser=session?.user||null;if(event==="SIGNED_OUT"){activeUser=null;teacherPreferences={};state.studentPortal={students:[],lessons:[],schedules:[],exceptions:[]};state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers","studentInvitations","studentLinks"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();}});
  return client;
 }
 async function initializeLive(){
@@ -1230,7 +1249,7 @@ async function googleLogin(){
 }
 async function signOut(){
  if(client){const {error}=await client.auth.signOut();if(error){toast(error.message);return;}}
- activeUser=null;teacherPreferences={};state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();closeModal("account-modal");toast("已登出，目前使用預覽模式");
+ activeUser=null;teacherPreferences={};state.studentPortal={students:[],lessons:[],schedules:[],exceptions:[]};state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers","studentInvitations","studentLinks"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();closeModal("account-modal");toast("已登出，目前使用預覽模式");
 }
 function toggleDemo(){
  teacherPreferences={};activeUser=null;state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();closeModal("account-modal");toast("現在可以自由試用，不影響正式資料");
