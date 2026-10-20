@@ -318,3 +318,6 @@
 .student-portal-lesson p{font-size:12px;line-height:1.7;color:#59544d}
 #view-student h3{font-size:14px;margin-top:20px}
 @media(max-width:650px){.role-indicator{max-width:210px}.role-indicator #role-indicator-text{max-width:153px;font-size:10px}.role-menu{max-width:calc(100vw - 18px)}.profile-display-form{align-items:stretch}.profile-display-form button{width:100%}}
+
+/* Student can only navigate their authorized read-only learning dashboard. */
+.student-mode .side-nav,.student-mode .mobile-nav{display:none!important}
