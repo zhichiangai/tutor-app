@@ -1,0 +1,19 @@
+name: V3 Regression Tests
+on:
+  push:
+    branches: ["main", "feat/v3-human-friendly-course-billing-guardian-20261020"]
+  pull_request:
+    branches: ["main"]
+permissions:
+  contents: read
+jobs:
+  browser-state-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run tutoring V2/V3 regression suites
+        run: node --test tests/*.mjs
