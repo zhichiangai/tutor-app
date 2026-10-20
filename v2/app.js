@@ -213,7 +213,7 @@ function render(){
  $("#role-teacher").classList.toggle("active",teacher);
  $("#role-parent").classList.toggle("active",role==="parent");
  $("#role-student").classList.toggle("active",studentMode);
- $("[data-nonstudent]").forEach(el=>el.classList.toggle("hidden",studentMode));
+ $$("[data-nonstudent]").forEach(el=>el.classList.toggle("hidden",studentMode));
  $("#home-money-card").classList.toggle("hidden",studentMode);
  $("#view-billing").classList.toggle("hidden",studentMode||state.view!=="billing");
  renderWorkspaceUI();
