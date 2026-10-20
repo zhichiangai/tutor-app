@@ -143,7 +143,7 @@ function render(){
  $("#role-indicator-text").textContent=teacher?"老師模式":"家長模式";
  $("#role-indicator-icon").textContent=teacher?"◈":"♧";
  $("#role-indicator").setAttribute("aria-label","目前使用："+(teacher?"老師模式":"家長模式")+"，點擊切換");
- $("[data-role-choice]").forEach(el=>el.setAttribute("aria-pressed",String(el.dataset.roleChoice===role)));
+ $$("[data-role-choice]").forEach(el=>el.setAttribute("aria-pressed",String(el.dataset.roleChoice===role)));
  $("#greeting-title").innerHTML=teacher?"把每一堂課，<em>好好記下來。</em>":"每個成長時刻，<em>都值得珍惜。</em>";
  $("#greeting-copy").textContent=teacher?"從課程到收款，讓重要的小事都有自己的位置。":"孩子的上課安排、請假和付款，打開就能看見。";
  $("#top-add").style.display=teacher?"":"none";
@@ -1281,7 +1281,7 @@ function bindEvents(){
  $("#schedule-form").addEventListener("submit",submitSchedule);
  $("#change-form").addEventListener("submit",submitChange);
  $("#cancel-form").addEventListener("submit",submitCancel);
- $("input[name=\"cancel-scope\"]").forEach(el=>el.addEventListener("change",updateCancelImpact));
+ $$("input[name=\"cancel-scope\"]").forEach(el=>el.addEventListener("change",updateCancelImpact));
  $("#change-action").onchange=()=>$("#change-date-area").classList.toggle("hidden",$("#change-action").value!=="reschedule");
  $("#schedule-student").onchange=()=>{if(!state.editingSchedule)selectStudentDefaults("schedule",$("#schedule-student").value)};
  $("#add-student").onclick=()=>{
