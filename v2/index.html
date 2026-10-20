@@ -20,7 +20,7 @@
         <button class="nav-item active" data-view="home"><span class="nav-icon">⌂</span>今天<span class="nav-active-dot"></span></button>
         <button class="nav-item" data-view="calendar"><span class="nav-icon">▦</span>課程月曆</button>
         <button class="nav-item" data-view="billing" data-nonstudent><span class="nav-icon">◈</span>收付款</button>
-        <button class="nav-item" data-view="students"><span class="nav-icon">♧</span>學生與家長</button>
+        <button class="nav-item" data-view="students"><span class="nav-icon">♧</span><span class="students-nav-label">學生與家長</span></button>
       </nav>
       <div class="sidebar-bottom">
         <div class="side-note"><span class="side-note-sun">☼</span><p>每一堂小小的課，<br>都是值得記住的成長。</p></div>
@@ -80,8 +80,8 @@
           <article class="card requests-card"><div class="section-row"><h2>請假與付款申請</h2><span class="muted-small">待確認會優先顯示</span></div><div id="requests-list"></div></article>
         </section>
         <section id="view-students" class="page-view hidden">
-          <div class="section-row page-head"><div><h2>學生與家長</h2><p class="section-sub">把每位學生的安排都收好</p></div><button class="secondary-button" id="add-student">＋ 新增學生</button></div>
-          <article class="card hidden" id="parent-learning-card"><div class="section-row"><div><h2>孩子的學習紀錄</h2><p class="section-sub">依科目查看老師記錄的專注度、學習態度與課後回饋</p></div></div><div id="parent-learning"></div></article><div class="student-grid" id="student-grid"></div>
+          <div class="section-row page-head"><div><h2 id="students-page-title">學生與家長</h2><p class="section-sub" id="students-page-subtitle">把每位學生的安排都收好</p></div><button class="secondary-button" id="add-student">＋ 新增學生</button></div>
+          <article class="card hidden" id="parent-learning-card"><div class="section-row"><div><h2 id="learning-records-title">孩子的學習紀錄</h2><p class="section-sub">依科目查看老師記錄的專注度、學習態度與課後回饋</p></div></div><div id="parent-learning"></div></article><div class="student-grid" id="student-grid"></div>
           <article class="card hidden" id="student-invitations-card"><div class="section-row"><div><h2>我的學生帳號邀請</h2><p class="section-sub">老師用你的 Google Email 邀請後，在這裡確認連結。你只能查看自己的課程和評價。</p></div></div><div id="student-invitations-content"></div></article>
           <article class="card hidden" id="teacher-student-invitations"><div class="section-row"><div><h2>邀請學生登入</h2><p class="section-sub">學生收到邀請並接受後，才能只讀查看自己的課表和老師評語；沒有收付款權限。</p></div></div>
             <form id="teacher-student-invite-form" class="invite-form"><label>學生<select id="student-invite-student" required></select></label><label>學生的 Google Email<input id="student-invite-email" type="email" maxlength="254" autocomplete="email" required placeholder="student@gmail.com"></label><button type="submit" class="primary-button">邀請學生</button></form><div id="teacher-student-invitation-list"></div>
@@ -91,7 +91,7 @@
         <footer class="site-footer"><span>好好上課 © 2026</span><span><a href="./privacy.html">隱私權政策</a> · <a href="./terms.html">服務條款</a> · V3 · Made with care. <span aria-hidden="true">✳</span></span></footer>
       </div>
     </main>
-    <nav class="mobile-nav" aria-label="手機導覽"><button data-view="home" class="active"><span>⌂</span>今天</button><button data-view="calendar"><span>▦</span>月曆</button><button data-view="billing" data-nonstudent><span>◈</span>帳務</button><button data-view="students"><span>♧</span>學生</button></nav>
+    <nav class="mobile-nav" aria-label="手機導覽"><button data-view="home" class="active"><span>⌂</span>今天</button><button data-view="calendar"><span>▦</span>月曆</button><button data-view="billing" data-nonstudent><span>◈</span>帳務</button><button data-view="students"><span>♧</span><span class="students-nav-label">學生</span></button></nav>
   </div>
 
 
