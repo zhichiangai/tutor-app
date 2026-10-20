@@ -317,14 +317,66 @@ function renderStudents(){
  renderParentLearning();
  $("#add-student").style.display=state.role==="teacher"?"":"none";
  $("#student-grid").innerHTML=st.length?st.map(s=>'<article class="student-card"><div class="student-icon">✿</div><h3>'+esc(s.name)+'</h3><p>'+esc(s.subject||"課程")+' · '+money(s.hourly_rate)+'／小時</p><div class="tag-line">已安排 '+visibleLessons().filter(l=>l.student_id===s.id).length+' 堂課</div></article>').join(""):'<div class="card empty">目前沒有學生資料。'+(state.role==="parent"?"請先接受老師的邀請。":"先新增一位學生吧。")+'</div>';
- const parent=state.role==="parent";$("#invite-title").textContent=parent?"家長邀請":"邀請家長加入";$("#invite-description").textContent=parent?"老師邀請你後，可以在這裡確認連結。":"輸入家長的 Google 帳號 Email，登入後即可取得孩子的課程檢視權限。";
+ const parent=state.role==="parent";
+ $("#invite-title").textContent=parent?"家長邀請":"家長邀請與權限管理";
+ $("#invite-description").textContent=parent?"老師邀請你後，可以在這裡確認連結。":"新增邀請、修改待接受 Email、撤銷邀請或解除已加入的家長。";
  if(parent){
-  const connected=new Set(state.guardians.map(g=>g.student_id));
+  const connected=new Set(state.guardians.filter(g=>state.mode==="demo"||g.guardian_id===activeUser?.id).map(g=>g.invite_id));
   const invites=state.invites.filter(i=>state.mode==="demo"||i.email===activeUser?.email?.toLowerCase());
-  $("#invite-content").innerHTML=invites.length?invites.map(i=>'<div class="request-row"><div class="lesson-main"><strong>'+esc(state.students.find(s=>s.id===i.student_id)?.name||"學生邀請")+'</strong><small>'+esc(workspaceTitle(i.teacher_id))+' · '+esc(i.email)+'</small></div>'+(connected.has(i.student_id)?'<span class="pill paid">已加入</span>':'<button class="secondary-button" data-action="accept-invite" data-id="'+esc(i.id)+'">接受邀請</button>')+'</div>').join(""):'<div class="empty">尚未收到邀請。請老師使用你 Google 帳號的 Email 發送邀請。</div>';
- }else{
-  $("#invite-content").innerHTML=st.length?'<form class="invite-form" id="invite-form"><label>選擇學生<select id="invite-student">'+st.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.name)+'</option>').join("")+'</select></label><label>家長的 Google Email<input id="invite-email" type="email" required placeholder="parent@gmail.com" autocomplete="email"></label><button type="submit" class="primary-button">建立邀請</button></form><div class="invite-list">'+state.invites.filter(i=>state.mode==="demo"||i.teacher_id===activeUser?.id).map(i=>'<div class="lesson-row"><div class="lesson-main"><strong>'+esc(i.email)+'</strong><small>'+esc(st.find(s=>s.id===i.student_id)?.name||"學生")+'</small></div><span class="pill">已建立邀請</span></div>').join("")+'</div>':'<div class="empty">新增學生後，就可以邀請家長共同查看課程。</div>';
+  $("#invite-content").innerHTML=invites.length?invites.map(i=>'<div class="request-row"><div class="lesson-main"><strong>'+esc(state.students.find(s=>s.id===i.student_id)?.name||"學生邀請")+'</strong><small>'+esc(workspaceTitle(i.teacher_id))+' · '+esc(i.email)+'</small></div>'+(connected.has(i.id)?'<span class="pill paid">已連結</span>':'<button class="secondary-button" data-action="accept-invite" data-id="'+esc(i.id)+'">接受邀請</button>')+'</div>').join(""):'<div class="empty">尚未收到邀請。請老師使用你 Google 帳號的 Email 發送邀請。</div>';
+  return;
  }
+ const invites=state.invites.filter(i=>state.mode==="demo"||i.teacher_id===activeUser?.id);
+ const myLinks=state.guardians.filter(g=>state.mode==="demo"||g.teacher_id===activeUser?.id);
+ const items=invites.map(i=>{
+  const accepted=myLinks.filter(g=>g.invite_id===i.id);
+  const connected=accepted.length>0;
+  const student=st.find(s=>s.id===i.student_id);
+  return '<div class="guardian-management-row"><div class="guardian-management-info"><strong>'+esc(student?.name||"學生")+'</strong><small>'+esc(i.email)+'</small><span class="pill '+(connected?"paid":"pending")+'">'+(connected?"已連結":"等待接受")+'</span></div><div class="guardian-management-actions">'+
+   (connected?'<button type="button" class="secondary-button" data-action="revoke-invite" data-id="'+esc(i.id)+'">解除連結</button>':
+   '<button type="button" class="secondary-button" data-action="edit-invite" data-id="'+esc(i.id)+'">修改 Email</button><button type="button" class="secondary-button" data-action="revoke-invite" data-id="'+esc(i.id)+'">撤銷邀請</button>')+'</div></div>';
+ }).join("");
+ $("#invite-content").innerHTML=st.length?'<form class="invite-form" id="invite-form"><label>選擇學生<select id="invite-student">'+st.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.name)+'</option>').join("")+'</select></label><label>家長的 Google Email<input id="invite-email" type="email" required maxlength="254" placeholder="parent@gmail.com" autocomplete="email"></label><button type="submit" class="primary-button">建立邀請</button></form><div class="guardian-management-list">'+(items||'<div class="empty">尚未建立邀請。</div>')+'</div>':'<div class="empty">新增學生後，就可以邀請家長共同查看課程。</div>';
+}
+function acceptedInvite(inviteId){
+ return state.guardians.some(g=>g.invite_id===inviteId&&(state.mode==="demo"||g.teacher_id===activeUser?.id));
+}
+function editInvite(id){
+ const i=state.invites.find(x=>x.id===id&&(state.mode==="demo"||x.teacher_id===activeUser?.id));
+ if(!i||state.role!=="teacher")return;
+ if(acceptedInvite(id)){toast("家長已接受邀請。請先解除連結，再重新邀請正確 Email");return}
+ state.editingInvite=id;
+ $("#invite-edit-student").textContent=(state.students.find(s=>s.id===i.student_id)?.name||"學生")+" · 尚未接受的邀請";
+ $("#invite-edit-email").value=i.email;
+ showModal("invite-edit-modal");
+}
+async function submitInviteEdit(ev){
+ ev.preventDefault();
+ const i=state.invites.find(x=>x.id===state.editingInvite);
+ const email=$("#invite-edit-email").value.trim().toLowerCase();
+ if(!i||state.role!=="teacher"||!i.id||!email)return;
+ if(acceptedInvite(i.id)){toast("家長已加入，不能直接改變已接受邀請的 Email");return}
+ if(state.invites.some(x=>x.id!==i.id&&x.student_id===i.student_id&&x.email===email)){toast("這位家長已經在此學生的邀請清單中");return}
+ const ok=await persist(async()=>{
+  if(state.mode==="demo")i.email=email;
+  else assertResult(await client.from("guardian_invites").update({email}).eq("id",i.id).eq("teacher_id",activeUser.id).select("id").single());
+ });
+ if(ok){closeModal("invite-edit-modal");state.editingInvite=null;toast("已更新家長 Email，舊帳號無法再接受此邀請")}
+}
+async function revokeInvite(id){
+ const i=state.invites.find(x=>x.id===id&&(state.mode==="demo"||x.teacher_id===activeUser?.id));
+ if(!i||state.role!=="teacher")return;
+ const linked=acceptedInvite(id);
+ const who=state.students.find(s=>s.id===i.student_id)?.name||"學生";
+ if(!confirm("確定"+(linked?"解除":"撤銷")+"「"+who+"」家長 "+i.email+" 的"+(linked?"查看權限":"邀請")+"？\n"+(linked?"此操作將立即解除課程查看權限，但不刪除學生、已完成課程、付款與回饋歷史。":"舊邀請將不能再接受。")))return;
+ const ok=await persist(async()=>{
+  // student_guardians.invite_id has an ON DELETE CASCADE FK: deleting the invite atomically revokes accepted access.
+  if(state.mode==="demo"){
+   state.invites=state.invites.filter(x=>x.id!==id);
+   state.guardians=state.guardians.filter(g=>g.invite_id!==id);
+  }else assertResult(await client.from("guardian_invites").delete().eq("id",id).eq("teacher_id",activeUser.id).select("id").single());
+ });
+ if(ok)toast(linked?"已解除家長連結，查看權限立即停止":"已撤銷邀請，原 Email 不再有加入權限");
 }
 // V3: Only teacher-owned, non-sensitive form defaults are synchronized across devices.
 function recentCourseForStudent(studentId){
