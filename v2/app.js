@@ -96,7 +96,7 @@ function userDisplayName(){
  return String(p?.display_name||activeUser?.user_metadata?.full_name||activeUser?.user_metadata?.name||"使用者")
   .trim().slice(0,80)||"使用者";
 }
-function roleFullName(){return userDisplayName()+" "+ROLE_SUFFIX[state.role]}
+function roleFullName(){return userDisplayName()+ROLE_SUFFIX[state.role]}
 async function saveLastRole(role){
  if(state.mode!=="live"||!activeUser)return;
  const id=activeUser.id;
@@ -173,6 +173,7 @@ async function saveMyWorkspace(rename=false){
 }
 function render(){
  const role=state.role,teacher=role==="teacher",student=role==="student";
+ document.body?.classList?.toggle("student-mode",student);
  const identity=(state.mode==="live"&&activeUser)?roleFullName():("預覽"+ROLE_SUFFIX[role]);
  $("#role-indicator-text").textContent=identity+" · "+ROLE_TITLE[role];
  $("#role-indicator-icon").textContent=teacher?"◈":student?"✎":"♧";
