@@ -137,3 +137,15 @@ test("Migration allows pending email edits but blocks owner changes and retains 
  assert.ok(sql.includes("l.type='planned'"));
  assert.ok(!sql.includes("delete from public.lesson_records"));
 });
+
+test("Previously saved future planned rows disappear from the calendar without deletion",()=>{
+ const {app}=fixture();
+ app.state.schedules[0].cancelled_from="2026-10-22";
+ app.state.lessons=[
+  {id:"future-planned",schedule_id:"rule-a",scheduled_date:"2026-10-29",lesson_date:"2026-10-29",owner_id:"teacher-a",student_id:"student-a",type:"leave",total_amount:0},
+  {id:"completed-history",schedule_id:"rule-a",scheduled_date:"2026-10-15",lesson_date:"2026-10-15",owner_id:"teacher-a",student_id:"student-a",type:"lesson",total_amount:500}
+ ];
+ assert.ok(!app.visibleLessons().some(l=>l.id==="future-planned"));
+ assert.ok(app.visibleLessons().some(l=>l.id==="completed-history"));
+ assert.equal(app.state.lessons.length,2,"Cancelling a schedule must not destroy stored records");
+});
