@@ -48,8 +48,8 @@ function seed(){
   schedules:[{id:"demo-rule-1",teacher_id:"demo-teacher",student_id:"demo-s3",subject:"理化",weekdays:[3,6],every_weeks:1,starts_on:dateKey(today),ends_on:dateKey(new Date(today.getFullYear(),today.getMonth()+3,today.getDate())),start_time:"16:00",end_time:"17:30",hourly_rate:550}],
   exceptions:[],paymentBatches:[],paymentBatchItems:[]};
 }
-function saveDemo(){if(state.mode==="demo")localStorage.setItem(STORAGE,JSON.stringify({students:state.students,lessons:state.lessons,invites:state.invites,guardians:state.guardians,requests:state.requests,schedules:state.schedules,exceptions:state.exceptions,paymentBatches:state.paymentBatches,paymentBatchItems:state.paymentBatchItems}))}
-function loadDemo(){try{const o=JSON.parse(localStorage.getItem(STORAGE)||"null")||seed();for(const k of ["students","lessons","invites","guardians","requests","schedules","exceptions","paymentBatches","paymentBatchItems"])state[k]=Array.isArray(o[k])?o[k]:(k==="schedules"?seed().schedules:[]);}catch{Object.assign(state,seed());}saveDemo();}
+function saveDemo(){if(state.mode==="demo")localStorage.setItem(STORAGE,JSON.stringify({students:state.students,lessons:state.lessons,invites:state.invites,guardians:state.guardians,requests:state.requests,schedules:state.schedules,exceptions:state.exceptions,paymentBatches:state.paymentBatches,paymentBatchItems:state.paymentBatchItems,studentInvitations:state.studentInvitations,studentLinks:state.studentLinks}))}
+function loadDemo(){try{const o=JSON.parse(localStorage.getItem(STORAGE)||"null")||seed();for(const k of ["students","lessons","invites","guardians","requests","schedules","exceptions","paymentBatches","paymentBatchItems","studentInvitations","studentLinks"])state[k]=Array.isArray(o[k])?o[k]:(k==="schedules"?seed().schedules:[]);}catch{Object.assign(state,seed());}saveDemo();}
 function visibleStudents(){
  if(state.role==="student")return state.mode==="demo"?state.students.slice(0,1):state.studentPortal.students||[];
  if(state.role==="teacher")return state.students.filter(s=>state.mode==="demo"||s.teacher_id===activeUser?.id);
@@ -964,7 +964,7 @@ function openLessonPopup(id){
  closeModal("day-modal");
  state.activeLesson=id;
  const d=actualDefaults(lesson);
- const teacher=state.role==="teacher",locked=lessonLocked(lesson),inactive=lesson.type==="leave"||lesson.type==="moved";
+ const teacher=state.role==="teacher",studentMode=state.role==="student",locked=lessonLocked(lesson),inactive=lesson.type==="leave"||lesson.type==="moved";
  $("#lesson-modal-heading").textContent=(studentFor(lesson)?.name||lesson.student||"學生")+" · "+(lesson.subject||"課程");
  $("#lesson-modal-date").textContent=prettyDate(lesson.lesson_date)+" · "+statusLabel(lesson);
  $("#lesson-planned-time").textContent=d.scheduledStart+" – "+d.scheduledEnd+"（"+(durationHours(d.scheduledStart,d.scheduledEnd)||0)+" 小時）";
@@ -973,12 +973,14 @@ function openLessonPopup(id){
  $("#lesson-actual-end").value=d.actualEnd;
  $("#lesson-actual-hours").value=String(d.actualHours);
  state.actualHoursManual=false;
- $("#lesson-lock-hint").classList.toggle("hidden",!locked);
+ $("#lesson-lock-hint").classList.toggle("hidden",!locked||studentMode);
+ $("#student-lesson-review").classList.toggle("hidden",!studentMode);
+ $("#student-lesson-review").innerHTML=studentMode?(lesson.type==="lesson"?'<strong>老師課後回饋</strong><p>專注度：'+learningRating(lesson.focus_rating)+' · 學習態度：'+learningRating(lesson.attitude_rating)+'</p><p>'+esc(lesson.remarks||"老師尚未填寫課後回饋")+"</p>":"<p>此堂尚未上課，課後會顯示老師的評價。</p>"):"";
  $("#lesson-teacher-actions").classList.toggle("hidden",!teacher);
- $("#lesson-parent-actions").classList.toggle("hidden",teacher);
- $("#lesson-parent-note-wrap").classList.toggle("hidden",teacher||inactive);
+ $("#lesson-parent-actions").classList.toggle("hidden",teacher||studentMode);
+ $("#lesson-parent-note-wrap").classList.toggle("hidden",teacher||inactive||studentMode);
  $("#lesson-parent-note").value="";
- $("#lesson-time-editor").classList.toggle("hidden",inactive||(state.role==="parent"&&lesson.type!=="lesson"));
+ $("#lesson-time-editor").classList.toggle("hidden",studentMode||inactive||(state.role==="parent"&&lesson.type!=="lesson"));
  $("#lesson-actual-heading").textContent=teacher?"實際上課時間":"實際時間更正建議";
  $("#lesson-save").textContent=lesson.type==="leave"?"恢復原安排":lesson.type==="lesson"?"儲存實際上課紀錄":lesson.type==="moved"?"查看改期安排":"確認完成上課";
  $("#lesson-save").disabled=locked||lesson.type==="moved";
@@ -1422,6 +1424,9 @@ function bindEvents(){
    
    if(kind==="payment-period-single"){const l=resolveLesson(id);if(l)openPeriodModal(l.student_id,l.lesson_date,l.lesson_date)}
    if(kind==="accept-invite")await acceptInvite(id);
+   if(kind==="accept-student-invite")await acceptStudentInvite(id);
+   if(kind==="edit-student-invite")editStudentInvite(id);
+   if(kind==="revoke-student-invite")await revokeStudentInvite(id);
    if(kind==="edit-invite")editInvite(id);
    if(kind==="revoke-invite")await revokeInvite(id);
    if(kind==="approve-request")await reviewRequest(id,true);
@@ -1487,6 +1492,9 @@ function bindEvents(){
  $("#request-form").addEventListener("submit",submitRequest);
  document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e)});
  $("#invite-edit-form").addEventListener("submit",submitInviteEdit);
+ $("#teacher-student-invite-form").addEventListener("submit",sendStudentInvite);
+ $("#student-invite-edit-form").addEventListener("submit",submitStudentInviteEdit);
+ $("#profile-name-form").addEventListener("submit",saveProfileName);
  $("#workspace-start").onclick=()=>showModal("account-modal");
  $("#workspace-create").onclick=()=>saveMyWorkspace(false);
  $("#workspace-rename").onclick=()=>saveMyWorkspace(true);
@@ -1498,7 +1506,7 @@ function bindEvents(){
  $("#demo-reset").onclick=()=>{if(state.mode!=="demo")return;if(!confirm("將清除這台瀏覽器的 V2 測試課程與測試付款紀錄，重新載入範例資料。確定？"))return;
   localStorage.removeItem(STORAGE);loadDemo();render();closeModal("account-modal");toast("預覽已重置，可以測試跨月與部分付款");
  };
- $("#role-teacher").onclick=()=>setRole("teacher");$("#role-parent").onclick=()=>setRole("parent");
+ $("#role-teacher").onclick=()=>setRole("teacher");$("#role-parent").onclick=()=>setRole("parent");$("#role-student").onclick=()=>setRole("student");
  $$(".modal").forEach(d=>d.addEventListener("click",e=>{if(e.target===d)d.close()}));
 }
 function moveMonth(offset){state.month=new Date(state.month.getFullYear(),state.month.getMonth()+offset,1);render()}
