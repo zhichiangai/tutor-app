@@ -22,7 +22,7 @@ function appFixture(){
  const document={querySelector:get,querySelectorAll:()=>[],addEventListener(){},createElement:make};
  const storage={getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)};
  const app=new Function("document","localStorage","crypto","confirm","console","setTimeout","FormData","window",...Object.keys(helpers),
- source+"\nrender=()=>{};return {state,visibleStudents,visibleLessons,displayRoleName,accountDisplayName,setRole,sendStudentInvite,acceptStudentInvite,revokeStudentInvite,refreshStudentPortal,renderStudents,renderStudentInvitationPanels,openLessonPopup,"+
+ source+"\nconst realRender=render;render=()=>{};return {realRender,state,visibleStudents,visibleLessons,displayRoleName,accountDisplayName,setRole,sendStudentInvite,acceptStudentInvite,revokeStudentInvite,refreshStudentPortal,renderStudents,renderStudentInvitationPanels,openLessonPopup,"+
  "setUser(x){activeUser=x},setClient(x){client=x},setRender(x){render=x},setMode(x){state.mode=x}}")(
  document,storage,{randomUUID:()=>String(Math.random())},()=>true,console,()=>0,FormData,{},...Object.values(helpers));
  return {app,get,store};
@@ -100,4 +100,20 @@ test("Student enrollment SQL enforces teacher invitation, linked user and revoca
   assert.ok(!rpc.includes("'"+sensitive+"'"),"Sensitive field leaked via student portal "+sensitive);
  }
  assert.ok(!sql.includes("create policy student_")||!sql.includes("on public.lesson_records for select to authenticated using(true)"));
+});
+
+test("Full desktop/mobile role render survives switching among three modes",()=>{
+ const {app,get}=appFixture();
+ app.state.mode="demo";
+ app.state.students=[{id:"demo",name:"小明",subject:"數學",hourly_rate:500,teacher_id:"demo-teacher"}];
+ app.state.lessons=[{id:"lesson",student_id:"demo",owner_id:"demo-teacher",subject:"數學",
+  lesson_date:"2026-10-20",start_time:"17:00",end_time:"18:00",type:"lesson",
+  hours:1,total_amount:500,remarks:"進步",focus_rating:4,attitude_rating:5}];
+ app.state.guardians=[];app.state.schedules=[];app.state.exceptions=[];app.state.requests=[];
+ app.state.paymentBatches=[];app.state.paymentBatchItems=[];
+ for(const role of ["teacher","parent","student"]){
+  app.state.role=role;
+  assert.doesNotThrow(()=>app.realRender(),"Should render "+role+" mode");
+  assert.equal(get("#role-indicator-sub").textContent,"目前為"+({teacher:"老師模式",parent:"家長模式",student:"學生模式"}[role]));
+ }
 });
