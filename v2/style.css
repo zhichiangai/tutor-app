@@ -297,3 +297,24 @@
  .guardian-management-actions button{flex:1}
  .lesson-secondary-actions #lesson-cancel{grid-column:1/-1}
 }
+
+/* V3 student mode: recognizable identity with strictly read-only content. */
+.role-indicator{max-width:min(40vw,260px)}
+#role-indicator-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.profile-display-form{border-top:1px solid #e9e4dd;margin:14px 0;padding:16px 0 5px;display:flex;gap:12px;align-items:end;flex-wrap:wrap}
+.profile-display-form.hidden{display:none}
+.profile-display-form label{display:flex;flex:1 1 175px;flex-direction:column;gap:8px;font-size:12px;font-weight:700}
+.profile-display-form input{border:1px solid #ddd7ce;border-radius:10px;padding:12px;width:100%}
+.profile-display-form button{min-height:42px}
+#view-student .card{margin-bottom:18px}
+.student-portal-line{padding:13px 0;border-bottom:1px solid #eeeae3;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;font-size:13px}
+.student-portal-line:last-child{border:0}
+.student-portal-summary{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+.student-portal-summary strong{background:#f4eee6;border-radius:999px;padding:9px 13px;font-size:12px}
+.student-portal-lesson{border-bottom:1px solid #eeeae3;padding:15px 0}
+.student-portal-lesson strong,.student-portal-lesson small{display:block}
+.student-portal-lesson small{font-size:11px;color:var(--muted);margin-top:6px}
+.student-portal-ratings{margin-top:9px;font-size:12px;color:#69635a;background:#f8f3ed;padding:9px;border-radius:9px}
+.student-portal-lesson p{font-size:12px;line-height:1.7;color:#59544d}
+#view-student h3{font-size:14px;margin-top:20px}
+@media(max-width:650px){.role-indicator{max-width:210px}.role-indicator #role-indicator-text{max-width:153px;font-size:10px}.role-menu{max-width:calc(100vw - 18px)}.profile-display-form{align-items:stretch}.profile-display-form button{width:100%}}
