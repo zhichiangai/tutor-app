@@ -213,6 +213,10 @@ function render(){
  $("#role-teacher").classList.toggle("active",teacher);
  $("#role-parent").classList.toggle("active",role==="parent");
  $("#role-student").classList.toggle("active",studentMode);
+ $("#students-page-title").textContent=studentMode?"我的學習紀錄":"學生與家長";
+ $("#students-page-subtitle").textContent=studentMode?"我的課程安排與老師回饋":"把每位學生的安排都收好";
+ $("#learning-records-title").textContent=studentMode?"我的課後回饋":"孩子的學習紀錄";
+ $(".students-nav-label").forEach(el=>el.textContent=studentMode?"學習紀錄":el.closest(".mobile-nav")?"學生":"學生與家長");
  $$("[data-nonstudent]").forEach(el=>el.classList.toggle("hidden",studentMode));
  $("#home-money-card").classList.toggle("hidden",studentMode);
  $("#view-billing").classList.toggle("hidden",studentMode||state.view!=="billing");
@@ -363,7 +367,7 @@ function renderParentLearning(){
  const grouped=new Map();
  for(const l of thisMonth){const n=l.subject||"課程";grouped.set(n,(grouped.get(n)||0)+1)}
  const summary=[...grouped].map(([k,v])=>'<span class="learning-subject-chip">'+esc(k)+' · '+v+' 堂</span>').join("");
- $("#parent-learning-home").innerHTML='<div class="section-row"><div><h2>孩子的學習近況</h2><p class="section-sub">'+(lessons.length?"最新課後回饋，先看孩子的進步":"尚無已完成課程的老師回饋")+'</p></div><button type="button" class="text-link" data-view="students">查看學習紀錄 ↗</button></div>'+
+ $("#parent-learning-home").innerHTML='<div class="section-row"><div><h2>'+(studentMode?"我的學習近況":"孩子的學習近況")+'</h2><p class="section-sub">'+(lessons.length?"最新課後回饋，先看孩子的進步":"尚無已完成課程的老師回饋")+'</p></div><button type="button" class="text-link" data-view="students">查看學習紀錄 ↗</button></div>'+
  (lessons.length?'<p><strong>'+esc(studentFor(lessons[0])?.name||"學生")+' · '+esc(lessons[0].subject||"課程")+'</strong> · '+esc(lessons[0].lesson_date)+'</p><p class="learning-note">'+esc(lessons[0].remarks||"老師尚未填寫課後回饋")+'</p>':'');
  $("#parent-learning").innerHTML=lessons.length?'<div class="learning-subjects">'+(summary||"本月還沒有已完成的課程")+'</div>'+
  lessons.slice(0,24).map(l=>'<article class="learning-lesson"><div class="learning-lesson-title"><strong>'+
