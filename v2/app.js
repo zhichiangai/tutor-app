@@ -92,12 +92,54 @@ function setBusy(yes){
 function showModal(id){const dialog=$("#"+id);if(dialog&&!dialog.open)dialog.showModal()}
 function closeModal(id){const dialog=$("#"+id);if(dialog?.open)dialog.close()}
 function setView(view){state.view=view;$$(".page-view").forEach(x=>x.classList.toggle("hidden",x.id!=="view-"+view));$$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));$("#breadcrumb-name").textContent=({home:"今天",calendar:"課程月曆",billing:"收付款",students:"學生與家長"})[view];render()}
+const ROLE_VALUES=["teacher","parent","student"];
+const ROLE_LABELS={teacher:"老師",parent:"家長",student:"同學"};
+const ROLE_MODES={teacher:"老師模式",parent:"家長模式",student:"學生模式"};
+let roleWriteQueue=Promise.resolve();
+function currentProfile(){return state.profiles.find(p=>p.id===activeUser?.id)||null}
+function accountDisplayName(){
+ const stored=asText(currentProfile()?.display_name).trim();
+ const google=asText(activeUser?.user_metadata?.full_name||activeUser?.user_metadata?.name).trim();
+ return (stored&&stored!=="使用者"?stored:google)||"使用者";
+}
+function displayRoleName(){
+ const name=accountDisplayName(),suffix=ROLE_LABELS[state.role]||"使用者";
+ return name.endsWith(suffix)?name:name+" "+suffix;
+}
+async function saveProfileName(ev){
+ ev.preventDefault();
+ if(state.mode!=="live"||!activeUser){toast("請先使用 Google 登入，再儲存個人姓名");return}
+ const name=$("#profile-display-name").value.trim().slice(0,80);
+ if(!name){toast("請輸入要顯示的姓名");return}
+ const userId=activeUser.id;
+ const {data,error}=await client.from("profiles").update({display_name:name}).eq("id",userId).select("id").single();
+ if(error){toast("姓名儲存失敗："+error.message);return}
+ if(activeUser?.id!==userId)return;
+ await refreshLive();render();toast("已儲存姓名，其他裝置登入後也會顯示");
+}
+function writeRolePreference(userId,role){
+ roleWriteQueue=roleWriteQueue.catch(()=>{}).then(async()=>{
+  if(activeUser?.id!==userId||state.mode!=="live")return;
+  const {error}=await client.from("profiles").update({last_role:role}).eq("id",userId);
+  if(error)throw error;
+  const row=state.profiles.find(p=>p.id===userId);if(row)row.last_role=role;
+ });
+ return roleWriteQueue.catch(err=>{console.warn("角色偏好同步失敗",err);toast("已切換角色，但跨裝置同步尚未完成："+err.message)});
+}
 function setRole(role){
- if(role!=="teacher"&&role!=="parent")return;
+ if(!ROLE_VALUES.includes(role))return;
  state.role=role;
  const menu=$("#role-menu");menu.classList.add("hidden");$("#role-indicator").setAttribute("aria-expanded","false");
  localStorage.setItem(state.mode==="live"&&activeUser?ROLE_STORAGE+"_"+activeUser.id:ROLE_STORAGE,role);
- setView("home");toast(role==="teacher"?"已切換到老師檢視":"已切換到家長檢視");
+ setView("home");
+ if(state.mode==="live"&&activeUser){
+  const userId=activeUser.id;
+  void writeRolePreference(userId,role);
+  if(role==="student")void refreshStudentPortal().then(()=>{
+   if(state.role==="student"&&activeUser?.id===userId)render();
+  }).catch(err=>{console.error(err);toast("學生課程載入失敗："+err.message)});
+ }
+ toast("已切換至"+ROLE_MODES[role]);
 }
 function myWorkspace(){return state.mode==="live"&&activeUser?state.workspaces.find(w=>w.owner_id===activeUser.id):null}
 function requireTeacherWorkspace(){
@@ -1225,18 +1267,28 @@ async function initializeLive(){
   await ensureClient();const {data,error}=await client.auth.getSession();if(error)throw error;
   activeUser=data.session?.user||null;
   if(activeUser){
-   // Role is a display preference scoped to each account; authorization stays in RLS.
    await ensureMyProfile();
    await refreshLive();
-   const priorRole=localStorage.getItem(ROLE_STORAGE+"_"+activeUser.id);
+   const profile=currentProfile();
+   const cloudRole=ROLE_VALUES.includes(profile?.last_role)?profile.last_role:null;
+   const localRole=localStorage.getItem(ROLE_STORAGE+"_"+activeUser.id);
    const guardian=state.guardians.some(g=>g.guardian_id===activeUser.id);
-   const invited=state.invites.some(i=>i.email===activeUser.email?.toLowerCase());
-   state.role=priorRole==="parent"||priorRole==="teacher"?priorRole:
-    (!myWorkspace()&&(guardian||invited)?"parent":"teacher");
+   const parentInvite=state.invites.some(i=>i.email===activeUser.email?.toLowerCase());
+   const studentInvite=state.studentInvitations.some(i=>i.email===activeUser.email?.toLowerCase());
+   const linkedStudent=state.studentLinks.some(l=>l.user_id===activeUser.id);
+   const inferred=!myWorkspace()&&(linkedStudent||studentInvite)?"student":
+      !myWorkspace()&&(guardian||parentInvite)?"parent":"teacher";
+   state.role=cloudRole||(ROLE_VALUES.includes(localRole)?localRole:inferred);
    localStorage.setItem(ROLE_STORAGE+"_"+activeUser.id,state.role);
+   if(!cloudRole)await writeRolePreference(activeUser.id,state.role);
+   if(state.role==="student")await refreshStudentPortal();
    await loadTeacherPreferences();
-   toast("已登入並同步課程");
-  }else{for(const k of LIVE_FIELDS)state[k]=[];teacherPreferences={};}
+   toast("已登入並同步"+ROLE_MODES[state.role]);
+  }else{
+   for(const k of LIVE_FIELDS)state[k]=[];
+   state.studentPortal={students:[],lessons:[],schedules:[],exceptions:[]};
+   teacherPreferences={};
+  }
   render();
  }catch(err){console.error(err);toast("Supabase 連線失敗："+err.message);showModal("account-modal")}
 }
