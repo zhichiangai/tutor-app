@@ -11,7 +11,7 @@ export const isVirtualOccurrence = (l)=>Boolean(l?.virtual_occurrence);
 export const originalOccurrenceDate = (l)=>l?.scheduled_date||l?.lesson_date;
 
 export function matchesRecurrence(schedule,day){
- if(day<schedule.starts_on||(schedule.ends_on&&day>schedule.ends_on))return false;
+ if(day<schedule.starts_on||(schedule.ends_on&&day>schedule.ends_on)||(schedule.cancelled_from&&day>=schedule.cancelled_from))return false;
  const d=dateAtNoon(day);
  if(!(schedule.weekdays||[]).map(Number).includes(isoDay(d)))return false;
  const weeks=Math.round((mondayOf(day)-mondayOf(schedule.starts_on))/(7*86400000));

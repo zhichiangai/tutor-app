@@ -222,3 +222,78 @@
  #view-calendar .calendar-toolbar #manage-schedules{align-self:start}
  #view-calendar .calendar-date-controls{justify-content:space-between}
 }
+
+
+/* V3.1: visible role and human-friendly guardian, lesson, learning, billing surfaces. */
+.role-switcher{position:relative;flex:0 0 auto}
+.role-indicator{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:41px;padding:8px 13px;border:1px solid #e0dbd4;background:#fff;border-radius:99px;color:#4a554c;font-size:12px;font-weight:800;white-space:nowrap}
+.role-indicator:hover{background:#f8f4ee}
+.role-indicator:focus-visible{outline:3px solid #e8a195;outline-offset:2px}
+.role-indicator[aria-expanded="true"]{border-color:#a8b9a9}
+.role-chevron{font-size:16px;color:#8b867c}
+.role-menu{position:absolute;right:0;top:calc(100% + 9px);z-index:80;min-width:235px;padding:8px;background:white;border:1px solid #e9e3d9;border-radius:15px;box-shadow:0 12px 36px #3c352422}
+.role-menu.hidden{display:none}
+.role-menu button{display:flex;flex-direction:column;gap:4px;width:100%;padding:13px 14px;border:0;border-radius:10px;background:transparent;text-align:left;color:var(--ink);font-weight:800;font-size:13px;min-height:53px}
+.role-menu button:hover,.role-menu button[aria-pressed="true"]{background:#f4f1eb}
+.role-menu small{color:var(--muted);font-size:11px;font-weight:400}
+.student-bill-row{border:1px solid #f0ebe4;border-radius:14px;margin:10px 0;overflow:hidden;background:#fff}
+.student-bill-row summary{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px;cursor:pointer;list-style:none}
+.student-bill-row summary::-webkit-details-marker{display:none}
+.student-bill-row summary:hover{background:#fdfaf7}
+.student-bill-row summary:focus-visible{outline:3px solid #e8a195;outline-offset:-3px}
+.student-bill-name,.student-bill-numbers{display:flex;flex-direction:column;gap:5px;min-width:0}
+.student-bill-name strong,.student-bill-numbers strong{font-size:13px}
+.student-bill-name small,.student-bill-numbers small{color:#8a8178;font-size:11px;line-height:1.5}
+.student-bill-numbers{text-align:right}
+.student-bill-detail{background:#fcfaf7;border-top:1px solid #eee7df;padding:3px 16px}
+.student-bill-line{display:flex;justify-content:space-between;gap:15px;align-items:center;padding:11px 0;border-bottom:1px solid #eee8df}
+.student-bill-line:last-child{border:0}
+.student-bill-line>span{display:flex;flex-direction:column;gap:4px}
+.student-bill-line>span:last-child{text-align:right}
+.student-bill-line strong{font-size:12px}
+.student-bill-line small{font-size:11px;color:var(--muted)}
+.parent-learning-home{margin-bottom:20px}
+.parent-learning-home .section-row{margin-bottom:10px}
+.learning-note,.learning-lesson p{font-size:12px;color:#645d55;line-height:1.8;margin:7px 0 0}
+.learning-subjects{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 14px}
+.learning-subject-chip{background:#f4eee6;color:#635347;border-radius:99px;padding:7px 11px;font-size:11px}
+.learning-lesson{padding:16px 0;border-bottom:1px solid #efe9e1}
+.learning-lesson:last-child{border-bottom:0}
+.learning-lesson-title{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.learning-lesson-title strong{font-size:13px}
+.learning-lesson-title small{font-size:11px;color:var(--muted)}
+.learning-ratings{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.learning-ratings span{font-size:11px;color:#625d54;background:#f8f4ee;border-radius:9px;padding:7px 10px}
+.guardian-management-list{margin-top:18px}
+.guardian-management-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;padding:15px 0;border-top:1px solid #eee7df}
+.guardian-management-info{display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+.guardian-management-info strong{font-size:13px}
+.guardian-management-info small{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.guardian-management-actions{display:flex;gap:8px;flex-wrap:wrap}
+.guardian-management-actions button{min-height:41px}
+.cancel-scope-fieldset{border:0;min-width:0;padding:0;margin:0}
+.cancel-scope-fieldset legend{font-weight:800;font-size:13px;margin-bottom:10px}
+.cancel-scope-option{display:flex;align-items:flex-start;gap:12px;border:1px solid #eee7df;background:#fff;border-radius:13px;padding:14px;margin:9px 0;cursor:pointer}
+.cancel-scope-option:has(input:checked){background:#fdf6ef;border-color:#dda999}
+.cancel-scope-option input{accent-color:#b87567;width:18px;height:18px;margin:2px 0 0;flex-shrink:0}
+.cancel-scope-option span{display:flex;flex-direction:column;gap:5px}
+.cancel-scope-option strong{font-size:13px}
+.cancel-scope-option small{font-size:11px;color:var(--muted);line-height:1.6}
+.cancel-scope-option.hidden{display:none}
+#cancel-impact{line-height:1.7;padding:12px;border:1px solid #efe5db;background:#fcf8f3;border-radius:11px}
+@media(max-width:900px){.topbar{position:sticky;top:0;z-index:35;background:#fffcf9f6;backdrop-filter:blur(12px)}}
+@media(max-width:650px){
+ .topbar{gap:8px}
+ .topbar .breadcrumb{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .top-actions{gap:7px;flex-shrink:0}
+ .role-indicator{min-height:37px;padding:7px 9px;font-size:11px;gap:4px}
+ .topbar .status-pill{font-size:0;min-width:30px;height:30px;padding:0;display:flex;align-items:center;justify-content:center}
+ .topbar .status-pill i{font-size:10px;margin:0}
+ .role-menu{min-width:220px}
+ .student-bill-row summary{align-items:flex-start;flex-direction:column;gap:8px}
+ .student-bill-numbers{text-align:left}
+ .guardian-management-row{align-items:flex-start;flex-direction:column}
+ .guardian-management-actions{width:100%}
+ .guardian-management-actions button{flex:1}
+ .lesson-secondary-actions #lesson-cancel{grid-column:1/-1}
+}

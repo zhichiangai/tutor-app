@@ -28,7 +28,7 @@
       </div>
     </aside>
     <main class="main-content" id="main-content">
-      <div class="topbar"><div class="breadcrumb">我的工作空間 <span>/</span> <strong id="breadcrumb-name">今天</strong></div><div class="top-actions"><span id="connection-status" class="status-pill"><i></i> 體驗模式</span><button class="round-icon" id="account-action" title="帳號與設定" aria-label="帳號與設定">⚙</button></div></div>
+      <div class="topbar"><div class="breadcrumb">我的工作空間 <span>/</span> <strong id="breadcrumb-name">今天</strong></div><div class="top-actions"><div class="role-switcher"><button type="button" id="role-indicator" class="role-indicator" aria-haspopup="true" aria-expanded="false" aria-controls="role-menu"><span id="role-indicator-icon" aria-hidden="true">◈</span><span id="role-indicator-text">老師模式</span><span class="role-chevron" aria-hidden="true">⌄</span></button><div id="role-menu" class="role-menu hidden" role="group" aria-label="選擇目前使用身分"><button type="button" data-role-choice="teacher">老師模式<small>排課、學生與收款</small></button><button type="button" data-role-choice="parent">家長模式<small>孩子的學習、課程與付款</small></button></div></div><span id="connection-status" class="status-pill"><i></i> 體驗模式</span><button class="round-icon" id="account-action" title="帳號與設定" aria-label="帳號與設定">⚙</button></div></div>
       <div class="content-wrap">
         <section class="greeting" id="greeting"><div><p class="eyebrow">A LITTLE PROGRESS, EVERY DAY <span class="eyebrow-line"></span></p><h1 id="greeting-title">把每一堂課，<em>好好記下來。</em></h1><p id="greeting-copy">從課程到收款，讓重要的小事都有自己的位置。</p></div><button class="primary-button" id="top-add"><span>＋</span> 新增課程</button></section>
         <div class="demo-banner" id="demo-banner"><span>✦</span> 互動預覽資料只儲存在目前這台裝置；手機與電腦不會自動同步。正式登入後才會使用 Supabase 同步。<button id="go-live">使用 Google 登入</button></div>
@@ -41,7 +41,7 @@
           <select id="parent-teacher-select" aria-label="選擇查看的老師"><option value="all">全部老師</option></select>
         </div>
         <section id="view-home" class="page-view">
-          <div class="metrics-grid" id="metrics"></div>
+          <div class="metrics-grid" id="metrics"></div><article class="card parent-learning-home hidden" id="parent-learning-home"></article>
           <div class="home-grid">
             <div class="column-stack">
               <article class="card next-card"><div class="card-heading"><span class="mini-label">UP NEXT · 下一堂課</span><span class="tiny-sparkle">✳</span></div><div id="next-lesson"></div></article>
@@ -74,14 +74,14 @@
         </section>
         <section id="view-billing" class="page-view hidden">
           <div class="section-row page-head"><div><h2 id="billing-title">收付款整理</h2><p class="section-sub">清楚對帳，不再一筆一筆慢慢算</p></div><div class="month-controls"><button id="billing-prev" aria-label="上個月">‹</button><strong id="billing-month"></strong><button id="billing-next" aria-label="下個月">›</button></div></div>
-          <div class="billing-summary" id="billing-summary"></div>
+          <div class="billing-summary" id="billing-summary"></div><article class="card" id="billing-student-card"><div class="section-row"><div><h2>每位學生的本月收款</h2><p class="section-sub">依科目與學生彙總，點開查看每堂課；已確認與家長回報分開計算</p></div></div><div id="billing-student-summary"></div></article>
           <article class="card period-records-card"><div class="section-row"><div><h2>期間付款／收款紀錄</h2><p class="section-sub">保留每筆課程期間、付款日期與老師確認日期</p></div></div><div id="payment-batch-history"></div></article>
           <article class="card"><div class="section-row"><div><h2>課程與付款明細</h2><p class="section-sub">家長回報與老師收款分開紀錄</p></div><button class="secondary-button" id="batch-action" type="button">選擇付款期間</button></div><div id="billing-list"></div></article>
           <article class="card requests-card"><div class="section-row"><h2>請假與付款申請</h2><span class="muted-small">待確認會優先顯示</span></div><div id="requests-list"></div></article>
         </section>
         <section id="view-students" class="page-view hidden">
           <div class="section-row page-head"><div><h2>學生與家長</h2><p class="section-sub">把每位學生的安排都收好</p></div><button class="secondary-button" id="add-student">＋ 新增學生</button></div>
-          <div class="student-grid" id="student-grid"></div>
+          <article class="card hidden" id="parent-learning-card"><div class="section-row"><div><h2>孩子的學習紀錄</h2><p class="section-sub">依科目查看老師記錄的專注度、學習態度與課後回饋</p></div></div><div id="parent-learning"></div></article><div class="student-grid" id="student-grid"></div>
           <article class="card invite-card"><div class="section-row"><div><h2 id="invite-title">邀請家長加入</h2><p class="section-sub" id="invite-description">使用家長的 Google 帳號 Email 連結課程資料</p></div></div><div id="invite-content"></div></article>
         </section>
         <footer class="site-footer"><span>好好上課 © 2026</span><span><a href="./privacy.html">隱私權政策</a> · <a href="./terms.html">服務條款</a> · V3 · Made with care. <span aria-hidden="true">✳</span></span></footer>
@@ -147,7 +147,7 @@
         <div class="lesson-secondary-actions">
           <button type="button" class="secondary-button" id="lesson-student-leave">學生請假</button>
           <button type="button" class="secondary-button" id="lesson-teacher-leave">老師停課</button>
-          <button type="button" class="text-link" id="lesson-move">改期／補課 ↗</button>
+          <button type="button" class="text-link" id="lesson-move">改期／補課 ↗</button><button type="button" class="secondary-button" id="lesson-cancel">取消／刪除課程</button>
         </div>
       </div>
       <div id="lesson-parent-actions" class="lesson-actions hidden">
@@ -180,6 +180,27 @@
       <div class="form-row"><label>鐘點費（NT$／小時）<input id="schedule-rate" type="number" min="0" step="1" value="500" list="schedule-rate-options" required><datalist id="schedule-rate-options"></datalist></label><label>結束日期（可空白）<input id="schedule-end-date" type="date"></label></div>
       <div id="schedule-scope" class="scope-choice hidden"><strong>修改固定課表的範圍</strong><label><input type="radio" name="schedule-scope" value="future" checked> 自指定日期起變更（保留過去課程）</label><label><input type="radio" name="schedule-scope" value="all"> 修改這組固定規則（已完成紀錄不變）</label></div>
       <div class="form-actions"><button type="button" class="secondary-button" data-close="schedule-modal">取消</button><button type="submit" class="primary-button" id="schedule-save">儲存固定課表</button></div>
+    </form>
+  </dialog>
+  <dialog class="modal schedule-sheet" id="cancel-modal">
+    <form class="modal-inner" id="cancel-form">
+      <div class="modal-head"><div><p class="eyebrow">COURSE CANCELLATION</p><h2>取消課程</h2><p id="cancel-lesson-description" class="modal-description"></p></div><button type="button" class="close-modal" data-close="cancel-modal" aria-label="關閉">×</button></div>
+      <fieldset class="cancel-scope-fieldset"><legend>要影響哪些課程？</legend>
+        <label class="cancel-scope-option"><input type="radio" name="cancel-scope" value="one" checked><span><strong>只取消這一堂</strong><small>其餘日期照常上課，保留取消紀錄</small></span></label>
+        <label class="cancel-scope-option" data-repeat-scope><input type="radio" name="cancel-scope" value="future"><span><strong>這堂以及未來所有課程</strong><small>從選取日期起停止這組固定課表</small></span></label>
+        <label class="cancel-scope-option" data-repeat-scope><input type="radio" name="cancel-scope" value="all"><span><strong>整組固定課表</strong><small>停止這組排課，已完成與已付款紀錄不受影響</small></span></label>
+        <label class="cancel-scope-option" id="cancel-delete-option"><input type="radio" name="cancel-scope" value="delete"><span><strong>刪除誤建的單堂課</strong><small>只適用尚未完成且未進入帳務的單次課程</small></span></label>
+      </fieldset>
+      <p id="cancel-impact" class="helper-note"></p>
+      <div class="form-actions"><button class="secondary-button" type="button" data-close="cancel-modal">返回</button><button class="primary-button" type="submit" id="cancel-submit">確認取消這一堂</button></div>
+    </form>
+  </dialog>
+  <dialog class="modal schedule-sheet" id="invite-edit-modal">
+    <form class="modal-inner" id="invite-edit-form">
+      <div class="modal-head"><div><p class="eyebrow">INVITATION</p><h2>修改家長邀請</h2><p id="invite-edit-student" class="modal-description"></p></div><button type="button" class="close-modal" data-close="invite-edit-modal" aria-label="關閉">×</button></div>
+      <label>新的家長 Google Email<input id="invite-edit-email" type="email" maxlength="254" required autocomplete="email"></label>
+      <p class="helper-note">只能修改尚未接受的邀請。修改後，原 Email 將不能再接受此邀請。</p>
+      <div class="form-actions"><button class="secondary-button" type="button" data-close="invite-edit-modal">取消</button><button class="primary-button" type="submit">儲存邀請</button></div>
     </form>
   </dialog>
   <dialog class="modal schedule-sheet" id="change-modal">
