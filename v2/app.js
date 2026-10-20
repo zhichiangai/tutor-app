@@ -354,9 +354,88 @@ function renderParentLearning(){
  '<p>'+esc(l.remarks||"老師尚未填寫課後回饋")+'</p></article>').join(""):
  '<div class="empty">目前還沒有已完成課程的學習紀錄。老師填寫課後評語後，會在這裡顯示。</div>';
 }
+function renderStudentPortal(){
+ const demo=state.mode==="demo";
+ const me=activeUser?.id;
+ const invitations=state.studentInvites.filter(i=>demo||i.email===activeUser?.email?.toLowerCase());
+ const joined=new Set(state.studentLinks.filter(l=>demo||l.user_id===me).map(l=>l.invite_id));
+ $("#student-invites").innerHTML=demo?'<div class="helper-note">目前是預覽模式。正式登入 Google 後，才可接受老師發出的個人邀請。</div>':
+ invitations.length?invitations.map(i=>'<div class="student-portal-line"><span>老師邀請加入課程 · '+esc(i.email)+'</span>'+
+ (joined.has(i.id)?'<span class="pill paid">已連結</span>':'<button class="secondary-button" data-action="accept-student-invite" data-id="'+esc(i.id)+'">接受邀請</button>')+'</div>').join(""):
+ '<div class="empty">目前尚未收到學生邀請。請老師將你的 Google Email 加入學生邀請清單。</div>';
+ const data=demo?{students:state.students.slice(0,1).map(({id,name,subject})=>({id,name,subject})),
+  lessons:state.lessons.filter(l=>l.student_id===state.students[0]?.id).map(({id,student_id,lesson_date,subject,start_time,end_time,type,remarks,focus_rating,attitude_rating})=>({id,student_id,lesson_date,subject,start_time,end_time,type,remarks,focus_rating,attitude_rating})),schedules:[]}:
+ state.studentPortal||{students:[],lessons:[],schedules:[]};
+ const students=data.students||[],lessons=data.lessons||[],schedules=data.schedules||[];
+ const studentsById=new Map(students.map(x=>[x.id,x]));
+ const entries=lessons.filter(l=>studentsById.has(l.student_id)).sort((a,b)=>String(b.lesson_date).localeCompare(String(a.lesson_date)));
+ const recurring=schedules.filter(r=>studentsById.has(r.student_id));
+ $("#student-portal-content").innerHTML=students.length?
+ '<div class="student-portal-summary">'+students.map(st=>'<strong>'+esc(st.name)+' 同學 · '+esc(st.subject||"課程")+'</strong>').join("")+'</div>'+
+ (recurring.length?'<h3>固定課程安排</h3>'+recurring.map(r=>'<div class="student-portal-line"><span>'+esc(studentsById.get(r.student_id)?.name||"學生")+' · '+esc(r.subject)+
+ ' · 每'+(Number(r.every_weeks)===2?"兩週":"週")+' '+esc((r.weekdays||[]).map(d=>["","一","二","三","四","五","六","日"][d]).join("、"))+
+ ' · '+esc(String(r.start_time).slice(0,5))+'–'+esc(String(r.end_time).slice(0,5))+(r.cancelled_from?' · '+esc(r.cancelled_from)+' 起停止':'')+'</span></div>').join(""):'')+
+ '<h3>上課與課後回饋</h3>'+(entries.length?entries.slice(0,120).map(l=>'<div class="student-portal-lesson"><strong>'+esc(studentsById.get(l.student_id)?.name||"學生")+' · '+esc(l.subject||"課程")+'</strong><small>'+
+ esc(l.lesson_date)+' · '+esc(String(l.start_time||"").slice(0,5))+'–'+esc(String(l.end_time||"").slice(0,5))+' · '+(l.type==="lesson"?"已完成":l.type==="leave"?"已取消":"已安排")+'</small>'+
+ (l.type==="lesson"?'<div class="student-portal-ratings">專注度：'+(l.focus_rating==null?"尚未評分":esc(l.focus_rating)+"／5")+' · 學習態度：'+(l.attitude_rating==null?"尚未評分":esc(l.attitude_rating)+"／5")+'</div><p>'+esc(l.remarks||"老師尚未填寫課後回饋")+'</p>':"")+
+ '</div>').join(""):'<div class="empty">老師尚未新增課堂紀錄。</div>'):
+ '<div class="empty">尚未連結自己的學生資料。接受老師邀請後，這裡會顯示課程與學習回饋。</div>';
+}
+function renderStudentInvitesForTeacher(){
+ const card=$("#student-invite-teacher-card");
+ const teacher=state.role==="teacher";
+ card.classList.toggle("hidden",!teacher);
+ if(!teacher)return;
+ const st=visibleStudents();
+ const inv=state.studentInvites.filter(i=>state.mode==="demo"||i.teacher_id===activeUser?.id);
+ const links=state.studentLinks.filter(l=>state.mode==="demo"||l.teacher_id===activeUser?.id);
+ $("#student-invite-teacher-content").innerHTML=st.length?
+ '<form id="student-invite-form" class="invite-form"><label>學生<select id="student-invite-student">'+st.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join("")+'</select></label>'+
+ '<label>學生自己的 Google Email<input type="email" id="student-invite-email" required maxlength="254" placeholder="student@gmail.com"></label><button type="submit" class="primary-button">邀請學生</button></form>'+
+ (inv.length?'<div class="guardian-management-list">'+inv.map(i=>{
+ const name=st.find(x=>x.id===i.student_id)?.name||"學生",linked=links.some(l=>l.invite_id===i.id);
+ return '<div class="guardian-management-row"><div class="guardian-management-info"><strong>'+esc(name)+'</strong><small>'+esc(i.email)+'</small><span class="pill '+(linked?"paid":"pending")+'">'+(linked?"已連結":"等待接受")+'</span></div>'+
+ '<button type="button" class="secondary-button" data-action="remove-student-invite" data-id="'+esc(i.id)+'">'+(linked?"解除學生連結":"撤銷邀請")+'</button></div>';
+ }).join("")+'</div>':'<div class="empty">尚未邀請學生。</div>'):
+ '<div class="empty">請先新增學生，才能邀請學生登入。</div>';
+}
+async function saveStudentInvite(ev){
+ ev.preventDefault();
+ if(state.role!=="teacher"||!requireTeacherWorkspace())return;
+ const student_id=$("#student-invite-student").value,email=$("#student-invite-email").value.trim().toLowerCase();
+ if(!visibleStudents().some(s=>s.id===student_id))return;
+ const teacher_id=activeUser?.id||"demo-teacher";
+ const ok=await persist(async()=>{
+  if(state.mode==="demo"){
+   if(state.studentInvites.some(x=>x.student_id===student_id&&x.email===email))throw Error("已經邀請這位學生");
+   state.studentInvites.push({id:uid(),teacher_id,student_id,email});
+  }else assertResult(await client.from("student_invites").insert({teacher_id,student_id,email}));
+ });
+ if(ok){$("#student-invite-email").value="";toast("已邀請學生，請對方以這個 Google Email 登入")}
+}
+async function acceptStudentInvite(id){
+ const inv=state.studentInvites.find(x=>x.id===id);
+ if(!inv||state.role!=="student"||state.mode!=="live"||!activeUser)return;
+ const ok=await persist(async()=>{
+  const {error}=await client.rpc("claim_student_invite",{p_invite_id:id});
+  if(error)throw error;
+ });
+ if(ok)toast("學生身分已成功連結，現在可以查看自己的課程");
+}
+async function removeStudentInvite(id){
+ const inv=state.studentInvites.find(x=>x.id===id&&(state.mode==="demo"||x.teacher_id===activeUser?.id));
+ if(!inv||state.role!=="teacher")return;
+ if(!confirm("確定撤銷這位學生的邀請或查看權限？已完成的課程資料會保留。"))return;
+ const ok=await persist(async()=>{
+  if(state.mode==="demo"){state.studentInvites=state.studentInvites.filter(x=>x.id!==id);state.studentLinks=state.studentLinks.filter(x=>x.invite_id!==id)}
+  else assertResult(await client.from("student_invites").delete().eq("id",id).eq("teacher_id",activeUser.id).select("id").single());
+ });
+ if(ok)toast("已撤銷學生登入連結，歷史課程保留");
+}
 function renderStudents(){
  const st=visibleStudents();
  renderParentLearning();
+ renderStudentInvitesForTeacher();
  $("#add-student").style.display=state.role==="teacher"?"":"none";
  $("#student-grid").innerHTML=st.length?st.map(s=>'<article class="student-card"><div class="student-icon">✿</div><h3>'+esc(s.name)+'</h3><p>'+esc(s.subject||"課程")+' · '+money(s.hourly_rate)+'／小時</p><div class="tag-line">已安排 '+visibleLessons().filter(l=>l.student_id===s.id).length+' 堂課</div></article>').join(""):'<div class="card empty">目前沒有學生資料。'+(state.role==="parent"?"請先接受老師的邀請。":"先新增一位學生吧。")+'</div>';
  const parent=state.role==="parent";
@@ -1304,6 +1383,8 @@ function bindEvents(){
    
    if(kind==="payment-period-single"){const l=resolveLesson(id);if(l)openPeriodModal(l.student_id,l.lesson_date,l.lesson_date)}
    if(kind==="accept-invite")await acceptInvite(id);
+   if(kind==="accept-student-invite")await acceptStudentInvite(id);
+   if(kind==="remove-student-invite")await removeStudentInvite(id);
    if(kind==="edit-invite")editInvite(id);
    if(kind==="revoke-invite")await revokeInvite(id);
    if(kind==="approve-request")await reviewRequest(id,true);
@@ -1367,7 +1448,7 @@ function bindEvents(){
    $$("#record-weekdays input").forEach(el=>el.checked=Number(el.value)===day);
  });
  $("#request-form").addEventListener("submit",submitRequest);
- document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e)});
+ document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e);if(e.target.id==="student-invite-form")saveStudentInvite(e)});
  $("#invite-edit-form").addEventListener("submit",submitInviteEdit);
  $("#workspace-start").onclick=()=>showModal("account-modal");
  $("#workspace-create").onclick=()=>saveMyWorkspace(false);
