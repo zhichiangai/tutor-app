@@ -351,12 +351,13 @@ function renderBilling(){
 }
 function learningRating(value){return value==null||value===""?"老師尚未評分":esc(String(value))+"／5"}
 function renderParentLearning(){
- const parent=state.role==="parent";
- $("#parent-learning-card").classList.toggle("hidden",!parent);
- $("#parent-learning-home").classList.toggle("hidden",!parent);
- if(!parent)return;
+ const parent=state.role==="parent",studentMode=state.role==="student";
+ $("#parent-learning-card").classList.toggle("hidden",!(parent||studentMode));
+ $("#parent-learning-home").classList.toggle("hidden",!(parent||studentMode));
+ if(!parent&&!studentMode)return;
  const ids=new Set(visibleStudents().map(s=>s.id));
- const lessons=state.lessons.filter(l=>ids.has(l.student_id)&&l.type==="lesson").sort((a,b)=>
+ const source=studentMode&&state.mode==="live"?state.studentPortal.lessons:state.lessons;
+ const lessons=source.filter(l=>ids.has(l.student_id)&&l.type==="lesson").sort((a,b)=>
   (b.lesson_date+" "+(b.start_time||"")).localeCompare(a.lesson_date+" "+(a.start_time||"")));
  const thisMonth=lessons.filter(l=>sameMonth(l.lesson_date,state.month));
  const grouped=new Map();
@@ -374,8 +375,11 @@ function renderParentLearning(){
 function renderStudents(){
  const st=visibleStudents();
  renderParentLearning();
+ renderStudentInvitationPanels();
+ $("#guardian-invite-card").classList.toggle("hidden",state.role==="student");
  $("#add-student").style.display=state.role==="teacher"?"":"none";
- $("#student-grid").innerHTML=st.length?st.map(s=>'<article class="student-card"><div class="student-icon">✿</div><h3>'+esc(s.name)+'</h3><p>'+esc(s.subject||"課程")+' · '+money(s.hourly_rate)+'／小時</p><div class="tag-line">已安排 '+visibleLessons().filter(l=>l.student_id===s.id).length+' 堂課</div></article>').join(""):'<div class="card empty">目前沒有學生資料。'+(state.role==="parent"?"請先接受老師的邀請。":"先新增一位學生吧。")+'</div>';
+ $("#student-grid").innerHTML=st.length?st.map(s=>'<article class="student-card"><div class="student-icon">✿</div><h3>'+esc(s.name)+'</h3><p>'+esc(s.subject||"課程")+(state.role==="student"?"":' · '+money(s.hourly_rate)+'／小時')+'</p><div class="tag-line">已安排 '+visibleLessons().filter(l=>l.student_id===s.id).length+' 堂課</div></article>').join(""):'<div class="card empty">目前沒有學生資料。'+(state.role==="parent"?"請先接受老師的邀請。":state.role==="student"?"請老師使用你的 Google Email 發出學生邀請，再於下方接受。":"先新增一位學生吧。")+'</div>';
+ if(state.role==="student")return;
  const parent=state.role==="parent";
  $("#invite-title").textContent=parent?"家長邀請":"家長邀請與權限管理";
  $("#invite-description").textContent=parent?"老師邀請你後，可以在這裡確認連結。":"新增邀請、修改待接受 Email、撤銷邀請或解除已加入的家長。";
