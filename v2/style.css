@@ -330,3 +330,6 @@
  .role-indicator-label small{font-size:8px}
  .topbar .breadcrumb{font-size:10px}
 }
+
+/* Separate bottom-navigation label typography from the icon span. */
+.mobile-nav button .students-nav-label{font-size:10px;line-height:1.3}
