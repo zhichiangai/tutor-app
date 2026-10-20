@@ -1,7 +1,7 @@
 -- V3 Student portal: invite-only access, no raw finance/guardian records for student accounts.
 -- The RPC below is deliberately narrow SECURITY DEFINER: student users must never be
 -- granted direct SELECT on lesson_records, which contains financial/private family data.
-alter table public.profiles add column if not exists last_role text not null default 'teacher'
+alter table public.profiles add column if not exists last_role text
  check (last_role in ('teacher','parent','student'));
 grant update(last_role) on public.profiles to authenticated;
 
