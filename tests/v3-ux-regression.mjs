@@ -103,9 +103,10 @@ test("New Google accounts do not inherit another account's parent display role",
  const id="user-b";
  const stub={
   auth:{async getSession(){return {data:{session:{user:{id,email:"teacherb@example.test",user_metadata:{name:"B"}}}},error:null}}},
+  rpc:async()=>({data:{students:[],lessons:[],schedules:[]},error:null}),
   from(table){
    return {
-    select(){return this},order(){return this},eq(){return this},
+    select(){return this},order(){return this},eq(){return this},update(){return this},single:async()=>({data:{id},error:null}),
     async maybeSingle(){return {data:table==="profiles"?{id}:null,error:null}},
     async range(){return {data:[],error:null}}
    }
