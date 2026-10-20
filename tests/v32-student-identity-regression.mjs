@@ -34,7 +34,7 @@ function makeApp(){
 test("Teacher, parent and student show distinct salutation for a named Google account",()=>{
  const {app}=makeApp();app.setUser({id:"u",email:"name@example.test"});
  app.state.mode="live";app.state.profiles=[{id:"u",display_name:"XWX"}];
- for(const [role,title] of [["teacher","XWX 老師"],["parent","XWX 家長"],["student","XWX 同學"]]){
+ for(const [role,title] of [["teacher","XWX老師"],["parent","XWX家長"],["student","XWX同學"]]){
   app.state.role=role;
   assert.equal(app.roleFullName(),title);
  }
