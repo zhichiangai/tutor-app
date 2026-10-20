@@ -91,7 +91,7 @@ function setBusy(yes){
 }
 function showModal(id){const dialog=$("#"+id);if(dialog&&!dialog.open)dialog.showModal()}
 function closeModal(id){const dialog=$("#"+id);if(dialog?.open)dialog.close()}
-function setView(view){state.view=view;$$(".page-view").forEach(x=>x.classList.toggle("hidden",x.id!=="view-"+view));$$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));$("#breadcrumb-name").textContent=({home:"今天",calendar:"課程月曆",billing:"收付款",students:"學生與家長"})[view];render()}
+function setView(view){if(state.role==="student"&&view==="billing")view="home";state.view=view;$$(".page-view").forEach(x=>x.classList.toggle("hidden",x.id!=="view-"+view));$$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));$("#breadcrumb-name").textContent=({home:"今天",calendar:"課程月曆",billing:"收付款",students:"學生與家長"})[view];render()}
 const ROLE_VALUES=["teacher","parent","student"];
 const ROLE_LABELS={teacher:"老師",parent:"家長",student:"同學"};
 const ROLE_MODES={teacher:"老師模式",parent:"家長模式",student:"學生模式"};
@@ -190,27 +190,32 @@ async function saveMyWorkspace(rename=false){
  if(ok){await loadTeacherPreferences();closeModal("account-modal");toast(rename?"空間名稱已更新":"家教空間已建立，現在可以新增學生")}
 }
 function render(){
- const role=state.role,teacher=role==="teacher";
- $("#role-indicator-text").textContent=teacher?"老師模式":"家長模式";
- $("#role-indicator-icon").textContent=teacher?"◈":"♧";
- $("#role-indicator").setAttribute("aria-label","目前使用："+(teacher?"老師模式":"家長模式")+"，點擊切換");
+ const role=state.role,teacher=role==="teacher",studentMode=role==="student";
+ $("#role-indicator-text").textContent=displayRoleName();
+ $("#role-indicator-sub").textContent="目前為"+ROLE_MODES[role];
+ $("#role-indicator-icon").textContent=teacher?"◈":studentMode?"✎":"♧";
+ $("#role-indicator").setAttribute("aria-label","目前使用："+displayRoleName()+"，"+ROLE_MODES[role]+"，點擊切換");
  $$("[data-role-choice]").forEach(el=>el.setAttribute("aria-pressed",String(el.dataset.roleChoice===role)));
- $("#greeting-title").innerHTML=teacher?"把每一堂課，<em>好好記下來。</em>":"每個成長時刻，<em>都值得珍惜。</em>";
- $("#greeting-copy").textContent=teacher?"從課程到收款，讓重要的小事都有自己的位置。":"孩子的上課安排、請假和付款，打開就能看見。";
+ $("#greeting-title").innerHTML=teacher?"把每一堂課，<em>好好記下來。</em>":studentMode?"我的每一堂課，<em>都看得見。</em>":"每個成長時刻，<em>都值得珍惜。</em>";
+ $("#greeting-copy").textContent=teacher?"從課程到收款，讓重要的小事都有自己的位置。":studentMode?"看看接下來的課表、已完成的課程和老師的回饋。":"孩子的上課安排、請假和付款，打開就能看見。";
  $("#top-add").style.display=teacher?"":"none";
  $("#demo-banner").classList.toggle("hidden",state.mode!=="demo");
  $("#demo-reset").classList.toggle("hidden",state.mode!=="demo");
  $("#connection-status").classList.toggle("live",state.mode==="live"&&!!activeUser);
  $("#connection-status").innerHTML=state.mode==="demo"?"<i></i> 體驗模式":activeUser?"<i></i> 已安全連線":"<i></i> 尚未登入";
- $("#account-label").textContent=activeUser?.email?activeUser.email.split("@")[0]:"預覽使用者";
- $("#account-subtitle").textContent=state.mode==="demo"?"體驗模式":
-  !activeUser?"尚未登入":state.role==="teacher"?
-    (myWorkspace()?.name||"尚未建立工作空間"):
-    ("家長 · "+new Set(state.guardians.filter(g=>g.guardian_id===activeUser.id).map(g=>g.teacher_id)).size+" 位授權老師");
- $("#avatar").textContent=activeUser?.email?.charAt(0).toUpperCase()||"好";
+ $("#account-label").textContent=displayRoleName();
+ $("#account-subtitle").textContent=state.mode==="demo"?"預覽 · "+ROLE_MODES[role]:
+  !activeUser?"尚未登入":ROLE_MODES[role];
+ $("#avatar").textContent=accountDisplayName().charAt(0)||"好";
+ const nameInput=$("#profile-display-name");
+ if(document.activeElement!==nameInput)nameInput.value=accountDisplayName()==="使用者"?"":accountDisplayName();
  $("#account-current").textContent=activeUser?.email||"尚未使用 Google 登入";
  $("#role-teacher").classList.toggle("active",teacher);
- $("#role-parent").classList.toggle("active",!teacher);
+ $("#role-parent").classList.toggle("active",role==="parent");
+ $("#role-student").classList.toggle("active",studentMode);
+ $("[data-nonstudent]").forEach(el=>el.classList.toggle("hidden",studentMode));
+ $("#home-money-card").classList.toggle("hidden",studentMode);
+ $("#view-billing").classList.toggle("hidden",studentMode||state.view!=="billing");
  renderWorkspaceUI();
  const ls=monthLessons(),done=ls.filter(l=>l.type==="lesson"),pending=done.filter(l=>lessonBalance(l).confirmed < lessonBalance(l).total-0.005);
  const completed=done.filter(l=>lessonBalance(l).confirmed>=lessonBalance(l).total-0.005);
@@ -219,12 +224,15 @@ function render(){
  const metrics=teacher?[
  ["本月已完成","◷",String(done.length),"<small>堂課</small>","繼續累積每一份努力"],
  ["本月上課時數","☷",hourTotal(ls).toFixed(1),"<small>小時</small>","依已完成課程計算"],
- ["尚待收款","◈",money(unreceived),"","未完成收款的課程"]]:[
+ ["尚待收款","◈",money(unreceived),"","未完成收款的課程"]]:studentMode?[
+ ["本月已完成","◷",String(done.length),"<small>堂課</small>","我的學習足跡"],
+ ["本月上課時數","☷",hourTotal(ls).toFixed(1),"<small>小時</small>","依已完成課程計算"],
+ ["我的科目","✎",String(new Set(ls.map(l=>l.subject).filter(Boolean)).size),"<small>科</small>","專屬學生課程"]]:[
  ["本月已完成","◷",String(done.length),"<small>堂課</small>","查看孩子的學習足跡"],
  ["本月上課時數","☷",hourTotal(ls).toFixed(1),"<small>小時</small>","依已完成課程計算"],
  ["待確認費用","◈",money(lessonSum(pending)),"","依課程付款狀態計算"]];
  $("#metrics").innerHTML=metrics.map(([label,icon,value,unit,foot])=>'<article class="metric-card"><div class="metric-label">'+label+'</div><div class="metric-icon">'+icon+'</div><div class="metric-value">'+esc(value)+(unit||"")+'</div><div class="metric-footer">'+foot+'</div></article>').join("");
- $("#money-reminder").textContent=teacher?"本月已確認收到 "+money(received)+"。":"目前有 "+pending.length+" 筆課程等待付款或收款確認。";
+ $("#money-reminder").textContent=teacher?"本月已確認收到 "+money(received)+"。":studentMode?"查看老師的學習回饋，掌握自己的進步。":"目前有 "+pending.length+" 筆課程等待付款或收款確認。";
  renderNext();renderRecent();renderMiniCalendar();renderFullCalendar();renderBilling();renderStudents();refreshDaySheet();
 }
 function rowHTML(l,full=false){
@@ -233,13 +241,13 @@ function rowHTML(l,full=false){
   (l.type==="planned"?'<button class="mini-action" data-action="complete" data-id="'+esc(l.id)+'">完成上課</button>':"")+
   (l.type==="lesson"&&l.status==="家長已付款"&&!state.paymentBatchItems.some(i=>i.lesson_id===l.id)?'<button class="mini-action" data-action="received" data-id="'+esc(l.id)+'">確認單堂收款</button>':"")+
   (full && l.type!=="moved"?'<button class="mini-action" data-action="edit" data-id="'+esc(l.id)+'">編輯</button><button class="mini-action" data-action="change-lesson" data-id="'+esc(l.id)+'">改期／請假</button>'+(l.type==="planned"&&!lessonLocked(l)?'<button class="mini-action" data-action="cancel-lesson" data-id="'+esc(l.id)+'">取消課程</button>':"")+((l.type==="leave"||l.moved_from||(l.schedule_id&&l.scheduled_date&&l.lesson_date!==l.scheduled_date))?'<button class="mini-action" data-action="restore-lesson" data-id="'+esc(l.id)+'">恢復原安排</button>':""):(full&&l.type==="moved"?'<button class="mini-action" data-action="restore-lesson" data-id="'+esc(l.id)+'">還原原日期</button>':""))
- ):(l.type==="planned"||l.type==="lesson"?'<button class="mini-action" data-action="leave-request" data-id="'+esc(l.id)+'">請假</button>':"");
+ ):(state.role==="student"?"":l.type==="planned"||l.type==="lesson"?'<button class="mini-action" data-action="leave-request" data-id="'+esc(l.id)+'">請假</button>':"");
  const pay=state.role==="parent" && l.type==="lesson"&&lessonBalance(l).available>0?'<button class="mini-action" data-action="payment-period-single" data-id="'+esc(l.id)+'">我已付款</button>':"";
- return '<div class="lesson-row"><span class="lesson-color '+(p==="paid"?"sage":"")+'"></span><div class="lesson-main"><button type="button" class="day-lesson-open" data-action="open-lesson" data-id="'+esc(l.id)+'">'+esc(name)+' · '+esc(l.subject||s?.subject||"課程")+'</button><small>'+prettyDate(l.lesson_date)+' · '+esc(timeLabel(l.start_time))+'–'+esc(timeLabel(l.end_time))+'</small></div><div class="row-actions"><span class="pill '+p+'">'+esc(statusLabel(l))+'</span>'+(full?'<span class="lesson-amount">'+money(l.type==="lesson"?l.total_amount:0)+'</span>':"")+(l.schedule_id?'<span class="repeat-marker" title="固定課表">↻</span>':"")+actions+pay+'</div></div>';
+ return '<div class="lesson-row"><span class="lesson-color '+(p==="paid"?"sage":"")+'"></span><div class="lesson-main"><button type="button" class="day-lesson-open" data-action="open-lesson" data-id="'+esc(l.id)+'">'+esc(name)+' · '+esc(l.subject||s?.subject||"課程")+'</button><small>'+prettyDate(l.lesson_date)+' · '+esc(timeLabel(l.start_time))+'–'+esc(timeLabel(l.end_time))+'</small></div><div class="row-actions"><span class="pill '+p+'">'+esc(statusLabel(l))+'</span>'+(full&&state.role!=="student"?'<span class="lesson-amount">'+money(l.type==="lesson"?l.total_amount:0)+'</span>':"")+(l.schedule_id?'<span class="repeat-marker" title="固定課表">↻</span>':"")+actions+pay+'</div></div>';
 }
 function renderNext(){
  const next=visibleLessons().filter(l=>l.type==="planned"&&l.lesson_date>=dateKey(tick())).sort((a,b)=>(a.lesson_date+" "+a.start_time).localeCompare(b.lesson_date+" "+b.start_time))[0];
- $("#next-lesson").innerHTML=next?'<h2 class="next-heading">'+esc((studentFor(next)?.name||next.student||"學生")+' · '+next.subject)+'</h2><div class="next-meta"><span class="date-tag">'+prettyDate(next.lesson_date)+'</span><span>'+esc(timeLabel(next.start_time))+' – '+esc(timeLabel(next.end_time))+'</span></div><div class="next-actions"><button class="button-outline" data-view="calendar" data-date="'+esc(next.lesson_date)+'">查看這一天 ↗</button>'+(state.role==="teacher"?'<button class="text-link" data-action="complete" data-id="'+esc(next.id)+'">完成上課</button>':'<button class="text-link" data-action="leave-request" data-id="'+esc(next.id)+'">我要請假</button>')+'</div>':'<div class="empty">目前沒有即將開始的課程。<br>慢慢來，也是一種很好的節奏。</div>';
+ $("#next-lesson").innerHTML=next?'<h2 class="next-heading">'+esc((studentFor(next)?.name||next.student||"學生")+' · '+next.subject)+'</h2><div class="next-meta"><span class="date-tag">'+prettyDate(next.lesson_date)+'</span><span>'+esc(timeLabel(next.start_time))+' – '+esc(timeLabel(next.end_time))+'</span></div><div class="next-actions"><button class="button-outline" data-view="calendar" data-date="'+esc(next.lesson_date)+'">查看這一天 ↗</button>'+(state.role==="teacher"?'<button class="text-link" data-action="complete" data-id="'+esc(next.id)+'">完成上課</button>':state.role==="student"?"":'<button class="text-link" data-action="leave-request" data-id="'+esc(next.id)+'">我要請假</button>')+'</div>':'<div class="empty">目前沒有即將開始的課程。<br>慢慢來，也是一種很好的節奏。</div>';
 }
 function renderRecent(){
  const rows=visibleLessons().filter(l=>l.type!=="leave"&&l.type!=="moved").sort((a,b)=>(b.lesson_date+" "+b.start_time).localeCompare(a.lesson_date+" "+a.start_time)).slice(0,4);
