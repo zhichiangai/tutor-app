@@ -297,3 +297,39 @@
  .guardian-management-actions button{flex:1}
  .lesson-secondary-actions #lesson-cancel{grid-column:1/-1}
 }
+
+/* V3.2: personal role identity and invite-only student portal. */
+.role-indicator-label{display:flex;flex-direction:column;align-items:flex-start;gap:3px;max-width:185px;min-width:0}
+.role-indicator-label strong{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.role-indicator-label small{color:#918a81;font-size:10px;font-weight:500;white-space:nowrap}
+.profile-name-form{display:flex;flex-direction:column;gap:8px;padding:14px 0;border-bottom:1px solid #eee7df}
+.profile-name-form label{font-weight:800;font-size:12px}
+.profile-name-controls{display:flex;align-items:center;gap:8px}
+.profile-name-controls input{flex:1;min-width:0;border:1px solid #e7dcd0;border-radius:10px;padding:11px 12px;background:white}
+.profile-name-controls button{white-space:nowrap;min-height:42px}
+.profile-name-form small{color:var(--muted);font-size:11px;line-height:1.6}
+.account-role .segment-control{display:flex;flex-wrap:wrap;gap:5px}
+.account-role .segment-control button{flex:1;min-width:73px;min-height:40px}
+#student-invitations-content .guardian-management-row{margin-top:8px}
+#student-invitations-content .primary-button{min-height:42px;white-space:nowrap}
+.student-lesson-review{display:flex;flex-direction:column;gap:8px;background:#f5f7f1;border:1px solid #e0e8da;padding:14px;border-radius:13px}
+.student-lesson-review p{margin:0;color:#615f55;font-size:12px;line-height:1.8}
+.student-lesson-review strong{font-size:13px}
+.student-lesson-review.hidden{display:none}
+#teacher-student-invitations.hidden,#student-invitations-card.hidden,#guardian-invite-card.hidden,#home-money-card.hidden,[data-nonstudent].hidden{display:none!important}
+@media(max-width:650px){
+ .role-indicator{min-width:0;max-width:180px}
+ .role-indicator-label{max-width:112px}
+ .role-indicator-label strong{font-size:11px}
+ .role-indicator-label small{font-size:9px}
+ .profile-name-controls{flex-wrap:wrap}
+ .profile-name-controls input{flex:1 1 130px}
+}
+@media(max-width:380px){
+ .role-indicator-label{max-width:82px}
+ .role-indicator-label small{font-size:8px}
+ .topbar .breadcrumb{font-size:10px}
+}
+
+/* Separate bottom-navigation label typography from the icon span. */
+.mobile-nav button .students-nav-label{font-size:10px;line-height:1.3}
