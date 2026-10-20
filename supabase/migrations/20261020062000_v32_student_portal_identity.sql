@@ -44,16 +44,16 @@ create policy student_invites_teacher_insert on public.student_invitations
  for insert to authenticated with check (
  teacher_id=(select auth.uid()) and
  exists(select 1 from public.students s
-        where s.id=student_id and s.teacher_id=(select auth.uid()))
+        where s.id=public.student_invitations.student_id and s.teacher_id=(select auth.uid()))
 );
 create policy student_invites_teacher_revoke on public.student_invitations
  for delete to authenticated using (teacher_id=(select auth.uid()));
 create policy student_invites_teacher_edit_pending on public.student_invitations
  for update to authenticated
  using (teacher_id=(select auth.uid()) and
-        not exists(select 1 from public.student_links l where l.invitation_id=id))
+        not exists(select 1 from public.student_links l where l.invitation_id=public.student_invitations.id))
  with check (teacher_id=(select auth.uid()) and
-        not exists(select 1 from public.student_links l where l.invitation_id=id));
+        not exists(select 1 from public.student_links l where l.invitation_id=public.student_invitations.id));
 create policy student_links_self_or_teacher_read on public.student_links
  for select to authenticated
  using (user_id=(select auth.uid()) or teacher_id=(select auth.uid()));
@@ -61,8 +61,9 @@ create policy student_links_invitee_accept on public.student_links
  for insert to authenticated with check (
  user_id=(select auth.uid()) and
  exists(select 1 from public.student_invitations i
-  where i.id=invitation_id and i.student_id=student_id
-    and i.teacher_id=teacher_id
+  where i.id=public.student_links.invitation_id
+    and i.student_id=public.student_links.student_id
+    and i.teacher_id=public.student_links.teacher_id
     and i.email=lower((select auth.jwt())->>'email'))
 );
 
