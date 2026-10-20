@@ -929,7 +929,7 @@ function scheduleRuleLabel(rule){
 function renderScheduleRules(){
  const st=state.schedules.filter(r=>state.mode==="demo"||r.teacher_id===activeUser?.id);
  $("#schedule-rules-list").innerHTML=st.length?'<div class="schedule-rules-title">目前固定課表（'+st.length+' 組）</div>'+st.map(r=>
-  '<div class="schedule-rule-row"><div><strong>'+esc(scheduleRuleLabel(r))+'</strong><small>'+esc(r.starts_on)+' 起'+(r.ends_on?' · 至 '+esc(r.ends_on):' · 長期')+'</small></div><button type="button" class="mini-action" data-action="edit-rule" data-id="'+esc(r.id)+'">編輯</button><button type="button" class="mini-action" data-action="stop-rule" data-id="'+esc(r.id)+'">停止</button></div>').join(""):'<div class="helper-note">目前沒有固定課表。選擇學生與日期，設定一次即可。</div>';
+  '<div class="schedule-rule-row"><div><strong>'+esc(scheduleRuleLabel(r))+'</strong><small>'+esc(r.starts_on)+' 起'+(r.ends_on?' · 至 '+esc(r.ends_on):' · 長期')+(r.cancelled_from?' · '+esc(r.cancelled_from)+' 起已停止':'')+'</small></div><button type="button" class="mini-action" data-action="edit-rule" data-id="'+esc(r.id)+'">編輯</button><button type="button" class="mini-action" data-action="stop-rule" data-id="'+esc(r.id)+'">'+(r.cancelled_from?'已停止':'停止')+'</button></div>').join(""):'<div class="helper-note">目前沒有固定課表。選擇學生與日期，設定一次即可。</div>';
 }
 function openSchedule(rule=null){
  if(state.role!=="teacher"){toast("請先切換老師模式");return}
@@ -1017,22 +1017,93 @@ async function submitSchedule(event){
    start:data.start_time,end:data.end_time,repeat:data.every_weeks===2?"biweekly":"weekly",weekdays:data.weekdays});
   closeModal("schedule-modal");toast("固定課表已儲存；未來日期會自動顯示")}
 }
-async function stopSchedule(id){
- const rule=state.schedules.find(x=>x.id===id);if(!rule||state.role!=="teacher")return;
- if(!confirm("停止「"+scheduleRuleLabel(rule)+"」的未來排課？過去已上課與收款紀錄會保留。"))return;
- const today=dateKey(tick());
- if(rule.starts_on>=today){
-  const hasRecords=state.lessons.some(l=>l.schedule_id===id);
-  if(hasRecords){toast("此課表已有單堂紀錄，請使用編輯功能調整結束日期");return}
-  const ok=await persist(async()=>{
-    if(state.mode==="demo")state.schedules=state.schedules.filter(s=>s.id!==id);
-    else assertResult(await client.from("recurring_schedules").delete().eq("id",id).select("id").single());
-  });if(ok){renderScheduleRules();toast("已移除尚未開始的課表")}return;
+async function cancelFutureSchedule(rule,from){
+ const effective=from>rule.starts_on?from:rule.starts_on;
+ if(state.lessons.some(l=>l.schedule_id===rule.id&&l.scheduled_date>=effective&&l.type==="planned"&&lessonLocked(l))){
+  toast("未來排課已有待確認的付款或帳務，請先完成對帳");return false;
  }
- const dayBefore=dateKey(new Date(parseDate(today).getFullYear(),parseDate(today).getMonth(),parseDate(today).getDate()-1));
- if(dayBefore<rule.starts_on){toast("課表今天才開始。請修改結束日期或取消單堂課");return}
- const ok=await persist(async()=>{if(state.mode==="demo")rule.ends_on=dayBefore;else assertResult(await client.from("recurring_schedules").update({ends_on:dayBefore}).eq("id",id).select("id").single())});
- if(ok){renderScheduleRules();toast("未來排課已停止，舊紀錄仍保留")}
+ return persist(async()=>{
+  if(state.mode==="demo"){
+   rule.cancelled_from=!rule.cancelled_from||effective<rule.cancelled_from?effective:rule.cancelled_from;
+   for(const l of state.lessons.filter(l=>l.schedule_id===rule.id&&l.scheduled_date>=rule.cancelled_from&&l.type==="planned")){
+    Object.assign(l,{type:"leave",leave_source:"teacher",hours:0,total_amount:0,
+     actual_start_time:null,actual_end_time:null,actual_hours:null,remarks:l.remarks||"已取消後續排課"});
+   }
+  }else assertResult(await client.rpc("cancel_recurring_schedule",{p_schedule_id:rule.id,p_from:effective}));
+ });
+}
+async function stopSchedule(id){
+ const rule=state.schedules.find(r=>r.id===id);
+ if(!rule||state.role!=="teacher")return;
+ const from=dateKey(tick())>rule.starts_on?dateKey(tick()):rule.starts_on;
+ if(rule.ends_on&&from>rule.ends_on){toast("這組固定課表已經結束");return}
+ if(rule.cancelled_from&&from>=rule.cancelled_from){toast("這組課表已停止排課");return}
+ if(!confirm("確定停止「"+scheduleRuleLabel(rule)+"」從 "+from+" 起的未來排課？已完成及付款紀錄保留。"))return;
+ const ok=await cancelFutureSchedule(rule,from);
+ if(ok){renderScheduleRules();toast("已停止未來排課，歷史紀錄完整保留")}
+}
+function updateCancelImpact(){
+ const lesson=resolveLesson(state.cancelLessonId);if(!lesson)return;
+ const scope=$('input[name="cancel-scope"]:checked')?.value||"one";
+ const rule=state.schedules.find(r=>r.id===lesson.schedule_id);
+ const day=originalOccurrenceDate(lesson);
+ const descriptions={one:"只取消這一堂，其餘日期照常；月曆保留已取消紀錄。",
+  future:"從 "+day+" 起停止這組課程的後續排課，已完成和已付款的歷史不受影響。",
+  all:"停止「"+(rule?scheduleRuleLabel(rule):"這組固定課表")+"」全部未完成的排課，歷史紀錄保留。",
+  delete:"只刪除這筆尚未完成、尚未進入帳務的誤建單次課程。"};
+ $("#cancel-impact").textContent=descriptions[scope];
+ $("#cancel-submit").textContent=scope==="delete"?"確認刪除誤建課程":scope==="one"?"確認取消這一堂":"確認停止固定課表";
+}
+function openCancel(lesson){
+ if(!lesson||state.role!=="teacher")return;
+ const rule=state.schedules.find(r=>r.id===lesson.schedule_id);
+ const completed=lesson.type==="lesson";
+ if(lessonLocked(lesson)){toast("這堂課已進入付款流程，請先完成對帳");return}
+ if(completed&&!rule){toast("已完成的單次課程不能直接刪除，請保留帳務歷史");return}
+ if(lesson.type==="leave"||lesson.type==="moved"){toast("已經取消或改期的課程，請使用還原功能");return}
+ state.cancelLessonId=lesson.id;
+ $("#cancel-lesson-description").textContent=(studentFor(lesson)?.name||"學生")+" · "+(lesson.subject||"課程")+" · "+prettyDate(lesson.lesson_date);
+ $$("[data-repeat-scope]").forEach(el=>el.classList.toggle("hidden",!rule));
+ $("#cancel-delete-option").classList.toggle("hidden",!!rule||isVirtualOccurrence(lesson)||completed);
+ const one=$('input[name="cancel-scope"][value="one"]');
+ one.disabled=completed;
+ if(completed&&rule)$('input[name="cancel-scope"][value="future"]').checked=true;
+ else one.checked=true;
+ closeModal("lesson-modal");closeModal("day-modal");updateCancelImpact();showModal("cancel-modal");
+}
+async function submitCancel(ev){
+ ev.preventDefault();
+ const lesson=resolveLesson(state.cancelLessonId);if(!lesson||state.role!=="teacher")return;
+ const scope=$('input[name="cancel-scope"]:checked')?.value||"one";
+ const rule=state.schedules.find(r=>r.id===lesson.schedule_id);
+ if(lessonLocked(lesson)){toast("這堂課已進入付款流程，不能直接取消");return}
+ if(["future","all"].includes(scope)&&!rule){toast("找不到固定課表，請重新整理");return}
+ if(lesson.type==="lesson"&&["one","delete"].includes(scope)){toast("已完成課程不能直接取消或刪除");return}
+ if(scope==="delete"&&(lesson.schedule_id||isVirtualOccurrence(lesson)||lesson.type!=="planned")){toast("只可刪除誤建的未完成單次課程");return}
+ if(["future","all"].includes(scope)&&!confirm("確定停止「"+scheduleRuleLabel(rule)+"」的"+(scope==="all"?"整組":"所選日期以後")+"課程？已完成及付款紀錄會保留。"))return;
+ let ok=false;
+ if(["future","all"].includes(scope)){
+  ok=await cancelFutureSchedule(rule,scope==="all"?rule.starts_on:originalOccurrenceDate(lesson));
+ }else if(scope==="delete"){
+  if(state.requests.some(r=>r.lesson_id===lesson.id)){toast("此課程已有家長申請紀錄，請改成取消");return}
+  ok=await persist(async()=>{
+   if(state.mode==="demo")state.lessons=state.lessons.filter(l=>l.id!==lesson.id);
+   else assertResult(await client.from("lesson_records").delete().eq("id",lesson.id).eq("owner_id",activeUser.id).select("id").single());
+  });
+ }else if(scope==="one"){
+  if(lesson.type!=="planned"){toast("只可取消尚未完成的課程");return}
+  ok=await persist(async()=>{
+   if(isVirtualOccurrence(lesson))await upsertException(lesson,"teacher_leave",null,"已取消本堂課");
+   else{
+    const patch={type:"leave",leave_source:"teacher",hours:0,total_amount:0,
+     actual_start_time:null,actual_end_time:null,actual_hours:null,remarks:lesson.remarks||"已取消本堂課"};
+    if(state.mode==="demo")Object.assign(lesson,patch);
+    else assertResult(await client.from("lesson_records").update(patch).eq("id",lesson.id).eq("owner_id",activeUser.id).select("id").single());
+   }
+  });
+ }
+ if(ok){closeModal("cancel-modal");state.cancelLessonId=null;
+  toast(scope==="one"?"已取消這一堂，其餘課程照常":scope==="delete"?"誤建課程已刪除":"後續固定排課已停止，歷史保留")}
 }
 function openChange(lesson){
  if(!lesson||lesson.type==="moved"||state.role!=="teacher")return;
@@ -1168,7 +1239,7 @@ function bindEvents(){
    if(kind==="open-lesson"||kind==="complete"||kind==="edit"||kind==="leave-request"){openLessonPopup(id);return}
    if(kind==="received")await updateLesson(id,{status:"老師已收到",received_date:dateKey(tick())},"已確認收款");
    
-   if(kind==="cancel-lesson")openChange(resolveLesson(id));
+   if(kind==="cancel-lesson")openCancel(resolveLesson(id));
    if(kind==="change-lesson")openChange(resolveLesson(id));
    if(kind==="restore-lesson")await restoreLesson(id);
    if(kind==="edit-rule")openSchedule(state.schedules.find(r=>r.id===id));
@@ -1189,6 +1260,7 @@ function bindEvents(){
  $("#lesson-actual-hours").addEventListener("input",()=>{state.actualHoursManual=true});
  $("#lesson-student-leave").onclick=()=>markLessonLeave("student");
  $("#lesson-teacher-leave").onclick=()=>markLessonLeave("teacher");
+ $("#lesson-cancel").onclick=()=>openCancel(resolveLesson(state.activeLesson));
  $("#lesson-move").onclick=()=>{const lesson=resolveLesson(state.activeLesson);closeModal("lesson-modal");openChange(lesson)};
  $("#lesson-parent-correct").onclick=()=>submitParentLessonRequest("time_correction");
  $("#lesson-parent-leave").onclick=()=>submitParentLessonRequest("leave");
@@ -1200,6 +1272,8 @@ function bindEvents(){
  $("#day-add-rule").onclick=()=>openSchedule();
  $("#schedule-form").addEventListener("submit",submitSchedule);
  $("#change-form").addEventListener("submit",submitChange);
+ $("#cancel-form").addEventListener("submit",submitCancel);
+ $("input[name=\"cancel-scope\"]").forEach(el=>el.addEventListener("change",updateCancelImpact));
  $("#change-action").onchange=()=>$("#change-date-area").classList.toggle("hidden",$("#change-action").value!=="reschedule");
  $("#schedule-student").onchange=()=>{if(!state.editingSchedule)selectStudentDefaults("schedule",$("#schedule-student").value)};
  $("#add-student").onclick=()=>{
