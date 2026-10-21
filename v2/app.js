@@ -1624,6 +1624,8 @@ async function restoreLesson(id){
 const LIVE_TABLES=["student_invites","student_links","students","lesson_records","guardian_invites","student_guardians","family_requests","recurring_schedules","schedule_exceptions","payment_batches","payment_batch_items","profiles","workspaces","workspace_members"];
 const LIVE_FIELDS=["studentInvites","studentLinks","students","lessons","invites","guardians","requests","schedules","exceptions","paymentBatches","paymentBatchItems","profiles","workspaces","workspaceMembers"];
 let authDataGeneration=0;
+// Ignore token refresh while a user-initiated logout is pending.
+let signOutRequested=false;
 const SESSION_PRIVATE_DOM_IDS=[
  "student-portal-content","student-invites","shared-student-content","shared-parent-content",
  "parent-learning","parent-learning-home","billing-list","period-lesson-list",
@@ -1708,6 +1710,8 @@ async function ensureClient(){
  if(!createClient)throw Error("登入元件載入失敗，請重新整理頁面後再試");
  client=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
  client.auth.onAuthStateChange((event,session)=>{
+  if(signOutRequested&&event!=="SIGNED_OUT")return;
+  if(event==="SIGNED_OUT")signOutRequested=false;
   const previousId=activeUser?.id||null;
   const nextUser=session?.user||null;
   const switchedAccounts=previousId&&nextUser&&previousId!==nextUser.id;
@@ -1726,11 +1730,12 @@ async function ensureClient(){
  return client;
 }
 async function initializeLive(){
+ if(signOutRequested)return;
  const bootGeneration=authDataGeneration;
  try{
   await ensureClient();
   const {data,error}=await client.auth.getSession();
-  if(bootGeneration!==authDataGeneration)return;
+  if(signOutRequested||bootGeneration!==authDataGeneration)return;
   if(error)throw error;
   activeUser=data.session?.user||null;
   if(activeUser){
@@ -1785,20 +1790,33 @@ async function initializeLive(){
 }
 async function googleLogin(){
  try{
+  signOutRequested=false;
   const db=await ensureClient();state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
   const {error}=await db.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname}});
   if(error)throw error;
  }catch(err){console.error(err);toast("Google 登入尚未完成："+err.message);showModal("account-modal")}
 }
 async function signOut(){
- if(client){
-  const {error}=await client.auth.signOut();
-  if(error){toast(error.message);return}
- }
+ // Immediately erase private data before awaiting the remote Auth response.
+ signOutRequested=true;
+ const db=client;
  activeUser=null;
  clearUserSessionState();
  state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
- render();showModal("account-modal");toast("已登出 Google 帳號");
+ render();
+ showModal("account-modal");
+ try{
+  if(db){
+   const {error}=await db.auth.signOut();
+   if(error)throw error;
+  }
+  signOutRequested=false;
+  toast("已登出 Google 帳號");
+ }catch(err){
+  // A failed remote signout must never repopulate the previous learner's DOM.
+  console.warn("Google 登出未完成",err);
+  toast("本機學習資料已清空，但遠端登出未完成；請稍後重新驗證登入狀態",8000);
+ }
 }
 function bindEvents(){
  document.addEventListener("click",async ev=>{
