@@ -409,3 +409,19 @@
 .learning-payment-expand summary::-webkit-details-marker{display:none}
 .learning-payment-expand[open]{padding:6px 0}
 .learning-payment-expand div{margin-top:8px;padding:9px 11px;background:#faf7f3;border-radius:8px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* V3.5.2: five reachable stars per row on narrow touch devices. */
+@media (max-width:420px){
+ /* At 320px viewport the dialog is 290px wide: 16px inner padding leaves
+    258px, enough for five 44px stars plus four 4px gaps (236px). */
+ #lesson-modal .modal-inner{padding:20px 16px}
+ .lesson-rating-row{grid-template-columns:minmax(0,1fr);gap:20px}
+ .lesson-rating-row .rating-field{min-width:0;width:100%}
+ .lesson-rating-row .star-rating{display:grid;grid-template-columns:repeat(5,44px);gap:4px;flex-wrap:nowrap;max-width:100%}
+ .lesson-rating-row .rating-star{width:44px;height:44px;min-width:44px;min-height:44px;
+  padding:0;display:grid;place-items:center;touch-action:manipulation;font-size:30px}
+}
+@media (max-width:360px){
+ .lesson-rating-row{grid-template-columns:minmax(0,1fr)}
+ .lesson-learning-editor{min-width:0}
+}

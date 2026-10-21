@@ -508,11 +508,13 @@ function renderSharedPlanner(){
 async function loadSharedCourseHistory(){
  state.sharedCourseHistory={};
  if(state.mode!=="live"||!client||!activeUser)return;
+ const userId=activeUser.id,generation=authDataGeneration;
  const linked=state.role==="student"?(state.studentPortal?.students||[]):visibleStudents();
  const lists=await Promise.all(linked.slice(0,20).map(async st=>{
   const {data,error}=await client.rpc("shared_course_history",{p_student_id:st.id});
   return [st.id,error?[]:Array.isArray(data)?data:[]];
  }));
+ if(activeUser?.id!==userId||generation!==authDataGeneration)return;
  for(const [id,rows] of lists)state.sharedCourseHistory[id]=rows;
 }
 
@@ -640,6 +642,11 @@ async function cancelSharedCourse(kind,id){
 }
 
 function renderStudentPortal(){
+ if(state.mode==="live"&&!activeUser){
+  $("#student-invites").innerHTML="";
+  $("#student-portal-content").innerHTML="";
+  return;
+ }
  const demo=state.mode==="demo";
  const me=activeUser?.id;
  const invitations=state.studentInvites.filter(i=>demo||i.email===activeUser?.email?.toLowerCase());
@@ -1616,6 +1623,56 @@ async function restoreLesson(id){
 
 const LIVE_TABLES=["student_invites","student_links","students","lesson_records","guardian_invites","student_guardians","family_requests","recurring_schedules","schedule_exceptions","payment_batches","payment_batch_items","profiles","workspaces","workspace_members"];
 const LIVE_FIELDS=["studentInvites","studentLinks","students","lessons","invites","guardians","requests","schedules","exceptions","paymentBatches","paymentBatchItems","profiles","workspaces","workspaceMembers"];
+let authDataGeneration=0;
+const SESSION_PRIVATE_DOM_IDS=[
+ "student-portal-content","student-invites","shared-student-content","shared-parent-content",
+ "parent-learning","parent-learning-home","billing-list","period-lesson-list",
+ "billing-student-summary","billing-summary","payment-batch-history",
+ "student-billing-summary","student-billing-list","shared-course-error",
+ "agenda-list","calendar-grid","day-modal-lessons","invite-content","mini-calendar",
+ "month-lesson-list","month-lesson-preview","next-lesson","period-overview",
+ "period-student","receipt-details","recent-lessons","requests-list",
+ "schedule-rules-list","student-grid","student-invite-teacher-content",
+ "lesson-content","lesson-feedback","lesson-focus-stars","lesson-mood-stars",
+ "profile-display-name","workspace-name","invite-edit-email"
+];
+function clearUserSessionState(){
+ authDataGeneration++;
+ for(const field of LIVE_FIELDS)state[field]=[];
+ state.studentPortal={students:[],lessons:[],schedules:[],exceptions:[]};
+ state.sharedCourseHistory={};
+ state.sharedCourseDraft=null;
+ state.activeLesson=null;
+ state.receiptBatch=null;
+ state.editing=null;
+ state.editingSchedule=null;
+ state.changingLesson=null;
+ state.actualHoursManual=false;
+ state.lessonRatings={focus:null,mood:null};
+ state.enabledRoles=["teacher"];
+ state.role="teacher";
+ state.view="home";
+ state.parentTeacherFilter="all";
+ teacherPreferences={};
+ for(const id of SESSION_PRIVATE_DOM_IDS){
+  const el=document.querySelector?.("#"+id);
+  if(!el)continue;
+  if("value" in el)el.value="";
+  el.innerHTML="";
+  if("textContent" in el)el.textContent="";
+ }
+ // Reset every visible/hidden form, including dynamically created invitation
+ // forms, so switching Google accounts cannot inherit A's draft values.
+ document.querySelectorAll?.("form")?.forEach(form=>form.reset?.());
+ for(const id of ["lesson-form","shared-course-form","record-form","request-form","period-form",
+  "profile-display-form","mode-settings-form","receipt-form","invite-edit-form",
+  "schedule-form","cancel-form","change-form","student-form"]){
+  document.querySelector?.("#"+id)?.reset?.();
+ }
+ document.querySelectorAll?.(".modal")?.forEach(dialog=>{
+  if(dialog.id!=="account-modal"&&dialog.open)dialog.close?.();
+ });
+}
 const PAGE_SIZE=500;
 async function fetchAllRows(table){
  const rows=[];
@@ -1633,11 +1690,14 @@ async function fetchAllRows(table){
 }
 async function refreshLive(){
  if(!client||!activeUser)return;
- const userId=activeUser.id;
+ const userId=activeUser.id,generation=authDataGeneration;
+ const belongsToThisSession=()=>state.mode==="live"&&
+  activeUser?.id===userId&&generation===authDataGeneration;
  const results=await Promise.all(LIVE_TABLES.map(fetchAllRows));
- if(state.mode!=="live"||activeUser?.id!==userId)return;
+ if(!belongsToThisSession())return;
  LIVE_FIELDS.forEach((key,i)=>{state[key]=results[i]});
  const portal=await client.rpc("student_portal_data");
+ if(!belongsToThisSession())return;
  if(portal.error)throw Error("學生資料讀取失敗："+portal.error.message);
  state.studentPortal=portal.data||{students:[],lessons:[],schedules:[]};
  if(typeof loadSharedCourseHistory==="function")await loadSharedCourseHistory();
@@ -1648,23 +1708,37 @@ async function ensureClient(){
  if(!createClient)throw Error("登入元件載入失敗，請重新整理頁面後再試");
  client=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
  client.auth.onAuthStateChange((event,session)=>{
-  activeUser=session?.user||null;
-  if(event==="SIGNED_OUT"){
-   activeUser=null;teacherPreferences={};state.parentTeacherFilter="all";
-   for(const k of LIVE_FIELDS)state[k]=[];
+  const previousId=activeUser?.id||null;
+  const nextUser=session?.user||null;
+  const switchedAccounts=previousId&&nextUser&&previousId!==nextUser.id;
+  const lostSession=previousId&&!nextUser;
+  if(event==="SIGNED_OUT"||switchedAccounts||lostSession){
+   clearUserSessionState();
+   activeUser=nextUser;
    state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
-   render();showModal("account-modal");
+   render();
+   if(nextUser){void initializeLive();}
+   else showModal("account-modal");
+   return;
   }
+  activeUser=nextUser;
  });
  return client;
 }
 async function initializeLive(){
+ const bootGeneration=authDataGeneration;
  try{
-  await ensureClient();const {data,error}=await client.auth.getSession();if(error)throw error;
+  await ensureClient();
+  const {data,error}=await client.auth.getSession();
+  if(bootGeneration!==authDataGeneration)return;
+  if(error)throw error;
   activeUser=data.session?.user||null;
   if(activeUser){
+   const initializingUserId=activeUser.id,initializingGeneration=authDataGeneration;
    await ensureMyProfile();
+   if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    await refreshLive();
+   if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    const profile=state.profiles.find(p=>p.id===activeUser.id);
    const guardian=state.guardians.some(g=>g.guardian_id===activeUser.id);
    const invited=state.invites.some(i=>i.email===activeUser.email?.toLowerCase());
@@ -1682,22 +1756,32 @@ async function initializeLive(){
       .update({enabled_roles:state.enabledRoles,roles_configured:true})
       .eq("id",activeUser.id).select("id").single();
     if(error)throw error;
+    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    }else state.enabledRoles=normalizedRoles(profile.enabled_roles);
    if(!state.enabledRoles.length)state.enabledRoles=["teacher"];
    state.role=[remote,cached,...state.enabledRoles].find(r=>state.enabledRoles.includes(r))||state.enabledRoles[0];
    localStorage.setItem(ROLE_STORAGE+"_"+activeUser.id,state.role);
    if(remote!==state.role)await saveLastRole(state.role);
+   if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    state.view=state.role==="student"?"student":"home";
    await loadTeacherPreferences();
+   if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    closeModal("account-modal");
    toast("已登入並同步課程");
   }else{
-   for(const k of LIVE_FIELDS)state[k]=[];
-   teacherPreferences={};state.enabledRoles=["teacher"];
+   clearUserSessionState();
   }
   render();
   if(!activeUser)showModal("account-modal");
- }catch(err){console.error(err);toast("Supabase 連線失敗："+err.message);showModal("account-modal")}
+ }catch(err){
+  if(bootGeneration!==authDataGeneration)return;
+  console.error(err);
+  activeUser=null;
+  clearUserSessionState();
+  render();
+  toast("Supabase 連線失敗："+err.message);
+  showModal("account-modal");
+ }
 }
 async function googleLogin(){
  try{
@@ -1707,9 +1791,12 @@ async function googleLogin(){
  }catch(err){console.error(err);toast("Google 登入尚未完成："+err.message);showModal("account-modal")}
 }
 async function signOut(){
- if(client){const {error}=await client.auth.signOut();if(error){toast(error.message);return;}}
- activeUser=null;teacherPreferences={};state.parentTeacherFilter="all";
- for(const k of LIVE_FIELDS)state[k]=[];
+ if(client){
+  const {error}=await client.auth.signOut();
+  if(error){toast(error.message);return}
+ }
+ activeUser=null;
+ clearUserSessionState();
  state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
  render();showModal("account-modal");toast("已登出 Google 帳號");
 }
