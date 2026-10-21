@@ -803,7 +803,7 @@ function openRecord(lesson=null){
  $("#record-until").value="";
  const weekday=((parseDate($("#record-date").value).getDay()+6)%7)+1;
  const saved=teacherPreferences.lastWeekdays||[weekday];
- $("#record-weekdays input").forEach(el=>el.checked=saved.includes(Number(el.value)));
+ Array.from(document.querySelectorAll("#record-weekdays input")).forEach(el=>el.checked=saved.includes(Number(el.value)));
  syncRecurringWeekdays("record-date","record-weekdays","record-weekday-hint");
  updateRecordRepeatUI();
  showModal("record-modal");
@@ -1262,7 +1262,7 @@ function openSchedule(rule=null){
  const initWeekday=rule?.weekdays?.map(Number)||
   (Array.isArray(teacherPreferences.lastWeekdays)&&teacherPreferences.lastWeekdays.length
    ?teacherPreferences.lastWeekdays:[((parseDate(state.selected).getDay()+6)%7)+1]);
- $("#schedule-weekdays input").forEach(i=>i.checked=initWeekday.includes(Number(i.value)));
+ Array.from(document.querySelectorAll("#schedule-weekdays input")).forEach(i=>i.checked=initWeekday.includes(Number(i.value)));
  syncRecurringWeekdays("schedule-start","schedule-weekdays","schedule-weekday-hint");
  $('input[name="schedule-scope"]').forEach(r=>r.checked=r.value==="future");
  renderScheduleRules();showModal("schedule-modal");
