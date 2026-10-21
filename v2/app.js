@@ -27,7 +27,7 @@ const timeLabel = (s) => asText(s).slice(0,5);
 const tick = ()=>new Date();
 const uid = ()=>crypto.randomUUID();
 let client=null, activeUser=null, loading=false, teacherPreferences={};
-const state={mode:localStorage.getItem(MODE_STORAGE)==="live"?"live":"demo",role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",paymentBatches:[],paymentBatchItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",studentInvites:[],studentLinks:[],studentPortal:{students:[],lessons:[],schedules:[]},receiptBatch:null,activeLesson:null,actualHoursManual:false};
+const state={mode:localStorage.getItem(MODE_STORAGE)==="live"?"live":"demo",role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",paymentBatches:[],paymentBatchItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",studentInvites:[],studentLinks:[],studentPortal:{students:[],lessons:[],schedules:[]},sharedCourseDraft:null,sharedCourseHistory:{},receiptBatch:null,activeLesson:null,actualHoursManual:false};
 
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
@@ -200,6 +200,7 @@ function render(){
   $$(".page-view").forEach(x=>x.classList.toggle("hidden",x.id!=="view-student"));
   $("#breadcrumb-name").textContent="我的學習";
   renderStudentPortal();
+  renderSharedPlanner();
   return;
  }
  $("#view-student").classList.add("hidden");
@@ -217,7 +218,7 @@ function render(){
  ["待確認費用","◈",money(lessonSum(pending)),"","依課程付款狀態計算"]];
  $("#metrics").innerHTML=metrics.map(([label,icon,value,unit,foot])=>'<article class="metric-card"><div class="metric-label">'+label+'</div><div class="metric-icon">'+icon+'</div><div class="metric-value">'+esc(value)+(unit||"")+'</div><div class="metric-footer">'+foot+'</div></article>').join("");
  $("#money-reminder").textContent=teacher?"本月已確認收到 "+money(received)+"。":"目前有 "+pending.length+" 筆課程等待付款或收款確認。";
- renderNext();renderRecent();renderMiniCalendar();renderFullCalendar();renderBilling();renderStudents();refreshDaySheet();
+ renderNext();renderRecent();renderMiniCalendar();renderFullCalendar();renderBilling();renderStudents();refreshDaySheet();renderSharedPlanner();
 }
 function rowHTML(l,full=false){
  const s=studentFor(l),name=s?.name||l.student||"學生",p=pillClass(l);
@@ -355,6 +356,164 @@ function renderParentLearning(){
  '<p>'+esc(l.remarks||"老師尚未填寫課後回饋")+'</p></article>').join(""):
  '<div class="empty">目前還沒有已完成課程的學習紀錄。老師填寫課後評語後，會在這裡顯示。</div>';
 }
+
+/* V3.3 shared course planner. Teacher's existing billing and attendance workflows stay unchanged.
+ * Non-teachers mutate schedules only via a scoped server-side RPC; no client-provided rate/owner. */
+function sharedCourseStudents(){
+ return state.role==="student"?(state.mode==="demo"?[]:(state.studentPortal?.students||[])):visibleStudents();
+}
+function sharedCourseRules(){
+ const ids=new Set(sharedCourseStudents().map(s=>s.id));
+ return (state.role==="student"?(state.studentPortal?.schedules||[]):state.schedules)
+  .filter(r=>ids.has(r.student_id));
+}
+function sharedCourseLessons(){
+ if(state.role!=="student")return visibleLessons();
+ const data=state.studentPortal||{};
+ const st=sharedCourseStudents(),ids=new Set(st.map(s=>s.id));
+ const real=(data.lessons||[]).filter(l=>ids.has(l.student_id));
+ const virtual=expandSchedules({
+  schedules:sharedCourseRules().map(r=>({...r,hourly_rate:0})),
+  lessons:real,exceptions:data.exceptions||[],allowedStudents:[...ids],
+  month:state.month,today:dateKey(tick())
+ });
+ return [...real,...virtual];
+}
+function renderSharedPlanner(){
+ const parent=$("#shared-parent-card"),student=$("#shared-student-card");
+ parent.classList.toggle("hidden",state.role!=="parent");
+ student.classList.toggle("hidden",state.role!=="student");
+ if(state.role==="teacher")return;
+ const dest=state.role==="student"?"#shared-student-content":"#shared-parent-content";
+ if(state.mode!=="live"||!activeUser){
+  $(dest).innerHTML='<p class="helper-note">請先使用 Google 正式登入並接受課程邀請，才可共同管理課表；互動預覽不會寫入正式資料。</p>';
+  return;
+ }
+ const st=sharedCourseStudents();
+ if(!st.length){$(dest).innerHTML='<div class="empty">目前尚未連結課程。請先接受老師發出的邀請。</div>';return}
+ const students=new Map(st.map(s=>[s.id,s]));
+ const rules=sharedCourseRules().filter(r=>!r.cancelled_from)
+  .sort((a,b)=>a.starts_on.localeCompare(b.starts_on)).slice(0,18);
+ const lessons=sharedCourseLessons().filter(l=>l.type!=="moved"&&l.lesson_date>=dateKey(new Date(state.month.getFullYear(),state.month.getMonth(),1)))
+  .sort((a,b)=>(a.lesson_date+" "+a.start_time).localeCompare(b.lesson_date+" "+b.start_time)).slice(0,35);
+ const buttons='<div class="shared-course-buttons"><button type="button" class="primary-button" data-action="shared-new-lesson">＋ 新增單堂課</button>'+
+ '<button type="button" class="secondary-button" data-action="shared-new-schedule">↻ 新增固定課表</button></div>';
+ const ruleRows=rules.map(r=>'<div class="shared-course-line"><div><strong>'+esc(students.get(r.student_id)?.name||"學生")+' · '+esc(r.subject)+'</strong><small>'+
+ esc(r.starts_on)+' 起，每'+(Number(r.every_weeks)===2?"兩週":"週")+' '+esc((r.weekdays||[]).map(x=>["","一","二","三","四","五","六","日"][x]).join("、"))+
+ ' '+esc(timeLabel(r.start_time))+'–'+esc(timeLabel(r.end_time))+'</small></div><div class="shared-course-actions">'+
+ '<button type="button" class="mini-action" data-action="shared-edit-schedule" data-id="'+esc(r.id)+'">修改未來</button>'+
+ '<button type="button" class="mini-action" data-action="shared-cancel-future" data-id="'+esc(r.id)+'">取消未來</button>'+
+ '<button type="button" class="mini-action" data-action="shared-cancel-all" data-id="'+esc(r.id)+'">停止整組</button></div></div>').join("");
+ const lessonRows=lessons.map(l=>'<div class="shared-course-line"><div><strong>'+esc(students.get(l.student_id)?.name||"學生")+' · '+esc(l.subject||"課程")+'</strong><small>'+
+ esc(l.lesson_date)+' '+esc(timeLabel(l.start_time))+'–'+esc(timeLabel(l.end_time))+' · '+(l.type==="lesson"?"已完成":l.type==="leave"?"已取消":"已安排")+'</small></div>'+
+ (l.type==="planned"?'<div class="shared-course-actions"><button type="button" class="mini-action" data-action="shared-edit-lesson" data-id="'+esc(l.id)+'">改期／修改</button>'+
+ '<button type="button" class="mini-action" data-action="shared-cancel-lesson" data-id="'+esc(l.id)+'">取消這堂</button></div>':"")+'</div>').join("");
+ const history=st.flatMap(s=>(state.sharedCourseHistory[s.id]||[]).map(h=>({...h,studentName:s.name})))
+  .sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,8);
+ $(dest).innerHTML=buttons+'<p class="helper-note">三方操作的是同一份課表，修改後直接生效。已完成與已付款課程受保護；鐘點費與收款仍由老師管理。</p>'+
+ '<h3 class="shared-course-heading">固定課表</h3>'+(ruleRows||'<p class="muted-small">目前沒有進行中的固定課表。</p>')+
+ '<h3 class="shared-course-heading">本月及後續課程</h3>'+(lessonRows||'<p class="muted-small">目前沒有課程安排。</p>')+
+ (history.length?'<h3 class="shared-course-heading">最近變更</h3>'+history.map(h=>
+  '<p class="shared-history-row">'+esc(h.studentName)+' · '+esc(h.summary)+' <small>'+esc(String(h.created_at).slice(0,16).replace("T"," "))+'</small></p>').join(""):"");
+}
+async function loadSharedCourseHistory(){
+ state.sharedCourseHistory={};
+ if(state.mode!=="live"||!client||!activeUser)return;
+ const linked=state.role==="student"?(state.studentPortal?.students||[]):visibleStudents();
+ const lists=await Promise.all(linked.slice(0,20).map(async st=>{
+  const {data,error}=await client.rpc("shared_course_history",{p_student_id:st.id});
+  return [st.id,error?[]:Array.isArray(data)?data:[]];
+ }));
+ for(const [id,rows] of lists)state.sharedCourseHistory[id]=rows;
+}
+function openSharedCourseForm(action,id=null){
+ if(!["parent","student"].includes(state.role)||state.mode!=="live"){toast("請先使用受邀 Google 帳號登入");return}
+ const st=sharedCourseStudents();
+ if(!st.length){toast("尚未連結任何學生課程");return}
+ const rule=action==="edit-schedule"?sharedCourseRules().find(r=>r.id===id):null;
+ const lesson=action==="edit-lesson"?sharedCourseLessons().find(l=>l.id===id):null;
+ if((action==="edit-schedule"&&!rule)||(action==="edit-lesson"&&!lesson)){toast("找不到課程，請重新整理");return}
+ const virtual=!!lesson?.virtual_occurrence;
+ const isSchedule=action==="new-schedule"||action==="edit-schedule";
+ const sel=rule?.student_id||lesson?.student_id||st[0].id;
+ const linked=st.find(x=>x.id===sel);
+ state.sharedCourseDraft={
+  action:isSchedule?(rule?"update_schedule":"create_schedule"):(lesson?(virtual?"change_occurrence":"update_lesson"):"create_lesson"),
+  targetId:virtual?lesson.schedule_id:(rule?.id||lesson?.id||null),
+  studentId:sel,originalDate:virtual?originalOccurrenceDate(lesson):null,
+  expectedUpdatedAt:rule?.updated_at||(!virtual?lesson?.updated_at:null)
+ };
+ $("#shared-course-heading").textContent=rule?"修改未來固定課表":lesson?"修改這堂課":isSchedule?"新增固定課表":"新增單堂課";
+ $("#shared-course-student").innerHTML=st.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.name)+'</option>').join("");
+ $("#shared-course-student").value=sel;$("#shared-course-student").disabled=!!(rule||lesson);
+ $("#shared-course-subject").value=rule?.subject||lesson?.subject||linked?.subject||"";
+ $("#shared-course-subject").readOnly=virtual;
+ $("#shared-course-date").value=rule? (rule.starts_on>dateKey(tick())?rule.starts_on:dateKey(tick())):(lesson?.lesson_date||state.selected||dateKey(tick()));
+ $("#shared-course-date-label").textContent=isSchedule?"從哪一天起生效":"上課日期";
+ // Changing label via textContent would remove input: restore its contents safely.
+ $("#shared-course-date-label").innerHTML=(isSchedule?"修改從這一天起生效":"上課日期")+'<input id="shared-course-date" type="date" required>';
+ $("#shared-course-date").value=rule?(rule.starts_on>dateKey(tick())?rule.starts_on:dateKey(tick())):(lesson?.lesson_date||state.selected||dateKey(tick()));
+ $("#shared-course-start").value=timeLabel(rule?.start_time||lesson?.start_time||"19:00");
+ $("#shared-course-end").value=timeLabel(rule?.end_time||lesson?.end_time||"20:30");
+ $("#shared-course-start").readOnly=virtual;
+ $("#shared-course-end").readOnly=virtual;
+ $("#shared-course-repeat").classList.toggle("hidden",!isSchedule);
+ $("#shared-course-end-label").classList.toggle("hidden",!isSchedule);
+ $("#shared-course-end-date").value=rule?.ends_on||"";
+ $("#shared-course-frequency").value=String(rule?.every_weeks||1);
+ const days=rule?.weekdays||[((parseDate($("#shared-course-date").value).getDay()+6)%7)+1];
+ $("#shared-course-weekdays input").forEach(x=>{x.checked=days.includes(Number(x.value))});
+ $("#shared-course-note").textContent=virtual?
+  "此堂是固定課表產生的課程，目前可直接更改單堂日期；若需更改科目或時間，請修改固定課表。鐘點費仍由老師管理。":
+  "雙方共用同一份課表。鐘點費由老師設定，這裡不會修改已完成的課程或收款。";
+ showModal("shared-course-modal");
+}
+async function submitSharedCourse(event){
+ event.preventDefault();
+ const d=state.sharedCourseDraft;if(!d||state.mode!=="live")return;
+ const studentId=$("#shared-course-student").value;
+ if(!sharedCourseStudents().some(s=>s.id===studentId)){toast("沒有這位學生的權限");return}
+ const date=$("#shared-course-date").value,subject=$("#shared-course-subject").value.trim();
+ const start_time=$("#shared-course-start").value,end_time=$("#shared-course-end").value;
+ const payload={subject,start_time,end_time};
+ if(!subject||!start_time||!end_time||end_time<=start_time||!date){toast("請填寫正確的日期、科目與時間");return}
+ if(d.action==="change_occurrence"){
+  if(date===d.originalDate){toast("請選擇與原定日期不同的一天");return}
+  Object.assign(payload,{original_date:d.originalDate,moved_to:date});
+ }else if(d.action==="create_schedule"||d.action==="update_schedule"){
+  const weekdays=$("#shared-course-weekdays input:checked").map(x=>Number(x.value));
+  if(!weekdays.length){toast("固定課表至少選一天");return}
+  Object.assign(payload,{weekdays,every_weeks:Number($("#shared-course-frequency").value),
+   starts_on:date,ends_on:$("#shared-course-end-date").value||null});
+  if(d.action==="update_schedule")payload.effective_on=date;
+ }else payload.lesson_date=date;
+ if(d.expectedUpdatedAt)payload.expected_updated_at=d.expectedUpdatedAt;
+ const ok=await persist(async()=>assertResult(await client.rpc("shared_course_action",{
+  p_action:d.action,p_student_id:studentId,p_target_id:d.targetId,p_payload:payload
+ })));
+ if(ok){closeModal("shared-course-modal");state.sharedCourseDraft=null;toast("共同課表已更新，老師、家長與學生可查看最新安排")}
+}
+async function cancelSharedCourse(kind,id){
+ if(state.mode!=="live"||!["parent","student"].includes(state.role))return;
+ const lesson=kind==="lesson"?sharedCourseLessons().find(l=>l.id===id):null;
+ const rule=kind!=="lesson"?sharedCourseRules().find(r=>r.id===id):null;
+ if((kind==="lesson"&&!lesson)||(kind!=="lesson"&&!rule)){toast("找不到課程");return}
+ if(lesson&&lesson.type!=="planned"){toast("已完成或已取消的課程不能直接取消");return}
+ const today=dateKey(tick());
+ const from=kind==="all"?rule.starts_on:kind==="future"?(today>rule.starts_on?today:rule.starts_on):null;
+ if(!confirm(kind==="lesson"?"確定取消這一堂課？這不會影響其他週，也不會刪除帳務歷史。":
+   "確定停止這組固定課表"+(kind==="all"?"的所有未來排課":"自 "+from+" 起的課程")+"？已完成與已付款紀錄會保留。"))return;
+ const payload=lesson?(lesson.virtual_occurrence?{original_date:originalOccurrenceDate(lesson)}:{expected_updated_at:lesson.updated_at}):
+  {from_date:from,expected_updated_at:rule.updated_at};
+ const action=lesson?(lesson.virtual_occurrence?"cancel_occurrence":"cancel_lesson"):"cancel_schedule";
+ const target=lesson?(lesson.virtual_occurrence?lesson.schedule_id:lesson.id):rule.id;
+ const studentId=lesson?.student_id||rule?.student_id;
+ const ok=await persist(async()=>assertResult(await client.rpc("shared_course_action",{
+  p_action:action,p_student_id:studentId,p_target_id:target,p_payload:payload
+ })));
+ if(ok)toast("課程已取消，相關歷史紀錄仍會保留");
+}
+
 function renderStudentPortal(){
  const demo=state.mode==="demo";
  const me=activeUser?.id;
@@ -1312,6 +1471,7 @@ async function refreshLive(){
  const portal=await client.rpc("student_portal_data");
  if(portal.error)throw Error("學生資料讀取失敗："+portal.error.message);
  state.studentPortal=portal.data||{students:[],lessons:[],schedules:[]};
+ await loadSharedCourseHistory();
 }
 async function ensureClient(){
  if(client)return client;
@@ -1373,6 +1533,13 @@ function bindEvents(){
   const switcher=ev.target.closest("[data-calendar-mode]");if(switcher){changeCalendarMode(switcher.dataset.calendarMode);return}
   const action=ev.target.closest("[data-action]");if(action){
    const id=action.dataset.id,kind=action.dataset.action;
+   if(kind==="shared-new-lesson"){openSharedCourseForm("new-lesson");return}
+   if(kind==="shared-new-schedule"){openSharedCourseForm("new-schedule");return}
+   if(kind==="shared-edit-lesson"){openSharedCourseForm("edit-lesson",id);return}
+   if(kind==="shared-edit-schedule"){openSharedCourseForm("edit-schedule",id);return}
+   if(kind==="shared-cancel-lesson"){await cancelSharedCourse("lesson",id);return}
+   if(kind==="shared-cancel-future"){await cancelSharedCourse("future",id);return}
+   if(kind==="shared-cancel-all"){await cancelSharedCourse("all",id);return}
    if(kind==="open-lesson"||kind==="complete"||kind==="edit"||kind==="leave-request"){openLessonPopup(id);return}
    if(kind==="received")await updateLesson(id,{status:"老師已收到",received_date:dateKey(tick())},"已確認收款");
    
@@ -1397,6 +1564,7 @@ function bindEvents(){
  });
  document.addEventListener("keydown",ev=>{const el=ev.target.closest("[data-day]");if(el&&!ev.target.closest("[data-action]")&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();openDay(el.dataset.day)}});
  $("#lesson-form").addEventListener("submit",saveLessonOutcome);
+ $("#shared-course-form").addEventListener("submit",submitSharedCourse);
  ["lesson-actual-start","lesson-actual-end"].forEach(id=>$("#"+id).addEventListener("change",syncActualHoursFromTime));
  $("#lesson-actual-hours").addEventListener("input",()=>{state.actualHoursManual=true});
  $("#lesson-student-leave").onclick=()=>markLessonLeave("student");
