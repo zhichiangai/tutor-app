@@ -41,6 +41,7 @@
           <select id="parent-teacher-select" aria-label="選擇查看的老師"><option value="all">全部老師</option></select>
         </div>
         <section id="view-student" class="page-view hidden">
+ <article class="card shared-course-card" id="shared-student-card"><div class="section-row"><h2>共同管理課程</h2></div><div id="shared-student-content"></div></article>
  <div class="section-row page-head"><div><h2>我的學習空間</h2><p class="section-sub">只顯示老師授權給我的課程和回饋，不包含帳務資料</p></div></div>
  <article class="card"><div class="section-row"><h2>我的學生邀請</h2></div><div id="student-invites"></div></article>
  <article class="card"><div class="section-row"><h2>我的課程與學習紀錄</h2></div><div id="student-portal-content"></div></article>
@@ -59,6 +60,7 @@
           </div>
         </section>
         <section id="view-calendar" class="page-view hidden">
+ <article class="card shared-course-card hidden" id="shared-parent-card"><div class="section-row"><h2>與老師共同排課</h2></div><div id="shared-parent-content"></div></article>
           <div class="section-row page-head"><div><h2>課程月曆</h2><p class="section-sub">每個值得期待的日子，都在這裡</p></div><div class="month-controls calendar-toolbar"><button id="manage-schedules" class="secondary-button" type="button">☷ 固定課表</button><div class="calendar-date-controls"><button id="prev-month" aria-label="上個月" type="button">‹</button><strong id="calendar-month"></strong><button id="next-month" aria-label="下個月" type="button">›</button><button class="today-button" id="jump-today" type="button">今天</button></div></div></div>
           <div class="calendar-overview-head">
             <div class="calendar-overview-label"><span class="eyebrow">YOUR LESSONS · 課程總覽</span><p id="month-overview" aria-live="polite">本月課程整理中</p></div>
@@ -252,6 +254,32 @@
     <button class="text-link signout" id="sign-out" type="button">登出</button>
     <div class="smallprint">Google 登入需在 Supabase 與 Google Cloud 完成 OAuth 設定。</div>
   </div></dialog>
+  <dialog class="modal schedule-sheet" id="shared-course-modal" aria-labelledby="shared-course-heading">
+    <form id="shared-course-form" class="modal-inner">
+      <div class="modal-head"><div><p class="eyebrow">SHARED LESSON PLANNER</p><h2 id="shared-course-heading">共同安排課程</h2>
+        <p class="modal-description">老師、家長與學生共用同一筆課表；變更立即生效，不需要另一方核准。</p></div>
+        <button type="button" class="close-modal" data-close="shared-course-modal" aria-label="關閉">×</button></div>
+      <label>學生<select id="shared-course-student" required></select></label>
+      <label id="shared-course-subject-label">科目<input id="shared-course-subject" maxlength="80" required placeholder="例如：數學"></label>
+      <div class="form-row"><label id="shared-course-date-label">課程日期／修改生效日<input id="shared-course-date" type="date" required></label>
+        <label id="shared-course-end-label" class="hidden">固定課表結束日（可留空）<input id="shared-course-end-date" type="date"></label></div>
+      <div class="form-row" id="shared-course-times"><label>開始時間<input id="shared-course-start" type="time" required></label>
+        <label>結束時間<input id="shared-course-end" type="time" required></label></div>
+      <div id="shared-course-repeat" class="hidden">
+        <p class="form-label">每週上課日（可複選）</p>
+        <div class="shared-weekdays" id="shared-course-weekdays">
+          <label><input type="checkbox" value="1">一</label><label><input type="checkbox" value="2">二</label>
+          <label><input type="checkbox" value="3">三</label><label><input type="checkbox" value="4">四</label>
+          <label><input type="checkbox" value="5">五</label><label><input type="checkbox" value="6">六</label>
+          <label><input type="checkbox" value="7">日</label>
+        </div>
+        <label>頻率<select id="shared-course-frequency"><option value="1">每週</option><option value="2">每兩週</option></select></label>
+      </div>
+      <p class="helper-note" id="shared-course-note">鐘點費與收款由老師管理；此處只會更動課程安排，不會修改帳務。</p>
+      <div class="form-actions"><button class="secondary-button" type="button" data-close="shared-course-modal">返回</button>
+        <button class="primary-button" type="submit" id="shared-course-save">儲存共同課程</button></div>
+    </form>
+  </dialog>
   <div id="toast" role="status" aria-live="polite" class="toast" hidden></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js" crossorigin="anonymous"></script>
   <script type="module" src="./app.js"></script>
