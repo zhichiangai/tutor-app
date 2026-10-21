@@ -558,7 +558,7 @@ begin
  update public.recurring_schedules set updated_at=clock_timestamp() where id=v.id;
  if tg_op='DELETE' then return old; end if;
  return new;
-end;$;
+end;$$;
 revoke all on function tutor_private.v34_guard_exception_write() from public,anon,authenticated;
 drop trigger if exists trg_v34_guard_exception_write on public.schedule_exceptions;
 create trigger trg_v34_guard_exception_write
