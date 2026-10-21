@@ -115,5 +115,4 @@ select jsonb_build_object(
    join public.student_links sl on sl.student_id=r.student_id
    where sl.user_id=auth.uid()), '[]'::jsonb)
 );
-$function$
-
+$function$;
