@@ -77,7 +77,21 @@ function lessonBalance(l){return lessonAllocation(l,state.paymentBatches,state.p
 function lessonSum(list){return list.filter(l=>l.type==="lesson").reduce((v,l)=>v+num(l.total_amount),0)}
 function monthLessons(){return visibleLessons().filter(l=>sameMonth(l.lesson_date,state.month))}
 function hourTotal(list){return list.filter(l=>l.type==="lesson").reduce((v,l)=>v+num(l.hours),0)}
-function toast(message){const box=$("#toast");box.textContent=message;box.hidden=false;clearTimeout(toast.timer);toast.timer=setTimeout(()=>box.hidden=true,3500)}
+function toast(message,duration=3500){
+ const box=$("#toast");box.textContent=message;box.hidden=false;
+ clearTimeout(toast.timer);toast.timer=setTimeout(()=>box.hidden=true,duration);
+}
+function readableWriteError(err){
+ const message=typeof err==="string"?err:
+  [err?.message,err?.details,err?.hint].find(v=>typeof v==="string"&&v.trim())||"伺服器未提供錯誤原因，請稍後再試";
+ if(/時間衝突|撞期|重疊/.test(message))return "時間撞期："+message+"。請改選其他時段。";
+ if(/版本已變更|剛被其他人修改|缺少版本/.test(message))return "課程已被其他人更新。請重新整理後再修改，避免覆蓋最新安排。";
+ return message;
+}
+function sharedCourseError(message=""){
+ const alert=$("#shared-course-error");
+ if(alert){alert.textContent=message;alert.hidden=!message}
+}
 function setBusy(yes){
  loading=yes;
  $$("button[type=submit]").forEach(el=>{
@@ -474,12 +488,13 @@ function openSharedCourseForm(action,id=null){
     ? sharedCourseRules().find(r=>r.id===lesson?.schedule_id)?.updated_at
     : lesson?.updated_at) || null
  };
- $("#shared-course-heading").textContent=rule?"修改未來固定課表":lesson?"修改這堂課":isSchedule?"新增固定課表":"新增單堂課";
+ $("#shared-course-heading").textContent=rule?"修改未來固定課表":virtual?"單堂補課／改期":lesson?"修改這堂課":isSchedule?"新增固定課表":"新增單堂課";
+ sharedCourseError();
  $("#shared-course-student").innerHTML=st.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.name)+'</option>').join("");
  $("#shared-course-student").value=sel;$("#shared-course-student").disabled=!!(rule||lesson);
  $("#shared-course-subject").value=rule?.subject||lesson?.subject||linked?.subject||"";
  $("#shared-course-subject").readOnly=virtual;
- $("#shared-course-date-label-text").textContent=isSchedule?"修改從這一天起生效":"上課日期";
+ $("#shared-course-date-label-text").textContent=isSchedule?"修改從這一天起生效":virtual?"補課日期（可選非原定上課週）":"上課日期";
  $("#shared-course-date").value=rule?(rule.starts_on>dateKey(tick())?rule.starts_on:dateKey(tick())):(lesson?.lesson_date||state.selected||dateKey(tick()));
  $("#shared-course-start").value=timeLabel(rule?.start_time||lesson?.start_time||"19:00");
  $("#shared-course-end").value=timeLabel(rule?.end_time||lesson?.end_time||"20:30");
@@ -493,13 +508,14 @@ function openSharedCourseForm(action,id=null){
  Array.from(document.querySelectorAll("#shared-course-weekdays input")).forEach(x=>{x.checked=days.includes(Number(x.value))});
  if(isSchedule)syncRecurringWeekdays("shared-course-date","shared-course-weekdays","shared-weekday-hint");
  $("#shared-course-note").textContent=virtual?
-  "此堂來自固定課表：可改單堂日期；科目與上課時間請修改未來固定規則。若別人剛修改會要求重新整理。":
+  "這是單堂補課：可以改到其他星期或雙週的非上課週，但新日期不可撞期；原固定課表及其他課程不會跟著更改。若要改整組規則，請回固定課表操作。":
   "三方共用同一份課表，系統會阻止撞期及過期修改。科目更動不會自動換算鐘點費：計費仍按老師既有學生預設費率或原課程費率，特殊科目請老師確認。";
  showModal("shared-course-modal");
 }
 async function submitSharedCourse(event){
  event.preventDefault();
  const d=state.sharedCourseDraft;if(!d||state.mode!=="live")return;
+ sharedCourseError();
  if(d.targetId&&!d.expectedUpdatedAt){toast("這堂課缺少最新版本資訊，請重新整理後再修改");return}
  const studentId=$("#shared-course-student").value;
  if(!sharedCourseStudents().some(s=>s.id===studentId)){toast("沒有這位學生的權限");return}
@@ -520,7 +536,7 @@ async function submitSharedCourse(event){
  if(d.targetId)payload.expected_updated_at=d.expectedUpdatedAt;
  const ok=await persist(async()=>assertResult(await client.rpc("shared_course_action",{
   p_action:d.action,p_student_id:studentId,p_target_id:d.targetId,p_payload:payload
- })));
+ })),{onError:sharedCourseError});
  if(ok){closeModal("shared-course-modal");state.sharedCourseDraft=null;toast("共同課表已更新，老師、家長與學生可查看最新安排")}
 }
 async function cancelSharedCourse(kind,id){
@@ -830,7 +846,7 @@ function scheduleDates(day,repeat,until){
  }
  return out;
 }
-async function persist(op){
+async function persist(op,options={}){
  if(loading)return false;
  setBusy(true);
  try{
@@ -838,8 +854,11 @@ async function persist(op){
   await op();
   if(state.mode==="demo")saveDemo();
  }catch(err){
-  console.error(err);
-  toast("儲存未完成："+(err.message||"請稍後再試"));
+  const message=readableWriteError(err);
+  if(/時間衝突|撞期|重疊|版本已變更|已被其他人更新/.test(message))console.warn("排課未儲存："+message);
+  else console.error("儲存未完成",err);
+  if(options.onError)options.onError(message);
+  toast("儲存未完成："+message,options.onError?8000:5000);
   setBusy(false);
   return false;
  }

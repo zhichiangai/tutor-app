@@ -343,3 +343,7 @@
  .shared-course-buttons{display:grid;grid-template-columns:1fr}
  .shared-course-buttons button{width:100%}
 }
+
+/* V3.4.1: retain visible course validation feedback after a rejected RPC. */
+.shared-course-error{margin:12px 0;padding:12px 14px;border-radius:10px;background:#fff3ef;border:1px solid #e7b4a6;color:#8f3124;font-size:13px;line-height:1.65;font-weight:600;overflow-wrap:anywhere}
+.shared-course-error[hidden]{display:none}
