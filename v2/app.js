@@ -1198,6 +1198,32 @@ async function submitReceipt(ev){
 function lessonLocked(lesson){
  return !isVirtualOccurrence(lesson)&&isPaymentLocked(lesson,state.paymentBatches,state.paymentBatchItems,state.requests);
 }
+function renderLessonStars(){
+ for(const key of ["focus","mood"]){
+  const selected=state.lessonRatings[key];
+  $("#lesson-"+key+"-stars").innerHTML=[1,2,3,4,5].map(n=>
+   '<button type="button" class="rating-star'+(selected!=null&&n<=selected?' active':'')+
+   '" data-lesson-star="'+key+'" data-star-value="'+n+
+   '" aria-label="'+(key==="focus"?"專注度":"學生心情")+n+'星" aria-pressed="'+(selected===n)+'">★</button>').join("");
+ }
+}
+function lessonLearningPayload(){
+ return {
+  p_lesson_content:$("#lesson-content").value.trim(),
+  p_focus_rating:state.lessonRatings.focus,
+  p_mood_rating:state.lessonRatings.mood,
+  p_remarks:$("#lesson-feedback").value.trim()
+ };
+}
+async function saveOnlyLessonLearning(){
+ const lesson=resolveLesson(state.activeLesson);
+ if(!lesson||state.role!=="teacher"||lesson.type!=="lesson"||isVirtualOccurrence(lesson))return;
+ const payload=lessonLearningPayload();
+ const ok=await persist(async()=>assertResult(await client.rpc("update_lesson_learning",{
+  p_lesson_id:lesson.id,p_expected_updated_at:lesson.updated_at,...payload
+ })));
+ if(ok){closeModal("lesson-modal");toast("課後紀錄已更新；原有收款、時數及金額不變")}
+}
 function openLessonPopup(id){
  const lesson=resolveLesson(id);
  if(!lesson){toast("找不到這堂課，請重新整理月曆");return}
@@ -1212,6 +1238,13 @@ function openLessonPopup(id){
  $("#lesson-actual-start").value=d.actualStart;
  $("#lesson-actual-end").value=d.actualEnd;
  $("#lesson-actual-hours").value=String(d.actualHours);
+ $("#lesson-content").value=lesson.lesson_content||"";
+ $("#lesson-feedback").value=lesson.remarks||"";
+ state.lessonRatings={focus:lesson.focus_rating??null,mood:lesson.mood_rating??null};
+ renderLessonStars();
+ $("#lesson-learning-editor").classList.toggle("hidden",!teacher||inactive);
+ $("#lesson-learning-lock-note").classList.toggle("hidden",!teacher||!locked);
+ $("#lesson-learning-save").classList.toggle("hidden",!teacher||!locked||lesson.type!=="lesson");
  state.actualHoursManual=false;
  $("#lesson-lock-hint").classList.toggle("hidden",!locked);
  $("#lesson-teacher-actions").classList.toggle("hidden",!teacher);
@@ -1247,8 +1280,11 @@ async function saveLessonOutcome(ev){
  if(lesson.type==="leave"){closeModal("lesson-modal");await restoreLesson(lesson.id);return}
  if(lesson.type==="moved"||lessonLocked(lesson)){toast("請先處理已取消或已進入帳務流程的課程");return}
  let values;try{values=lessonFormValues()}catch(e){toast(e.message);return}
+ const feedback=lessonLearningPayload();
  const patch={type:"lesson",actual_start_time:values.actual_start_time,actual_end_time:values.actual_end_time,
-  actual_hours:values.actual_hours,hours:values.hours,total_amount:Math.round(values.hours*Number(lesson.hourly_rate)*100)/100};
+  actual_hours:values.actual_hours,hours:values.hours,total_amount:Math.round(values.hours*Number(lesson.hourly_rate)*100)/100,
+  lesson_content:feedback.p_lesson_content,focus_rating:feedback.p_focus_rating,
+  mood_rating:feedback.p_mood_rating,remarks:feedback.p_remarks};
  const ok=await updateLesson(lesson.id,patch,lesson.type==="lesson"?"實際時數已更新":"已完成上課，費用會依實際計費時數計算");
  if(ok)closeModal("lesson-modal");
 }
@@ -1650,6 +1686,15 @@ async function signOut(){
 }
 function bindEvents(){
  document.addEventListener("click",async ev=>{
+  const star=ev.target.closest("[data-lesson-star]");
+  if(star){
+   const key=star.dataset.lessonStar,score=Number(star.dataset.starValue);
+   if(["focus","mood"].includes(key)&&score>=1&&score<=5){
+    state.lessonRatings[key]=state.lessonRatings[key]===score?null:score;
+    renderLessonStars();
+   }
+   return;
+  }
   const choice=ev.target.closest("[data-role-choice]");
   if(choice){setRole(choice.dataset.roleChoice);return}
   const trigger=ev.target.closest("#role-indicator");
@@ -1691,6 +1736,7 @@ function bindEvents(){
  });
  document.addEventListener("keydown",ev=>{const el=ev.target.closest("[data-day]");if(el&&!ev.target.closest("[data-action]")&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();openDay(el.dataset.day)}});
  $("#lesson-form").addEventListener("submit",saveLessonOutcome);
+ $("#lesson-learning-save").addEventListener("click",saveOnlyLessonLearning);
  $("#shared-course-form").addEventListener("submit",submitSharedCourse);
  ["lesson-actual-start","lesson-actual-end"].forEach(id=>$("#"+id).addEventListener("change",syncActualHoursFromTime));
  $("#lesson-actual-hours").addEventListener("input",()=>{state.actualHoursManual=true});
