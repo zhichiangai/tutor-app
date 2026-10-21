@@ -1582,7 +1582,15 @@ async function ensureClient(){
  const createClient=window.supabase?.createClient;
  if(!createClient)throw Error("登入元件載入失敗，請重新整理頁面後再試");
  client=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
- client.auth.onAuthStateChange((event,session)=>{activeUser=session?.user||null;if(event==="SIGNED_OUT"){activeUser=null;teacherPreferences={};state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();}});
+ client.auth.onAuthStateChange((event,session)=>{
+  activeUser=session?.user||null;
+  if(event==="SIGNED_OUT"){
+   activeUser=null;teacherPreferences={};state.parentTeacherFilter="all";
+   for(const k of LIVE_FIELDS)state[k]=[];
+   state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
+   render();showModal("account-modal");
+  }
+ });
  return client;
 }
 async function initializeLive(){
@@ -1590,25 +1598,40 @@ async function initializeLive(){
   await ensureClient();const {data,error}=await client.auth.getSession();if(error)throw error;
   activeUser=data.session?.user||null;
   if(activeUser){
-   // Role is a display preference scoped to each account; authorization stays in RLS.
    await ensureMyProfile();
    await refreshLive();
-   const cached=localStorage.getItem(ROLE_STORAGE+"_"+activeUser.id);
-   const remote=state.profiles.find(p=>p.id===activeUser.id)?.last_role;
+   const profile=state.profiles.find(p=>p.id===activeUser.id);
    const guardian=state.guardians.some(g=>g.guardian_id===activeUser.id);
    const invited=state.invites.some(i=>i.email===activeUser.email?.toLowerCase());
    const isStudent=state.studentLinks.some(l=>l.user_id===activeUser.id)||
-    state.studentInvites.some(i=>i.email===activeUser.email?.toLowerCase());
-   state.role=VALID_ROLES.includes(remote)?remote:
-    VALID_ROLES.includes(cached)?cached:
-    (!myWorkspace()&&isStudent?"student":(!myWorkspace()&&(guardian||invited)?"parent":"teacher"));
+     state.studentInvites.some(i=>i.email===activeUser.email?.toLowerCase());
+   const cached=localStorage.getItem(ROLE_STORAGE+"_"+activeUser.id);
+   const remote=profile?.last_role;
+   if(!profile?.roles_configured){
+    const initial=normalizedRoles([
+      ...(myWorkspace()?["teacher"]:[]),
+      ...(guardian||invited?["parent"]:[]),
+      ...(isStudent?["student"]:[])]);
+    state.enabledRoles=initial.length?initial:["teacher"];
+    const {error}=await client.from("profiles")
+      .update({enabled_roles:state.enabledRoles,roles_configured:true})
+      .eq("id",activeUser.id).select("id").single();
+    if(error)throw error;
+   }else state.enabledRoles=normalizedRoles(profile.enabled_roles);
+   if(!state.enabledRoles.length)state.enabledRoles=["teacher"];
+   state.role=[remote,cached,...state.enabledRoles].find(r=>state.enabledRoles.includes(r))||state.enabledRoles[0];
    localStorage.setItem(ROLE_STORAGE+"_"+activeUser.id,state.role);
-   if(!VALID_ROLES.includes(remote))await saveLastRole(state.role);
+   if(remote!==state.role)await saveLastRole(state.role);
    state.view=state.role==="student"?"student":"home";
    await loadTeacherPreferences();
+   closeModal("account-modal");
    toast("已登入並同步課程");
-  }else{for(const k of LIVE_FIELDS)state[k]=[];teacherPreferences={};}
+  }else{
+   for(const k of LIVE_FIELDS)state[k]=[];
+   teacherPreferences={};state.enabledRoles=["teacher"];
+  }
   render();
+  if(!activeUser)showModal("account-modal");
  }catch(err){console.error(err);toast("Supabase 連線失敗："+err.message);showModal("account-modal")}
 }
 async function googleLogin(){
@@ -1620,10 +1643,10 @@ async function googleLogin(){
 }
 async function signOut(){
  if(client){const {error}=await client.auth.signOut();if(error){toast(error.message);return;}}
- activeUser=null;teacherPreferences={};state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();closeModal("account-modal");toast("已登出，目前使用預覽模式");
-}
-function toggleDemo(){
- teacherPreferences={};activeUser=null;state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();closeModal("account-modal");toast("現在可以自由試用，不影響正式資料");
+ activeUser=null;teacherPreferences={};state.parentTeacherFilter="all";
+ for(const k of LIVE_FIELDS)state[k]=[];
+ state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
+ render();showModal("account-modal");toast("已登出 Google 帳號");
 }
 function bindEvents(){
  document.addEventListener("click",async ev=>{
@@ -1748,5 +1771,10 @@ function bindEvents(){
  $$(".modal").forEach(d=>d.addEventListener("click",e=>{if(e.target===d)d.close()}));
 }
 function moveMonth(offset){state.month=new Date(state.month.getFullYear(),state.month.getMonth()+offset,1);render()}
-function main(){if(state.mode==="demo"){loadDemo();loadTeacherPreferences()}else for(const k of LIVE_FIELDS)state[k]=[];bindEvents();render();if(state.mode==="live")initializeLive();else showModal("account-modal")}
+function main(){
+ state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
+ for(const k of LIVE_FIELDS)state[k]=[];
+ bindEvents();render();
+ initializeLive();
+}
 main();
