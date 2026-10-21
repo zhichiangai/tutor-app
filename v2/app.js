@@ -372,6 +372,27 @@ function renderStudentBilling(lessons){
   return '<div class="student-bill-line"><span><strong>'+esc(l.subject||"課程")+'</strong><small>'+esc(l.lesson_date)+' · '+esc(String(l.hours||0))+' 小時</small></span><span><strong>'+money(balance.total)+'</strong><small>已確認 '+money(balance.confirmed)+' ／ 待確認 '+money(balance.pending)+'</small></span></div>';
  }).join("")+'</div></details>').join(""):'<div class="empty">這個月尚無已完成且需要結算的課程。</div>';
 }
+function compactStars(value){
+ const score=Number(value);
+ return value==null||value===""||score<1||score>5?"未評分":
+  "★".repeat(score)+"☆".repeat(5-score);
+}
+function learningPaymentLine(lesson,due=null){
+ const balance=lessonBalance(lesson);
+ const outstanding=due===null?balance.total:due;
+ const student=studentFor(lesson)?.name||lesson.student||"學生";
+ const description=lesson.lesson_content||"老師尚未填寫本堂上課內容";
+ return '<div class="learning-payment-line">'+
+  '<div class="learning-payment-date"><strong>'+esc(String(lesson.lesson_date).slice(5).replace("-","/"))+
+  '</strong><small>'+esc(String(lesson.hours||0))+' 小時</small></div>'+
+  '<div class="learning-payment-detail"><strong>'+esc(student)+' · '+esc(lesson.subject||"課程")+'</strong>'+
+  '<p class="learning-payment-content">'+esc(description)+'</p>'+
+  '<div class="learning-payment-stars"><span>專注 '+esc(compactStars(lesson.focus_rating))+
+  '</span><span>心情 '+esc(compactStars(lesson.mood_rating))+'</span></div>'+
+  (lesson.remarks?'<small class="learning-payment-note">'+esc(lesson.remarks)+'</small>':'')+
+  '</div><div class="learning-payment-total"><strong>'+money(outstanding)+'</strong>'+
+  '<small>'+esc(statusLabel(lesson))+'</small></div></div>';
+}
 function renderBilling(){
  const ls=monthLessons().filter(l=>l.type==="lesson").sort((a,b)=>a.lesson_date.localeCompare(b.lesson_date));
  const billed=ls.reduce((sum,l)=>sum+lessonBalance(l).total,0);
@@ -387,7 +408,9 @@ function renderBilling(){
  renderStudentBilling(ls);
  $("#batch-action").classList.remove("hidden");
  $("#batch-action").textContent=state.role==="teacher"?"查看指定期間收款":"選擇期間回報已付款";
- $("#billing-list").innerHTML=ls.length?ls.map(l=>rowHTML(l,true)).join(""):'<div class="empty">這個月還沒有已完成的課程。排定的未上課時段不會算入費用。</div>';
+ $("#billing-list").innerHTML=ls.length?
+  (state.role==="parent"?ls.map(l=>learningPaymentLine(l)).join(""):ls.map(l=>rowHTML(l,true)).join("")):
+  '<div class="empty">這個月還沒有已完成的課程。排定的未上課時段不會算入費用。</div>';
  renderPaymentHistory();
  const reqs=state.requests.filter(r=>state.role==="teacher"?(state.mode==="demo"||r.teacher_id===activeUser?.id):
  (state.mode==="demo"||r.parent_id===activeUser?.id&&(state.parentTeacherFilter==="all"||r.teacher_id===state.parentTeacherFilter)))
@@ -1127,7 +1150,8 @@ function renderPeriodPreview(resetAmount=false){
   const hours=r.rows.reduce((n,x)=>n+num(x.lesson.hours),0);
   $("#period-overview").innerHTML='<strong>'+money(r.total)+'</strong><div class="period-summary-metrics"><span>'+r.rows.length+' 堂可結算</span><span>'+hours.toFixed(1)+' 小時</span><span>'+esc(r.start)+' ～ '+esc(r.end)+'</span></div>';
   $("#period-lesson-list").innerHTML=r.rows.length?r.rows.map(({lesson,allocation})=>
-    '<div class="period-line"><div><strong>'+esc(lesson.lesson_date)+' · '+esc(lesson.subject||"課程")+'</strong><small>'+esc(timeLabel(lesson.start_time))+'–'+esc(timeLabel(lesson.end_time))+' · 可付款餘額</small></div><span>'+money(allocation.available)+'</span></div>').join(""):'<div class="empty">這段期間沒有可付款的課程；已收款或待老師確認的款項不會重複列入。</div>';
+    learningPaymentLine(lesson,allocation.available)).join(""):
+   '<div class="empty">這段期間沒有可付款的課程；已收款或待老師確認的款項不會重複列入。</div>';
   if(resetAmount||!$("#period-paid-amount").value)$("#period-paid-amount").value=r.total>0?r.total.toFixed(2):"";
   $("#period-submit").disabled=r.total<=0;
  }else{
