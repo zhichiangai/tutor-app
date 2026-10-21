@@ -68,6 +68,16 @@ begin
   update public.lesson_records set hours=3,total_amount=1500 where id=lp;
  exception when others then rejected:=true;end;
  if not rejected then raise exception 'FAILED: pending payment request did not guard billable hours';end if;
+ -- Original teacher approval of an old family payment request must still work.
+ perform public.review_family_request(
+  (select id from public.family_requests where lesson_id=lp and kind='payment'),true);
+ if not exists(select 1 from public.lesson_records where id=lp and status='家長已付款')
+ then raise exception 'FAILED: old family payment approval regressed';end if;
+ rejected:=false;
+ begin
+  update public.lesson_records set status='未付款' where id=lp;
+ exception when others then rejected:=true;end;
+ if not rejected then raise exception 'FAILED: approved family payment could be downgraded';end if;
  rejected:=false;
  begin
   update public.lesson_records set hours=3,total_amount=1500 where id=lb;
@@ -96,7 +106,9 @@ begin
  execute 'reset role';
  if not exists(select 1 from tutor_private.legacy_receipt_reversal_audit a
   where a.lesson_id=l and a.actor_id=t and a.applied
-    and a.previous_status='老師已收到' and length(a.reason)>=10)
+    and a.previous_status='老師已收到' and length(a.reason)>=10
+    and a.previous_hours=2 and a.previous_hourly_rate=500
+    and a.previous_total_amount=1000)
  then raise exception 'FAILED: no applied audit of authorized reversal';end if;
  execute 'set local role authenticated';
  -- The teacher may correct billable hours only *after* the controlled reversal.
@@ -104,6 +116,12 @@ begin
  if not exists(select 1 from public.lesson_records where id=l
    and hours=3 and total_amount=1500 and status='未付款')
  then raise exception 'FAILED: authorized reversal did not reopen correction path';end if;
+ -- A paid lesson may still receive academic notes and star ratings.
+ update public.lesson_records set lesson_content='v352 日誌更新',focus_rating=4,mood_rating=5
+ where id=l2;
+ if not exists(select 1 from public.lesson_records where id=l2
+  and lesson_content='v352 日誌更新' and focus_rating=4 and mood_rating=5)
+ then raise exception 'FAILED: paid feedback incorrectly locked';end if;
 
  perform set_config('request.jwt.claim.sub',g::text,true);
  perform set_config('request.jwt.claims',json_build_object('sub',g::text,'role','authenticated')::text,true);
