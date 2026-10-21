@@ -426,6 +426,33 @@ async function loadSharedCourseHistory(){
  }));
  for(const [id,rows] of lists)state.sharedCourseHistory[id]=rows;
 }
+
+/* A date change selects its new weekday only for a single-day recurring rule.
+ * Multi-day rules (e.g. Mon/Wed/Fri) keep all manually selected weekdays. */
+function weekdayForDate(value){
+ const date=String(value||"");
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return null;
+ const parsed=parseDate(date);
+ return Number.isFinite(parsed.getTime())&&dateKey(parsed)===date?((parsed.getDay()+6)%7)+1:null;
+}
+function syncRecurringWeekdays(dateId,groupId,hintId,dateChanged=false){
+ const day=weekdayForDate($("#"+dateId)?.value);
+ const items=Array.from(document.querySelectorAll("#"+groupId+" input[type=checkbox]"));
+ const before=items.filter(item=>item.checked);
+ if(dateChanged&&day&&before.length<=1){
+  items.forEach(item=>{item.checked=Number(item.value)===day});
+ }
+ const selected=items.filter(item=>item.checked).map(item=>Number(item.value)).sort((a,b)=>a-b);
+ const hint=$("#"+hintId);
+ if(hint){
+  const names=["","一","二","三","四","五","六","日"];
+  hint.textContent=!selected.length?"請至少選擇一個上課星期。":
+   selected.length===1?"固定每週"+names[selected[0]]+"上課；修改日期時，單一星期會跟著更新，仍可手動調整。":
+   "已選擇週"+selected.map(n=>names[n]).join("、")+"；多個上課星期不會因修改開始日期而被覆蓋。";
+ }
+ return selected;
+}
+
 function openSharedCourseForm(action,id=null){
  if(!["parent","student"].includes(state.role)||state.mode!=="live"){toast("請先使用受邀 Google 帳號登入");return}
  const st=sharedCourseStudents();
@@ -448,10 +475,7 @@ function openSharedCourseForm(action,id=null){
  $("#shared-course-student").value=sel;$("#shared-course-student").disabled=!!(rule||lesson);
  $("#shared-course-subject").value=rule?.subject||lesson?.subject||linked?.subject||"";
  $("#shared-course-subject").readOnly=virtual;
- $("#shared-course-date").value=rule? (rule.starts_on>dateKey(tick())?rule.starts_on:dateKey(tick())):(lesson?.lesson_date||state.selected||dateKey(tick()));
- $("#shared-course-date-label").textContent=isSchedule?"從哪一天起生效":"上課日期";
- // Changing label via textContent would remove input: restore its contents safely.
- $("#shared-course-date-label").innerHTML=(isSchedule?"修改從這一天起生效":"上課日期")+'<input id="shared-course-date" type="date" required>';
+ $("#shared-course-date-label-text").textContent=isSchedule?"修改從這一天起生效":"上課日期";
  $("#shared-course-date").value=rule?(rule.starts_on>dateKey(tick())?rule.starts_on:dateKey(tick())):(lesson?.lesson_date||state.selected||dateKey(tick()));
  $("#shared-course-start").value=timeLabel(rule?.start_time||lesson?.start_time||"19:00");
  $("#shared-course-end").value=timeLabel(rule?.end_time||lesson?.end_time||"20:30");
@@ -463,6 +487,7 @@ function openSharedCourseForm(action,id=null){
  $("#shared-course-frequency").value=String(rule?.every_weeks||1);
  const days=rule?.weekdays||[((parseDate($("#shared-course-date").value).getDay()+6)%7)+1];
  Array.from(document.querySelectorAll("#shared-course-weekdays input")).forEach(x=>{x.checked=days.includes(Number(x.value))});
+ if(isSchedule)syncRecurringWeekdays("shared-course-date","shared-course-weekdays","shared-weekday-hint");
  $("#shared-course-note").textContent=virtual?
   "此堂是固定課表產生的課程，目前可直接更改單堂日期；若需更改科目或時間，請修改固定課表。鐘點費仍由老師管理。":
   "雙方共用同一份課表。鐘點費由老師設定，這裡不會修改已完成的課程或收款。";
@@ -778,7 +803,8 @@ function openRecord(lesson=null){
  $("#record-until").value="";
  const weekday=((parseDate($("#record-date").value).getDay()+6)%7)+1;
  const saved=teacherPreferences.lastWeekdays||[weekday];
- $$("#record-weekdays input").forEach(el=>el.checked=saved.includes(Number(el.value)));
+ Array.from(document.querySelectorAll("#record-weekdays input")).forEach(el=>el.checked=saved.includes(Number(el.value)));
+ syncRecurringWeekdays("record-date","record-weekdays","record-weekday-hint");
  updateRecordRepeatUI();
  showModal("record-modal");
 }
@@ -1236,8 +1262,9 @@ function openSchedule(rule=null){
  const initWeekday=rule?.weekdays?.map(Number)||
   (Array.isArray(teacherPreferences.lastWeekdays)&&teacherPreferences.lastWeekdays.length
    ?teacherPreferences.lastWeekdays:[((parseDate(state.selected).getDay()+6)%7)+1]);
- $$("#schedule-weekdays input").forEach(i=>i.checked=initWeekday.includes(Number(i.value)));
- $$('input[name="schedule-scope"]').forEach(r=>r.checked=r.value==="future");
+ Array.from(document.querySelectorAll("#schedule-weekdays input")).forEach(i=>i.checked=initWeekday.includes(Number(i.value)));
+ syncRecurringWeekdays("schedule-start","schedule-weekdays","schedule-weekday-hint");
+ $('input[name="schedule-scope"]').forEach(r=>r.checked=r.value==="future");
  renderScheduleRules();showModal("schedule-modal");
 }
 function getScheduleForm(){
@@ -1611,11 +1638,20 @@ function bindEvents(){
  $("#record-form").addEventListener("submit",saveRecord);$("#student-form").addEventListener("submit",saveStudent);
  $("#record-repeat").addEventListener("change",updateRecordRepeatUI);
  $("#record-date").addEventListener("change",()=>{
-  if(state.editing)return;
-  const day=((parseDate($("#record-date").value).getDay()+6)%7)+1;
-  if(!$$("#record-weekdays input:checked").length)
-   $$("#record-weekdays input").forEach(el=>el.checked=Number(el.value)===day);
+  if(!state.editing&&["weekly","biweekly"].includes($("#record-repeat").value))
+   syncRecurringWeekdays("record-date","record-weekdays","record-weekday-hint",true);
  });
+ $("#schedule-start").addEventListener("change",()=>syncRecurringWeekdays(
+  "schedule-start","schedule-weekdays","schedule-weekday-hint",true));
+ $("#shared-course-date").addEventListener("change",()=>{
+  if(["create_schedule","update_schedule"].includes(state.sharedCourseDraft?.action))
+   syncRecurringWeekdays("shared-course-date","shared-course-weekdays","shared-weekday-hint",true);
+ });
+ for(const [group,hint,date] of [
+  ["schedule-weekdays","schedule-weekday-hint","schedule-start"],
+  ["record-weekdays","record-weekday-hint","record-date"],
+  ["shared-course-weekdays","shared-weekday-hint","shared-course-date"]
+ ])$("#"+group).addEventListener("change",()=>syncRecurringWeekdays(date,group,hint));
  $("#request-form").addEventListener("submit",submitRequest);
  document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e);if(e.target.id==="student-invite-form")saveStudentInvite(e)});
  $("#invite-edit-form").addEventListener("submit",submitInviteEdit);

@@ -1,203 +1,73 @@
-# 家教計時器（tutor-app）
+# 好好上課（tutor-app）｜家教課程與收付款管理 V3.3
 
-> **V3 多人獨立家教正式版**：保留 V2.7 多工作空間權限與原有課費功能，改善桌面月曆、每位學生上次科目／費率／時間、自選每週一三五固定排課、新帳號角色初始化。沒有訂閱收費或多人團隊共同管理。詳見 [V3 變更與驗收](./docs/v3-multi-tenant-ux.md)。
+**正式網站：** https://tutor.rapid4grad.com/  
+**程式碼：** https://github.com/zhichiangai/tutor-app  
+**目前版本：** V3.3（2026-10-21），部署基準為 GitHub `main`。 
 
-> **V2.7（2026-10-20）獨立家教多人工作空間**：Google 登入後每位老師可以建立自己的家教空間，學生、固定課表、請假與付款資料依空間隔離；家長可用同一帳號加入多位老師並篩選課程。未開發平台收費或多人共同管理；V1 不變。詳見 [V2.7 工作空間規劃、資料庫遷移與測試](./docs/v27-personal-workspaces.md)。
+> 本 README 說明**目前正式運行的 Vercel + Supabase 版**。舊 GAS、Google Sheets 和 GitHub Pages 專案仍保存在程式庫內，但**不是本網域 V3.3 使用的後端**。舊版記錄見 [歷史 README](docs/legacy-readme-20261019.md)。
 
-> **安全維護更新（2026-10-20）**：保留目前 V2.5 操作與 Google 登入；修復 Supabase RLS 授權與危險資料表權限、保護付款歷史、補齊版本 SQL，並處理大量資料載入。詳見 [安全維護與檢驗紀錄](./docs/v26-security-and-maintenance.md)。
-
-> **V2.5（2026-10-20）**：直接點課程月曆上的課，開啟不顯示金額的課程方框，設定實際開始／結束時間、手動小數時數、事後請假或停課；家長可提出時間更正，由老師核准。預設沿用預訂時段，帳務按實際計費時數計算，仍由家長自選付款區間。詳見 [V2 使用說明](./v2/README.md)。
-
-> **V2.3（2026-10-20）**：新增家長指定課程起訖日期付款、跨月／部分付款、老師確認同一期間實際收款及付款批次稽核紀錄。Supabase 已建立安全的付款批次與堂課金額分配；V1/GAS/Google Sheets 未更動。詳見 [V2.3 操作與驗收說明](./v2/README.md)。
-
-> **V2.1 課程月曆更新（2026-10-19）**：新增日期點選管理、固定每週／雙週課表、請假／停課／改期／補課與歷史紀錄保護。詳見 [V2 更新說明](./v2/README.md)。目前正式 GAS／Google Sheets 仍未切換，Google 登入需完成 Google OAuth 設定與真實帳號測試。
-
-> **V2 更新（2026-10-19）**：已在 [`v2/`](./v2/) 建立主 Todoist（C）＋副 Notion Calendar（A）的響應式家教網站新版，支援互動預覽、課程月曆、老師／家長角色檢視，以及 Supabase Auth／資料庫整合程式。**目前尚待 Google Cloud OAuth 授權與真實帳號驗收**，沒有將原 GAS／Sheets 正式資料搬到新系統。參考 [V2 部署與驗收說明](./v2/README.md)。
-
-給家教老師與家長共同使用的**課程月曆、請假與收付款對帳工具**。
-
-> **系統狀態（最後確認：2026-10-19）**
->
-> - **目前網站**：GitHub Pages 前端 + Google Apps Script（GAS）API + Google Sheets。
-> - **下一代後端（準備中）**：已建立獨立的 Supabase `tutor-app` 專案與基礎資料表，**尚未接入前端、尚未搬移正式資料**。
-> - **重要**：不要把「Supabase 已建立」誤認為「網站已切換」。原有 GAS / Sheets 流程維持不變。
-> - **部署方針**：使用 GitHub Pages；本專案**不使用 Vercel**。
-
-## 連結
-
-- [家教網站（GitHub Pages）](https://zhichiangai.github.io/tutor-app/)
-- [GitHub 程式庫](https://github.com/zhichiangai/tutor-app)
-- [Supabase 專案 Dashboard（登入後）](https://supabase.com/dashboard/project/vctisuglfoxyuwlvyjee)
-
-以上網站網址為儲存庫既有部署位置；是否正常連線及最新部署狀態仍需以實際測試確認。
-
-## 1. 目前正在使用的架構（Legacy / Current）
+## 正式系統架構
 
 ```text
-老師 / 家長（瀏覽器）
-          |
-          v
-GitHub Pages（靜態前端）
-  frontend/index.html
-  frontend/app.js
-  frontend/style.css
-          |
-          | HTTP GET / POST
-          v
-Google Apps Script Web App
-  backend/apps-script/Code.js
-          |
-          v
-Google Sheets（課程、請假、付款紀錄）
-
-瀏覽器 localStorage：
-- 儲存介面偏好、GAS URL、本機紀錄/雲端備份
-- 不是可信的身分驗證或權限邊界
+老師／家長／學生（電腦或手機瀏覽器）
+     ↓
+https://tutor.rapid4grad.com
+     ↓
+Vercel：從 main 發布，依 vercel.json 路由至 v2/ 靜態前端
+     ├── Supabase Auth：Google OAuth 登入
+     └── Supabase PostgreSQL：學生、課程、固定課表、邀請、帳務與稽核紀錄
+                    ├── RLS：老師工作空間、家長連結等權限
+                    └── 受控 RPC：三方共同排課與學生專用資料
 ```
 
-- 前端採原生 HTML、CSS、JavaScript，未使用大型前端框架。
-- GAS 的 `doGet()` 提供讀取；`doPost()` 處理新增、修改、刪除與批次付款狀態更新。
-- GAS 使用 `SpreadsheetApp.getActiveSpreadsheet()` 取得所連結的試算表。
-- Google Drive 曾找到與 GAS 20 欄資料結構相同的「Rapid4Grad 家教帳本」，但**尚未驗證是否就是正式 GAS 使用的那一份**。
-- 現有「老師／家長模式」主要為前端 UI 模式，**不是已完成的伺服器端權限控管**。
+- **前端**：`v2/index.html`、`v2/app.js`、`v2/style.css`，原生 HTML／JavaScript，依 `vercel.json` 設定正式網址的檔案路由。
+- **資料庫專案**：Supabase `tutor-app`（Project Ref：`vctisuglfoxyuwlvyjee`，東京區域）；歷次 SQL 版本存放於 `supabase/migrations/`。
+- **正式部署**：Vercel `tutor-app-v2`（請以 Vercel Deployments 查詢目前生效版本）；GitHub PR 合併不表示 SQL migration 自動套用。
+- **舊版**：`frontend/`、`backend/apps-script/` 供歷史與舊資料參考。不要以這兩個路徑推斷 V3.3 正式站的行為。
 
-## 2. 規劃中的新架構（Supabase / Not yet production）
+## 使用者角色與功能
 
-```text
-老師 / 家長（瀏覽器）
-          |
-          v
-GitHub Pages（沿用靜態前端）
-          |
-          +--> Supabase Auth（規劃老師 / 家長登入）
-          |
-          +--> Supabase PostgreSQL
-                   public.lesson_records
-                   RLS（已啟用）
-```
+| 功能 | 老師 | 已連結家長 | 已連結學生 |
+| --- | --- | --- | --- |
+| 查看屬於自己的課程 | ✅ | ✅ | ✅ |
+| 新增單堂、每週／雙週固定課表 | ✅ | ✅ | ✅ |
+| 改期、調整與取消課程 | ✅ | ✅ | ✅ |
+| 課後回饋／評分 | 編輯 | 查看 | 查看 |
+| 設定鐘點費與確認收款 | ✅ | — | — |
+| 付款申報與對帳 | 查看／確認 | 申報／查看 | 不顯示 |
+| 修改其他沒有連結的學生資料 | 禁止 | 禁止 | 禁止 |
 
-**Supabase 已確認狀態（2026-10-19）：**
+三方管理的是**同一份課表**，但家長與學生必須先被老師邀請並建立有效連結，不能單純切換介面角色取得權限。共同排課經 `shared_course_action` RPC 驗證使用者與學生關聯；老師原有的出席和付款流程保持獨立。
 
-| 項目 | 現況 |
-| --- | --- |
-| 專案名稱 | `tutor-app` |
-| Project Ref | `vctisuglfoxyuwlvyjee` |
-| Organization | `rapid4grad`（與 RAPID4GRAD 各自獨立專案 / 資料庫） |
-| 區域 | `ap-northeast-1`（東京） |
-| 健康狀態 | `ACTIVE_HEALTHY`（查詢時） |
-| 已建立資料表 | `public.lesson_records` |
-| 現有資料列 | **0 筆**（查詢時） |
-| RLS | **已啟用**；已建立資料擁有者 CRUD 政策 |
-| 前端 Supabase SDK / Auth | **尚未整合** |
-| 老師與家長共享權限 | **尚未設計完成** |
-| 舊資料遷移 | **尚未開始** |
-| 正式系統切換 | **尚未進行** |
+**實務限制與已知狀態：**
 
-目前的 `lesson_records` 以 `owner_id`（參照 `auth.users`）設定資料擁有者，並有 SELECT / INSERT / UPDATE / DELETE 的 owner-only RLS 政策。這是安全的初始隔離模型，**尚不支援家長與老師共同管理同一堂課**；不得直接將其視為已完成的多角色授權。
+- 三個不同真實 Google 帳號的跨裝置端對端（E2E）測試，尚需正式完成；自動單元回歸測試不等於真人驗收。
+- 目前改動後主要透過重新載入取得別人的最新操作，尚未宣稱具備即時推播或 Email 通知。
+- 已完成、付款中或已結算課程不得透過家庭共同排課功能直接刪改。
+- 固定課表可選多星期；改動日期時單一星期與新日期連動，多星期的人工選擇應保留。細節見 [V3.3 排課設計及驗收清單](docs/v33-shared-course-management.md)。
+- 目前**沒有**導入訂閱費、線上刷卡收款、跨老師的團隊共同管理或自動搬移舊 GAS/Sheets 歷史資料。
 
-### 舊 GAS / Sheets 欄位與 Supabase 對照
+## 開發與測試
 
-原 GAS 的主要欄位包括：
+1. 建立 GitHub 分支並修改 `v2/` 程式或 `supabase/migrations/`，避免直接在正式 `main` 試驗。
+2. 本機執行 `node --test tests/*.mjs`。GitHub Actions 工作流程位於 `.github/workflows/v3-regression.yml`，每次提交 PR 或合併 main 會自動測試。
+3. 如果新增 SQL migration，**必須另外透過 Supabase 審查與套用**，避免「前端已發布但 RPC 不存在」。
+4. 通過自動測試後合併 PR，確認 Vercel 對應 commit 部署成功。
+5. 使用獨立的老師、家長、學生測試帳號及測試學生，完成新增、改期、取消、跨裝置同步、取消連結與帳務隔離驗收。不要用正式學生或已付款課程測試。
 
-`id`, `type`, `leaveSource`, `paymentGroupId`, `date`, `student`, `subject`, `startTime`, `endTime`, `hours`, `hourlyRate`, `totalAmount`, `status`, `paymentDate`, `receivedDate`, `parentNote`, `remarks`, `focusRating`, `attitudeRating`, `updatedAt`。
+## 安全規範
 
-> 原格式實際是 **20 欄**：上述欄位以 GAS `HEADERS` 為準。新資料表採 snake_case（例如 `date` → `lesson_date`、`hourlyRate` → `hourly_rate`），另有 `owner_id`、`legacy_id`、建立與更新時間。匯入時需要明確轉換，不能直接把舊資料原樣 INSERT。
+- 瀏覽器只放公開的 Supabase publishable key，**絕不能**在前端或 GitHub 提交 `service_role` 或私密金鑰。
+- 外部資料表使用 RLS；存取權限必須按實際學生關聯驗證，而不是依介面上顯示的老師／家長／學生模式判斷。
+- 有意開放給 `authenticated` 的 `SECURITY DEFINER` RPC 仍會被 Supabase Security Advisor 標示警告；不應為了消除警告而直接停用必要功能。逐一說明見 [V3.3 安全檢查](docs/v33-security-audit.md)。
+- 停用不再使用的舊學生快照 RPC 公開執行權限。密碼洩漏防護屬 Supabase Auth 設定，應由管理員核對 Email／Password 是否啟用及方案限制。
+- 任何更動正式資料、刪除、匯入或重新結算前都應先備份、驗證且取得適當授權。
 
-目前僅建立單一課程紀錄表，學生、家長關聯、授權與付款分表等**尚未定案**；後續應在需求和 RLS 規則明確後再擴充。
+## 其他技術文件
 
-## 3. 主要功能（既有程式）
-
-- **月曆總覽**：每日課程、請假、付款狀態。
-- **老師模式**：記錄上課、預排課程、請假、確認收款。
-- **家長模式**：查看課程、請假、確認付款。
-- **重複排課**：單次、每週、雙週、每月、指定結束日。
-- **對帳**：上課時數、鐘點費、金額、付款狀態與備註。
-- **同步與備援**：GAS / Sheets 雲端資料，加上瀏覽器本機記錄或備份。
-
-上述代表 GitHub 原始碼中已有相關功能；**不代表所有情境都已完成實機驗收**。
-
-## 4. 儲存庫結構
-
-```text
-tutor-app/
-├── frontend/
-│   ├── index.html        # 網頁 UI
-│   ├── app.js            # 月曆、課程、付款、GAS 呼叫
-│   └── style.css         # 版面與視覺樣式
-├── backend/
-│   └── apps-script/
-│       ├── Code.js       # GAS Web App API + Sheets 讀寫
-│       └── appsscript.json
-├── index.html            # 根目錄跳轉至 frontend/index.html
-├── .gitignore
-└── README.md
-```
-
-## 5. 開發與部署
-
-### 前端（目前）
-
-1. 修改 `frontend/`，先在分支測試。
-2. 建立 PR、檢查無誤後合併到 `main`。
-3. 依現有 GitHub Pages 設定，從 `main` 的根目錄提供靜態網站。
-4. 實際開啟頁面確認：月曆、表單、請假與付款流程是否正常。
-
-### GAS 後端（目前）
-
-1. 後端原始碼置於 `backend/apps-script/`。
-2. 正式 GAS 部署**不會因 GitHub Pages 更新而自動改版**。
-3. 需要有權限的 Google 帳號透過 `clasp` 或 Apps Script 管理介面推送程式、建立版本、更新部署。
-4. **GitHub Actions 自動部署 GAS 尚未建立與驗證**，請勿假設已自動同步。
-
-### Supabase（尚未切換）
-
-1. 先確認老師／家長帳號、學生關聯及資料讀寫權限規則。
-2. 完成資料模型、RLS 與 Auth 流程，於測試環境驗證。
-3. 修改前端 API 串接，先使用測試資料檢查完整 CRUD 與付款流程。
-4. 備份 Google Sheets 並進行欄位轉換、數量比對與還原演練。
-5. 完成驗收後才考慮正式切換；切換前**GAS / Sheets 持續是既有系統**。
-
-## 6. 安全與資料保護
-
-- **不可**將學生個資、家長聯絡資料、付款細節、Google OAuth 憑證、`service_role` / secret key 提交至公開儲存庫。
-- 前端只允許使用 Supabase publishable key；**不能**在瀏覽器放入 secret / service role key。
-- Supabase 所有對外資料表必須啟用 RLS，且以實際使用者與資源關聯檢查授權；不能只判斷「已登入」。
-- 現有 GAS `appsscript.json` 設定為匿名可存取，`Code.js` 亦未提供完整的伺服器端身分驗證。**在完成保護前，應視現有 GAS URL 及資料 API 為高風險存取路徑。**
-- 任何資料遷移、覆蓋正式部署或刪除舊資料前，必須先備份並取得明確確認。
-
-以下檔案不應公開提交（現有 `.gitignore` 已排除）：
-
-- `note/`
-- `策略MD合集/`
-- `.clasp.json`
-- `.DS_Store`
-
-## 7. UI / UX 設計方向（待選定）
-
-希望做成**乾淨、漂亮、具有質感、手機友善**的家教課程工具。以下僅供風格參考，**尚未選定也尚未實作**：
-
-- [Notion Calendar](https://www.notion.com/zh-tw/product/calendar)：極簡、以月曆為中心。
-- [Linear](https://linear.app/)：精準間距、專業 Dashboard。
-- [Todoist](https://www.todoist.com/zh-TW)：溫暖簡潔、易上手的任務操作。
-
-設計原則：課程一眼可見、老師與家長操作清楚、手機優先、付款狀態可辨識、避免過度裝飾。視覺方案需在確認參考風格後再正式定稿。
-
-## 8. 協作原則（ChatGPT × Codex）
-
-- **GitHub** 是前後端原始碼的共同版本來源，**不**代表它自動擁有 Google 端正式部署版本。
-- **ChatGPT**：閱讀程式與資料庫結構、規劃需求、審查 GitHub PR、協助 Supabase SQL 與權限檢查。
-- **Codex**：多檔案修改、本機測試、Git 分支、PR、部署腳本。
-- 涉及前端 / GAS / Supabase 同時修改時，優先分階段開發，避免一次改動正式來源與目的端。
-- 新功能應先列出：需求、資料欄位變更、權限、測試方式、回滾方法；通過驗收再部署。
-
-## 9. 待辦優先順序
-
-1. 決定 UI 視覺方向並完成手機 / 桌面頁面規劃。
-2. 設計老師、家長與學生的關聯及 RLS 權限，不讓家長修改老師收款確認。
-3. 完成 Supabase Auth 和前端串接的獨立測試環境。
-4. 建立 GAS → Supabase 資料轉換與備份、比對機制（尚不匯入正式資料）。
-5. 功能與安全測試通過後，再決定正式上線與舊系統退場時間。
-
----
-
-**更新紀錄：2026-10-19** — 記錄既有 GAS / Sheets 架構，以及新建立但尚未上線的 Supabase 架構。本次 README 更新僅為文件變更，不代表功能已完成遷移。
+- [V3.3 三方共同課程管理](docs/v33-shared-course-management.md)
+- [V3 人性化課程與收付款流程](docs/v3-human-friendly-ux.md)
+- [V3 獨立家教工作空間](docs/v3-multi-tenant-ux.md)
+- [V2.7 工作空間與 RLS](docs/v27-personal-workspaces.md)
+- [V2.6 安全維護](docs/v26-security-and-maintenance.md)
+- [舊版 GAS／Sheets 專案備份](docs/legacy-readme-20261019.md)
