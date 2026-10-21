@@ -389,7 +389,8 @@ function learningPaymentLine(lesson,due=null){
   '<p class="learning-payment-content">'+esc(description)+'</p>'+
   '<div class="learning-payment-stars"><span>專注 '+esc(compactStars(lesson.focus_rating))+
   '</span><span>心情 '+esc(compactStars(lesson.mood_rating))+'</span></div>'+
-  (lesson.remarks?'<small class="learning-payment-note">'+esc(lesson.remarks)+'</small>':'')+
+  (lesson.lesson_content||lesson.remarks?'<details class="learning-payment-expand"><summary>查看完整課後紀錄</summary>'+
+  '<div>上課內容：'+esc(description)+(lesson.remarks?'\n老師備註：'+esc(lesson.remarks):'')+'</div></details>':'')+
   '</div><div class="learning-payment-total"><strong>'+money(outstanding)+'</strong>'+
   '<small>'+esc(statusLabel(lesson))+'</small></div></div>';
 }
