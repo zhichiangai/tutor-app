@@ -51,3 +51,30 @@ revoke all on function public.update_lesson_learning(uuid,timestamptz,text,small
  from public,anon;
 grant execute on function public.update_lesson_learning(uuid,timestamptz,text,smallint,smallint,text)
  to authenticated;
+
+-- Private audit history. No exposed table or new public read permissions.
+create table if not exists tutor_private.lesson_feedback_audit (
+ id bigserial primary key,lesson_id uuid not null,actor_id uuid,
+ edited_at timestamptz not null default clock_timestamp(),
+ previous jsonb not null,updated jsonb not null
+);
+revoke all on table tutor_private.lesson_feedback_audit from public,anon,authenticated;
+revoke all on sequence tutor_private.lesson_feedback_audit_id_seq from public,anon,authenticated;
+create or replace function tutor_private.v35_track_lesson_feedback()
+ returns trigger language plpgsql security definer set search_path='' as $$
+begin
+ if (new.lesson_content,new.focus_rating,new.mood_rating,new.remarks)
+  is distinct from (old.lesson_content,old.focus_rating,old.mood_rating,old.remarks) then
+  insert into tutor_private.lesson_feedback_audit(lesson_id,actor_id,previous,updated)
+  values(old.id,auth.uid(),
+   jsonb_build_object('lesson_content',old.lesson_content,'focus_rating',old.focus_rating,
+   'mood_rating',old.mood_rating,'remarks',old.remarks),
+   jsonb_build_object('lesson_content',new.lesson_content,'focus_rating',new.focus_rating,
+   'mood_rating',new.mood_rating,'remarks',new.remarks));
+ end if;
+ return new;
+end;$$;
+revoke all on function tutor_private.v35_track_lesson_feedback() from public,anon,authenticated;
+drop trigger if exists trg_v35_track_lesson_feedback on public.lesson_records;
+create trigger trg_v35_track_lesson_feedback after update on public.lesson_records
+ for each row execute function tutor_private.v35_track_lesson_feedback();
