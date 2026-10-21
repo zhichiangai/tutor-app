@@ -1755,19 +1755,16 @@ function bindEvents(){
  $("#request-form").addEventListener("submit",submitRequest);
  document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e);if(e.target.id==="student-invite-form")saveStudentInvite(e)});
  $("#invite-edit-form").addEventListener("submit",submitInviteEdit);
- $("#workspace-start").onclick=()=>showModal("account-modal");
+ $("#workspace-start").onclick=()=>setView("settings");
  $("#workspace-create").onclick=()=>saveMyWorkspace(false);
  $("#workspace-rename").onclick=()=>saveMyWorkspace(true);
  $("#parent-teacher-select").onchange=()=>{state.parentTeacherFilter=$("#parent-teacher-select").value;render()};
- $("#profile-button").onclick=()=>showModal("account-modal");
- $("#account-action").onclick=()=>showModal("account-modal");
- $("#go-live").onclick=()=>showModal("account-modal");
- $("#google-login").onclick=googleLogin;$("#demo-login").onclick=toggleDemo;$("#sign-out").onclick=signOut;
- $("#demo-reset").onclick=()=>{if(state.mode!=="demo")return;if(!confirm("將清除這台瀏覽器的 V2 測試課程與測試付款紀錄，重新載入範例資料。確定？"))return;
-  localStorage.removeItem(STORAGE);loadDemo();render();closeModal("account-modal");toast("預覽已重置，可以測試跨月與部分付款");
- };
- $("#role-teacher").onclick=()=>setRole("teacher");$("#role-parent").onclick=()=>setRole("parent");$("#role-student").onclick=()=>setRole("student");
- $("#profile-display-form").addEventListener("submit",saveDisplayName);
+ $("#profile-button").onclick=()=>activeUser?setView("settings"):showModal("account-modal");
+ $("#account-action").onclick=()=>activeUser?setView("settings"):showModal("account-modal");
+ $("#google-login").onclick=googleLogin;
+ $("#sign-out").onclick=signOut;
+ $("#mode-settings-form").addEventListener("submit",saveEnabledRoles);
+  $("#profile-display-form").addEventListener("submit",saveDisplayName);
  $$(".modal").forEach(d=>d.addEventListener("click",e=>{if(e.target===d)d.close()}));
 }
 function moveMonth(offset){state.month=new Date(state.month.getFullYear(),state.month.getMonth()+offset,1);render()}
