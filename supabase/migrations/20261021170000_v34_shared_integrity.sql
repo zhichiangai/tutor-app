@@ -469,3 +469,94 @@ from (select e.action,e.summary,e.actor_id,e.actor_role,e.cancellation_source,
 $$;
 revoke all on function public.shared_course_history(uuid) from public,anon;
 grant execute on function public.shared_course_history(uuid) to authenticated;
+
+
+-- Make teacher's legacy direct table writes obey the same collision rule.
+-- The guard only runs if a live lesson's date/time/student/owner/type changes.
+create or replace function tutor_private.v34_guard_lesson_write()
+returns trigger language plpgsql security definer set search_path='' as $$
+begin
+ if new.student_id is null or new.type in ('leave','moved')
+    or new.start_time is null or new.end_time is null then
+   return new;
+ end if;
+ if tg_op='UPDATE' then
+   if (new.student_id,new.owner_id,new.lesson_date,new.start_time,new.end_time,new.type)
+      is not distinct from
+      (old.student_id,old.owner_id,old.lesson_date,old.start_time,old.end_time,old.type)
+      then return new;
+   end if;
+ end if;
+ perform pg_advisory_xact_lock(hashtextextended(new.owner_id::text,42034));
+ if tutor_private.v34_has_conflict(new.owner_id,new.student_id,new.lesson_date,
+      new.start_time,new.end_time,
+      case when tg_op='UPDATE' then old.id else null end,
+      new.schedule_id,new.scheduled_date) then
+   raise exception '課程時間衝突：這位老師或學生在同一時間已有其他課程';
+ end if;
+ return new;
+end;$$;
+revoke all on function tutor_private.v34_guard_lesson_write() from public,anon,authenticated;
+drop trigger if exists trg_v34_guard_lesson_write on public.lesson_records;
+create trigger trg_v34_guard_lesson_write
+ before insert or update on public.lesson_records
+ for each row execute function tutor_private.v34_guard_lesson_write();
+
+create or replace function tutor_private.v34_guard_rule_write()
+returns trigger language plpgsql security definer set search_path='' as $$
+begin
+ if tg_op='UPDATE' then
+   if (new.student_id,new.teacher_id,new.starts_on,new.ends_on,
+     new.weekdays,new.every_weeks,new.start_time,new.end_time)
+      is not distinct from
+      (old.student_id,old.teacher_id,old.starts_on,old.ends_on,
+       old.weekdays,old.every_weeks,old.start_time,old.end_time) then
+       return new;
+   end if;
+ end if;
+ perform pg_advisory_xact_lock(hashtextextended(new.teacher_id::text,42034));
+ perform tutor_private.v34_assert_schedule_available(
+   new.teacher_id,new.student_id,new.starts_on,new.ends_on,
+   new.weekdays,new.every_weeks,new.start_time,new.end_time,
+   case when tg_op='UPDATE' then old.id else null end);
+ return new;
+end;$$;
+revoke all on function tutor_private.v34_guard_rule_write() from public,anon,authenticated;
+drop trigger if exists trg_v34_guard_rule_write on public.recurring_schedules;
+create trigger trg_v34_guard_rule_write
+ before insert or update on public.recurring_schedules
+ for each row execute function tutor_private.v34_guard_rule_write();
+
+-- A direct teacher edit to a single recurring occurrence advances the rule's
+-- revision; that invalidates stale guardian/student dialogs for this series.
+create or replace function tutor_private.v34_guard_exception_write()
+returns trigger language plpgsql security definer set search_path='' as $$
+declare
+ v public.recurring_schedules%rowtype;
+ v_teacher uuid;
+ v_schedule uuid;
+begin
+ v_schedule:=case when tg_op='DELETE' then old.schedule_id else new.schedule_id end;
+ v_teacher:=case when tg_op='DELETE' then old.teacher_id else new.teacher_id end;
+ perform pg_advisory_xact_lock(hashtextextended(v_teacher::text,42034));
+ select * into v from public.recurring_schedules where id=v_schedule for update;
+ if not found then return case when tg_op='DELETE' then old else new end; end if;
+ if tg_op<>'DELETE' then
+   if not tutor_private.v34_occurs(v.starts_on,v.ends_on,v.cancelled_from,
+     v.weekdays,v.every_weeks,new.original_date) then
+      raise exception '無效的固定課表日期：此日不是有效的雙週／每週課程';
+   end if;
+   if new.action='reschedule' and
+     tutor_private.v34_has_conflict(v.teacher_id,v.student_id,new.moved_to,
+       v.start_time,v.end_time,null,v.id,new.original_date) then
+      raise exception '補課時間衝突：新日期已有其他學生或老師的課程';
+   end if;
+ end if;
+ update public.recurring_schedules set updated_at=clock_timestamp() where id=v.id;
+ return case when tg_op='DELETE' then old else new end;
+end;$$;
+revoke all on function tutor_private.v34_guard_exception_write() from public,anon,authenticated;
+drop trigger if exists trg_v34_guard_exception_write on public.schedule_exceptions;
+create trigger trg_v34_guard_exception_write
+ before insert or update or delete on public.schedule_exceptions
+ for each row execute function tutor_private.v34_guard_exception_write();
