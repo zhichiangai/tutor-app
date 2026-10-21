@@ -46,7 +46,7 @@ test("paid-safe feedback RPC writes only teaching fields",()=>{
  assert.ok(app.includes('client.rpc("update_lesson_learning"'));
 });
 test("student-safe portal carries content and mood but not billing",()=>{
- const i=sql.indexOf("create or replace function public.student_portal_data()");
+ const i=sql.toLowerCase().indexOf("create or replace function public.student_portal_data()");
  assert.ok(i>=0);
  const p=sql.slice(i);
  assert.ok(p.includes("'lesson_content',l.lesson_content"));
