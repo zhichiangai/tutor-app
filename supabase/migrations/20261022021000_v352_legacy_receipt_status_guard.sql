@@ -12,6 +12,10 @@ create table if not exists tutor_private.legacy_receipt_reversal_audit (
   previous_status text not null,
   previous_payment_date date,
   previous_received_date date,
+  previous_hours numeric,
+  previous_actual_hours numeric,
+  previous_hourly_rate numeric,
+  previous_total_amount numeric,
   reason text not null,
   authorized_txid bigint not null,
   applied boolean not null default false,
@@ -148,9 +152,13 @@ begin
  end if;
  insert into tutor_private.legacy_receipt_reversal_audit(
   lesson_id,teacher_id,actor_id,previous_status,
-  previous_payment_date,previous_received_date,reason,authorized_txid)
+  previous_payment_date,previous_received_date,
+  previous_hours,previous_actual_hours,previous_hourly_rate,previous_total_amount,
+  reason,authorized_txid)
  values(p_lesson_id,v_lesson.owner_id,v_actor,v_lesson.status,
-  v_lesson.payment_date,v_lesson.received_date,v_reason,pg_catalog.txid_current());
+  v_lesson.payment_date,v_lesson.received_date,
+  v_lesson.hours,v_lesson.actual_hours,v_lesson.hourly_rate,v_lesson.total_amount,
+  v_reason,pg_catalog.txid_current());
  update public.lesson_records
    set status='未付款',payment_date=null,received_date=null,
        updated_at=pg_catalog.clock_timestamp()
