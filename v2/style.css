@@ -425,3 +425,45 @@
  .lesson-rating-row{grid-template-columns:minmax(0,1fr)}
  .lesson-learning-editor{min-width:0}
 }
+
+/* V3.5.3: agenda entries are buttons; their intrinsic min-width must not
+   expand the document beyond a 320px viewport. Do not hide overflow at body level. */
+#view-calendar .calendar-month-list,
+#view-calendar .calendar-month-preview,
+#view-calendar .month-agenda-group,
+#view-calendar #month-lesson-list {min-width:0;max-width:100%}
+#view-calendar .month-agenda-row.lesson-quick-trigger{
+ display:flex;
+ box-sizing:border-box;
+ width:100%;
+ max-width:100%;
+ min-width:0;
+ text-align:left;
+ white-space:normal;
+}
+#view-calendar .month-agenda-row .month-agenda-info{
+ flex:1 1 0;
+ min-width:0;
+ overflow:hidden;
+}
+#view-calendar .month-agenda-row .month-agenda-info strong,
+#view-calendar .month-agenda-row .month-agenda-info small{
+ min-width:0;
+ max-width:100%;
+ overflow:hidden;
+ text-overflow:ellipsis;
+ white-space:nowrap;
+}
+#view-calendar .month-agenda-row .pill{
+ flex:0 1 auto;
+ max-width:42%;
+ min-width:0;
+ white-space:normal;
+ overflow-wrap:anywhere;
+ line-height:1.4;
+ text-align:center;
+}
+@media(max-width:360px){
+ #view-calendar .month-agenda-row.lesson-quick-trigger{gap:7px;padding:11px 0}
+ #view-calendar .month-agenda-row .pill{padding:6px 7px;max-width:43%}
+}
