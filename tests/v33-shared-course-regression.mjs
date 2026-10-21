@@ -118,3 +118,50 @@ test("student invitation compatibility links and revokes by real schema column",
  assert.ok(app.includes("joined.has(i.student_id)"));
  assert.ok(app.includes("linked=links.some(l=>l.student_id===i.student_id"));
 });
+
+
+test("virtual recurring lessons send their parent-rule revision to the shared RPC",async()=>{
+ const {app,node}=harness();
+ const updated="2026-10-21T06:00:00.123456+00:00";
+ app.state.mode="live";app.state.role="student";app.state.month=new Date(2026,9,1);
+ app.setUser({id:"student-user"});
+ app.state.studentPortal={
+  students:[{id:"mine",name:"學生",teacher_id:"teacher",subject:"數學"}],
+  lessons:[],
+  schedules:[{id:"rule-a",student_id:"mine",teacher_id:"teacher",subject:"數學",
+    starts_on:"2026-10-19",ends_on:"2026-12-31",cancelled_from:null,
+    weekdays:[1],every_weeks:1,start_time:"18:00",end_time:"20:00",
+    updated_at:updated}],
+  exceptions:[]};
+ const lesson=app.sharedCourseLessons().find(x=>x.virtual_occurrence&&x.scheduled_date==="2026-10-26");
+ assert.ok(lesson,"weekly occurrence must be expanded");
+ app.openSharedCourseForm("edit-lesson",lesson.id);
+ assert.equal(app.state.sharedCourseDraft.action,"change_occurrence");
+ assert.equal(app.state.sharedCourseDraft.expectedUpdatedAt,updated);
+ node("#shared-course-student").value="mine";
+ node("#shared-course-date").value="2026-10-27";
+ node("#shared-course-subject").value="數學";
+ node("#shared-course-start").value="18:00";
+ node("#shared-course-end").value="20:00";
+ const calls=[];
+ app.setClient({rpc:async(name,args)=>{calls.push({name,args});return {data:{ok:true},error:null}}});
+ await app.submitSharedCourse({preventDefault(){}});
+ const result=calls.find(x=>x.name==="shared_course_action");
+ assert.ok(result,"rescheduling should reach server");
+ assert.equal(result.args.p_payload.expected_updated_at,updated);
+ assert.equal(result.args.p_payload.original_date,"2026-10-26");
+ assert.equal(result.args.p_payload.moved_to,"2026-10-27");
+});
+
+test("missing concurrency revision is blocked before RPC call",async()=>{
+ const {app,node}=harness();
+ app.state.mode="live";app.state.role="student";
+ app.setUser({id:"student-user"});
+ app.state.studentPortal={students:[{id:"mine",name:"學生"}],schedules:[],lessons:[]};
+ app.state.sharedCourseDraft={action:"update_lesson",targetId:"lesson-x",studentId:"mine",expectedUpdatedAt:null};
+ node("#shared-course-student").value="mine";
+ let called=0;
+ app.setClient({rpc:async()=>{called++;return {data:{ok:true},error:null}}});
+ await app.submitSharedCourse({preventDefault(){}});
+ assert.equal(called,0);
+});
