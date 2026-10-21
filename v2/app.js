@@ -1726,7 +1726,7 @@ function bindEvents(){
   const choice=ev.target.closest("[data-role-choice]");
   if(choice){setRole(choice.dataset.roleChoice);return}
   const trigger=ev.target.closest("#role-indicator");
-  if(trigger){const menu=$("#role-menu");const open=!menu.classList.toggle("hidden");trigger.setAttribute("aria-expanded",String(open));return}
+  if(trigger){if(enabledRoles().length<2)return;const menu=$("#role-menu");const open=!menu.classList.toggle("hidden");trigger.setAttribute("aria-expanded",String(open));return}
   if(!ev.target.closest("#role-menu")){$("#role-menu").classList.add("hidden");$("#role-indicator").setAttribute("aria-expanded","false")}
   const nav=ev.target.closest("[data-view]");if(nav){setView(nav.dataset.view);if(nav.dataset.date){state.selected=nav.dataset.date;state.month=parseDate(state.selected);render()}return}
   const close=ev.target.closest("[data-close]");if(close){closeModal(close.dataset.close);return}
@@ -1763,6 +1763,7 @@ function bindEvents(){
   const day=ev.target.closest("[data-day]");if(day){openDay(day.dataset.day);return}
  });
  document.addEventListener("keydown",ev=>{const el=ev.target.closest("[data-day]");if(el&&!ev.target.closest("[data-action]")&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();openDay(el.dataset.day)}});
+ $("#account-modal").addEventListener("cancel",ev=>{if(!activeUser)ev.preventDefault()});
  $("#lesson-form").addEventListener("submit",saveLessonOutcome);
  $("#lesson-learning-save").addEventListener("click",saveOnlyLessonLearning);
  $("#shared-course-form").addEventListener("submit",submitSharedCourse);
