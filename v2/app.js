@@ -27,7 +27,7 @@ const timeLabel = (s) => asText(s).slice(0,5);
 const tick = ()=>new Date();
 const uid = ()=>crypto.randomUUID();
 let client=null, activeUser=null, loading=false, teacherPreferences={};
-const state={mode:localStorage.getItem(MODE_STORAGE)==="live"?"live":"demo",role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",paymentBatches:[],paymentBatchItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",studentInvites:[],studentLinks:[],studentPortal:{students:[],lessons:[],schedules:[]},sharedCourseDraft:null,sharedCourseHistory:{},receiptBatch:null,activeLesson:null,actualHoursManual:false};
+const state={mode:"live",enabledRoles:["teacher"],lessonRatings:{focus:null,mood:null},role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",paymentBatches:[],paymentBatchItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",studentInvites:[],studentLinks:[],studentPortal:{students:[],lessons:[],schedules:[]},sharedCourseDraft:null,sharedCourseHistory:{},receiptBatch:null,activeLesson:null,actualHoursManual:false};
 
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
@@ -101,10 +101,52 @@ function setBusy(yes){
 }
 function showModal(id){const dialog=$("#"+id);if(dialog&&!dialog.open)dialog.showModal()}
 function closeModal(id){const dialog=$("#"+id);if(dialog?.open)dialog.close()}
-function setView(view){if(state.role==="student")view="student";else if(view==="student")view="home";state.view=view;$$(".page-view").forEach(x=>x.classList.toggle("hidden",x.id!=="view-"+view));$$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));$("#breadcrumb-name").textContent=({home:"今天",calendar:"課程月曆",billing:"收付款",students:"學生與家長"})[view];render()}
+function setView(view){
+ if(state.role==="student"&&view!=="settings")view="student";
+ else if(state.role!=="student"&&view==="student")view="home";
+ state.view=view;
+ $$(".page-view").forEach(x=>x.classList.toggle("hidden",x.id!=="view-"+view));
+ $$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
+ $("#breadcrumb-name").textContent=({home:"今天",calendar:"課程月曆",billing:"收付款",students:"學生與家長",settings:"設定",student:"我的學習"})[view]||"今天";
+ render();
+}
 const VALID_ROLES=["teacher","parent","student"];
 const ROLE_SUFFIX={teacher:"老師",parent:"家長",student:"同學"};
 const ROLE_TITLE={teacher:"老師模式",parent:"家長模式",student:"學生模式"};
+function normalizedRoles(list){
+ const roles=Array.isArray(list)?list.filter(x=>VALID_ROLES.includes(x)):[];
+ return VALID_ROLES.filter(x=>roles.includes(x));
+}
+function enabledRoles(){
+ const selected=normalizedRoles(state.enabledRoles);
+ return selected.length?selected:["teacher"];
+}
+function renderRoleSettings(){
+ const modes=enabledRoles();
+ $$('[data-role-choice]').forEach(item=>item.classList.toggle("hidden",!modes.includes(item.dataset.roleChoice)));
+ $$('input[name="enabled-role"]').forEach(input=>input.checked=modes.includes(input.value));
+ $("#role-indicator").setAttribute("aria-haspopup",String(modes.length>1));
+ $("#settings-back-student").classList.toggle("hidden",state.role!=="student");
+}
+async function saveEnabledRoles(event){
+ event.preventDefault();
+ if(!activeUser||state.mode!=="live")return;
+ const selected=normalizedRoles($$('input[name="enabled-role"]:checked').map(x=>x.value));
+ if(!selected.length){toast("至少需要開啟一個使用模式");return}
+ const ok=await persist(async()=>{
+  assertResult(await client.from("profiles").update({enabled_roles:selected,roles_configured:true})
+    .eq("id",activeUser.id).select("id").single());
+ });
+ if(!ok)return;
+ state.enabledRoles=selected;
+ if(!selected.includes(state.role)){
+  state.role=selected[0];
+  await saveLastRole(state.role);
+  state.view=state.role==="student"?"student":"settings";
+ }
+ render();
+ toast("已儲存模式設定；上方只顯示勾選的模式");
+}
 function userDisplayName(){
  const p=state.profiles.find(p=>p.id===activeUser?.id);
  return String(p?.display_name||activeUser?.user_metadata?.full_name||activeUser?.user_metadata?.name||"使用者")
@@ -119,7 +161,7 @@ async function saveLastRole(role){
  const mine=state.profiles.find(p=>p.id===id);if(mine)mine.last_role=role;
 }
 function setRole(role){
- if(!VALID_ROLES.includes(role))return;
+ if(!VALID_ROLES.includes(role)||!enabledRoles().includes(role))return;
  state.role=role;
  const menu=$("#role-menu");menu.classList.add("hidden");$("#role-indicator").setAttribute("aria-expanded","false");
  localStorage.setItem(state.mode==="live"&&activeUser?ROLE_STORAGE+"_"+activeUser.id:ROLE_STORAGE,role);
@@ -141,7 +183,7 @@ function myWorkspace(){return state.mode==="live"&&activeUser?state.workspaces.f
 function requireTeacherWorkspace(){
  if(state.mode==="live"&&(!activeUser||!myWorkspace())){
   toast("請先建立自己的家教空間，再新增學生或課程");
-  showModal("account-modal");return false;
+  setView("settings");return false;
  }
  return true;
 }
@@ -183,12 +225,12 @@ async function saveMyWorkspace(rename=false){
   if(rename)assertResult(await client.from("workspaces").update({name}).eq("id",ws.id).select("id").single());
   else assertResult(await client.from("workspaces").insert({owner_id:activeUser.id,kind:"individual",name}).select("id").single());
  });
- if(ok){await loadTeacherPreferences();closeModal("account-modal");toast(rename?"空間名稱已更新":"家教空間已建立，現在可以新增學生")}
+ if(ok){await loadTeacherPreferences();render();toast(rename?"空間名稱已更新":"家教空間已建立，現在可以新增學生")}
 }
 function render(){
  const role=state.role,teacher=role==="teacher",student=role==="student";
  document.body?.classList?.toggle("student-mode",student);
- const identity=(state.mode==="live"&&activeUser)?roleFullName():("預覽"+ROLE_SUFFIX[role]);
+ const identity=activeUser?roleFullName():"尚未登入";
  $("#role-indicator-text").textContent=identity+" · "+ROLE_TITLE[role];
  $("#role-indicator-icon").textContent=teacher?"◈":student?"✎":"♧";
  $("#role-indicator").setAttribute("aria-label","目前使用："+identity+"，"+ROLE_TITLE[role]+"，點擊切換");
@@ -196,20 +238,25 @@ function render(){
  $("#greeting-title").innerHTML=teacher?"把每一堂課，<em>好好記下來。</em>":student?"我的學習，<em>一步一步進步。</em>":"每個成長時刻，<em>都值得珍惜。</em>";
  $("#greeting-copy").textContent=teacher?"從課程到收款，讓重要的小事都有自己的位置。":student?"這裡只顯示老師授權給我的課程及學習回饋。":"孩子的上課安排、請假和付款，打開就能看見。";
  $("#top-add").style.display=teacher?"":"none";
- $("#demo-banner").classList.toggle("hidden",state.mode!=="demo");
- $("#demo-reset").classList.toggle("hidden",state.mode!=="demo");
+ document.body?.classList?.toggle("login-required",!activeUser);
  $("#connection-status").classList.toggle("live",state.mode==="live"&&!!activeUser);
- $("#connection-status").innerHTML=state.mode==="demo"?"<i></i> 體驗模式":activeUser?"<i></i> 已安全連線":"<i></i> 尚未登入";
+ $("#connection-status").innerHTML=activeUser?"<i></i> 已安全連線":"<i></i> 尚未登入";
  $("#account-label").textContent=identity;
- $("#account-subtitle").textContent=ROLE_TITLE[role]+(state.mode==="demo"?" · 體驗模式":"");
+ $("#account-subtitle").textContent=activeUser?ROLE_TITLE[role]:"使用 Google 登入";
  $("#avatar").textContent=identity.slice(0,1);
  $("#account-current").textContent=activeUser?.email||"尚未使用 Google 登入";
  if(document.activeElement!==$("#profile-display-name"))$("#profile-display-name").value=state.mode==="live"&&activeUser?userDisplayName():"";
- $("#profile-display-form").classList.toggle("hidden",state.mode!=="live"||!activeUser);
- $("#role-teacher").classList.toggle("active",teacher);
- $("#role-parent").classList.toggle("active",role==="parent");
- $("#role-student").classList.toggle("active",student);
+ $("#profile-display-form").classList.toggle("hidden",!activeUser);
+ renderRoleSettings();
+ $("#settings-role-card").classList.toggle("hidden",!activeUser);
+ // Role preference checkboxes are on the separate settings page.
  if(student){
+  if(state.view==="settings"){
+   $$(".page-view").forEach(x=>x.classList.toggle("hidden",x.id!=="view-settings"));
+   $("#breadcrumb-name").textContent="設定";
+   renderWorkspaceUI();
+   return;
+  }
   state.view="student";
   $$(".page-view").forEach(x=>x.classList.toggle("hidden",x.id!=="view-student"));
   $("#breadcrumb-name").textContent="我的學習";
@@ -325,6 +372,28 @@ function renderStudentBilling(lessons){
   return '<div class="student-bill-line"><span><strong>'+esc(l.subject||"課程")+'</strong><small>'+esc(l.lesson_date)+' · '+esc(String(l.hours||0))+' 小時</small></span><span><strong>'+money(balance.total)+'</strong><small>已確認 '+money(balance.confirmed)+' ／ 待確認 '+money(balance.pending)+'</small></span></div>';
  }).join("")+'</div></details>').join(""):'<div class="empty">這個月尚無已完成且需要結算的課程。</div>';
 }
+function compactStars(value){
+ const score=Number(value);
+ return value==null||value===""||score<1||score>5?"未評分":
+  "★".repeat(score)+"☆".repeat(5-score);
+}
+function learningPaymentLine(lesson,due=null){
+ const balance=lessonBalance(lesson);
+ const outstanding=due===null?balance.total:due;
+ const student=studentFor(lesson)?.name||lesson.student||"學生";
+ const description=lesson.lesson_content||"老師尚未填寫本堂上課內容";
+ return '<div class="learning-payment-line">'+
+  '<div class="learning-payment-date"><strong>'+esc(String(lesson.lesson_date).slice(5).replace("-","/"))+
+  '</strong><small>'+esc(String(lesson.hours||0))+' 小時</small></div>'+
+  '<div class="learning-payment-detail"><strong>'+esc(student)+' · '+esc(lesson.subject||"課程")+'</strong>'+
+  '<p class="learning-payment-content">'+esc(description)+'</p>'+
+  '<div class="learning-payment-stars"><span>專注 '+esc(compactStars(lesson.focus_rating))+
+  '</span><span>心情 '+esc(compactStars(lesson.mood_rating))+'</span></div>'+
+  (lesson.lesson_content||lesson.remarks?'<details class="learning-payment-expand"><summary>查看完整課後紀錄</summary>'+
+  '<div>上課內容：'+esc(description)+(lesson.remarks?'\n老師備註：'+esc(lesson.remarks):'')+'</div></details>':'')+
+  '</div><div class="learning-payment-total"><strong>'+money(outstanding)+'</strong>'+
+  '<small>'+esc(statusLabel(lesson))+'</small></div></div>';
+}
 function renderBilling(){
  const ls=monthLessons().filter(l=>l.type==="lesson").sort((a,b)=>a.lesson_date.localeCompare(b.lesson_date));
  const billed=ls.reduce((sum,l)=>sum+lessonBalance(l).total,0);
@@ -340,7 +409,9 @@ function renderBilling(){
  renderStudentBilling(ls);
  $("#batch-action").classList.remove("hidden");
  $("#batch-action").textContent=state.role==="teacher"?"查看指定期間收款":"選擇期間回報已付款";
- $("#billing-list").innerHTML=ls.length?ls.map(l=>rowHTML(l,true)).join(""):'<div class="empty">這個月還沒有已完成的課程。排定的未上課時段不會算入費用。</div>';
+ $("#billing-list").innerHTML=ls.length?
+  (state.role==="parent"?ls.map(l=>learningPaymentLine(l)).join(""):ls.map(l=>rowHTML(l,true)).join("")):
+  '<div class="empty">這個月還沒有已完成的課程。排定的未上課時段不會算入費用。</div>';
  renderPaymentHistory();
  const reqs=state.requests.filter(r=>state.role==="teacher"?(state.mode==="demo"||r.teacher_id===activeUser?.id):
  (state.mode==="demo"||r.parent_id===activeUser?.id&&(state.parentTeacherFilter==="all"||r.teacher_id===state.parentTeacherFilter)))
@@ -362,11 +433,13 @@ function renderParentLearning(){
  for(const l of thisMonth){const n=l.subject||"課程";grouped.set(n,(grouped.get(n)||0)+1)}
  const summary=[...grouped].map(([k,v])=>'<span class="learning-subject-chip">'+esc(k)+' · '+v+' 堂</span>').join("");
  $("#parent-learning-home").innerHTML='<div class="section-row"><div><h2>孩子的學習近況</h2><p class="section-sub">'+(lessons.length?"最新課後回饋，先看孩子的進步":"尚無已完成課程的老師回饋")+'</p></div><button type="button" class="text-link" data-view="students">查看學習紀錄 ↗</button></div>'+
- (lessons.length?'<p><strong>'+esc(studentFor(lessons[0])?.name||"學生")+' · '+esc(lessons[0].subject||"課程")+'</strong> · '+esc(lessons[0].lesson_date)+'</p><p class="learning-note">'+esc(lessons[0].remarks||"老師尚未填寫課後回饋")+'</p>':'');
+ (lessons.length?'<p><strong>'+esc(studentFor(lessons[0])?.name||"學生")+' · '+esc(lessons[0].subject||"課程")+'</strong> · '+esc(lessons[0].lesson_date)+'</p>'+
+  '<p class="learning-note">'+esc(lessons[0].lesson_content||lessons[0].remarks||"老師尚未填寫課後回饋")+'</p>':'');
  $("#parent-learning").innerHTML=lessons.length?'<div class="learning-subjects">'+(summary||"本月還沒有已完成的課程")+'</div>'+
  lessons.slice(0,24).map(l=>'<article class="learning-lesson"><div class="learning-lesson-title"><strong>'+
  esc(studentFor(l)?.name||l.student||"學生")+' · '+esc(l.subject||"課程")+'</strong><small>'+esc(l.lesson_date)+' · '+esc(String(l.actual_hours??l.hours??0))+' 小時</small></div>'+
- '<div class="learning-ratings"><span>專注度：'+learningRating(l.focus_rating)+'</span><span>學習態度：'+learningRating(l.attitude_rating)+'</span></div>'+
+ '<p>'+esc(l.lesson_content||"尚無本堂上課內容")+'</p>'+
+ '<div class="learning-ratings"><span>專注度：'+learningRating(l.focus_rating)+'</span><span>學生心情：'+learningRating(l.mood_rating)+'</span></div>'+
  '<p>'+esc(l.remarks||"老師尚未填寫課後回饋")+'</p></article>').join(""):
  '<div class="empty">目前還沒有已完成課程的學習紀錄。老師填寫課後評語後，會在這裡顯示。</div>';
 }
@@ -589,7 +662,9 @@ function renderStudentPortal(){
  ' · '+esc(String(r.start_time).slice(0,5))+'–'+esc(String(r.end_time).slice(0,5))+(r.cancelled_from?' · '+esc(r.cancelled_from)+' 起停止':'')+'</span></div>').join(""):'')+
  '<h3>上課與課後回饋</h3>'+(entries.length?entries.slice(0,120).map(l=>'<div class="student-portal-lesson"><strong>'+esc(studentsById.get(l.student_id)?.name||"學生")+' · '+esc(l.subject||"課程")+'</strong><small>'+
  esc(l.lesson_date)+' · '+esc(String(l.start_time||"").slice(0,5))+'–'+esc(String(l.end_time||"").slice(0,5))+' · '+(l.type==="lesson"?"已完成":l.type==="leave"?"已取消":"已安排")+'</small>'+
- (l.type==="lesson"?'<div class="student-portal-ratings">專注度：'+(l.focus_rating==null?"尚未評分":esc(l.focus_rating)+"／5")+' · 學習態度：'+(l.attitude_rating==null?"尚未評分":esc(l.attitude_rating)+"／5")+'</div><p>'+esc(l.remarks||"老師尚未填寫課後回饋")+'</p>':"")+
+ (l.type==="lesson"?'<p>'+esc(l.lesson_content||"尚未填寫上課內容")+'</p>'+
+  '<div class="student-portal-ratings">專注度：'+learningRating(l.focus_rating)+' · 學生心情：'+learningRating(l.mood_rating)+'</div>'+
+  '<p>'+esc(l.remarks||"老師尚未填寫課後回饋")+'</p>':"")+
  '</div>').join(""):'<div class="empty">老師尚未新增課堂紀錄。</div>'):
  '<div class="empty">尚未連結自己的學生資料。接受老師邀請後，這裡會顯示課程與學習回饋。</div>';
 }
@@ -1080,7 +1155,8 @@ function renderPeriodPreview(resetAmount=false){
   const hours=r.rows.reduce((n,x)=>n+num(x.lesson.hours),0);
   $("#period-overview").innerHTML='<strong>'+money(r.total)+'</strong><div class="period-summary-metrics"><span>'+r.rows.length+' 堂可結算</span><span>'+hours.toFixed(1)+' 小時</span><span>'+esc(r.start)+' ～ '+esc(r.end)+'</span></div>';
   $("#period-lesson-list").innerHTML=r.rows.length?r.rows.map(({lesson,allocation})=>
-    '<div class="period-line"><div><strong>'+esc(lesson.lesson_date)+' · '+esc(lesson.subject||"課程")+'</strong><small>'+esc(timeLabel(lesson.start_time))+'–'+esc(timeLabel(lesson.end_time))+' · 可付款餘額</small></div><span>'+money(allocation.available)+'</span></div>').join(""):'<div class="empty">這段期間沒有可付款的課程；已收款或待老師確認的款項不會重複列入。</div>';
+    learningPaymentLine(lesson,allocation.available)).join(""):
+   '<div class="empty">這段期間沒有可付款的課程；已收款或待老師確認的款項不會重複列入。</div>';
   if(resetAmount||!$("#period-paid-amount").value)$("#period-paid-amount").value=r.total>0?r.total.toFixed(2):"";
   $("#period-submit").disabled=r.total<=0;
  }else{
@@ -1151,6 +1227,32 @@ async function submitReceipt(ev){
 function lessonLocked(lesson){
  return !isVirtualOccurrence(lesson)&&isPaymentLocked(lesson,state.paymentBatches,state.paymentBatchItems,state.requests);
 }
+function renderLessonStars(){
+ for(const key of ["focus","mood"]){
+  const selected=state.lessonRatings[key];
+  $("#lesson-"+key+"-stars").innerHTML=[1,2,3,4,5].map(n=>
+   '<button type="button" class="rating-star'+(selected!=null&&n<=selected?' active':'')+
+   '" data-lesson-star="'+key+'" data-star-value="'+n+
+   '" aria-label="'+(key==="focus"?"專注度":"學生心情")+n+'星" aria-pressed="'+(selected===n)+'">★</button>').join("");
+ }
+}
+function lessonLearningPayload(){
+ return {
+  p_lesson_content:$("#lesson-content").value.trim(),
+  p_focus_rating:state.lessonRatings.focus,
+  p_mood_rating:state.lessonRatings.mood,
+  p_remarks:$("#lesson-feedback").value.trim()
+ };
+}
+async function saveOnlyLessonLearning(){
+ const lesson=resolveLesson(state.activeLesson);
+ if(!lesson||state.role!=="teacher"||lesson.type!=="lesson"||isVirtualOccurrence(lesson))return;
+ const payload=lessonLearningPayload();
+ const ok=await persist(async()=>assertResult(await client.rpc("update_lesson_learning",{
+  p_lesson_id:lesson.id,p_expected_updated_at:lesson.updated_at,...payload
+ })));
+ if(ok){closeModal("lesson-modal");toast("課後紀錄已更新；原有收款、時數及金額不變")}
+}
 function openLessonPopup(id){
  const lesson=resolveLesson(id);
  if(!lesson){toast("找不到這堂課，請重新整理月曆");return}
@@ -1165,6 +1267,13 @@ function openLessonPopup(id){
  $("#lesson-actual-start").value=d.actualStart;
  $("#lesson-actual-end").value=d.actualEnd;
  $("#lesson-actual-hours").value=String(d.actualHours);
+ $("#lesson-content").value=lesson.lesson_content||"";
+ $("#lesson-feedback").value=lesson.remarks||"";
+ state.lessonRatings={focus:lesson.focus_rating??null,mood:lesson.mood_rating??null};
+ renderLessonStars();
+ $("#lesson-learning-editor").classList.toggle("hidden",!teacher||inactive);
+ $("#lesson-learning-lock-note").classList.toggle("hidden",!teacher||!locked);
+ $("#lesson-learning-save").classList.toggle("hidden",!teacher||!locked||lesson.type!=="lesson");
  state.actualHoursManual=false;
  $("#lesson-lock-hint").classList.toggle("hidden",!locked);
  $("#lesson-teacher-actions").classList.toggle("hidden",!teacher);
@@ -1200,8 +1309,11 @@ async function saveLessonOutcome(ev){
  if(lesson.type==="leave"){closeModal("lesson-modal");await restoreLesson(lesson.id);return}
  if(lesson.type==="moved"||lessonLocked(lesson)){toast("請先處理已取消或已進入帳務流程的課程");return}
  let values;try{values=lessonFormValues()}catch(e){toast(e.message);return}
+ const feedback=lessonLearningPayload();
  const patch={type:"lesson",actual_start_time:values.actual_start_time,actual_end_time:values.actual_end_time,
-  actual_hours:values.actual_hours,hours:values.hours,total_amount:Math.round(values.hours*Number(lesson.hourly_rate)*100)/100};
+  actual_hours:values.actual_hours,hours:values.hours,total_amount:Math.round(values.hours*Number(lesson.hourly_rate)*100)/100,
+  lesson_content:feedback.p_lesson_content,focus_rating:feedback.p_focus_rating,
+  mood_rating:feedback.p_mood_rating,remarks:feedback.p_remarks};
  const ok=await updateLesson(lesson.id,patch,lesson.type==="lesson"?"實際時數已更新":"已完成上課，費用會依實際計費時數計算");
  if(ok)closeModal("lesson-modal");
 }
@@ -1535,7 +1647,15 @@ async function ensureClient(){
  const createClient=window.supabase?.createClient;
  if(!createClient)throw Error("登入元件載入失敗，請重新整理頁面後再試");
  client=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
- client.auth.onAuthStateChange((event,session)=>{activeUser=session?.user||null;if(event==="SIGNED_OUT"){activeUser=null;teacherPreferences={};state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();}});
+ client.auth.onAuthStateChange((event,session)=>{
+  activeUser=session?.user||null;
+  if(event==="SIGNED_OUT"){
+   activeUser=null;teacherPreferences={};state.parentTeacherFilter="all";
+   for(const k of LIVE_FIELDS)state[k]=[];
+   state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
+   render();showModal("account-modal");
+  }
+ });
  return client;
 }
 async function initializeLive(){
@@ -1543,25 +1663,40 @@ async function initializeLive(){
   await ensureClient();const {data,error}=await client.auth.getSession();if(error)throw error;
   activeUser=data.session?.user||null;
   if(activeUser){
-   // Role is a display preference scoped to each account; authorization stays in RLS.
    await ensureMyProfile();
    await refreshLive();
-   const cached=localStorage.getItem(ROLE_STORAGE+"_"+activeUser.id);
-   const remote=state.profiles.find(p=>p.id===activeUser.id)?.last_role;
+   const profile=state.profiles.find(p=>p.id===activeUser.id);
    const guardian=state.guardians.some(g=>g.guardian_id===activeUser.id);
    const invited=state.invites.some(i=>i.email===activeUser.email?.toLowerCase());
    const isStudent=state.studentLinks.some(l=>l.user_id===activeUser.id)||
-    state.studentInvites.some(i=>i.email===activeUser.email?.toLowerCase());
-   state.role=VALID_ROLES.includes(remote)?remote:
-    VALID_ROLES.includes(cached)?cached:
-    (!myWorkspace()&&isStudent?"student":(!myWorkspace()&&(guardian||invited)?"parent":"teacher"));
+     state.studentInvites.some(i=>i.email===activeUser.email?.toLowerCase());
+   const cached=localStorage.getItem(ROLE_STORAGE+"_"+activeUser.id);
+   const remote=profile?.last_role;
+   if(!profile?.roles_configured){
+    const initial=normalizedRoles([
+      ...(myWorkspace()?["teacher"]:[]),
+      ...(guardian||invited?["parent"]:[]),
+      ...(isStudent?["student"]:[])]);
+    state.enabledRoles=initial.length?initial:["teacher"];
+    const {error}=await client.from("profiles")
+      .update({enabled_roles:state.enabledRoles,roles_configured:true})
+      .eq("id",activeUser.id).select("id").single();
+    if(error)throw error;
+   }else state.enabledRoles=normalizedRoles(profile.enabled_roles);
+   if(!state.enabledRoles.length)state.enabledRoles=["teacher"];
+   state.role=[remote,cached,...state.enabledRoles].find(r=>state.enabledRoles.includes(r))||state.enabledRoles[0];
    localStorage.setItem(ROLE_STORAGE+"_"+activeUser.id,state.role);
-   if(!VALID_ROLES.includes(remote))await saveLastRole(state.role);
+   if(remote!==state.role)await saveLastRole(state.role);
    state.view=state.role==="student"?"student":"home";
    await loadTeacherPreferences();
+   closeModal("account-modal");
    toast("已登入並同步課程");
-  }else{for(const k of LIVE_FIELDS)state[k]=[];teacherPreferences={};}
+  }else{
+   for(const k of LIVE_FIELDS)state[k]=[];
+   teacherPreferences={};state.enabledRoles=["teacher"];
+  }
   render();
+  if(!activeUser)showModal("account-modal");
  }catch(err){console.error(err);toast("Supabase 連線失敗："+err.message);showModal("account-modal")}
 }
 async function googleLogin(){
@@ -1573,17 +1708,26 @@ async function googleLogin(){
 }
 async function signOut(){
  if(client){const {error}=await client.auth.signOut();if(error){toast(error.message);return;}}
- activeUser=null;teacherPreferences={};state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();closeModal("account-modal");toast("已登出，目前使用預覽模式");
-}
-function toggleDemo(){
- teacherPreferences={};activeUser=null;state.parentTeacherFilter="all";for(const k of ["profiles","workspaces","workspaceMembers"])state[k]=[];state.mode="demo";localStorage.setItem(MODE_STORAGE,"demo");loadDemo();render();closeModal("account-modal");toast("現在可以自由試用，不影響正式資料");
+ activeUser=null;teacherPreferences={};state.parentTeacherFilter="all";
+ for(const k of LIVE_FIELDS)state[k]=[];
+ state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
+ render();showModal("account-modal");toast("已登出 Google 帳號");
 }
 function bindEvents(){
  document.addEventListener("click",async ev=>{
+  const star=ev.target.closest("[data-lesson-star]");
+  if(star){
+   const key=star.dataset.lessonStar,score=Number(star.dataset.starValue);
+   if(["focus","mood"].includes(key)&&score>=1&&score<=5){
+    state.lessonRatings[key]=state.lessonRatings[key]===score?null:score;
+    renderLessonStars();
+   }
+   return;
+  }
   const choice=ev.target.closest("[data-role-choice]");
   if(choice){setRole(choice.dataset.roleChoice);return}
   const trigger=ev.target.closest("#role-indicator");
-  if(trigger){const menu=$("#role-menu");const open=!menu.classList.toggle("hidden");trigger.setAttribute("aria-expanded",String(open));return}
+  if(trigger){if(enabledRoles().length<2)return;const menu=$("#role-menu");const open=!menu.classList.toggle("hidden");trigger.setAttribute("aria-expanded",String(open));return}
   if(!ev.target.closest("#role-menu")){$("#role-menu").classList.add("hidden");$("#role-indicator").setAttribute("aria-expanded","false")}
   const nav=ev.target.closest("[data-view]");if(nav){setView(nav.dataset.view);if(nav.dataset.date){state.selected=nav.dataset.date;state.month=parseDate(state.selected);render()}return}
   const close=ev.target.closest("[data-close]");if(close){closeModal(close.dataset.close);return}
@@ -1620,7 +1764,9 @@ function bindEvents(){
   const day=ev.target.closest("[data-day]");if(day){openDay(day.dataset.day);return}
  });
  document.addEventListener("keydown",ev=>{const el=ev.target.closest("[data-day]");if(el&&!ev.target.closest("[data-action]")&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();openDay(el.dataset.day)}});
+ $("#account-modal").addEventListener("cancel",ev=>{if(!activeUser)ev.preventDefault()});
  $("#lesson-form").addEventListener("submit",saveLessonOutcome);
+ $("#lesson-learning-save").addEventListener("click",saveOnlyLessonLearning);
  $("#shared-course-form").addEventListener("submit",submitSharedCourse);
  ["lesson-actual-start","lesson-actual-end"].forEach(id=>$("#"+id).addEventListener("change",syncActualHoursFromTime));
  $("#lesson-actual-hours").addEventListener("input",()=>{state.actualHoursManual=true});
@@ -1685,21 +1831,23 @@ function bindEvents(){
  $("#request-form").addEventListener("submit",submitRequest);
  document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e);if(e.target.id==="student-invite-form")saveStudentInvite(e)});
  $("#invite-edit-form").addEventListener("submit",submitInviteEdit);
- $("#workspace-start").onclick=()=>showModal("account-modal");
+ $("#workspace-start").onclick=()=>setView("settings");
  $("#workspace-create").onclick=()=>saveMyWorkspace(false);
  $("#workspace-rename").onclick=()=>saveMyWorkspace(true);
  $("#parent-teacher-select").onchange=()=>{state.parentTeacherFilter=$("#parent-teacher-select").value;render()};
- $("#profile-button").onclick=()=>showModal("account-modal");
- $("#account-action").onclick=()=>showModal("account-modal");
- $("#go-live").onclick=()=>showModal("account-modal");
- $("#google-login").onclick=googleLogin;$("#demo-login").onclick=toggleDemo;$("#sign-out").onclick=signOut;
- $("#demo-reset").onclick=()=>{if(state.mode!=="demo")return;if(!confirm("將清除這台瀏覽器的 V2 測試課程與測試付款紀錄，重新載入範例資料。確定？"))return;
-  localStorage.removeItem(STORAGE);loadDemo();render();closeModal("account-modal");toast("預覽已重置，可以測試跨月與部分付款");
- };
- $("#role-teacher").onclick=()=>setRole("teacher");$("#role-parent").onclick=()=>setRole("parent");$("#role-student").onclick=()=>setRole("student");
- $("#profile-display-form").addEventListener("submit",saveDisplayName);
+ $("#profile-button").onclick=()=>activeUser?setView("settings"):showModal("account-modal");
+ $("#account-action").onclick=()=>activeUser?setView("settings"):showModal("account-modal");
+ $("#google-login").onclick=googleLogin;
+ $("#sign-out").onclick=signOut;
+ $("#mode-settings-form").addEventListener("submit",saveEnabledRoles);
+  $("#profile-display-form").addEventListener("submit",saveDisplayName);
  $$(".modal").forEach(d=>d.addEventListener("click",e=>{if(e.target===d)d.close()}));
 }
 function moveMonth(offset){state.month=new Date(state.month.getFullYear(),state.month.getMonth()+offset,1);render()}
-function main(){if(state.mode==="demo"){loadDemo();loadTeacherPreferences()}else for(const k of LIVE_FIELDS)state[k]=[];bindEvents();render();if(state.mode==="live")initializeLive();else showModal("account-modal")}
+function main(){
+ state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
+ for(const k of LIVE_FIELDS)state[k]=[];
+ bindEvents();render();
+ initializeLive();
+}
 main();
