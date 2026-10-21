@@ -437,7 +437,7 @@ function weekdayForDate(value){
 }
 function syncRecurringWeekdays(dateId,groupId,hintId,dateChanged=false){
  const day=weekdayForDate($("#"+dateId)?.value);
- const items=$("#"+groupId+" input[type=checkbox]");
+ const items=Array.from(document.querySelectorAll("#"+groupId+" input[type=checkbox]"));
  const before=items.filter(item=>item.checked);
  if(dateChanged&&day&&before.length<=1){
   items.forEach(item=>{item.checked=Number(item.value)===day});
