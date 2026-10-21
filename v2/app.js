@@ -462,7 +462,7 @@ function openSharedCourseForm(action,id=null){
  $("#shared-course-end-date").value=rule?.ends_on||"";
  $("#shared-course-frequency").value=String(rule?.every_weeks||1);
  const days=rule?.weekdays||[((parseDate($("#shared-course-date").value).getDay()+6)%7)+1];
- $("#shared-course-weekdays input").forEach(x=>{x.checked=days.includes(Number(x.value))});
+ Array.from(document.querySelectorAll("#shared-course-weekdays input")).forEach(x=>{x.checked=days.includes(Number(x.value))});
  $("#shared-course-note").textContent=virtual?
   "此堂是固定課表產生的課程，目前可直接更改單堂日期；若需更改科目或時間，請修改固定課表。鐘點費仍由老師管理。":
   "雙方共用同一份課表。鐘點費由老師設定，這裡不會修改已完成的課程或收款。";
@@ -481,7 +481,7 @@ async function submitSharedCourse(event){
   if(date===d.originalDate){toast("請選擇與原定日期不同的一天");return}
   Object.assign(payload,{original_date:d.originalDate,moved_to:date});
  }else if(d.action==="create_schedule"||d.action==="update_schedule"){
-  const weekdays=$("#shared-course-weekdays input:checked").map(x=>Number(x.value));
+  const weekdays=Array.from(document.querySelectorAll("#shared-course-weekdays input:checked")).map(x=>Number(x.value));
   if(!weekdays.length){toast("固定課表至少選一天");return}
   Object.assign(payload,{weekdays,every_weeks:Number($("#shared-course-frequency").value),
    starts_on:date,ends_on:$("#shared-course-end-date").value||null});
