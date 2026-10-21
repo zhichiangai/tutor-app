@@ -40,7 +40,7 @@ test("Teacher, parent and student show distinct salutation for a named Google ac
  }
  const html=read("../v2/index.html");
  assert.ok(html.includes('data-role-choice="student"'));
- assert.ok(html.includes('id="role-student"'));
+ assert.ok(html.includes('name="enabled-role" value="student"'));
  assert.ok(html.includes('id="profile-display-name"'));
 });
 
@@ -72,8 +72,8 @@ test("Student claim calls protected RPC with selected invitation ID",async()=>{
 
 test("Cross-device restoration prefers profile.last_role over browser localStorage",()=>{
  const code=read("../v2/app.js");
- assert.ok(code.includes("VALID_ROLES.includes(remote)?remote"));
- assert.ok(code.includes('state.profiles.find(p=>p.id===activeUser.id)?.last_role'));
+ assert.ok(code.includes("const remote=profile?.last_role"));
+ assert.ok(code.includes("state.enabledRoles.includes(r)"));
  assert.ok(code.includes('client.from("profiles").update({last_role:role})'));
  assert.ok(code.includes('state.view=state.role==="student"?"student":"home"'));
 });
