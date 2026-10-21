@@ -103,7 +103,7 @@
                 <button class="secondary-button" type="submit">儲存顯示名稱</button>
               </form>
             </article>
-            <article class="card settings-card" id="settings-role-card"><h3>角色與帳號</h3>
+            <details class="card settings-card settings-role-disclosure" id="settings-role-card"><summary class="settings-summary"><span><strong>角色與帳號</strong><small>點開選擇你要使用的模式</small></span><span aria-hidden="true">›</span></summary>
               <p class="section-sub">打勾後才會出現在上方模式切換。模式不代表取得其他學生的資料權限。</p>
               <form id="mode-settings-form">
                 <label class="settings-mode"><input type="checkbox" name="enabled-role" value="teacher"><span><strong>老師模式</strong><small>管理課程、學生及收款</small></span></label>
@@ -112,7 +112,7 @@
                 <p class="helper-note">至少保留一個模式，啟用項目會隨同一 Google 帳號跨裝置同步。</p>
                 <button class="primary-button" type="submit">儲存角色設定</button>
               </form>
-            </article>
+            </details>
             <article class="card settings-card" id="workspace-account"><h3>我的家教空間</h3>
               <p class="section-sub" id="workspace-description">只有老師需要家教空間。設定不會更動已有學生或帳務。</p>
               <label for="workspace-name">空間名稱<input id="workspace-name" type="text" maxlength="80" placeholder="例如：陳老師的數學教室"></label>
