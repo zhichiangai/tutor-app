@@ -33,3 +33,7 @@ SQL 檔：`supabase/migrations/20261021181000_v35_roles_lesson_learning.sql`。
 - 暫未提供科目個別鐘點費設定表，計價規則沿用現有老師設定與課程歷史。
 - `attitude_rating` 舊資料保留，V3.5 正式課後介面改顯示 `mood_rating`。
 - Supabase Security Advisor 的必要 `SECURITY DEFINER` RPC 警告及外洩密碼防護仍須另行定期審查。
+
+## V3.5.1 補強：角色及設定持久化
+
+原 V3.5 的 `profiles`／`workspaces`／`guardian_invites` 已有 UPDATE RLS，但未給 `authenticated` 資料表 UPDATE 權限。V3.5.1 Migration 只授予所需欄位的最小權限，不放寬既有 RLS。以真正 `authenticated` 資料庫角色執行跨使用者交易測試，確認當事人可儲存、未授權使用者無法修改。
