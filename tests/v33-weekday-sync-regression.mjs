@@ -13,10 +13,10 @@ function fixture(date="2026-10-21",chosen=[3]){
  fields.set("#hint",{textContent:""});
  const inputs=Array.from({length:7},(_,i)=>({value:String(i+1),checked:chosen.includes(i+1)}));
  const $=k=>fields.get(k);
- const $$=selector=>selector==="#weekdays input[type=checkbox]"?inputs:[];
+ const document={querySelectorAll:selector=>selector==="#weekdays input[type=checkbox]"?inputs:[]};
  const parseDate=s=>new Date(s+"T12:00:00");
  const dateKey=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
- const api=new Function("$","$$","parseDate","dateKey",src+"\nreturn {weekdayForDate,syncRecurringWeekdays};")($,$$,parseDate,dateKey);
+ const api=new Function("document","$","parseDate","dateKey",src+"\nreturn {weekdayForDate,syncRecurringWeekdays};")(document,$,parseDate,dateKey);
  const chosenNow=()=>inputs.filter(x=>x.checked).map(x=>Number(x.value));
  const select=(arr)=>inputs.forEach(x=>x.checked=arr.includes(Number(x.value)));
  const changeDate=(v)=>{fields.get("#date").value=v;return api.syncRecurringWeekdays("date","weekdays","hint",true)};
@@ -54,9 +54,9 @@ test("teacher, guardian, and student scheduling forms wire date changes and pres
  for(const id of ["schedule-weekday-hint","record-weekday-hint","shared-weekday-hint","shared-course-date-label-text"]){
   assert.ok(html.includes('id="'+id+'"'),id+" missing");
  }
- assert.ok(app.includes('"schedule-start").addEventListener("change"'));
- assert.ok(app.includes('"shared-course-date").addEventListener("change"'));
- assert.ok(app.includes('"record-date").addEventListener("change"'));
+ assert.ok(app.includes('$("#schedule-start").addEventListener("change"'));
+ assert.ok(app.includes('$("#shared-course-date").addEventListener("change"'));
+ assert.ok(app.includes('$("#record-date").addEventListener("change"'));
  assert.ok(app.includes('"weekly","biweekly"].includes($("#record-repeat").value)'));
  assert.ok(!app.includes('$("#shared-course-date-label").innerHTML='),"shared date input must not be recreated at form open");
 });
