@@ -78,3 +78,41 @@ revoke all on function tutor_private.v35_track_lesson_feedback() from public,ano
 drop trigger if exists trg_v35_track_lesson_feedback on public.lesson_records;
 create trigger trg_v35_track_lesson_feedback after update on public.lesson_records
  for each row execute function tutor_private.v35_track_lesson_feedback();
+
+-- Student RPC intentionally returns learning fields only; never include financial columns.
+CREATE OR REPLACE FUNCTION public.student_portal_data()
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+select jsonb_build_object(
+ 'students',coalesce((select jsonb_agg(jsonb_build_object(
+   'id',s.id,'name',s.name,'teacher_id',s.teacher_id,'subject',s.subject))
+   from public.student_links sl join public.students s on s.id=sl.student_id
+   where sl.user_id=auth.uid()), '[]'::jsonb),
+ 'lessons',coalesce((select jsonb_agg(jsonb_build_object(
+   'id',l.id,'student_id',l.student_id,'lesson_date',l.lesson_date,
+   'schedule_id',l.schedule_id,'scheduled_date',l.scheduled_date,
+   'subject',l.subject,'start_time',l.start_time,'end_time',l.end_time,
+   'type',l.type,'remarks',l.remarks,'lesson_content',l.lesson_content,'mood_rating',l.mood_rating,'focus_rating',l.focus_rating,
+   'attitude_rating',l.attitude_rating,'hours',l.hours,'updated_at',l.updated_at))
+   from public.lesson_records l join public.student_links sl on sl.student_id=l.student_id
+   where sl.user_id=auth.uid()), '[]'::jsonb),
+ 'schedules',coalesce((select jsonb_agg(jsonb_build_object(
+   'id',r.id,'student_id',r.student_id,'teacher_id',r.teacher_id,'subject',r.subject,
+   'starts_on',r.starts_on,'ends_on',r.ends_on,'cancelled_from',r.cancelled_from,
+   'weekdays',r.weekdays,'every_weeks',r.every_weeks,
+   'start_time',r.start_time,'end_time',r.end_time,'updated_at',r.updated_at))
+   from public.recurring_schedules r join public.student_links sl on sl.student_id=r.student_id
+   where sl.user_id=auth.uid()), '[]'::jsonb),
+ 'exceptions',coalesce((select jsonb_agg(jsonb_build_object(
+   'schedule_id',e.schedule_id,'original_date',e.original_date,
+   'action',e.action,'moved_to',e.moved_to))
+   from public.schedule_exceptions e
+   join public.recurring_schedules r on r.id=e.schedule_id
+   join public.student_links sl on sl.student_id=r.student_id
+   where sl.user_id=auth.uid()), '[]'::jsonb)
+);
+$function$
+
