@@ -34,8 +34,8 @@ function createApp(){
  return {app,element:id=>document.querySelector("#"+id)};
 }
 
-test("Existing preview data still loads without any tenant setup",()=>{
- const {app}=createApp();app.loadDemo();assert.equal(app.visibleStudents().length,3);
+test("Archived preview fixtures can still load explicitly in tests without tenant setup",()=>{
+ const {app}=createApp();app.state.mode="demo";app.loadDemo();assert.equal(app.visibleStudents().length,3);
 });
 
 test("New teacher sees setup; existing owner sees their own students",()=>{
