@@ -392,7 +392,7 @@ function renderSharedPlanner(){
  const st=sharedCourseStudents();
  if(!st.length){$(dest).innerHTML='<div class="empty">目前尚未連結課程。請先接受老師發出的邀請。</div>';return}
  const students=new Map(st.map(s=>[s.id,s]));
- const rules=sharedCourseRules().filter(r=>!r.cancelled_from)
+ const rules=sharedCourseRules().filter(r=>!r.cancelled_from||r.cancelled_from>dateKey(tick()))
   .sort((a,b)=>a.starts_on.localeCompare(b.starts_on)).slice(0,18);
  const lessons=sharedCourseLessons().filter(l=>l.type!=="moved"&&l.lesson_date>=dateKey(new Date(state.month.getFullYear(),state.month.getMonth(),1)))
   .sort((a,b)=>(a.lesson_date+" "+a.start_time).localeCompare(b.lesson_date+" "+b.start_time)).slice(0,35);
@@ -403,7 +403,7 @@ function renderSharedPlanner(){
  ' '+esc(timeLabel(r.start_time))+'–'+esc(timeLabel(r.end_time))+'</small></div><div class="shared-course-actions">'+
  '<button type="button" class="mini-action" data-action="shared-edit-schedule" data-id="'+esc(r.id)+'">修改未來</button>'+
  '<button type="button" class="mini-action" data-action="shared-cancel-future" data-id="'+esc(r.id)+'">取消未來</button>'+
- '<button type="button" class="mini-action" data-action="shared-cancel-all" data-id="'+esc(r.id)+'">停止整組</button></div></div>').join("");
+ '<button type="button" class="mini-action" data-action="shared-cancel-all" data-id="'+esc(r.id)+'">停止剩餘課程</button></div></div>').join("");
  const lessonRows=lessons.map(l=>'<div class="shared-course-line"><div><strong>'+esc(students.get(l.student_id)?.name||"學生")+' · '+esc(l.subject||"課程")+'</strong><small>'+
  esc(l.lesson_date)+' '+esc(timeLabel(l.start_time))+'–'+esc(timeLabel(l.end_time))+' · '+(l.type==="lesson"?"已完成":l.type==="leave"?"已取消":"已安排")+'</small></div>'+
  (l.type==="planned"?'<div class="shared-course-actions"><button type="button" class="mini-action" data-action="shared-edit-lesson" data-id="'+esc(l.id)+'">改期／修改</button>'+
@@ -414,7 +414,9 @@ function renderSharedPlanner(){
  '<h3 class="shared-course-heading">固定課表</h3>'+(ruleRows||'<p class="muted-small">目前沒有進行中的固定課表。</p>')+
  '<h3 class="shared-course-heading">本月及後續課程</h3>'+(lessonRows||'<p class="muted-small">目前沒有課程安排。</p>')+
  (history.length?'<h3 class="shared-course-heading">最近變更</h3>'+history.map(h=>
-  '<p class="shared-history-row">'+esc(h.studentName)+' · '+esc(h.summary)+' <small>'+esc(String(h.created_at).slice(0,16).replace("T"," "))+'</small></p>').join(""):"");
+  '<p class="shared-history-row">'+esc(h.studentName)+' · '+esc({teacher:"老師",guardian:"家長",student:"學生"}[h.actor_role]||"共同管理")+
+  ' · '+esc(h.summary)+(h.cancellation_reason?'（'+esc(h.cancellation_reason)+'）':"")+
+  ' <small>'+esc(String(h.created_at).slice(0,16).replace("T"," "))+'</small></p>').join(""):"");
 }
 async function loadSharedCourseHistory(){
  state.sharedCourseHistory={};
@@ -468,7 +470,9 @@ function openSharedCourseForm(action,id=null){
   action:isSchedule?(rule?"update_schedule":"create_schedule"):(lesson?(virtual?"change_occurrence":"update_lesson"):"create_lesson"),
   targetId:virtual?lesson.schedule_id:(rule?.id||lesson?.id||null),
   studentId:sel,originalDate:virtual?originalOccurrenceDate(lesson):null,
-  expectedUpdatedAt:rule?.updated_at||(!virtual?lesson?.updated_at:null)
+  expectedUpdatedAt:rule?.updated_at||(virtual
+    ? sharedCourseRules().find(r=>r.id===lesson?.schedule_id)?.updated_at
+    : lesson?.updated_at) || null
  };
  $("#shared-course-heading").textContent=rule?"修改未來固定課表":lesson?"修改這堂課":isSchedule?"新增固定課表":"新增單堂課";
  $("#shared-course-student").innerHTML=st.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.name)+'</option>').join("");
@@ -489,13 +493,14 @@ function openSharedCourseForm(action,id=null){
  Array.from(document.querySelectorAll("#shared-course-weekdays input")).forEach(x=>{x.checked=days.includes(Number(x.value))});
  if(isSchedule)syncRecurringWeekdays("shared-course-date","shared-course-weekdays","shared-weekday-hint");
  $("#shared-course-note").textContent=virtual?
-  "此堂是固定課表產生的課程，目前可直接更改單堂日期；若需更改科目或時間，請修改固定課表。鐘點費仍由老師管理。":
-  "雙方共用同一份課表。鐘點費由老師設定，這裡不會修改已完成的課程或收款。";
+  "此堂來自固定課表：可改單堂日期；科目與上課時間請修改未來固定規則。若別人剛修改會要求重新整理。":
+  "三方共用同一份課表，系統會阻止撞期及過期修改。科目更動不會自動換算鐘點費：計費仍按老師既有學生預設費率或原課程費率，特殊科目請老師確認。";
  showModal("shared-course-modal");
 }
 async function submitSharedCourse(event){
  event.preventDefault();
  const d=state.sharedCourseDraft;if(!d||state.mode!=="live")return;
+ if(d.targetId&&!d.expectedUpdatedAt){toast("這堂課缺少最新版本資訊，請重新整理後再修改");return}
  const studentId=$("#shared-course-student").value;
  if(!sharedCourseStudents().some(s=>s.id===studentId)){toast("沒有這位學生的權限");return}
  const date=$("#shared-course-date").value,subject=$("#shared-course-subject").value.trim();
@@ -512,7 +517,7 @@ async function submitSharedCourse(event){
    starts_on:date,ends_on:$("#shared-course-end-date").value||null});
   if(d.action==="update_schedule")payload.effective_on=date;
  }else payload.lesson_date=date;
- if(d.expectedUpdatedAt)payload.expected_updated_at=d.expectedUpdatedAt;
+ if(d.targetId)payload.expected_updated_at=d.expectedUpdatedAt;
  const ok=await persist(async()=>assertResult(await client.rpc("shared_course_action",{
   p_action:d.action,p_student_id:studentId,p_target_id:d.targetId,p_payload:payload
  })));
@@ -525,11 +530,17 @@ async function cancelSharedCourse(kind,id){
  if((kind==="lesson"&&!lesson)||(kind!=="lesson"&&!rule)){toast("找不到課程");return}
  if(lesson&&lesson.type!=="planned"){toast("已完成或已取消的課程不能直接取消");return}
  const today=dateKey(tick());
- const from=kind==="all"?rule.starts_on:kind==="future"?(today>rule.starts_on?today:rule.starts_on):null;
- if(!confirm(kind==="lesson"?"確定取消這一堂課？這不會影響其他週，也不會刪除帳務歷史。":
-   "確定停止這組固定課表"+(kind==="all"?"的所有未來排課":"自 "+from+" 起的課程")+"？已完成與已付款紀錄會保留。"))return;
- const payload=lesson?(lesson.virtual_occurrence?{original_date:originalOccurrenceDate(lesson)}:{expected_updated_at:lesson.updated_at}):
-  {from_date:from,expected_updated_at:rule.updated_at};
+ const from=rule? (today>rule.starts_on?today:rule.starts_on):null;
+ const version=lesson? (lesson.virtual_occurrence
+   ? sharedCourseRules().find(r=>r.id===lesson.schedule_id)?.updated_at
+   : lesson.updated_at):rule?.updated_at;
+ if(!version){toast("課程版本資訊未更新，請重新整理後再操作");return}
+ if(!confirm(lesson?"確定取消這一堂課？不會影響其他星期，帳務歷史保留。":
+   "確定停止此固定課表從 "+from+" 起的剩餘課程？過去及已完成課程不會受到影響。"))return;
+ const payload=lesson?(lesson.virtual_occurrence
+    ? {original_date:originalOccurrenceDate(lesson),expected_updated_at:version}
+    : {expected_updated_at:version}):
+   {from_date:from,expected_updated_at:version};
  const action=lesson?(lesson.virtual_occurrence?"cancel_occurrence":"cancel_lesson"):"cancel_schedule";
  const target=lesson?(lesson.virtual_occurrence?lesson.schedule_id:lesson.id):rule.id;
  const studentId=lesson?.student_id||rule?.student_id;
@@ -1264,7 +1275,7 @@ function openSchedule(rule=null){
    ?teacherPreferences.lastWeekdays:[((parseDate(state.selected).getDay()+6)%7)+1]);
  Array.from(document.querySelectorAll("#schedule-weekdays input")).forEach(i=>i.checked=initWeekday.includes(Number(i.value)));
  syncRecurringWeekdays("schedule-start","schedule-weekdays","schedule-weekday-hint");
- $('input[name="schedule-scope"]').forEach(r=>r.checked=r.value==="future");
+ $$('input[name="schedule-scope"]').forEach(r=>r.checked=r.value==="future");
  renderScheduleRules();showModal("schedule-modal");
 }
 function getScheduleForm(){
