@@ -181,7 +181,7 @@
       <label>上課科目<input id="schedule-subject" maxlength="80" list="schedule-subject-options" required placeholder="例如：數學"><datalist id="schedule-subject-options"></datalist></label>
       <div><span class="form-label">每週上課日（可複選）</span><div class="weekday-selector" id="schedule-weekdays">
         <label><input type="checkbox" value="1"><span>一</span></label><label><input type="checkbox" value="2"><span>二</span></label><label><input type="checkbox" value="3"><span>三</span></label><label><input type="checkbox" value="4"><span>四</span></label><label><input type="checkbox" value="5"><span>五</span></label><label><input type="checkbox" value="6"><span>六</span></label><label><input type="checkbox" value="7"><span>日</span></label>
-      </div></div>
+      </div><small class="helper-note" id="schedule-weekday-hint" aria-live="polite">選擇上課星期；修改開始日期時會同步單一星期。</small></div>
       <div class="form-row"><label>排課頻率<select id="schedule-frequency"><option value="1">每週</option><option value="2">每兩週</option></select></label><label>開始日期<input id="schedule-start" type="date" required></label></div>
       <div class="form-row"><label>上課時間<input type="time" id="schedule-time-start" value="19:00" required></label><label>結束時間<input type="time" id="schedule-time-end" value="20:30" required></label></div>
       <div class="form-row"><label>鐘點費（NT$／小時）<input id="schedule-rate" type="number" min="0" step="1" value="500" list="schedule-rate-options" required><datalist id="schedule-rate-options"></datalist></label><label>結束日期（可空白）<input id="schedule-end-date" type="date"></label></div>
@@ -229,7 +229,7 @@
     <label id="repeat-label">重複排課<select name="repeat" id="record-repeat"><option value="none">僅這一堂</option><option value="weekly">每週（可複選星期）</option><option value="biweekly">每兩週（可複選星期）</option><option value="monthly">每月（依當月日期）</option></select></label>
     <div class="record-weekdays hidden" id="record-weekdays-wrap"><span class="form-label">上課星期（可複選）</span><div class="weekday-selector" id="record-weekdays">
       <label><input type="checkbox" value="1"><span>一</span></label><label><input type="checkbox" value="2"><span>二</span></label><label><input type="checkbox" value="3"><span>三</span></label><label><input type="checkbox" value="4"><span>四</span></label><label><input type="checkbox" value="5"><span>五</span></label><label><input type="checkbox" value="6"><span>六</span></label><label><input type="checkbox" value="7"><span>日</span></label>
-    </div><small class="helper-note">星期一、三、五可以一次設定；時間相同的課程會共用一組固定規則。</small></div>
+    </div><small class="helper-note" id="record-weekday-hint" aria-live="polite">多個星期可以一次設定；修改日期時不會覆蓋多選結果。</small></div>
     <label id="until-label" class="hidden"><span id="repeat-until-caption">重複到日期（可留空，空白代表長期）</span><input type="date" id="record-until"></label>
     <div class="form-actions"><button type="button" class="secondary-button" data-close="record-modal">取消</button><button type="submit" class="primary-button" id="save-record">儲存課程</button></div>
   </form></dialog>
@@ -261,7 +261,7 @@
         <button type="button" class="close-modal" data-close="shared-course-modal" aria-label="關閉">×</button></div>
       <label>學生<select id="shared-course-student" required></select></label>
       <label id="shared-course-subject-label">科目<input id="shared-course-subject" maxlength="80" required placeholder="例如：數學"></label>
-      <div class="form-row"><label id="shared-course-date-label">課程日期／修改生效日<input id="shared-course-date" type="date" required></label>
+      <div class="form-row"><label id="shared-course-date-label"><span id="shared-course-date-label-text">課程日期／修改生效日</span><input id="shared-course-date" type="date" required></label>
         <label id="shared-course-end-label" class="hidden">固定課表結束日（可留空）<input id="shared-course-end-date" type="date"></label></div>
       <div class="form-row" id="shared-course-times"><label>開始時間<input id="shared-course-start" type="time" required></label>
         <label>結束時間<input id="shared-course-end" type="time" required></label></div>
@@ -273,6 +273,7 @@
           <label><input type="checkbox" value="5">五</label><label><input type="checkbox" value="6">六</label>
           <label><input type="checkbox" value="7">日</label>
         </div>
+        <small class="helper-note" id="shared-weekday-hint" aria-live="polite">修改日期時，只有單一上課星期會同步；多選星期會保留。</small>
         <label>頻率<select id="shared-course-frequency"><option value="1">每週</option><option value="2">每兩週</option></select></label>
       </div>
       <p class="helper-note" id="shared-course-note">鐘點費與收款由老師管理；此處只會更動課程安排，不會修改帳務。</p>
