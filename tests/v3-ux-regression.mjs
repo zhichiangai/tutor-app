@@ -44,7 +44,7 @@ function createApp(){
 }
 
 test("A student remembers its own latest rate, subject and time",async()=>{
- const {app,el}=createApp();app.loadDemo();await app.loadTeacherPreferences();
+ const {app,el}=createApp();app.state.mode="demo";app.loadDemo();await app.loadTeacherPreferences();
  await app.rememberTeacherForm({studentId:"demo-s2",subject:"英文進度",rate:200,start:"17:00",end:"18:00"});
  app.openRecord();
  assert.equal(el("record-student").value,"demo-s2");
@@ -57,7 +57,7 @@ test("A student remembers its own latest rate, subject and time",async()=>{
 });
 
 test("History suggestions stay editable and keep both 200 and 500",async()=>{
- const {app,el}=createApp();app.loadDemo();await app.loadTeacherPreferences();
+ const {app,el}=createApp();app.state.mode="demo";app.loadDemo();await app.loadTeacherPreferences();
  await app.rememberTeacherForm({studentId:"demo-s1",rate:200,subject:"數學"});
  await app.rememberTeacherForm({studentId:"demo-s1",rate:500,subject:"數學"});
  app.openRecord();
@@ -69,7 +69,7 @@ test("History suggestions stay editable and keep both 200 and 500",async()=>{
 });
 
 test("Monday/Wednesday/Friday weekly scheduling writes one recurring rule, not 52 lesson rows",async()=>{
- const {app,el,weekdays}=createApp();app.loadDemo();await app.loadTeacherPreferences();
+ const {app,el,weekdays}=createApp();app.state.mode="demo";app.loadDemo();await app.loadTeacherPreferences();
  const nLessons=app.state.lessons.length,nRules=app.state.schedules.length;
  app.openRecord();
  el("record-date").value="2026-10-19";
