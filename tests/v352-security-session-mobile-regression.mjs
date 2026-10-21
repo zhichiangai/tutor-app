@@ -202,3 +202,79 @@ test("reversal audit preserves original billable hours, rate and amount",()=>{
  assert.ok(rollbackFixture.includes("FAILED: old family payment approval regressed"));
  assert.ok(rollbackFixture.includes("FAILED: paid feedback incorrectly locked"));
 });
+
+
+test("V3.5.3 logout scrubs the student DOM immediately while remote signout is pending",async()=>{
+ const {app,node}=browserHarness();
+ let finishRemote;let called=false;
+ const remote=new Promise(resolve=>{finishRemote=resolve});
+ app.setClient({auth:{signOut(){called=true;return remote}}});
+ app.setUser({id:"student-A",email:"a@example.test"});
+ app.state.role="student";app.state.view="student";
+ app.state.studentPortal={students:[{id:"student-A",name:"Private student"}],
+   lessons:[{id:"lesson-A",lesson_content:"Secret content"}],schedules:[]};
+ app.state.sharedCourseHistory={"student-A":[{remarks:"Secret feedback"}]};
+ node("#student-portal-content").innerHTML="Private student; Secret content";
+ node("#payment-batch-history").innerHTML="Private billing";
+ node("#profile-display-name").value="Private display name";
+ const logoutPromise=app.signOut();
+ // These assertions run before finishRemote() resolves: no await or timers.
+ assert.ok(called,"Supabase signOut must still be requested");
+ assert.equal(app.getUser(),null);
+ assert.equal(node("#student-portal-content").innerHTML,"");
+ assert.equal(node("#payment-batch-history").innerHTML,"");
+ assert.equal(node("#profile-display-name").value,"");
+ assert.equal(app.state.studentPortal.lessons.length,0);
+ assert.deepEqual(app.state.sharedCourseHistory,{});
+ assert.equal(node("#account-modal").open,true);
+ finishRemote({error:null});
+ await logoutPromise;
+ assert.equal(node("#student-portal-content").innerHTML,"");
+});
+
+test("V3.5.3 remote signout failure cannot restore sensitive DOM",async()=>{
+ const {app,node}=browserHarness();
+ let finishRemote;
+ app.setClient({auth:{signOut(){return new Promise(resolve=>{finishRemote=resolve})}}});
+ app.setUser({id:"student-A"});
+ node("#student-portal-content").innerHTML="Still private";
+ const logoutPromise=app.signOut();
+ assert.equal(node("#student-portal-content").innerHTML,"");
+ finishRemote({error:new Error("Network offline")});
+ await logoutPromise;
+ assert.equal(app.getUser(),null);
+ assert.equal(node("#student-portal-content").innerHTML,"");
+ assert.equal(node("#account-modal").open,true);
+ assert.match(node("#toast").textContent,/遠端登出未完成/);
+});
+
+test("V3.5.3 token refresh cannot rehydrate a user while logout is pending",async()=>{
+ const {app,node,window}=browserHarness();
+ let callback,finishRemote;
+ window.supabase={createClient:()=>({
+  auth:{
+   onAuthStateChange(cb){callback=cb},
+   signOut(){return new Promise(resolve=>{finishRemote=resolve})}
+  }
+ })};
+ await app.ensureClient();
+ app.setUser({id:"student-A"});
+ node("#student-portal-content").innerHTML="A's lessons";
+ const logoutPromise=app.signOut();
+ callback("TOKEN_REFRESHED",{user:{id:"student-A"}});
+ assert.equal(app.getUser(),null);
+ assert.equal(node("#student-portal-content").innerHTML,"");
+ finishRemote({error:null});
+ await logoutPromise;
+ assert.equal(app.getUser(),null);
+});
+
+test("V3.5.3 narrow month agenda buttons can shrink inside a 320px viewport",()=>{
+ const html=read("../v2/index.html");
+ assert.match(css,/#view-calendar \.month-agenda-row\.lesson-quick-trigger\s*\{[^}]*width:100%;[^}]*max-width:100%;[^}]*min-width:0;/);
+ assert.match(css,/#view-calendar \.month-agenda-row \.month-agenda-info\s*\{[^}]*min-width:0;/);
+ assert.match(css,/#view-calendar \.month-agenda-row \.pill\s*\{[^}]*max-width:42%;[^}]*min-width:0;/);
+ // Actual viewport hitboxes and document.scrollWidth must still be checked by Codex browser.
+ assert.ok(!css.includes("body{overflow-x:hidden}"),"do not cover up overflow instead of fixing it");
+ assert.ok(html.includes("V3.5.3 · Made with care."));
+});
