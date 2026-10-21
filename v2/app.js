@@ -1715,8 +1715,12 @@ async function ensureClient(){
  return client;
 }
 async function initializeLive(){
+ const bootGeneration=authDataGeneration;
  try{
-  await ensureClient();const {data,error}=await client.auth.getSession();if(error)throw error;
+  await ensureClient();
+  const {data,error}=await client.auth.getSession();
+  if(bootGeneration!==authDataGeneration)return;
+  if(error)throw error;
   activeUser=data.session?.user||null;
   if(activeUser){
    const initializingUserId=activeUser.id,initializingGeneration=authDataGeneration;
@@ -1741,13 +1745,16 @@ async function initializeLive(){
       .update({enabled_roles:state.enabledRoles,roles_configured:true})
       .eq("id",activeUser.id).select("id").single();
     if(error)throw error;
+    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    }else state.enabledRoles=normalizedRoles(profile.enabled_roles);
    if(!state.enabledRoles.length)state.enabledRoles=["teacher"];
    state.role=[remote,cached,...state.enabledRoles].find(r=>state.enabledRoles.includes(r))||state.enabledRoles[0];
    localStorage.setItem(ROLE_STORAGE+"_"+activeUser.id,state.role);
    if(remote!==state.role)await saveLastRole(state.role);
+   if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    state.view=state.role==="student"?"student":"home";
    await loadTeacherPreferences();
+   if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    closeModal("account-modal");
    toast("已登入並同步課程");
   }else{
@@ -1756,6 +1763,7 @@ async function initializeLive(){
   render();
   if(!activeUser)showModal("account-modal");
  }catch(err){
+  if(bootGeneration!==authDataGeneration)return;
   console.error(err);
   activeUser=null;
   clearUserSessionState();
