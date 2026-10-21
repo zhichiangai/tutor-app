@@ -432,11 +432,13 @@ function renderParentLearning(){
  for(const l of thisMonth){const n=l.subject||"課程";grouped.set(n,(grouped.get(n)||0)+1)}
  const summary=[...grouped].map(([k,v])=>'<span class="learning-subject-chip">'+esc(k)+' · '+v+' 堂</span>').join("");
  $("#parent-learning-home").innerHTML='<div class="section-row"><div><h2>孩子的學習近況</h2><p class="section-sub">'+(lessons.length?"最新課後回饋，先看孩子的進步":"尚無已完成課程的老師回饋")+'</p></div><button type="button" class="text-link" data-view="students">查看學習紀錄 ↗</button></div>'+
- (lessons.length?'<p><strong>'+esc(studentFor(lessons[0])?.name||"學生")+' · '+esc(lessons[0].subject||"課程")+'</strong> · '+esc(lessons[0].lesson_date)+'</p><p class="learning-note">'+esc(lessons[0].remarks||"老師尚未填寫課後回饋")+'</p>':'');
+ (lessons.length?'<p><strong>'+esc(studentFor(lessons[0])?.name||"學生")+' · '+esc(lessons[0].subject||"課程")+'</strong> · '+esc(lessons[0].lesson_date)+'</p>'+
+  '<p class="learning-note">'+esc(lessons[0].lesson_content||lessons[0].remarks||"老師尚未填寫課後回饋")+'</p>':'');
  $("#parent-learning").innerHTML=lessons.length?'<div class="learning-subjects">'+(summary||"本月還沒有已完成的課程")+'</div>'+
  lessons.slice(0,24).map(l=>'<article class="learning-lesson"><div class="learning-lesson-title"><strong>'+
  esc(studentFor(l)?.name||l.student||"學生")+' · '+esc(l.subject||"課程")+'</strong><small>'+esc(l.lesson_date)+' · '+esc(String(l.actual_hours??l.hours??0))+' 小時</small></div>'+
- '<div class="learning-ratings"><span>專注度：'+learningRating(l.focus_rating)+'</span><span>學習態度：'+learningRating(l.attitude_rating)+'</span></div>'+
+ '<p>'+esc(l.lesson_content||"尚無本堂上課內容")+'</p>'+
+ '<div class="learning-ratings"><span>專注度：'+learningRating(l.focus_rating)+'</span><span>學生心情：'+learningRating(l.mood_rating)+'</span></div>'+
  '<p>'+esc(l.remarks||"老師尚未填寫課後回饋")+'</p></article>').join(""):
  '<div class="empty">目前還沒有已完成課程的學習紀錄。老師填寫課後評語後，會在這裡顯示。</div>';
 }
@@ -659,7 +661,9 @@ function renderStudentPortal(){
  ' · '+esc(String(r.start_time).slice(0,5))+'–'+esc(String(r.end_time).slice(0,5))+(r.cancelled_from?' · '+esc(r.cancelled_from)+' 起停止':'')+'</span></div>').join(""):'')+
  '<h3>上課與課後回饋</h3>'+(entries.length?entries.slice(0,120).map(l=>'<div class="student-portal-lesson"><strong>'+esc(studentsById.get(l.student_id)?.name||"學生")+' · '+esc(l.subject||"課程")+'</strong><small>'+
  esc(l.lesson_date)+' · '+esc(String(l.start_time||"").slice(0,5))+'–'+esc(String(l.end_time||"").slice(0,5))+' · '+(l.type==="lesson"?"已完成":l.type==="leave"?"已取消":"已安排")+'</small>'+
- (l.type==="lesson"?'<div class="student-portal-ratings">專注度：'+(l.focus_rating==null?"尚未評分":esc(l.focus_rating)+"／5")+' · 學習態度：'+(l.attitude_rating==null?"尚未評分":esc(l.attitude_rating)+"／5")+'</div><p>'+esc(l.remarks||"老師尚未填寫課後回饋")+'</p>':"")+
+ (l.type==="lesson"?'<p>'+esc(l.lesson_content||"尚未填寫上課內容")+'</p>'+
+  '<div class="student-portal-ratings">專注度：'+learningRating(l.focus_rating)+' · 學生心情：'+learningRating(l.mood_rating)+'</div>'+
+  '<p>'+esc(l.remarks||"老師尚未填寫課後回饋")+'</p>':"")+
  '</div>').join(""):'<div class="empty">老師尚未新增課堂紀錄。</div>'):
  '<div class="empty">尚未連結自己的學生資料。接受老師邀請後，這裡會顯示課程與學習回饋。</div>';
 }
