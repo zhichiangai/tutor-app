@@ -47,11 +47,19 @@ test("signed-out learning portal never renders stale content",()=>{
  app.state.receiptBatch="secret-receipt";
  node("#student-portal-content").innerHTML="A's private class";
  node("#shared-student-content").innerHTML="A's schedule";
+ node("#payment-batch-history").innerHTML="A's payment notes";
+ node("#invite-content").innerHTML="A's guardian invitations";
+ node("#billing-student-summary").innerHTML="A's private billing";
+ node("#profile-display-name").value="A private display name";
  app.setUser(null);
  app.clearUserSessionState();
  app.renderStudentPortal();
  assert.equal(node("#student-portal-content").innerHTML,"");
  assert.equal(node("#shared-student-content").innerHTML,"");
+ for(const id of ["payment-batch-history","invite-content","billing-student-summary"]){
+  assert.equal(node("#"+id).innerHTML,"","private page '"+id+"' was not cleared");
+ }
+ assert.equal(node("#profile-display-name").value,"");
  assert.equal(app.state.studentPortal.students.length,0);
  assert.deepEqual(app.state.sharedCourseHistory,{});
  assert.equal(app.state.sharedCourseDraft,null);
