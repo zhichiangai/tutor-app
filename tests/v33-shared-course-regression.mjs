@@ -69,7 +69,7 @@ test("linked parent can open a shared lesson form and cannot choose unrelated st
   {id:"student2",teacher_id:"teacher2",name:"別人家",subject:"數學",hourly_rate:999}];
  app.state.guardians=[{student_id:"student1",teacher_id:"teacher1",guardian_id:"parent1"}];
  app.openSharedCourseForm("new-lesson");
- assert.ok(shown.includes("shared-course-modal"));
+ assert.ok(shown.includes("#shared-course-modal"));
  assert.ok(node("#shared-course-student").innerHTML.includes("student1"));
  assert.ok(!node("#shared-course-student").innerHTML.includes("student2"));
  assert.equal(app.state.sharedCourseDraft.action,"create_lesson");
