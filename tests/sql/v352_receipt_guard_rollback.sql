@@ -83,10 +83,13 @@ begin
   perform public.reverse_legacy_lesson_receipt(l,before_rev,'repeated unauthorized reversal attempt');
  exception when others then rejected:=true;end;
  if not rejected then raise exception 'FAILED: reversal repeated';end if;
+ -- The private audit is readable by postgres only, never by authenticated.
+ execute 'reset role';
  if not exists(select 1 from tutor_private.legacy_receipt_reversal_audit a
   where a.lesson_id=l and a.actor_id=t and a.applied
     and a.previous_status='老師已收到' and length(a.reason)>=10)
  then raise exception 'FAILED: no applied audit of authorized reversal';end if;
+ execute 'set local role authenticated';
  -- The teacher may correct billable hours only *after* the controlled reversal.
  update public.lesson_records set hours=3,total_amount=1500 where id=l;
  if not exists(select 1 from public.lesson_records where id=l
