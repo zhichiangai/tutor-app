@@ -27,7 +27,7 @@ const timeLabel = (s) => asText(s).slice(0,5);
 const tick = ()=>new Date();
 const uid = ()=>crypto.randomUUID();
 let client=null, activeUser=null, loading=false, teacherPreferences={};
-const state={mode:localStorage.getItem(MODE_STORAGE)==="live"?"live":"demo",role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",paymentBatches:[],paymentBatchItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",studentInvites:[],studentLinks:[],studentPortal:{students:[],lessons:[],schedules:[]},sharedCourseDraft:null,sharedCourseHistory:{},receiptBatch:null,activeLesson:null,actualHoursManual:false};
+const state={mode:"live",enabledRoles:["teacher"],lessonRatings:{focus:null,mood:null},role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",paymentBatches:[],paymentBatchItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",studentInvites:[],studentLinks:[],studentPortal:{students:[],lessons:[],schedules:[]},sharedCourseDraft:null,sharedCourseHistory:{},receiptBatch:null,activeLesson:null,actualHoursManual:false};
 
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
@@ -101,10 +101,52 @@ function setBusy(yes){
 }
 function showModal(id){const dialog=$("#"+id);if(dialog&&!dialog.open)dialog.showModal()}
 function closeModal(id){const dialog=$("#"+id);if(dialog?.open)dialog.close()}
-function setView(view){if(state.role==="student")view="student";else if(view==="student")view="home";state.view=view;$$(".page-view").forEach(x=>x.classList.toggle("hidden",x.id!=="view-"+view));$$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));$("#breadcrumb-name").textContent=({home:"今天",calendar:"課程月曆",billing:"收付款",students:"學生與家長"})[view];render()}
+function setView(view){
+ if(state.role==="student"&&view!=="settings")view="student";
+ else if(state.role!=="student"&&view==="student")view="home";
+ state.view=view;
+ $$(".page-view").forEach(x=>x.classList.toggle("hidden",x.id!=="view-"+view));
+ $$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
+ $("#breadcrumb-name").textContent=({home:"今天",calendar:"課程月曆",billing:"收付款",students:"學生與家長",settings:"設定",student:"我的學習"})[view]||"今天";
+ render();
+}
 const VALID_ROLES=["teacher","parent","student"];
 const ROLE_SUFFIX={teacher:"老師",parent:"家長",student:"同學"};
 const ROLE_TITLE={teacher:"老師模式",parent:"家長模式",student:"學生模式"};
+function normalizedRoles(list){
+ const roles=Array.isArray(list)?list.filter(x=>VALID_ROLES.includes(x)):[];
+ return VALID_ROLES.filter(x=>roles.includes(x));
+}
+function enabledRoles(){
+ const selected=normalizedRoles(state.enabledRoles);
+ return selected.length?selected:["teacher"];
+}
+function renderRoleSettings(){
+ const modes=enabledRoles();
+ $$('[data-role-choice]').forEach(item=>item.classList.toggle("hidden",!modes.includes(item.dataset.roleChoice)));
+ $$('input[name="enabled-role"]').forEach(input=>input.checked=modes.includes(input.value));
+ $("#role-indicator").setAttribute("aria-haspopup",String(modes.length>1));
+ $("#settings-back-student").classList.toggle("hidden",state.role!=="student");
+}
+async function saveEnabledRoles(event){
+ event.preventDefault();
+ if(!activeUser||state.mode!=="live")return;
+ const selected=normalizedRoles($$('input[name="enabled-role"]:checked').map(x=>x.value));
+ if(!selected.length){toast("至少需要開啟一個使用模式");return}
+ const ok=await persist(async()=>{
+  assertResult(await client.from("profiles").update({enabled_roles:selected,roles_configured:true})
+    .eq("id",activeUser.id).select("id").single());
+ });
+ if(!ok)return;
+ state.enabledRoles=selected;
+ if(!selected.includes(state.role)){
+  state.role=selected[0];
+  await saveLastRole(state.role);
+  state.view=state.role==="student"?"student":"settings";
+ }
+ render();
+ toast("已儲存模式設定；上方只顯示勾選的模式");
+}
 function userDisplayName(){
  const p=state.profiles.find(p=>p.id===activeUser?.id);
  return String(p?.display_name||activeUser?.user_metadata?.full_name||activeUser?.user_metadata?.name||"使用者")
@@ -119,7 +161,7 @@ async function saveLastRole(role){
  const mine=state.profiles.find(p=>p.id===id);if(mine)mine.last_role=role;
 }
 function setRole(role){
- if(!VALID_ROLES.includes(role))return;
+ if(!VALID_ROLES.includes(role)||!enabledRoles().includes(role))return;
  state.role=role;
  const menu=$("#role-menu");menu.classList.add("hidden");$("#role-indicator").setAttribute("aria-expanded","false");
  localStorage.setItem(state.mode==="live"&&activeUser?ROLE_STORAGE+"_"+activeUser.id:ROLE_STORAGE,role);
