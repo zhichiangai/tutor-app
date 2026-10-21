@@ -1627,8 +1627,14 @@ let authDataGeneration=0;
 const SESSION_PRIVATE_DOM_IDS=[
  "student-portal-content","student-invites","shared-student-content","shared-parent-content",
  "parent-learning","parent-learning-home","billing-list","period-lesson-list",
+ "billing-student-summary","billing-summary","payment-batch-history",
  "student-billing-summary","student-billing-list","shared-course-error",
- "lesson-content","lesson-feedback"
+ "agenda-list","calendar-grid","day-modal-lessons","invite-content","mini-calendar",
+ "month-lesson-list","month-lesson-preview","next-lesson","period-overview",
+ "period-student","receipt-details","recent-lessons","requests-list",
+ "schedule-rules-list","student-grid","student-invite-teacher-content",
+ "lesson-content","lesson-feedback","lesson-focus-stars","lesson-mood-stars",
+ "profile-display-name","workspace-name","invite-edit-email"
 ];
 function clearUserSessionState(){
  authDataGeneration++;
@@ -1655,7 +1661,12 @@ function clearUserSessionState(){
   el.innerHTML="";
   if("textContent" in el)el.textContent="";
  }
- for(const id of ["lesson-form","shared-course-form","record-form","request-form","period-form"]){
+ // Reset every visible/hidden form, including dynamically created invitation
+ // forms, so switching Google accounts cannot inherit A's draft values.
+ document.querySelectorAll?.("form")?.forEach(form=>form.reset?.());
+ for(const id of ["lesson-form","shared-course-form","record-form","request-form","period-form",
+  "profile-display-form","mode-settings-form","receipt-form","invite-edit-form",
+  "schedule-form","cancel-form","change-form","student-form"]){
   document.querySelector?.("#"+id)?.reset?.();
  }
  document.querySelectorAll?.(".modal")?.forEach(dialog=>{
