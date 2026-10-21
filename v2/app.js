@@ -1700,7 +1700,8 @@ async function ensureClient(){
   const previousId=activeUser?.id||null;
   const nextUser=session?.user||null;
   const switchedAccounts=previousId&&nextUser&&previousId!==nextUser.id;
-  if(event==="SIGNED_OUT"||switchedAccounts){
+  const lostSession=previousId&&!nextUser;
+  if(event==="SIGNED_OUT"||switchedAccounts||lostSession){
    clearUserSessionState();
    activeUser=nextUser;
    state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
@@ -1754,7 +1755,14 @@ async function initializeLive(){
   }
   render();
   if(!activeUser)showModal("account-modal");
- }catch(err){console.error(err);toast("Supabase 連線失敗："+err.message);showModal("account-modal")}
+ }catch(err){
+  console.error(err);
+  activeUser=null;
+  clearUserSessionState();
+  render();
+  toast("Supabase 連線失敗："+err.message);
+  showModal("account-modal");
+ }
 }
 async function googleLogin(){
  try{
