@@ -107,3 +107,14 @@ test("server migration checks student/guardian linkage and financial locks",()=>
   assert.ok(!portal.includes(secret),"Student portal leaked "+secret);
  }
 });
+
+
+test("student invitation compatibility links and revokes by real schema column",()=>{
+ const sql=read("../supabase/migrations/20261021031000_v33_student_invitation_compat.sql");
+ assert.ok(sql.includes("student_links(invitation_id,teacher_id,student_id,user_id)"));
+ assert.ok(sql.includes("student_invitations"));
+ assert.ok(sql.includes("trg_revoke_shared_student_invite"));
+ const app=read("../v2/app.js");
+ assert.ok(app.includes("joined.has(i.student_id)"));
+ assert.ok(app.includes("linked=links.some(l=>l.student_id===i.student_id"));
+});
