@@ -73,6 +73,15 @@ begin
   update public.lesson_records set hours=3,total_amount=1500 where id=lb;
  exception when others then rejected:=true;end;
  if not rejected then raise exception 'FAILED: allocated pending batch did not guard billable hours';end if;
+ -- Confirm an actual partial batch (250/1000), then verify allocation guard survives.
+ perform public.review_range_payment(b,true,current_date-9);
+ if not exists(select 1 from public.payment_batches where id=b and status='confirmed')
+ then raise exception 'FAILED: normal partial payment confirmation regressed';end if;
+ rejected:=false;
+ begin
+  update public.lesson_records set hours=3,total_amount=1500 where id=lb;
+ exception when others then rejected:=true;end;
+ if not rejected then raise exception 'FAILED: confirmed batch did not guard billable hours';end if;
  select updated_at into before_rev from public.lesson_records where id=l;
  perform public.reverse_legacy_lesson_receipt(l,before_rev,'老師確認前一筆收款登錄有誤，撤銷以重新對帳');
  if not exists(select 1 from public.lesson_records where id=l
