@@ -518,10 +518,10 @@ function renderStudentPortal(){
  const demo=state.mode==="demo";
  const me=activeUser?.id;
  const invitations=state.studentInvites.filter(i=>demo||i.email===activeUser?.email?.toLowerCase());
- const joined=new Set(state.studentLinks.filter(l=>demo||l.user_id===me).map(l=>l.invite_id));
+ const joined=new Set(state.studentLinks.filter(l=>demo||l.user_id===me).map(l=>l.student_id));
  $("#student-invites").innerHTML=demo?'<div class="helper-note">目前是預覽模式。正式登入 Google 後，才可接受老師發出的個人邀請。</div>':
  invitations.length?invitations.map(i=>'<div class="student-portal-line"><span>老師邀請加入課程 · '+esc(i.email)+'</span>'+
- (joined.has(i.id)?'<span class="pill paid">已連結</span>':'<button class="secondary-button" data-action="accept-student-invite" data-id="'+esc(i.id)+'">接受邀請</button>')+'</div>').join(""):
+ (joined.has(i.student_id)?'<span class="pill paid">已連結</span>':'<button class="secondary-button" data-action="accept-student-invite" data-id="'+esc(i.id)+'">接受邀請</button>')+'</div>').join(""):
  '<div class="empty">目前尚未收到學生邀請。請老師將你的 Google Email 加入學生邀請清單。</div>';
  const data=demo?{students:state.students.slice(0,1).map(({id,name,subject})=>({id,name,subject})),
   lessons:state.lessons.filter(l=>l.student_id===state.students[0]?.id).map(({id,student_id,lesson_date,subject,start_time,end_time,type,remarks,focus_rating,attitude_rating})=>({id,student_id,lesson_date,subject,start_time,end_time,type,remarks,focus_rating,attitude_rating})),schedules:[]}:
@@ -553,7 +553,7 @@ function renderStudentInvitesForTeacher(){
  '<form id="student-invite-form" class="invite-form"><label>學生<select id="student-invite-student">'+st.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join("")+'</select></label>'+
  '<label>學生自己的 Google Email<input type="email" id="student-invite-email" required maxlength="254" placeholder="student@gmail.com"></label><button type="submit" class="primary-button">邀請學生</button></form>'+
  (inv.length?'<div class="guardian-management-list">'+inv.map(i=>{
- const name=st.find(x=>x.id===i.student_id)?.name||"學生",linked=links.some(l=>l.invite_id===i.id);
+ const name=st.find(x=>x.id===i.student_id)?.name||"學生",linked=links.some(l=>l.student_id===i.student_id&&l.teacher_id===i.teacher_id);
  return '<div class="guardian-management-row"><div class="guardian-management-info"><strong>'+esc(name)+'</strong><small>'+esc(i.email)+'</small><span class="pill '+(linked?"paid":"pending")+'">'+(linked?"已連結":"等待接受")+'</span></div>'+
  '<button type="button" class="secondary-button" data-action="remove-student-invite" data-id="'+esc(i.id)+'">'+(linked?"解除學生連結":"撤銷邀請")+'</button></div>';
  }).join("")+'</div>':'<div class="empty">尚未邀請學生。</div>'):
