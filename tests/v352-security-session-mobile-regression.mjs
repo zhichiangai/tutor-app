@@ -8,7 +8,7 @@ const css=read("../v2/style.css");
 const migration=read("../supabase/migrations/20261022021000_v352_legacy_receipt_status_guard.sql");
 const rollbackFixture=read("./sql/v352_receipt_guard_rollback.sql");
 
-function browserHarness(){
+function browserHarness({realInitialize=false}={}){
  const nodes=new Map(), storage=new Map();
  const element=(id)=>{
   if(!nodes.has(id))nodes.set(id,{
@@ -27,9 +27,10 @@ function browserHarness(){
   getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,String(v)),removeItem:k=>storage.delete(k)
  };
  const source=appSource.replace(/^import .* from "\.\/[^"]+";/gm,"").replace(/\nmain\(\);\s*$/,"");
+ const override=realInitialize?"render=()=>{};":"render=()=>{};initializeLive=async()=>{};";
  const app=new Function("document","localStorage","window","crypto","setTimeout","FormData",
-    source+"\nrender=()=>{};initializeLive=async()=>{};return {state,clearUserSessionState,renderStudentPortal,"+
-    "signOut,ensureClient,refreshLive,getUser(){return activeUser},setUser(v){activeUser=v},"+
+    source+"\n"+override+"return {state,clearUserSessionState,renderStudentPortal,"+
+    "signOut,ensureClient,refreshLive,initializeLive,getUser(){return activeUser},setUser(v){activeUser=v},"+
     "setClient(v){client=v}};")(
   doc,localStorage,window,{randomUUID:()=>"fixture"},()=>0,FormData);
  return {app,node:element,window,localStorage};
@@ -155,4 +156,41 @@ test("320px displays focus and mood vertically with five 44px targets in one row
  assert.match(css,/\.lesson-rating-row \.star-rating\s*\{display:grid;grid-template-columns:repeat\(5,44px\)/);
  assert.match(css,/\.lesson-rating-row \.rating-star\s*\{width:44px;height:44px;min-width:44px;min-height:44px/);
  assert.ok(css.includes("touch-action:manipulation"));
+});
+
+
+test("a getSession response from a signed-out account cannot rehydrate the old portal",async()=>{
+ const {app,node,window}=browserHarness({realInitialize:true});
+ let onAuthEvent,resolveSession;
+ const staleSession=new Promise(resolve=>{resolveSession=resolve});
+ window.supabase={createClient:()=>({
+  auth:{onAuthStateChange(cb){onAuthEvent=cb},getSession:()=>staleSession}
+ })};
+ const initializing=app.initializeLive();
+ await Promise.resolve();
+ app.setUser({id:"old-student"});
+ app.state.studentPortal={students:[{id:"private-old",name:"Former account"}],lessons:[],schedules:[]};
+ node("#student-portal-content").innerHTML="Former account";
+ onAuthEvent("SIGNED_OUT",null);
+ resolveSession({data:{session:{user:{id:"old-student"}}},error:null});
+ await initializing;
+ assert.equal(app.getUser(),null);
+ assert.equal(app.state.studentPortal.students.length,0);
+ assert.equal(node("#student-portal-content").innerHTML,"");
+ assert.equal(node("#account-modal").open,true);
+});
+test("320px modal has enough actual inner width for five 44px stars and remains scrollable",()=>{
+ const viewport=320,dialog=viewport-30,content=dialog-16*2;
+ const starRow=5*44+4*4;
+ assert.ok(content>=starRow,"Dialog content "+content+"px narrower than star row "+starRow+"px");
+ assert.match(css,/#lesson-modal \.modal-inner\s*\{padding:20px 16px\}/);
+ assert.match(css,/\.modal\s*\{[^}]*max-height:92vh;overflow-y:auto\}/);
+ assert.match(css,/\.lesson-rating-row \.star-rating\s*\{display:grid;grid-template-columns:repeat\(5,44px\)/);
+});
+test("reversal audit preserves original billable hours, rate and amount",()=>{
+ for(const col of ["previous_hours","previous_actual_hours","previous_hourly_rate","previous_total_amount"])
+   assert.ok(migration.includes(col),"audit omits "+col);
+ assert.ok(rollbackFixture.includes("a.previous_total_amount=1000"));
+ assert.ok(rollbackFixture.includes("FAILED: old family payment approval regressed"));
+ assert.ok(rollbackFixture.includes("FAILED: paid feedback incorrectly locked"));
 });
