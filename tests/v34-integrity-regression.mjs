@@ -82,3 +82,8 @@ test("V3.4 documents real Google-account checks independently of CI",()=>{
   assert.ok(doc.includes(term),term);
  }
 });
+
+
+test("teacher fixed-schedule editor selects its complete scope radio group",()=>{
+ assert.ok(app.includes("$$('input[name=\"schedule-scope\"]').forEach"));
+});
