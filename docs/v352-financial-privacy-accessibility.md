@@ -46,6 +46,17 @@
 
 在 `@media (max-width:420px)` 將「專注度」與「學生心情」由雙欄改為上下單欄；每組使用固定五欄、44×44px 觸控目標，讓五顆星維持同一排並保留垂直捲動。仍須真實 iOS Safari 驗證。
 
+## 第二輪安全審查與補強（2026-10-22）
+
+- 確認現行 `main` 仍是 PR #21（`9528c045c11e53fd0b7676e294e47d40ae8006b1`），PR #22 為 Draft，尚未套正式資料庫。
+- 舊式撤銷收款私有稽核新增原始 `hours`、`actual_hours`、`hourly_rate` 與 `total_amount`，不能只記錄前後收款狀態而丟失原金額。
+- 增加以真正 PostgreSQL `authenticated` 身分執行的交易回滾測試：先改已收款狀態再改金額被拒、既有家長付款申請可核准、部分付款批次仍可確認、完成付款後仍可補寫課後回饋、未授權家長不得撤銷收款。
+- 同一個 SQL 測試確認：`anon` 沒有撤銷收款函式 EXECUTE；`authenticated` 只能呼叫受控 RPC，不能直接 SELECT／INSERT 私有稽核表；RPC `search_path` 設定為空。測試使用 `BEGIN ... ROLLBACK`，沒有永久修改正式資料。
+- 登出清除範圍擴大到帳務、邀請、課程月曆、已填表單與個人資料欄位；所有非同步初始化步驟在登出或換帳號後不會再恢復前一帳號資料。
+- 320px 裝置的 lesson modal 內距調整為左右 16px：可用內容寬度約 258px，五個 44px 星級加間距合計 236px，能完整保留單列；同時保留既有垂直捲動與關閉操作。
+- 最新 CI 84/84 通過。這是 Node/DOM 模擬測試，未取得真人瀏覽器控制權，因此真實 iOS Safari 及三帳號 E2E 仍待測試。
+- 新的 `public.reverse_legacy_lesson_receipt` 是 `SECURITY DEFINER`，依授權模型刻意保留給 authenticated 使用者；正式上線前仍需審查此額外告警。不可為了消除 Advisor 警告而對其開放 anon 權限、放寬 RLS 或跳過收款稽核。
+
 ## 測試與發布條件
 
 - `node --test tests/*.mjs`：既有課表、Google 模式、學習與付款測試 + V3.5.2 新增登出/帳號切換、非同步舊資料、計費鎖、手機 CSS 回歸。
