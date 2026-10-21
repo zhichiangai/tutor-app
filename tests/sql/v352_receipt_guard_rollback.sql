@@ -143,3 +143,21 @@ begin
  exception when others then rejected:=true;end;
  if not rejected then raise exception 'FAILED: non-paid pending request could reverse';end if;
 end;$fixture$;
+
+-- Must run in same BEGIN/ROLLBACK transaction as the candidate migration.
+reset role;
+do $security$
+begin
+ if has_function_privilege('anon','public.reverse_legacy_lesson_receipt(uuid,timestamptz,text)','EXECUTE')
+ then raise exception 'FAILED: anon can execute receipt reversal';end if;
+ if not has_function_privilege('authenticated','public.reverse_legacy_lesson_receipt(uuid,timestamptz,text)','EXECUTE')
+ then raise exception 'FAILED: authenticated cannot call scoped reversal RPC';end if;
+ if has_table_privilege('authenticated','tutor_private.legacy_receipt_reversal_audit','INSERT')
+    or has_table_privilege('authenticated','tutor_private.legacy_receipt_reversal_audit','SELECT')
+    or has_table_privilege('anon','tutor_private.legacy_receipt_reversal_audit','INSERT')
+ then raise exception 'FAILED: private financial audit is browser-writable or readable';end if;
+ if not exists(select 1 from pg_proc
+    where oid='public.reverse_legacy_lesson_receipt(uuid,timestamptz,text)'::regprocedure
+      and ('search_path='||chr(34)||chr(34))=any(proconfig))
+ then raise exception 'FAILED: receipt reversal RPC search_path not hardened';end if;
+end;$security$;
