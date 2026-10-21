@@ -1275,7 +1275,7 @@ function openSchedule(rule=null){
    ?teacherPreferences.lastWeekdays:[((parseDate(state.selected).getDay()+6)%7)+1]);
  Array.from(document.querySelectorAll("#schedule-weekdays input")).forEach(i=>i.checked=initWeekday.includes(Number(i.value)));
  syncRecurringWeekdays("schedule-start","schedule-weekdays","schedule-weekday-hint");
- $('input[name="schedule-scope"]').forEach(r=>r.checked=r.value==="future");
+ $$('input[name="schedule-scope"]').forEach(r=>r.checked=r.value==="future");
  renderScheduleRules();showModal("schedule-modal");
 }
 function getScheduleForm(){
