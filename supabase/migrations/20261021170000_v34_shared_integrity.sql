@@ -375,7 +375,7 @@ begin
             or exists(select 1 from public.payment_batch_items b where b.lesson_id=l.id)
             or exists(select 1 from public.family_requests f where f.lesson_id=l.id and f.status='pending')))
       then raise exception '未來課程已進入帳務流程，不能取消'; end if;
-    v_effective:=least(v_effective,coalesce(v_r.cancelled_from,v_effective));
+    v_effective:=greatest(current_date,least(v_effective,coalesce(v_r.cancelled_from,v_effective)));
     update public.recurring_schedules set cancelled_from=v_effective,updated_at=now()
       where id=v_r.id;
     update public.lesson_records set type='leave',leave_source=v_cancel_source,hours=0,
@@ -540,7 +540,10 @@ begin
  v_teacher:=case when tg_op='DELETE' then old.teacher_id else new.teacher_id end;
  perform pg_advisory_xact_lock(hashtextextended(v_teacher::text,42034));
  select * into v from public.recurring_schedules where id=v_schedule for update;
- if not found then return case when tg_op='DELETE' then old else new end; end if;
+ if not found then
+   if tg_op='DELETE' then return old; end if;
+   return new;
+ end if;
  if tg_op<>'DELETE' then
    if not tutor_private.v34_occurs(v.starts_on,v.ends_on,v.cancelled_from,
      v.weekdays,v.every_weeks,new.original_date) then
@@ -553,8 +556,9 @@ begin
    end if;
  end if;
  update public.recurring_schedules set updated_at=clock_timestamp() where id=v.id;
- return case when tg_op='DELETE' then old else new end;
-end;$$;
+ if tg_op='DELETE' then return old; end if;
+ return new;
+end;$;
 revoke all on function tutor_private.v34_guard_exception_write() from public,anon,authenticated;
 drop trigger if exists trg_v34_guard_exception_write on public.schedule_exceptions;
 create trigger trg_v34_guard_exception_write
