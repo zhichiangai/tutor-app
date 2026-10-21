@@ -183,7 +183,7 @@ function myWorkspace(){return state.mode==="live"&&activeUser?state.workspaces.f
 function requireTeacherWorkspace(){
  if(state.mode==="live"&&(!activeUser||!myWorkspace())){
   toast("請先建立自己的家教空間，再新增學生或課程");
-  showModal("account-modal");return false;
+  setView("settings");return false;
  }
  return true;
 }
@@ -225,12 +225,12 @@ async function saveMyWorkspace(rename=false){
   if(rename)assertResult(await client.from("workspaces").update({name}).eq("id",ws.id).select("id").single());
   else assertResult(await client.from("workspaces").insert({owner_id:activeUser.id,kind:"individual",name}).select("id").single());
  });
- if(ok){await loadTeacherPreferences();closeModal("account-modal");toast(rename?"空間名稱已更新":"家教空間已建立，現在可以新增學生")}
+ if(ok){await loadTeacherPreferences();render();toast(rename?"空間名稱已更新":"家教空間已建立，現在可以新增學生")}
 }
 function render(){
  const role=state.role,teacher=role==="teacher",student=role==="student";
  document.body?.classList?.toggle("student-mode",student);
- const identity=(state.mode==="live"&&activeUser)?roleFullName():("預覽"+ROLE_SUFFIX[role]);
+ const identity=activeUser?roleFullName():"尚未登入";
  $("#role-indicator-text").textContent=identity+" · "+ROLE_TITLE[role];
  $("#role-indicator-icon").textContent=teacher?"◈":student?"✎":"♧";
  $("#role-indicator").setAttribute("aria-label","目前使用："+identity+"，"+ROLE_TITLE[role]+"，點擊切換");
@@ -238,20 +238,25 @@ function render(){
  $("#greeting-title").innerHTML=teacher?"把每一堂課，<em>好好記下來。</em>":student?"我的學習，<em>一步一步進步。</em>":"每個成長時刻，<em>都值得珍惜。</em>";
  $("#greeting-copy").textContent=teacher?"從課程到收款，讓重要的小事都有自己的位置。":student?"這裡只顯示老師授權給我的課程及學習回饋。":"孩子的上課安排、請假和付款，打開就能看見。";
  $("#top-add").style.display=teacher?"":"none";
- $("#demo-banner").classList.toggle("hidden",state.mode!=="demo");
- $("#demo-reset").classList.toggle("hidden",state.mode!=="demo");
+ document.body.classList.toggle("login-required",!activeUser);
  $("#connection-status").classList.toggle("live",state.mode==="live"&&!!activeUser);
- $("#connection-status").innerHTML=state.mode==="demo"?"<i></i> 體驗模式":activeUser?"<i></i> 已安全連線":"<i></i> 尚未登入";
+ $("#connection-status").innerHTML=activeUser?"<i></i> 已安全連線":"<i></i> 尚未登入";
  $("#account-label").textContent=identity;
- $("#account-subtitle").textContent=ROLE_TITLE[role]+(state.mode==="demo"?" · 體驗模式":"");
+ $("#account-subtitle").textContent=activeUser?ROLE_TITLE[role]:"使用 Google 登入";
  $("#avatar").textContent=identity.slice(0,1);
  $("#account-current").textContent=activeUser?.email||"尚未使用 Google 登入";
  if(document.activeElement!==$("#profile-display-name"))$("#profile-display-name").value=state.mode==="live"&&activeUser?userDisplayName():"";
- $("#profile-display-form").classList.toggle("hidden",state.mode!=="live"||!activeUser);
- $("#role-teacher").classList.toggle("active",teacher);
- $("#role-parent").classList.toggle("active",role==="parent");
- $("#role-student").classList.toggle("active",student);
+ $("#profile-display-form").classList.toggle("hidden",!activeUser);
+ renderRoleSettings();
+ $("#settings-role-card").classList.toggle("hidden",!activeUser);
+ // Role preference checkboxes are on the separate settings page.
  if(student){
+  if(state.view==="settings"){
+   $$(".page-view").forEach(x=>x.classList.toggle("hidden",x.id!=="view-settings"));
+   $("#breadcrumb-name").textContent="設定";
+   renderWorkspaceUI();
+   return;
+  }
   state.view="student";
   $$(".page-view").forEach(x=>x.classList.toggle("hidden",x.id!=="view-student"));
   $("#breadcrumb-name").textContent="我的學習";
