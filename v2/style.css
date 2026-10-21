@@ -321,3 +321,25 @@
 
 /* Student can only navigate their authorized read-only learning dashboard. */
 .student-mode .side-nav,.student-mode .mobile-nav{display:none!important}
+
+
+/* V3.3 shared course management (guardian/student): action labels stay visible on mobile. */
+.shared-course-card{margin-bottom:18px}
+.shared-course-buttons{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 12px}
+.shared-course-heading{font-size:15px;margin:22px 0 10px}
+.shared-course-line{display:flex;align-items:center;justify-content:space-between;gap:12px;
+ padding:12px 0;border-bottom:1px solid var(--border,rgba(100,116,139,.16))}
+.shared-course-line strong{display:block;font-size:14px}
+.shared-course-line small{display:block;margin-top:5px;color:var(--text-muted,#64748b);font-size:12px;line-height:1.5}
+.shared-course-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.shared-course-actions .mini-action{white-space:nowrap}
+.shared-weekdays{display:flex;flex-wrap:wrap;gap:10px;margin:7px 0 14px}
+.shared-weekdays label{display:flex;gap:5px;align-items:center;white-space:nowrap;font-size:14px}
+.shared-history-row{margin:8px 0;font-size:13px}
+.shared-history-row small{font-size:11px;color:var(--text-muted,#64748b)}
+@media(max-width:650px){
+ .shared-course-line{display:block}
+ .shared-course-actions{justify-content:flex-start;margin-top:10px}
+ .shared-course-buttons{display:grid;grid-template-columns:1fr}
+ .shared-course-buttons button{width:100%}
+}
