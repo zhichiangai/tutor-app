@@ -1,8 +1,8 @@
-# 好好上課（tutor-app）｜家教課程與收付款管理 V3.4
+# 好好上課（tutor-app）｜家教課程與收付款管理 V3.4.1
 
 **正式網站：** https://tutor.rapid4grad.com/  
 **程式碼：** https://github.com/zhichiangai/tutor-app  
-**目前版本：** V3.4（2026-10-21），部署基準為 GitHub `main`。 
+**目前版本：** V3.4.1（2026-10-21），部署基準為 GitHub `main`。 
 
 > 本 README 說明**目前正式運行的 Vercel + Supabase 版**。舊 GAS、Google Sheets 和 GitHub Pages 專案仍保存在程式庫內，但**不是本網域 V3.3 使用的後端**。舊版記錄見 [歷史 README](docs/legacy-readme-20261019.md)。
 
@@ -24,6 +24,12 @@ Vercel：從 main 發布，依 vercel.json 路由至 v2/ 靜態前端
 - **資料庫專案**：Supabase `tutor-app`（Project Ref：`vctisuglfoxyuwlvyjee`，東京區域）；歷次 SQL 版本存放於 `supabase/migrations/`。
 - **正式部署**：Vercel `tutor-app-v2`（請以 Vercel Deployments 查詢目前生效版本）；GitHub PR 合併不表示 SQL migration 自動套用。
 - **舊版**：`frontend/`、`backend/apps-script/` 供歷史與舊資料參考。不要以這兩個路徑推斷 V3.3 正式站的行為。
+
+## V3.4.1 排課體驗修正
+
+- **單堂補課與固定週期不同**：雙週 12/16 的課可以補到 12/23，不會把整組課表改成每週，12/30 仍照原規則上課。資料庫驗證原定日期是否屬於固定週期、補課目標時段是否撞期。
+- **錯誤提示保留**：三方共同排課遭拒絕（時間衝突或版本過期）時，表單顯示明確、可持續閱讀的錯誤說明；不依賴短暫 Toast。
+- `v2/README.md` 已更新為正式 Vercel + Supabase 架構；原 V2 歷史部署文件歸檔在 `docs/legacy-v2-readme-20261020.md`。
 
 ## 使用者角色與功能
 
