@@ -238,7 +238,7 @@ function render(){
  $("#greeting-title").innerHTML=teacher?"把每一堂課，<em>好好記下來。</em>":student?"我的學習，<em>一步一步進步。</em>":"每個成長時刻，<em>都值得珍惜。</em>";
  $("#greeting-copy").textContent=teacher?"從課程到收款，讓重要的小事都有自己的位置。":student?"這裡只顯示老師授權給我的課程及學習回饋。":"孩子的上課安排、請假和付款，打開就能看見。";
  $("#top-add").style.display=teacher?"":"none";
- document.body.classList.toggle("login-required",!activeUser);
+ document.body?.classList?.toggle("login-required",!activeUser);
  $("#connection-status").classList.toggle("live",state.mode==="live"&&!!activeUser);
  $("#connection-status").innerHTML=activeUser?"<i></i> 已安全連線":"<i></i> 尚未登入";
  $("#account-label").textContent=identity;
