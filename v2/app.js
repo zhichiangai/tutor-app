@@ -1471,7 +1471,7 @@ async function refreshLive(){
  const portal=await client.rpc("student_portal_data");
  if(portal.error)throw Error("學生資料讀取失敗："+portal.error.message);
  state.studentPortal=portal.data||{students:[],lessons:[],schedules:[]};
- await loadSharedCourseHistory();
+ if(typeof loadSharedCourseHistory==="function")await loadSharedCourseHistory();
 }
 async function ensureClient(){
  if(client)return client;
