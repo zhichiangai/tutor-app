@@ -1,8 +1,8 @@
-# 好好上課（tutor-app）｜家教課程與收付款管理 V3.3
+# 好好上課（tutor-app）｜家教課程與收付款管理 V3.4
 
 **正式網站：** https://tutor.rapid4grad.com/  
 **程式碼：** https://github.com/zhichiangai/tutor-app  
-**目前版本：** V3.3（2026-10-21），部署基準為 GitHub `main`。 
+**目前版本：** V3.4（2026-10-21），部署基準為 GitHub `main`。 
 
 > 本 README 說明**目前正式運行的 Vercel + Supabase 版**。舊 GAS、Google Sheets 和 GitHub Pages 專案仍保存在程式庫內，但**不是本網域 V3.3 使用的後端**。舊版記錄見 [歷史 README](docs/legacy-readme-20261019.md)。
 
@@ -64,6 +64,8 @@ Vercel：從 main 發布，依 vercel.json 路由至 v2/ 靜態前端
 - 任何更動正式資料、刪除、匯入或重新結算前都應先備份、驗證且取得適當授權。
 
 ## 其他技術文件
+
+- [V3.4 三方共同排課穩定性與驗收](docs/v34-shared-schedule-validation.md)
 
 - [V3.3 三方共同課程管理](docs/v33-shared-course-management.md)
 - [V3 人性化課程與收付款流程](docs/v3-human-friendly-ux.md)
