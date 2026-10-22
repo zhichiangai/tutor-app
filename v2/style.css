@@ -626,3 +626,54 @@
  .student-today-card{padding:18px}
  .student-today-card h3{font-size:17px}
 }
+
+/* V3.5.8 unified course calendars and quiet, expandable history. */
+#student-calendar-panel>.page-head{margin-bottom:14px}
+.student-calendar-toolbar{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin:0 0 15px}
+.student-calendar-toolbar strong{min-width:110px;text-align:center;font-size:13px;font-variant-numeric:tabular-nums}
+.student-calendar-overview{margin-bottom:14px}
+.student-calendar-cell{min-width:0;text-align:center}
+.student-calendar-cell .day-number{margin:0 auto}
+.student-calendar-cell .student-calendar-event{display:block;background:#fceee6;color:#a26d59;border-radius:5px;font-size:10px;margin:5px 0 0;padding:4px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.student-calendar-count{display:none}
+.student-calendar-cell:focus-visible{outline:3px solid #e8a195;outline-offset:-3px}
+.student-month-list-row{display:flex;align-items:center;gap:14px;width:100%;padding:13px 4px;border:0;border-bottom:1px solid var(--border);background:transparent;text-align:left;color:var(--ink)}
+.student-month-list-row:last-child{border-bottom:0}
+.student-month-list-row:hover{background:#fffbf6}
+.student-month-list-row strong{white-space:nowrap;font-size:12px}
+.student-month-list-row span{font-size:12px;line-height:1.6}
+.student-day-card{margin-top:18px}
+.student-day-lesson{border-bottom:1px solid var(--border)}
+.student-day-lesson:last-child{border-bottom:0}
+.student-day-lesson summary{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 0;cursor:pointer;list-style:none}
+.student-day-lesson summary::-webkit-details-marker{display:none}
+.student-day-lesson summary strong,.student-day-lesson summary small{display:block}
+.student-day-lesson summary strong{font-size:13px}
+.student-day-lesson summary small{color:var(--muted);font-size:11px;margin-top:5px}
+.student-day-detail{padding:0 0 15px;line-height:1.7;color:#77736d;font-size:12px}
+.student-day-detail p{margin:0 0 6px}
+#shared-student-card{margin-top:18px}
+#shared-parent-card{margin-top:18px}
+.recent-changes-card{margin-top:20px;border:1px solid var(--border);border-radius:17px;background:var(--white);box-shadow:var(--shadow);overflow:hidden}
+.recent-changes-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 24px;border:0;background:transparent;color:var(--ink);text-align:left;font-size:15px;font-weight:700}
+.recent-changes-toggle:hover{background:#fffbf6}
+.recent-changes-toggle small{margin-left:8px;color:var(--muted);font-size:11px;font-weight:500}
+.recent-changes-hint{color:#847b73;font-size:12px;font-weight:600;white-space:nowrap}
+.recent-changes-content{border-top:1px solid var(--border);padding:7px 24px 18px}
+.recent-change-row{padding:13px 0;border-bottom:1px solid #f2eee9;display:flex;justify-content:space-between;align-items:start;gap:15px}
+.recent-change-row:last-child{border-bottom:0}
+.recent-change-row strong{font-size:12px;font-weight:600;line-height:1.6}
+.recent-change-row small{font-size:11px;white-space:nowrap;color:var(--muted)}
+@media(max-width:650px){
+ .student-calendar-toolbar{justify-content:center;gap:5px}
+ .student-calendar-toolbar strong{min-width:99px}
+ .student-calendar-cell{min-height:60px;padding:7px 2px}
+ .student-calendar-cell .student-calendar-event{display:none}
+ .student-calendar-cell .student-calendar-count{display:block;font-size:9px;color:#a26d59;margin-top:5px;white-space:nowrap}
+ .student-calendar-overview{align-items:stretch}
+ .student-month-list-row{align-items:start;flex-direction:column;gap:4px}
+ .recent-changes-toggle{padding:17px 15px;min-height:52px}
+ .recent-changes-content{padding:6px 15px 15px}
+ .recent-change-row{flex-direction:column;gap:4px}
+ .recent-change-row small{white-space:normal}
+}
