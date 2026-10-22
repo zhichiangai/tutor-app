@@ -84,7 +84,7 @@ test("the teacher's student list shows own students, rates and student/guardian 
  setTeacherData(api);
  api.renderTeacherStudentManagement();
  const html=el("#teacher-student-list").innerHTML;
- for(const term of ["王小明","陳小美","NT$ 500","NT$ 650","學生帳號","家長帳號","等待接受","已連結"])
+ for(const term of ["王小明","陳小美","NT$ 500","NT$ 650","學生帳號","家長帳號","等待學生接受","學生已連結","家長已連結"])
   assert.ok(html.includes(term),"missing "+term);
  assert.ok(!html.includes("其他老師的學生"));
  assert.ok(el("#student-grid").classList.contains("hidden"),"old teacher-only student cards must be hidden");
