@@ -814,12 +814,8 @@ async function acceptStudentInvite(id){
 async function removeStudentInvite(id){
  const inv=state.studentInvites.find(x=>x.id===id&&(state.mode==="demo"||x.teacher_id===activeUser?.id));
  if(!inv||state.role!=="teacher")return;
- if(!confirm("確定撤銷這位學生的邀請或查看權限？已完成的課程資料會保留。"))return;
- const ok=await persist(async()=>{
-  if(state.mode==="demo"){state.studentInvites=state.studentInvites.filter(x=>x.id!==id);state.studentLinks=state.studentLinks.filter(x=>x.invite_id!==id)}
-  else assertResult(await client.from("student_invites").delete().eq("id",id).eq("teacher_id",activeUser.id).select("id").single());
- });
- if(ok)toast("已撤銷學生登入連結，歷史課程保留");
+ // Deleting only student_invites cannot revoke a claimed student_links row.
+ await revokeManagedStudentAccount(inv.student_id,inv.email);
 }
 
 /* V3.5.4: one student is the organizing unit, not three separate invitation lists.
@@ -2174,6 +2170,11 @@ function bindEvents(){
   const switcher=ev.target.closest("[data-calendar-mode]");if(switcher){changeCalendarMode(switcher.dataset.calendarMode);return}
   const action=ev.target.closest("[data-action]");if(action){
    const id=action.dataset.id,kind=action.dataset.action;
+   if(kind==="manage-student"){openStudentManager(id);return}
+   if(kind==="revoke-managed-student"){
+    await revokeManagedStudentAccount(action.dataset.student,action.dataset.email);
+    return;
+   }
    if(kind==="shared-new-lesson"){openSharedCourseForm("new-lesson");return}
    if(kind==="shared-new-schedule"){openSharedCourseForm("new-schedule");return}
    if(kind==="shared-edit-lesson"){openSharedCourseForm("edit-lesson",id);return}
@@ -2252,6 +2253,15 @@ function bindEvents(){
  });
  $("#jump-today").onclick=()=>{state.month=new Date(tick().getFullYear(),tick().getMonth(),1);state.selected=dateKey(tick());render()};
  $("#record-form").addEventListener("submit",saveRecord);$("#student-form").addEventListener("submit",saveStudent);
+ $("#student-management-basics-form").addEventListener("submit",saveManagedStudent);
+ $("#managed-student-invite-form").addEventListener("submit",submitManagedStudentInvite);
+ $("#managed-guardian-invite-form").addEventListener("submit",submitManagedGuardianInvite);
+ $("#teacher-student-search").addEventListener("input",ev=>{
+  state.studentSearch=ev.target.value;renderTeacherStudentList();
+ });
+ $("#teacher-student-filter").addEventListener("change",ev=>{
+  state.studentAccountFilter=ev.target.value;renderTeacherStudentList();
+ });
  $("#record-repeat").addEventListener("change",updateRecordRepeatUI);
  $("#record-date").addEventListener("change",()=>{
   if(!state.editing&&["weekly","biweekly"].includes($("#record-repeat").value))
