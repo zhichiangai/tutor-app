@@ -1,8 +1,8 @@
-# 好好上課（tutor-app）｜家教課程與收付款管理 V3.5.6
+# 好好上課（tutor-app）｜家教課程與收付款管理 V3.5.7
 
 **正式網站：** https://tutor.rapid4grad.com/  
 **程式碼：** https://github.com/zhichiangai/tutor-app  
-**目前版本：** V3.5.6（修補分支候選，待驗收及正式部署；2026-10-22），部署基準為 GitHub `main`。 
+**目前版本：** V3.5.7（2026-10-22），部署基準為 GitHub `main`。 
 
 > 本 README 說明**目前正式運行的 Vercel + Supabase 版**。舊 GAS、Google Sheets 和 GitHub Pages 專案仍保存在程式庫內，但**不是本網域 V3.3 使用的後端**。舊版記錄見 [歷史 README](docs/legacy-readme-20261019.md)。
 
@@ -25,7 +25,15 @@ Vercel：從 main 發布，依 vercel.json 路由至 v2/ 靜態前端
 - **正式部署**：Vercel `tutor-app-v2`（請以 Vercel Deployments 查詢目前生效版本）；GitHub PR 合併不表示 SQL migration 自動套用。
 - **舊版**：`frontend/`、`backend/apps-script/` 供歷史與舊資料參考。不要以這兩個路徑推斷 V3.3 正式站的行為。
 
-## V3.5.6 登入角色偏好修正（待發布）
+## V3.5.7 登入載入顯示與版號一致性
+
+- OAuth／帳號資料尚未完成讀取時，角色切換器使用「正在確認登入身分」中性提示，禁用切換，避免沿用上一個學生／家長／老師的角色文字。
+- 角色讀取完成後恢復帳號所選模式與正常切換；登入期間不變更角色偏好、課表、帳務、權限。
+- 網頁分頁標題與頁尾同步更新至 V3.5.7。
+- 新增 `tests/v357-neutral-auth-loading-regression.mjs`，驗證角色載入狀態、切換與版號。
+- 無資料庫 Migration；跨帳號 RLS API 越權測試、三方寫入同步、真實窄手機與跨裝置驗收仍需額外實測。
+
+## V3.5.6 登入角色偏好修正
 
 - 第一次登入沒有使用者明確偏好時，依已連結的學生、家長身分選擇首頁，不再一律採老師預設。
 - 已儲存的跨裝置 `profiles.last_role` 仍優先；使用者可於設定中調整下次登入角色，切換模式也會更新偏好。
