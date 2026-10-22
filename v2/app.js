@@ -27,7 +27,7 @@ const timeLabel = (s) => asText(s).slice(0,5);
 const tick = ()=>new Date();
 const uid = ()=>crypto.randomUUID();
 let client=null, activeUser=null, loading=false, teacherPreferences={};
-const state={mode:"live",enabledRoles:["teacher"],lessonRatings:{focus:null,mood:null},role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",paymentBatches:[],paymentBatchItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",studentInvites:[],studentLinks:[],studentPortal:{students:[],lessons:[],schedules:[]},sharedCourseDraft:null,sharedCourseHistory:{},receiptBatch:null,activeLesson:null,actualHoursManual:false};
+const state={mode:"live",enabledRoles:["teacher"],lessonRatings:{focus:null,mood:null},role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",paymentBatches:[],paymentBatchItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",studentInvites:[],studentLinks:[],studentLegacyInvites:[],managedStudentId:null,studentSearch:"",studentAccountFilter:"all",studentPortal:{students:[],lessons:[],schedules:[]},sharedCourseDraft:null,sharedCourseHistory:{},receiptBatch:null,activeLesson:null,actualHoursManual:false};
 
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
@@ -1716,8 +1716,8 @@ async function restoreLesson(id){
  if(ok){toast("已恢復原本的課程安排");refreshDaySheet()}
 }
 
-const LIVE_TABLES=["student_invites","student_links","students","lesson_records","guardian_invites","student_guardians","family_requests","recurring_schedules","schedule_exceptions","payment_batches","payment_batch_items","profiles","workspaces","workspace_members"];
-const LIVE_FIELDS=["studentInvites","studentLinks","students","lessons","invites","guardians","requests","schedules","exceptions","paymentBatches","paymentBatchItems","profiles","workspaces","workspaceMembers"];
+const LIVE_TABLES=["student_invites","student_links","student_invitations","students","lesson_records","guardian_invites","student_guardians","family_requests","recurring_schedules","schedule_exceptions","payment_batches","payment_batch_items","profiles","workspaces","workspace_members"];
+const LIVE_FIELDS=["studentInvites","studentLinks","studentLegacyInvites","students","lessons","invites","guardians","requests","schedules","exceptions","paymentBatches","paymentBatchItems","profiles","workspaces","workspaceMembers"];
 let authDataGeneration=0;
 // Ignore token refresh while a user-initiated logout is pending.
 let signOutRequested=false;
@@ -1732,6 +1732,7 @@ const SESSION_PRIVATE_DOM_IDS=[
  "month-lesson-list","month-lesson-preview","next-lesson","period-overview",
  "period-student","receipt-details","recent-lessons","requests-list",
  "schedule-rules-list","student-grid","student-invite-teacher-content",
+ "teacher-student-summary","teacher-student-list","managed-student-accounts","managed-guardian-accounts",
  "lesson-content","lesson-feedback","lesson-focus-stars","lesson-mood-stars",
  "profile-display-name","workspace-name","invite-edit-email"
 ];
@@ -1752,6 +1753,9 @@ function clearUserSessionState(){
  state.role="teacher";
  state.view="home";
  state.parentTeacherFilter="all";
+ state.managedStudentId=null;
+ state.studentSearch="";
+ state.studentAccountFilter="all";
  teacherPreferences={};
  for(const id of SESSION_PRIVATE_DOM_IDS){
   const el=document.querySelector?.("#"+id);
@@ -1765,7 +1769,8 @@ function clearUserSessionState(){
  document.querySelectorAll?.("form")?.forEach(form=>form.reset?.());
  for(const id of ["lesson-form","shared-course-form","record-form","request-form","period-form",
   "profile-display-form","mode-settings-form","receipt-form","invite-edit-form",
-  "schedule-form","cancel-form","change-form","student-form"]){
+  "schedule-form","cancel-form","change-form","student-form",
+  "student-management-basics-form","managed-student-invite-form","managed-guardian-invite-form"]){
   document.querySelector?.("#"+id)?.reset?.();
  }
  document.querySelectorAll?.(".modal")?.forEach(dialog=>{
