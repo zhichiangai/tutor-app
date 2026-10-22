@@ -49,8 +49,8 @@ function harness(){
  return {api,el};
 }
 test("page title and footer both show V3.5.9",()=>{
- assert.match(html,/<title>好好上課 · V3\.5\.8 家教課程管理<\/title>/);
- assert.match(html,/V3\.5\.8 · Made with care/);
+ assert.match(html,/<title>好好上課 · V3\.5\.9 家教課程管理<\/title>/);
+ assert.match(html,/V3\.5\.9 · Made with care/);
  assert.doesNotMatch(html,/V3\.5\.5 家教課程管理/);
 });
 test("checking session hides the stale student role, including accessible labels",()=>{
