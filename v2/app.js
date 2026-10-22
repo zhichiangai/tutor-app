@@ -948,7 +948,9 @@ function renderRecentChanges(){
  const opened=state.recentChangesOpen;
  const rows=history.length?history.map(h=>
   '<div class="recent-change-row"><strong>'+esc(h.studentName||"學生")+' · '+esc(h.summary||"課程異動")+
-  '</strong><small>'+esc(String(h.created_at||"").slice(0,16).replace("T"," "))+'</small></div>').join(""):
+  (h.cancellation_reason?'（'+esc(h.cancellation_reason)+'）':"")+
+  '</strong><small>'+(h.actor_role?esc(({teacher:"老師",guardian:"家長",student:"學生"})[h.actor_role]||"共同管理")+" · ":"")+
+  esc(String(h.created_at||"").slice(0,16).replace("T"," "))+'</small></div>').join(""):
   '<p class="empty">目前沒有最近變更。</p>';
  root.innerHTML='<button type="button" class="recent-changes-toggle" data-recent-changes-toggle aria-expanded="'+
   String(opened)+'" aria-controls="'+label+'"><span>◷ 最近變更 <small>'+
@@ -2281,7 +2283,7 @@ async function refreshLive({withHistory=true}={}){
  if(!belongsToThisSession())return;
  if(portal.error)throw Error("學生資料讀取失敗："+portal.error.message);
  state.studentPortal=portal.data||{students:[],lessons:[],schedules:[]};
- if(withHistory)await loadSharedCourseHistory();
+ if(withHistory&&typeof loadSharedCourseHistory==="function")await loadSharedCourseHistory();
 }
 async function ensureClient(){
  if(client)return client;
