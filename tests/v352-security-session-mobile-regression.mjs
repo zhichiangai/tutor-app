@@ -276,5 +276,5 @@ test("V3.5.3 narrow month agenda buttons can shrink inside a 320px viewport",()=
  assert.match(css,/#view-calendar \.month-agenda-row \.pill\s*\{[^}]*max-width:42%;[^}]*min-width:0;/);
  // Actual viewport hitboxes and document.scrollWidth must still be checked by Codex browser.
  assert.ok(!css.includes("body{overflow-x:hidden}"),"do not cover up overflow instead of fixing it");
- assert.ok(html.includes("V3.5.7 · Made with care."));
+ assert.ok(html.includes("V3.5.8 · Made with care."));
 });
