@@ -235,8 +235,8 @@ function render(){
  $("#role-indicator-icon").textContent=teacher?"◈":student?"✎":"♧";
  $("#role-indicator").setAttribute("aria-label","目前使用："+identity+"，"+ROLE_TITLE[role]+"，點擊切換");
  $$("[data-role-choice]").forEach(el=>el.setAttribute("aria-pressed",String(el.dataset.roleChoice===role)));
- $("#greeting-title").innerHTML=teacher?"把每一堂課，<em>好好記下來。</em>":student?"我的學習，<em>一步一步進步。</em>":"每個成長時刻，<em>都值得珍惜。</em>";
- $("#greeting-copy").textContent=teacher?"從課程到收款，讓重要的小事都有自己的位置。":student?"這裡只顯示老師授權給我的課程及學習回饋。":"孩子的上課安排、請假和付款，打開就能看見。";
+ $("#greeting-title").innerHTML=teacher?"今天的課程，<em>從這裡開始。</em>":student?"我的學習，<em>一步一步進步。</em>":"孩子的每堂課，<em>都在這裡。</em>";
+ $("#greeting-copy").textContent=teacher?"先看看今天的課程、需要補寫的紀錄，以及等你確認的收款。":student?"在這裡查看你的課表和老師的課後回饋。":"下一堂課、最新學習紀錄和付款狀態，不用再四處尋找。";
  $("#top-add").style.display=teacher?"":"none";
  document.body?.classList?.toggle("login-required",!activeUser);
  $("#connection-status").classList.toggle("live",state.mode==="live"&&!!activeUser);
@@ -279,7 +279,84 @@ function render(){
  ["待確認費用","◈",money(lessonSum(pending)),"","依課程付款狀態計算"]];
  $("#metrics").innerHTML=metrics.map(([label,icon,value,unit,foot])=>'<article class="metric-card"><div class="metric-label">'+label+'</div><div class="metric-icon">'+icon+'</div><div class="metric-value">'+esc(value)+(unit||"")+'</div><div class="metric-footer">'+foot+'</div></article>').join("");
  $("#money-reminder").textContent=teacher?"本月已確認收到 "+money(received)+"。":"目前有 "+pending.length+" 筆課程等待付款或收款確認。";
- renderNext();renderRecent();renderMiniCalendar();renderFullCalendar();renderBilling();renderStudents();refreshDaySheet();renderSharedPlanner();
+ renderNext();renderRecent();renderMiniCalendar();renderFullCalendar();renderBilling();renderStudents();refreshDaySheet();renderSharedPlanner();renderHomeFocus();
+}
+/* V3.5.4: answer a person's immediate questions before displaying the full dashboard.
+   Figures use the same linked lessons / payment ledger already shown elsewhere. */
+function renderHomeFocus(){
+ const root=$("#home-focus"),parent=state.role==="parent",teacher=state.role==="teacher";
+ $("#metrics").classList.toggle("hidden",parent);
+ $("#home-grid").classList.toggle("hidden",parent);
+ if(!activeUser||state.mode!=="live"||(!teacher&&!parent)){root.innerHTML="";return}
+ const today=dateKey(tick());
+ if(teacher){
+  const lessons=visibleLessons().filter(l=>l.type!=="leave"&&l.type!=="moved");
+  const todayLessons=lessons.filter(l=>l.lesson_date===today).sort((a,b)=>asText(a.start_time).localeCompare(asText(b.start_time)));
+  const unfinished=state.lessons.filter(l=>l.owner_id===activeUser.id&&l.type==="lesson"
+    &&sameMonth(l.lesson_date,tick())&&(!String(l.lesson_content||"").trim()
+      ||l.focus_rating==null||l.mood_rating==null))
+   .sort((a,b)=>String(b.lesson_date).localeCompare(String(a.lesson_date)));
+  const unconfirmedBatches=state.paymentBatches.filter(b=>b.teacher_id===activeUser.id&&b.status==="pending");
+  const unconfirmedRequests=state.requests.filter(r=>r.teacher_id===activeUser.id&&r.kind==="payment"&&r.status==="pending");
+  const unconfirmed=unconfirmedBatches.length+unconfirmedRequests.length;
+  const classDetail=todayLessons.length
+   ?esc((studentFor(todayLessons[0])?.name||todayLessons[0].student||"學生")+" · "+(todayLessons[0].subject||"課程"))
+    +" · "+esc(timeLabel(todayLessons[0].start_time))
+   :"今天沒有安排課程";
+  const notesAction=unfinished.length?
+   '<button type="button" class="home-focus-link" data-action="open-lesson" data-id="'+esc(unfinished[0].id)+'">補寫課後紀錄 ↗</button>':
+   '<button type="button" class="home-focus-link" data-view="calendar">查看課程月曆 ↗</button>';
+  root.innerHTML='<div class="home-focus-heading"><div><p class="mini-label">今天先看看</p>'+
+   '<h2>今天有什麼要處理？</h2><p>上課、課後紀錄與收款，從這裡就能開始。</p></div></div>'+
+   '<div class="home-focus-grid">'+
+   '<article class="home-focus-tile"><span class="home-focus-kicker">今天的課程</span><strong>'+
+    todayLessons.length+' 堂</strong><p>'+classDetail+'</p>'+
+    '<button type="button" class="home-focus-link" data-view="calendar" data-date="'+today+'">查看今天課程 ↗</button></article>'+
+   '<article class="home-focus-tile"><span class="home-focus-kicker">待補寫的上課紀錄</span><strong>'+
+    unfinished.length+' 堂</strong><p>'+(unfinished.length?"本月還有課後內容或評分尚未填寫。":"本月的課後紀錄都整理好了。")+
+    '</p>'+notesAction+'</article>'+
+   '<article class="home-focus-tile"><span class="home-focus-kicker">等你確認的收款</span><strong>'+
+    unconfirmed+' 筆</strong><p>'+(unconfirmed?"有家長回報付款，等你核對。":"目前沒有待確認的付款回報。")+
+    '</p><button type="button" class="home-focus-link" data-view="billing">查看收付款 ↗</button></article>'+
+   '</div>';
+  return;
+ }
+ const children=visibleStudents();
+ const allowed=new Set(children.map(s=>s.id));
+ const visible=visibleLessons().filter(l=>l.type!=="leave"&&l.type!=="moved");
+ const next=visible.filter(l=>l.type==="planned"&&l.lesson_date>=today)
+  .sort((a,b)=>(a.lesson_date+" "+asText(a.start_time)).localeCompare(b.lesson_date+" "+asText(b.start_time)))[0];
+ const completed=state.lessons.filter(l=>allowed.has(l.student_id)&&l.type==="lesson")
+  .sort((a,b)=>(b.lesson_date+" "+asText(b.start_time)).localeCompare(a.lesson_date+" "+asText(a.start_time)));
+ const latest=completed[0];
+ const monthRecords=completed.filter(l=>asText(l.lesson_date).slice(0,7)===today.slice(0,7));
+ const balance=monthRecords.reduce((a,l)=>{const b=lessonBalance(l);a.available+=b.available;a.pending+=b.pending;a.confirmed+=b.confirmed;return a},
+  {available:0,pending:0,confirmed:0});
+ const nextName=next?esc((studentFor(next)?.name||next.student||"孩子")+" · "+(next.subject||"課程")):"還沒有下一堂課的安排";
+ const nextTime=next?esc(prettyDate(next.lesson_date)+" · "+timeLabel(next.start_time)+"–"+timeLabel(next.end_time)):
+  "有新的課程安排時，會顯示在這裡。";
+ const content=latest?esc(latest.lesson_content||latest.remarks||"老師尚未填寫這堂課的學習內容。"):
+  "完成上課後，老師寫下的學習重點就會出現在這裡。";
+ const stars=latest?'<div class="home-focus-rating">專注度：'+compactStars(latest.focus_rating)+
+  '　學生心情：'+compactStars(latest.mood_rating)+'</div>':"";
+ const name=latest?esc((studentFor(latest)?.name||latest.student||"孩子")+" · "+(latest.subject||"課程")):"尚無學習紀錄";
+ const childrenLine=children.length?'<p>已連結：'+children.map(s=>esc(s.name)).join("、")+'</p>':
+  '<p>還沒有連結孩子的課程，請先接受老師的邀請。</p>';
+ root.innerHTML='<div class="home-focus-heading"><div><p class="mini-label">孩子的學習，一目了然</p>'+
+  '<h2>孩子最近的課程安排</h2><p>下一堂什麼時候上課、最近學了什麼、費用處理到哪裡。</p>'+childrenLine+
+  '</div><button type="button" class="home-focus-heading-link" data-view="students">查看孩子的學習 ↗</button></div>'+
+  '<div class="home-parent-grid"><article class="home-focus-tile home-parent-next"><span class="home-focus-kicker">下一堂課</span>'+
+   '<strong class="home-focus-lesson-name">'+nextName+'</strong><p>'+nextTime+'</p>'+
+   '<button type="button" class="home-focus-link" data-view="calendar"'+(next?' data-date="'+esc(next.lesson_date)+'"':'')+
+   '>查看課程安排 ↗</button></article>'+
+  '<article class="home-focus-tile home-parent-learning"><span class="home-focus-kicker">最近一次學習</span>'+
+   '<strong class="home-focus-lesson-name">'+name+'</strong><p>'+content+'</p>'+stars+
+   '<button type="button" class="home-focus-link" data-view="students">查看完整學習紀錄 ↗</button></article>'+
+  '<article class="home-focus-tile home-parent-payment"><span class="home-focus-kicker">本月費用</span>'+
+   '<div class="home-payment-lines"><div><span>尚待回報付款</span><strong>'+money(balance.available)+
+   '</strong></div><div><span>已回報，等老師確認</span><strong>'+money(balance.pending)+
+   '</strong></div><div><span>老師已確認收到</span><strong>'+money(balance.confirmed)+
+   '</strong></div></div><button type="button" class="home-focus-link" data-view="billing">查看付款紀錄 ↗</button></article></div>';
 }
 function rowHTML(l,full=false){
  const s=studentFor(l),name=s?.name||l.student||"學生",p=pillClass(l);
@@ -423,7 +500,8 @@ function learningRating(value){return value==null||value===""?"老師尚未評�
 function renderParentLearning(){
  const parent=state.role==="parent";
  $("#parent-learning-card").classList.toggle("hidden",!parent);
- $("#parent-learning-home").classList.toggle("hidden",!parent);
+ // The parent home now has its own next-class/learning/payment overview.
+ $("#parent-learning-home").classList.add("hidden");
  if(!parent)return;
  const ids=new Set(visibleStudents().map(s=>s.id));
  const lessons=state.lessons.filter(l=>ids.has(l.student_id)&&l.type==="lesson").sort((a,b)=>
