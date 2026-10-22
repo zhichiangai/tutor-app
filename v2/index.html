@@ -48,6 +48,7 @@
  <article class="card"><div class="section-row"><h2>我的課程與學習紀錄</h2></div><div id="student-portal-content"></div></article>
  </section>
  <section id="view-home" class="page-view">
+          <section id="home-focus" class="home-focus" aria-live="polite" aria-label="今天的重要資訊"></section>
           <div class="metrics-grid" id="metrics"></div><article class="card parent-learning-home hidden" id="parent-learning-home"></article>
           <div class="home-grid">
             <div class="column-stack">
@@ -124,7 +125,7 @@
             </article>
           </div>
         </section>
-        <footer class="site-footer"><span>好好上課 © 2026</span><span><a href="./privacy.html">隱私權政策</a> · <a href="./terms.html">服務條款</a> · V3.5.3 · Made with care. <span aria-hidden="true">✳</span></span></footer>
+        <footer class="site-footer"><span>好好上課 © 2026</span><span><a href="./privacy.html">隱私權政策</a> · <a href="./terms.html">服務條款</a> · V3.5.4 · Made with care. <span aria-hidden="true">✳</span></span></footer>
       </div>
     </main>
     <nav class="mobile-nav" aria-label="手機導覽"><button data-view="home" class="active"><span>⌂</span>今天</button><button data-view="calendar"><span>▦</span>月曆</button><button data-view="billing"><span>◈</span>帳務</button><button data-view="students"><span>♧</span>學生</button><button data-view="settings"><span>⚙</span>設定</button></nav>
@@ -281,11 +282,19 @@
   <dialog class="modal" id="student-modal"><form id="student-form" class="modal-inner"><div class="modal-head"><div><p class="eyebrow">NEW STUDENT</p><h2>新增學生</h2></div><button type="button" class="close-modal" data-close="student-modal">×</button></div><label>學生稱呼<input id="student-name" name="name" maxlength="80" required placeholder="例如：小明"></label><label>常用科目<input name="subject" maxlength="80" value="數學" list="student-subject-options" required><datalist id="student-subject-options"></datalist></label><label>鐘點費（NT$）<input name="hourly_rate" type="number" min="0" value="500" step="1" list="student-rate-options" required><datalist id="student-rate-options"></datalist></label><div class="form-actions"><button type="button" class="secondary-button" data-close="student-modal">取消</button><button class="primary-button" type="submit">儲存學生</button></div></form></dialog>
   <dialog class="modal" id="request-modal"><form id="request-form" class="modal-inner"><div class="modal-head"><div><p class="eyebrow">LET US KNOW</p><h2 id="request-heading">送出申請</h2></div><button type="button" class="close-modal" data-close="request-modal">×</button></div><p class="modal-description" id="request-description"></p><input id="request-lesson-id" type="hidden"><input id="request-kind" type="hidden"><label>想補充的話（選填）<textarea id="request-note" rows="3" placeholder="例如：已於今天轉帳／當天需要請假"></textarea></label><div class="form-actions"><button class="secondary-button" type="button" data-close="request-modal">取消</button><button class="primary-button" type="submit">送出申請</button></div></form></dialog>
   <dialog class="modal account-modal login-modal" id="account-modal" aria-labelledby="login-heading">
-    <div class="modal-inner"><div class="modal-head"><div><p class="eyebrow">WELCOME · 好好上課</p>
-      <h2 id="login-heading">登入好好上課</h2><p class="modal-description" id="login-description">用 Google 帳號登入，開始管理你的課程與學習紀錄。</p></div>
-    </div>
-      <button class="google-button" id="google-login" type="button"><span class="google-g">G</span>使用 Google 登入</button>
-      <p class="helper-note">登入後可前往「設定」修改名稱、家教空間與啟用的角色模式。</p>
+    <div class="modal-inner">
+      <div class="login-illustration" aria-hidden="true"><span>✿</span></div>
+      <div class="login-welcome"><p class="eyebrow">好好上課 · 每一堂，都好好安排</p>
+        <h2 id="login-heading">歡迎來到好好上課</h2>
+        <p class="modal-description" id="login-description">老師安排課程、家長了解孩子的學習、學生回顧每次進步。從這裡開始就好。</p>
+      </div>
+      <div id="login-progress" class="login-progress" role="status" aria-live="polite" hidden>
+        <span class="login-spinner" aria-hidden="true"></span>
+        <div><strong id="login-progress-title">正在為你準備課程</strong><p id="login-progress-copy">稍等一下，馬上就能看到你的安排。</p></div>
+      </div>
+      <button class="google-button" id="google-login" type="button"><span class="google-g" aria-hidden="true">G</span>使用 Google 帳號繼續</button>
+      <button class="secondary-button wide" id="login-retry" type="button" hidden>再試一次</button>
+      <p class="login-helper" id="login-help">第一次使用？老師可以從新增學生開始；家長和學生接受老師的邀請後，就能查看自己的課程。</p>
     </div>
   </dialog>
   <dialog class="modal schedule-sheet" id="shared-course-modal" aria-labelledby="shared-course-heading">
