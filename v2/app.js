@@ -711,19 +711,29 @@ function renderSharedPlanner(){
  '<h3 class="shared-course-heading">本月及後續課程</h3>'+(lessonRows||'<p class="muted-small">目前沒有課程安排。</p>')+
  '';
 }
+let historyRequestVersion=0;
 async function loadSharedCourseHistory(){
+ const request=++historyRequestVersion;
  state.sharedCourseHistory={};
+ state.historyReadFailed=false;
  if(state.mode!=="live"||!client||!activeUser)return;
- const userId=activeUser.id,generation=authDataGeneration;
- const linked=state.role==="student"?(state.studentPortal?.students||[]):visibleStudents();
+ const userId=activeUser.id,generation=authDataGeneration,role=state.role;
+ const linked=role==="student"?(state.studentPortal?.students||[]):visibleStudents();
  const lists=await Promise.all(linked.slice(0,20).map(async st=>{
-  const {data,error}=await client.rpc("shared_course_history",{p_student_id:st.id});
-  return [st.id,error?[]:Array.isArray(data)?data:[]];
+  try{
+   const {data,error}=await client.rpc("shared_course_history",{p_student_id:st.id});
+   if(error)throw error;
+   return {id:st.id,rows:Array.isArray(data)?data:[],failed:false};
+  }catch(err){
+   console.warn("近期課程變更讀取失敗",err);
+   return {id:st.id,rows:[],failed:true};
+  }
  }));
- if(activeUser?.id!==userId||generation!==authDataGeneration)return;
- for(const [id,rows] of lists)state.sharedCourseHistory[id]=rows;
+ if(activeUser?.id!==userId||generation!==authDataGeneration||
+    state.role!==role||request!==historyRequestVersion)return;
+ state.historyReadFailed=lists.some(result=>result.failed);
+ for(const item of lists)state.sharedCourseHistory[item.id]=item.rows;
 }
-
 /* A date change selects its new weekday only for a single-day recurring rule.
  * Multi-day rules (e.g. Mon/Wed/Fri) keep all manually selected weekdays. */
 function weekdayForDate(value){
@@ -853,7 +863,7 @@ async function cancelSharedCourse(kind,id){
  * lesson tables). This renderer intentionally never displays payment fields. */
 function studentCalendarLessons(){
  return sharedCourseLessons()
-  .filter(l=>l.type!=="moved"&&/^\\d{4}-\\d{2}-\\d{2}$/.test(String(l.lesson_date||"")))
+  .filter(l=>l.type!=="moved"&&/^\d{4}-\d{2}-\d{2}$/.test(String(l.lesson_date||"")))
   .sort((a,b)=>(String(a.lesson_date)+" "+timeLabel(a.start_time))
    .localeCompare(String(b.lesson_date)+" "+timeLabel(b.start_time)));
 }
@@ -863,7 +873,7 @@ function studentLessonSummary(l){
 }
 function renderStudentCalendar(){
  if(state.role!=="student")return;
- const month=state.month,monthStart=dateKey(new Date(month.getFullYear(),month.getMonth(),1));
+ const month=state.month;
  const lessons=studentCalendarLessons();
  const monthItems=lessons.filter(l=>sameMonth(l.lesson_date,month));
  const selectedDay=String(state.selected||"");
@@ -891,7 +901,6 @@ function renderStudentCalendar(){
   const yes=btn.dataset.studentCalendarMode===state.studentCalendarMode;
   btn.classList.toggle("active",yes);btn.setAttribute("aria-pressed",String(yes));
  });
- const names=new Map(sharedCourseStudents().map(person=>[person.id,person.name]));
  $("#student-calendar-list-view").innerHTML=monthItems.length?monthItems.map(l=>
   '<button type="button" class="student-month-list-row" data-student-day="'+esc(l.lesson_date)+'">'+
   '<strong>'+esc(l.lesson_date)+'</strong><span>'+studentLessonSummary(l)+'</span></button>').join(""):
@@ -916,7 +925,7 @@ function moveStudentMonth(direction){
  renderSharedPlanner();
 }
 function selectStudentDay(date){
- if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date))return;
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return;
  const d=parseDate(date);
  if(!Number.isFinite(d.getTime())||dateKey(d)!==date)return;
  state.selected=date;
