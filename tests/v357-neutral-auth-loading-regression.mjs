@@ -1,4 +1,4 @@
-// V3.5.8: prevent a stale role from being shown during OAuth/session initialization.
+// V3.5.9: prevent a stale role from being shown during OAuth/session initialization.
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
@@ -48,7 +48,7 @@ function harness(){
   );
  return {api,el};
 }
-test("page title and footer both show V3.5.8",()=>{
+test("page title and footer both show V3.5.9",()=>{
  assert.match(html,/<title>好好上課 · V3\.5\.8 家教課程管理<\/title>/);
  assert.match(html,/V3\.5\.8 · Made with care/);
  assert.doesNotMatch(html,/V3\.5\.5 家教課程管理/);
