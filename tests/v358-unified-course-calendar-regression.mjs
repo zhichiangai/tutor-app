@@ -72,7 +72,7 @@ test("student monthly calendar is the first section; each role has a last-positi
  assert.ok(parent.indexOf('id="calendar-month-view"')<parent.indexOf('id="agenda-list"'));
  assert.ok(parent.indexOf('id="agenda-list"')<parent.indexOf('id="shared-parent-card"'));
  assert.ok(parent.indexOf('id="shared-parent-card"')<parent.indexOf('id="calendar-recent-changes"'));
- assert.match(html,/V3\.5\.8 · Made with care/);
+ assert.match(html,/V3\.5\.9 · Made with care/);
  assert.match(css,/\.student-calendar-cell/);
  assert.match(css,/\.recent-changes-toggle/);
 });
