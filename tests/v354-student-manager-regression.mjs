@@ -18,6 +18,7 @@ function harness(){
   if(!elements.has(selector)){
    const classes=new Set();
    elements.set(selector,{
+    id:selector.startsWith("#")?selector.slice(1):"",
     innerHTML:"",textContent:"",value:"",hidden:false,open:false,
     style:{},dataset:{},
     classList:{
@@ -30,7 +31,9 @@ function harness(){
   }
   return elements.get(selector);
  };
- const document={querySelector,querySelectorAll:()=>[],body:{classList:{toggle(){}}},activeElement:null};
+ const document={querySelector,querySelectorAll:selector=>selector===".modal"?
+  [...elements.values()].filter(el=>el.id==="student-management-modal"||el.id==="account-modal"):[],
+  body:{classList:{toggle(){}}},activeElement:null};
  const code=source.replace(/^import .* from "\.\/[^"]+";/gm,"").replace(/\nmain\(\);\s*$/,"");
  const api=new Function("document","localStorage","window","crypto","setTimeout","FormData",
   "expandSchedules","lessonAllocation","confirm",
