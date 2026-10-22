@@ -75,7 +75,7 @@ test("Cross-device restoration prefers profile.last_role over browser localStora
  assert.ok(code.includes("const remote=profile?.last_role"));
  assert.ok(code.includes("state.enabledRoles.includes(r)"));
  assert.ok(code.includes('client.from("profiles").update({last_role:role})'));
- assert.ok(code.includes('state.view=state.role==="student"?"student":"home"'));
+ assert.ok(code.includes('state.view=state.role==="student"?"student-today":"home"'));
 });
 
 test("Private student linking cannot self-insert or read billing fields",()=>{
