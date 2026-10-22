@@ -1,4 +1,4 @@
-// V3.5.7: prevent a stale role from being shown during OAuth/session initialization.
+// V3.5.8: prevent a stale role from being shown during OAuth/session initialization.
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
@@ -33,7 +33,7 @@ function harness(){
   .replace(/\nmain\(\);\s*$/,"");
  const overrides=[
   "syncCurrentView=()=>{};renderRoleSettings=()=>{};renderWorkspaceUI=()=>{};",
-  "renderStudentPortal=()=>{};renderSharedPlanner=()=>{};renderStudentToday=()=>{};",
+  "renderStudentPortal=()=>{};renderSharedPlanner=()=>{};renderStudentToday=()=>{};renderStudentCalendar=()=>{};renderRecentChanges=()=>{};",
   "renderNext=()=>{};renderRecent=()=>{};renderMiniCalendar=()=>{};",
   "renderFullCalendar=()=>{};renderBilling=()=>{};renderStudents=()=>{};",
   "refreshDaySheet=()=>{};renderHomeFocus=()=>{};monthLessons=()=>[];",
@@ -48,9 +48,9 @@ function harness(){
   );
  return {api,el};
 }
-test("page title and footer both show V3.5.7",()=>{
- assert.match(html,/<title>好好上課 · V3\.5\.7 家教課程管理<\/title>/);
- assert.match(html,/V3\.5\.7 · Made with care/);
+test("page title and footer both show V3.5.8",()=>{
+ assert.match(html,/<title>好好上課 · V3\.5\.8 家教課程管理<\/title>/);
+ assert.match(html,/V3\.5\.8 · Made with care/);
  assert.doesNotMatch(html,/V3\.5\.5 家教課程管理/);
 });
 test("checking session hides the stale student role, including accessible labels",()=>{

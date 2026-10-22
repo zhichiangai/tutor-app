@@ -1,10 +1,18 @@
-# 好好上課（tutor-app）｜家教課程與收付款管理 V3.5.7
+# 好好上課（tutor-app）｜家教課程與收付款管理 V3.5.8
 
 **正式網站：** https://tutor.rapid4grad.com/  
 **程式碼：** https://github.com/zhichiangai/tutor-app  
-**目前版本：** V3.5.7（2026-10-22），部署基準為 GitHub `main`。 
+**目前版本：** V3.5.8（2026-10-23），部署基準為 GitHub `main`。 
 
 > 本 README 說明**目前正式運行的 Vercel + Supabase 版**。舊 GAS、Google Sheets 和 GitHub Pages 專案仍保存在程式庫內，但**不是本網域 V3.3 使用的後端**。舊版記錄見 [歷史 README](docs/legacy-readme-20261019.md)。
+
+## V3.5.8 三方月曆與最近變更
+
+- 學生「課表」最上面增加完整月份月曆、月份切換和月曆／清單切換。點選日期後可在下方檢視該日課程與狀態，接著才是原有共同排課與後續安排。
+- 老師、家長保留原有可用月份月曆；家長共同排課區塊移到月曆及當日課程下方。
+- 老師、家長、學生課表最底部皆提供最近變更，預設收合、點擊整列展開／再次收合；切換月份不會重置展開狀態。此區塊使用現有、以 `auth.uid()` 限制的 `shared_course_history` RPC。
+- 學生月曆只從已連結學生的 `student_portal_data` 授權資料讀取課程，不顯示付款金額、費率或其他學生資料。沒有更動資料庫、權限政策、Google 登入流程或現有的變更課程 RPC。
+- `tests/v358-unified-course-calendar-regression.mjs` 涵蓋月曆順序、學生隱私、日期切換、展開收合與三方資料隔離。真實瀏覽器及授權 API 完整驗收仍需另行執行。
 
 ## 正式系統架構
 
