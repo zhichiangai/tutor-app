@@ -56,7 +56,7 @@ function harness(){
   "renderRoleSettings=()=>{};renderWorkspaceUI=()=>{};",
   "renderNext=()=>{};renderRecent=()=>{};renderMiniCalendar=()=>{};renderFullCalendar=()=>{};",
   "renderBilling=()=>{};renderStudents=()=>{};refreshDaySheet=()=>{};renderSharedPlanner=()=>{};",
-  "renderStudentPortal=()=>{};renderHomeFocus=()=>{};toast=()=>{};",
+  "renderStudentPortal=()=>{};renderStudentCalendar=()=>{};renderRecentChanges=()=>{};renderHomeFocus=()=>{};toast=()=>{};",
   "return {state,render,setView,setRole,normalizeView,syncCurrentView,renderStudentToday,clearUserSessionState,",
   "setUser(u){activeUser=u},setAuthPhase(p){authPhase=p}};"
  ].join("\n");
