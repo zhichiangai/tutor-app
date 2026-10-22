@@ -189,8 +189,8 @@ async function saveEnabledRoles(event){
   localStorage.setItem(ROLE_STORAGE+"_"+id,selectedRole);
   localStorage.setItem(ROLE_PENDING_STORAGE+"_"+id,"1");
   try{
-   await saveLastRole(selectedRole);
-   if(activeUser?.id===id&&localStorage.getItem(ROLE_STORAGE+"_"+id)===selectedRole)
+   const saved=await queueLastRoleSave(selectedRole);
+   if(saved&&activeUser?.id===id&&localStorage.getItem(ROLE_STORAGE+"_"+id)===selectedRole)
     localStorage.setItem(ROLE_PENDING_STORAGE+"_"+id,"0");
   }catch(error){console.error(error);toast("角色已儲存，但登入預設模式尚未完成同步");}
  }
@@ -210,6 +210,18 @@ async function saveLastRole(role){
  if(error)throw error;
  const mine=state.profiles.find(p=>p.id===id);if(mine)mine.last_role=role;
 }
+// Serialize preference updates so rapid mode switches cannot save out of order.
+let lastRoleSaveQueue=Promise.resolve();
+function queueLastRoleSave(role){
+ const id=activeUser?.id;
+ const pending=lastRoleSaveQueue.catch(()=>{}).then(async()=>{
+  if(!id||signOutRequested||activeUser?.id!==id)return false;
+  await saveLastRole(role);
+  return true;
+ });
+ lastRoleSaveQueue=pending;
+ return pending;
+}
 function setRole(role){
  if(!VALID_ROLES.includes(role)||!enabledRoles().includes(role))return;
  state.role=role;
@@ -221,8 +233,8 @@ function setRole(role){
  setView(role==="student"?"student-today":"home");
  if(id){
   localStorage.setItem(ROLE_PENDING_STORAGE+"_"+id,"1");
-  saveLastRole(role).then(()=>{
-   if(localStorage.getItem(storageKey)===role)
+  queueLastRoleSave(role).then(saved=>{
+   if(saved&&localStorage.getItem(storageKey)===role)
     localStorage.setItem(ROLE_PENDING_STORAGE+"_"+id,"0");
   }).catch(err=>{
    console.error(err);
@@ -240,8 +252,8 @@ async function changeDefaultLoginRole(){
  localStorage.setItem(ROLE_STORAGE+"_"+id,role);
  localStorage.setItem(ROLE_PENDING_STORAGE+"_"+id,"1");
  try{
-  await saveLastRole(role);
-  if(activeUser?.id!==id)return;
+  const saved=await queueLastRoleSave(role);
+  if(!saved||activeUser?.id!==id)return;
   if(localStorage.getItem(ROLE_STORAGE+"_"+id)===role)
    localStorage.setItem(ROLE_PENDING_STORAGE+"_"+id,"0");
   toast("已設定下次登入優先進入"+ROLE_TITLE[role]);
@@ -2213,7 +2225,7 @@ async function initializeLive(){
    // A previously interrupted user choice may need retrying. Do not write
    // inferred defaults as if the user had explicitly selected them.
    if(pending){
-    if(remote!==state.role)await saveLastRole(state.role);
+    if(remote!==state.role)await queueLastRoleSave(state.role);
     if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
     if(localStorage.getItem(roleKey)===state.role)localStorage.setItem(pendingKey,"0");
    }
