@@ -319,8 +319,11 @@
 #view-student h3{font-size:14px;margin-top:20px}
 @media(max-width:650px){.role-indicator{max-width:210px}.role-indicator #role-indicator-text{max-width:153px;font-size:10px}.role-menu{max-width:calc(100vw - 18px)}.profile-display-form{align-items:stretch}.profile-display-form button{width:100%}}
 
-/* Student can only navigate their authorized read-only learning dashboard. */
-.student-mode .side-nav,.student-mode .mobile-nav{display:none!important}
+/* Student sees a dedicated menu. Teacher and parent account controls remain hidden. */
+.nav-student{display:none!important}
+.student-mode .nav-standard{display:none!important}
+.student-mode .side-nav .nav-student{display:flex!important}
+@media(max-width:900px){.student-mode .mobile-nav .nav-student{display:flex!important}}
 
 
 /* V3.3 shared course management (guardian/student): action labels stay visible on mobile. */
@@ -602,4 +605,24 @@
  .student-management-invite-form{grid-template-columns:minmax(0,1fr)}
  .student-account-row{align-items:flex-start;flex-direction:column}
  .student-account-actions{justify-content:flex-start}
+}
+
+
+/* V3.5.5 — student Today, Schedule, Learning, Settings, without financial pages. */
+.student-view-panel.hidden{display:none!important}
+.student-today-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;min-width:0}
+.student-today-card{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:12px;
+ margin:0!important;padding:23px;border-radius:16px}
+.student-today-welcome{grid-column:1/-1;background:linear-gradient(120deg,#fff8f1,#fff)}
+.student-today-card h3{font-size:18px;line-height:1.55;margin:0;overflow-wrap:anywhere}
+.student-today-card p{margin:0;color:#756d64;font-size:13px;line-height:1.8;overflow-wrap:anywhere}
+.student-today-card .text-link{margin-top:auto;min-height:42px;padding:10px 0 0}
+.student-today-rating{background:#faf5ed;border-radius:9px;padding:10px 12px;color:#8c634f!important}
+.student-view-panel .page-head{margin-bottom:18px}
+.side-nav [aria-current="page"],.mobile-nav [aria-current="page"]{font-weight:700}
+@media(max-width:650px){
+ .student-today-grid{grid-template-columns:minmax(0,1fr);gap:12px}
+ .student-today-welcome{grid-column:1}
+ .student-today-card{padding:18px}
+ .student-today-card h3{font-size:17px}
 }
