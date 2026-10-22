@@ -333,6 +333,17 @@ function renderAuthUI(){
  $("#google-login").hidden=waiting||failed;
  $("#login-retry").hidden=!failed;
  $("#login-help").hidden=waiting||failed;
+ // OAuth and profile data are not resolved yet. Never label a previous or
+ // cached role as the current account while authentication is still pending.
+ const indicator=$("#role-indicator");
+ indicator.disabled=waiting||!activeUser;
+ if(waiting){
+  $("#role-indicator-text").textContent="正在確認登入身分";
+  $("#role-indicator-icon").textContent="◌";
+  indicator.setAttribute("aria-label","正在確認登入身分");
+  indicator.setAttribute("aria-expanded","false");
+  $("#role-menu").classList.add("hidden");
+ }
 }
 function render(){
  const role=state.role,teacher=role==="teacher",student=role==="student";
@@ -340,10 +351,11 @@ function render(){
  // Login initialization sets state.view directly; always sync the visible page
  // and highlighted tabs, not only when someone manually clicks navigation.
  syncCurrentView();
- const identity=authPhase==="checking"?"正在準備你的課程":activeUser?roleFullName():"尚未登入";
- $("#role-indicator-text").textContent=identity+" · "+ROLE_TITLE[role];
- $("#role-indicator-icon").textContent=teacher?"◈":student?"✎":"♧";
- $("#role-indicator").setAttribute("aria-label","目前使用："+identity+"，"+ROLE_TITLE[role]+"，點擊切換");
+ const identity=authPhase==="checking"?"正在確認登入身分":activeUser?roleFullName():"尚未登入";
+ $("#role-indicator-text").textContent=authPhase==="checking"?identity:identity+" · "+ROLE_TITLE[role];
+ $("#role-indicator-icon").textContent=authPhase==="checking"?"◌":teacher?"◈":student?"✎":"♧";
+ $("#role-indicator").setAttribute("aria-label",authPhase==="checking"?
+  "正在確認登入身分":"目前使用："+identity+"，"+ROLE_TITLE[role]+"，點擊切換");
  $$("[data-role-choice]").forEach(el=>el.setAttribute("aria-pressed",String(el.dataset.roleChoice===role)));
  $("#greeting-title").innerHTML=teacher?"今天的課程，<em>從這裡開始。</em>":student?"我的學習，<em>一步一步進步。</em>":"孩子的每堂課，<em>都在這裡。</em>";
  $("#greeting-copy").textContent=teacher?"先看看今天的課程、需要補寫的紀錄，以及等你確認的收款。":student?"在這裡查看你的課表和老師的課後回饋。":"下一堂課、最新學習紀錄和付款狀態，不用再四處尋找。";
@@ -355,7 +367,7 @@ function render(){
   activeUser?"<i></i> 已登入":"<i></i> 尚未登入";
  renderAuthUI();
  $("#account-label").textContent=identity;
- $("#account-subtitle").textContent=activeUser?ROLE_TITLE[role]:"使用 Google 登入";
+ $("#account-subtitle").textContent=authPhase==="checking"?"正在確認登入身分":activeUser?ROLE_TITLE[role]:"使用 Google 登入";
  $("#avatar").textContent=identity.slice(0,1);
  $("#account-current").textContent=activeUser?.email||"尚未使用 Google 登入";
  if(document.activeElement!==$("#profile-display-name"))$("#profile-display-name").value=state.mode==="live"&&activeUser?userDisplayName():"";
