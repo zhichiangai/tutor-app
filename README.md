@@ -1,8 +1,8 @@
-# 好好上課（tutor-app）｜家教課程與收付款管理 V3.5.3
+# 好好上課（tutor-app）｜家教課程與收付款管理 V3.5.6
 
 **正式網站：** https://tutor.rapid4grad.com/  
 **程式碼：** https://github.com/zhichiangai/tutor-app  
-**目前版本：** V3.5.3（2026-10-22），部署基準為 GitHub `main`。 
+**目前版本：** V3.5.6（修補分支候選，待驗收及正式部署；2026-10-22），部署基準為 GitHub `main`。 
 
 > 本 README 說明**目前正式運行的 Vercel + Supabase 版**。舊 GAS、Google Sheets 和 GitHub Pages 專案仍保存在程式庫內，但**不是本網域 V3.3 使用的後端**。舊版記錄見 [歷史 README](docs/legacy-readme-20261019.md)。
 
@@ -24,6 +24,14 @@ Vercel：從 main 發布，依 vercel.json 路由至 v2/ 靜態前端
 - **資料庫專案**：Supabase `tutor-app`（Project Ref：`vctisuglfoxyuwlvyjee`，東京區域）；歷次 SQL 版本存放於 `supabase/migrations/`。
 - **正式部署**：Vercel `tutor-app-v2`（請以 Vercel Deployments 查詢目前生效版本）；GitHub PR 合併不表示 SQL migration 自動套用。
 - **舊版**：`frontend/`、`backend/apps-script/` 供歷史與舊資料參考。不要以這兩個路徑推斷 V3.3 正式站的行為。
+
+## V3.5.6 登入角色偏好修正（待發布）
+
+- 第一次登入沒有使用者明確偏好時，依已連結的學生、家長身分選擇首頁，不再一律採老師預設。
+- 已儲存的跨裝置 `profiles.last_role` 仍優先；使用者可於設定中調整下次登入角色，切換模式也會更新偏好。
+- 若登入前的角色偏好寫入中斷，依該帳號的本機待同步標記恢復並重試，不影響其他 Google 帳號。
+- 角色偏好不授權任何學生或帳務資料；所有真實資料存取仍依原本 RLS 與 RPC 限制。
+- 本次不需資料庫 Migration，也不變更任何真實課程或付款資料。
 
 ## V3.4.1 排課體驗修正
 

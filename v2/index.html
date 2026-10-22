@@ -131,7 +131,10 @@
                 <label class="settings-mode"><input type="checkbox" name="enabled-role" value="teacher"><span><strong>老師模式</strong><small>管理課程、學生及收款</small></span></label>
                 <label class="settings-mode"><input type="checkbox" name="enabled-role" value="parent"><span><strong>家長模式</strong><small>孩子的課程、學習及付款</small></span></label>
                 <label class="settings-mode"><input type="checkbox" name="enabled-role" value="student"><span><strong>學生模式</strong><small>自己的課表及課後回饋</small></span></label>
-                <p class="helper-note">至少保留一個模式，啟用項目會隨同一 Google 帳號跨裝置同步。</p>
+                <label for="default-login-role" class="settings-default-role">下次登入優先顯示
+                  <select id="default-login-role" aria-label="下次登入優先顯示的身分"></select>
+                </label>
+                <p class="helper-note">切換模式也會更新登入偏好；若同步中斷，下次登入會重試。本項設定不會授予額外資料權限。</p>
                 <button class="primary-button" type="submit">儲存角色設定</button>
               </form>
             </details>
@@ -146,7 +149,7 @@
             </article>
           </div>
         </section>
-        <footer class="site-footer"><span>好好上課 © 2026</span><span><a href="./privacy.html">隱私權政策</a> · <a href="./terms.html">服務條款</a> · V3.5.5 · Made with care. <span aria-hidden="true">✳</span></span></footer>
+        <footer class="site-footer"><span>好好上課 © 2026</span><span><a href="./privacy.html">隱私權政策</a> · <a href="./terms.html">服務條款</a> · V3.5.6 · Made with care. <span aria-hidden="true">✳</span></span></footer>
       </div>
     </main>
     <nav class="mobile-nav" aria-label="手機導覽">
