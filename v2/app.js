@@ -227,10 +227,24 @@ async function saveMyWorkspace(rename=false){
  });
  if(ok){await loadTeacherPreferences();render();toast(rename?"空間名稱已更新":"家教空間已建立，現在可以新增學生")}
 }
+function renderAuthUI(){
+ const waiting=authPhase==="checking";
+ const failed=authPhase==="error";
+ $("#login-heading").textContent=waiting?"正在為你準備好好上課":failed?
+  "剛剛沒有成功開啟課程":"歡迎來到好好上課";
+ $("#login-description").textContent=waiting?
+  "稍等一下，我們正在整理你的課程和學習紀錄。":
+  failed?"你的課程暫時無法顯示，請再試一次。":
+  "老師安排課程、家長了解孩子的學習、學生回顧每次進步。從這裡開始就好。";
+ $("#login-progress").hidden=!waiting;
+ $("#google-login").hidden=waiting||failed;
+ $("#login-retry").hidden=!failed;
+ $("#login-help").hidden=waiting||failed;
+}
 function render(){
  const role=state.role,teacher=role==="teacher",student=role==="student";
  document.body?.classList?.toggle("student-mode",student);
- const identity=activeUser?roleFullName():"尚未登入";
+ const identity=authPhase==="checking"?"正在準備你的課程":activeUser?roleFullName():"尚未登入";
  $("#role-indicator-text").textContent=identity+" · "+ROLE_TITLE[role];
  $("#role-indicator-icon").textContent=teacher?"◈":student?"✎":"♧";
  $("#role-indicator").setAttribute("aria-label","目前使用："+identity+"，"+ROLE_TITLE[role]+"，點擊切換");
@@ -238,9 +252,12 @@ function render(){
  $("#greeting-title").innerHTML=teacher?"今天的課程，<em>從這裡開始。</em>":student?"我的學習，<em>一步一步進步。</em>":"孩子的每堂課，<em>都在這裡。</em>";
  $("#greeting-copy").textContent=teacher?"先看看今天的課程、需要補寫的紀錄，以及等你確認的收款。":student?"在這裡查看你的課表和老師的課後回饋。":"下一堂課、最新學習紀錄和付款狀態，不用再四處尋找。";
  $("#top-add").style.display=teacher?"":"none";
- document.body?.classList?.toggle("login-required",!activeUser);
- $("#connection-status").classList.toggle("live",state.mode==="live"&&!!activeUser);
- $("#connection-status").innerHTML=activeUser?"<i></i> 已安全連線":"<i></i> 尚未登入";
+ document.body?.classList?.toggle("login-required",authPhase!=="ready"||!activeUser);
+ $("#connection-status").classList.toggle("live",authPhase==="ready"&&!!activeUser);
+ $("#connection-status").innerHTML=authPhase==="checking"?"<i></i> 正在準備課程":
+  authPhase==="error"?"<i></i> 課程暫時無法顯示":
+  activeUser?"<i></i> 已登入":"<i></i> 尚未登入";
+ renderAuthUI();
  $("#account-label").textContent=identity;
  $("#account-subtitle").textContent=activeUser?ROLE_TITLE[role]:"使用 Google 登入";
  $("#avatar").textContent=identity.slice(0,1);
@@ -1704,6 +1721,8 @@ const LIVE_FIELDS=["studentInvites","studentLinks","students","lessons","invites
 let authDataGeneration=0;
 // Ignore token refresh while a user-initiated logout is pending.
 let signOutRequested=false;
+// People should never see "not signed in" while we are still checking their account.
+let authPhase="checking";
 const SESSION_PRIVATE_DOM_IDS=[
  "student-portal-content","student-invites","shared-student-content","shared-parent-content",
  "parent-learning","parent-learning-home","billing-list","period-lesson-list",
@@ -1795,6 +1814,7 @@ async function ensureClient(){
   const switchedAccounts=previousId&&nextUser&&previousId!==nextUser.id;
   const lostSession=previousId&&!nextUser;
   if(event==="SIGNED_OUT"||switchedAccounts||lostSession){
+   authPhase=nextUser?"checking":"signedOut";
    clearUserSessionState();
    activeUser=nextUser;
    state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
@@ -1810,6 +1830,9 @@ async function ensureClient(){
 async function initializeLive(){
  if(signOutRequested)return;
  const bootGeneration=authDataGeneration;
+ authPhase="checking";
+ renderAuthUI();
+ showModal("account-modal");
  try{
   await ensureClient();
   const {data,error}=await client.auth.getSession();
@@ -1849,10 +1872,12 @@ async function initializeLive(){
    state.view=state.role==="student"?"student":"home";
    await loadTeacherPreferences();
    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
+   authPhase="ready";
    closeModal("account-modal");
-   toast("已登入並同步課程");
+   toast("歡迎回來，課程都準備好了");
   }else{
    clearUserSessionState();
+   authPhase="signedOut";
   }
   render();
   if(!activeUser)showModal("account-modal");
@@ -1861,22 +1886,32 @@ async function initializeLive(){
   console.error(err);
   activeUser=null;
   clearUserSessionState();
+  authPhase="error";
   render();
-  toast("Supabase 連線失敗："+err.message);
+  toast("剛剛沒能開啟課程，請按「再試一次」。");
   showModal("account-modal");
  }
 }
 async function googleLogin(){
  try{
   signOutRequested=false;
+  authPhase="checking";
+  renderAuthUI();
   const db=await ensureClient();state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
   const {error}=await db.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname}});
   if(error)throw error;
- }catch(err){console.error(err);toast("Google 登入尚未完成："+err.message);showModal("account-modal")}
+ }catch(err){
+  console.error(err);
+  authPhase="signedOut";
+  render();
+  toast("這次沒有完成 Google 登入，請再試一次。");
+  showModal("account-modal");
+ }
 }
 async function signOut(){
  // Immediately erase private data before awaiting the remote Auth response.
  signOutRequested=true;
+ authPhase="signedOut";
  const db=client;
  activeUser=null;
  clearUserSessionState();
@@ -2021,6 +2056,7 @@ function bindEvents(){
  $("#profile-button").onclick=()=>activeUser?setView("settings"):showModal("account-modal");
  $("#account-action").onclick=()=>activeUser?setView("settings"):showModal("account-modal");
  $("#google-login").onclick=googleLogin;
+ $("#login-retry").onclick=initializeLive;
  $("#sign-out").onclick=signOut;
  $("#mode-settings-form").addEventListener("submit",saveEnabledRoles);
   $("#profile-display-form").addEventListener("submit",saveDisplayName);
@@ -2031,6 +2067,7 @@ function main(){
  state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
  for(const k of LIVE_FIELDS)state[k]=[];
  bindEvents();render();
+ showModal("account-modal");
  initializeLive();
 }
 main();
