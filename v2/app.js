@@ -101,13 +101,38 @@ function setBusy(yes){
 }
 function showModal(id){const dialog=$("#"+id);if(dialog&&!dialog.open)dialog.showModal()}
 function closeModal(id){const dialog=$("#"+id);if(dialog?.open)dialog.close()}
+const STUDENT_VIEWS=["student-today","student-calendar","student-learning"];
+function normalizeView(view){
+ if(state.role==="student"){
+  if(view==="settings")return "settings";
+  if(view==="student")return "student-learning"; // previous internal route
+  return STUDENT_VIEWS.includes(view)?view:"student-today";
+ }
+ return ["home","calendar","billing","students","settings"].includes(view)?view:"home";
+}
+function syncCurrentView(){
+ state.view=normalizeView(state.view);
+ const page=state.role==="student"&&state.view!=="settings"?"student":state.view;
+ $$(".page-view").forEach(x=>x.classList.toggle("hidden",x.id!=="view-"+page));
+ $$(".side-nav [data-view], .mobile-nav [data-view]").forEach(button=>{
+  const selected=button.dataset.view===state.view;
+  button.classList.toggle("active",selected);
+  button.setAttribute("aria-current",selected?"page":"false");
+ });
+ $("#breadcrumb-name").textContent=({
+  home:"今天",calendar:"課程月曆",billing:"收付款",students:"學生管理",settings:"設定",
+  "student-today":"今天","student-calendar":"我的課表","student-learning":"學習紀錄"
+ })[state.view]||"今天";
+ if(state.role==="student"){
+  for(const [panel,route] of [
+   ["student-today-panel","student-today"],["student-calendar-panel","student-calendar"],
+   ["student-learning-panel","student-learning"]]){
+   $("#"+panel).classList.toggle("hidden",state.view!==route);
+  }
+ }
+}
 function setView(view){
- if(state.role==="student"&&view!=="settings")view="student";
- else if(state.role!=="student"&&view==="student")view="home";
- state.view=view;
- $$(".page-view").forEach(x=>x.classList.toggle("hidden",x.id!=="view-"+view));
- $$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
- $("#breadcrumb-name").textContent=({home:"今天",calendar:"課程月曆",billing:"收付款",students:"學生與家長",settings:"設定",student:"我的學習"})[view]||"今天";
+ state.view=normalizeView(view);
  render();
 }
 const VALID_ROLES=["teacher","parent","student"];
@@ -142,7 +167,7 @@ async function saveEnabledRoles(event){
  if(!selected.includes(state.role)){
   state.role=selected[0];
   await saveLastRole(state.role);
-  state.view=state.role==="student"?"student":"settings";
+  state.view=state.role==="student"?"student-today":"settings";
  }
  render();
  toast("已儲存模式設定；上方只顯示勾選的模式");
@@ -165,7 +190,7 @@ function setRole(role){
  state.role=role;
  const menu=$("#role-menu");menu.classList.add("hidden");$("#role-indicator").setAttribute("aria-expanded","false");
  localStorage.setItem(state.mode==="live"&&activeUser?ROLE_STORAGE+"_"+activeUser.id:ROLE_STORAGE,role);
- setView(role==="student"?"student":"home");
+ setView(role==="student"?"student-today":"home");
  if(state.mode==="live"&&activeUser)saveLastRole(role).catch(err=>{console.error(err);toast("模式已切換，但跨裝置同步失敗："+err.message)});
  toast("已切換到"+ROLE_TITLE[role]);
 }
@@ -244,6 +269,9 @@ function renderAuthUI(){
 function render(){
  const role=state.role,teacher=role==="teacher",student=role==="student";
  document.body?.classList?.toggle("student-mode",student);
+ // Login initialization sets state.view directly; always sync the visible page
+ // and highlighted tabs, not only when someone manually clicks navigation.
+ syncCurrentView();
  const identity=authPhase==="checking"?"正在準備你的課程":activeUser?roleFullName():"尚未登入";
  $("#role-indicator-text").textContent=identity+" · "+ROLE_TITLE[role];
  $("#role-indicator-icon").textContent=teacher?"◈":student?"✎":"♧";
@@ -269,16 +297,12 @@ function render(){
  // Role preference checkboxes are on the separate settings page.
  if(student){
   if(state.view==="settings"){
-   $$(".page-view").forEach(x=>x.classList.toggle("hidden",x.id!=="view-settings"));
-   $("#breadcrumb-name").textContent="設定";
    renderWorkspaceUI();
    return;
   }
-  state.view="student";
-  $$(".page-view").forEach(x=>x.classList.toggle("hidden",x.id!=="view-student"));
-  $("#breadcrumb-name").textContent="我的學習";
   renderStudentPortal();
   renderSharedPlanner();
+  renderStudentToday();
   return;
  }
  $("#view-student").classList.add("hidden");
@@ -736,6 +760,46 @@ async function cancelSharedCourse(kind,id){
  if(ok)toast("課程已取消，相關歷史紀錄仍會保留");
 }
 
+/* Student home is deliberately read-only and never renders rates, invoices or
+   teacher-only fields. Linked student_portal_data is the only data source. */
+function renderStudentToday(){
+ const root=$("#student-today-content");
+ if(state.role!=="student"||state.mode!=="live"||!activeUser){root.innerHTML="";return}
+ const data=state.studentPortal||{};
+ const people=Array.isArray(data.students)?data.students:[];
+ const ids=new Set(people.map(s=>s.id));
+ const lessons=(Array.isArray(data.lessons)?data.lessons:[]).filter(l=>ids.has(l.student_id));
+ const today=dateKey(tick());
+ const upcoming=lessons.filter(l=>l.type==="planned"&&String(l.lesson_date)>=today)
+  .sort((a,b)=>(String(a.lesson_date)+" "+asText(a.start_time)).localeCompare(
+    String(b.lesson_date)+" "+asText(b.start_time)))[0];
+ const finished=lessons.filter(l=>l.type==="lesson").sort((a,b)=>
+  (String(b.lesson_date)+" "+asText(b.start_time)).localeCompare(
+   String(a.lesson_date)+" "+asText(a.start_time)))[0];
+ const personFor=l=>people.find(s=>s.id===l.student_id);
+ const upcomingTitle=upcoming?esc((personFor(upcoming)?.name||"我")+" · "+(upcoming.subject||"課程")):
+  "到課表看看下一堂課";
+ const upcomingDetail=upcoming?
+  esc(prettyDate(upcoming.lesson_date)+" · "+timeLabel(upcoming.start_time)+"–"+timeLabel(upcoming.end_time)):
+  "老師安排的固定課程與後續時段都整理在課表裡。";
+ const lessonTitle=finished?esc((personFor(finished)?.name||"我")+" · "+(finished.subject||"課程")):
+  "目前還沒有完成的課程";
+ const lessonDetail=finished?esc(finished.lesson_content||"老師尚未填寫這堂課的學習內容。"):
+  "上完課後，老師的學習重點與回饋就會出現在這裡。";
+ const latestRating=finished?
+  '<p class="student-today-rating">專注度：'+learningRating(finished.focus_rating)+
+  '　學生心情：'+learningRating(finished.mood_rating)+'</p>':"";
+ const welcome=people.length?esc(people.map(s=>s.name).join("、"))+"，來看看接下來的安排。":
+  "接受老師的邀請後，就能在這裡看到自己的課程。";
+ root.innerHTML='<article class="card student-today-card student-today-welcome">'+
+  '<span class="mini-label">我的學習空間</span><h3>今天好好上課</h3><p>'+welcome+'</p></article>'+
+  '<article class="card student-today-card"><span class="mini-label">下一堂課</span>'+
+  '<h3>'+upcomingTitle+'</h3><p>'+upcomingDetail+'</p>'+
+  '<button type="button" class="text-link" data-view="student-calendar">查看我的課表 ↗</button></article>'+
+  '<article class="card student-today-card"><span class="mini-label">最近一次學習</span>'+
+  '<h3>'+lessonTitle+'</h3><p>'+lessonDetail+'</p>'+latestRating+
+  '<button type="button" class="text-link" data-view="student-learning">查看學習紀錄 ↗</button></article>';
+}
 function renderStudentPortal(){
  if(state.mode==="live"&&!activeUser){
   $("#student-invites").innerHTML="";
@@ -882,8 +946,8 @@ function renderTeacherStudentList(){
    (filter==="pending"&&x.pending)||(filter==="uninvited"&&!x.invited)));
  root.innerHTML=results.length?results.map(x=>{
   const s=x.student;
-  const studentStatus=x.studentLinked?"已連結":x.studentAccounts.length?"等待接受":"尚未邀請";
-  const guardianStatus=x.guardianLinked?"已連結":x.guardianAccounts.length?"等待接受":"尚未邀請";
+  const studentStatus=x.studentLinked?"學生已連結":x.studentAccounts.length?"等待學生接受":"尚未邀請";
+  const guardianStatus=x.guardianLinked?"家長已連結":x.guardianAccounts.length?"等待家長接受":"尚未邀請";
   const enrolled=visibleLessons().filter(l=>l.student_id===s.id).length;
   return '<article class="student-manager-row"><div class="student-manager-primary"><div class="student-manager-avatar" aria-hidden="true">✿</div>'+
    '<div><strong>'+esc(s.name)+'</strong><span>'+esc(s.subject||"未設定科目")+' · 已安排 '+enrolled+' 堂</span></div></div>'+
@@ -1937,7 +2001,7 @@ let signOutRequested=false;
 // People should never see "not signed in" while we are still checking their account.
 let authPhase="checking";
 const SESSION_PRIVATE_DOM_IDS=[
- "student-portal-content","student-invites","shared-student-content","shared-parent-content",
+ "student-portal-content","student-invites","student-today-content","shared-student-content","shared-parent-content",
  "parent-learning","parent-learning-home","billing-list","period-lesson-list",
  "billing-student-summary","billing-summary","payment-batch-history",
  "student-billing-summary","student-billing-list","shared-course-error",
@@ -2087,7 +2151,7 @@ async function initializeLive(){
    localStorage.setItem(ROLE_STORAGE+"_"+activeUser.id,state.role);
    if(remote!==state.role)await saveLastRole(state.role);
    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
-   state.view=state.role==="student"?"student":"home";
+   state.view=state.role==="student"?"student-today":"home";
    await loadTeacherPreferences();
    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    authPhase="ready";
