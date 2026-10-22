@@ -42,5 +42,5 @@ test("UI mode checkbox selection does not confer classroom authorization",()=>{
 });
 test("parent learning subtitle and version are current",()=>{
  assert.ok(html.includes("專注度、學生心情與課後回饋"));
- assert.ok(html.includes("V3.5.3 · Made with care."));
+ assert.ok(html.includes("V3.5.4 · Made with care."));
 });

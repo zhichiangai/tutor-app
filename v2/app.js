@@ -27,7 +27,7 @@ const timeLabel = (s) => asText(s).slice(0,5);
 const tick = ()=>new Date();
 const uid = ()=>crypto.randomUUID();
 let client=null, activeUser=null, loading=false, teacherPreferences={};
-const state={mode:"live",enabledRoles:["teacher"],lessonRatings:{focus:null,mood:null},role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",paymentBatches:[],paymentBatchItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",studentInvites:[],studentLinks:[],studentPortal:{students:[],lessons:[],schedules:[]},sharedCourseDraft:null,sharedCourseHistory:{},receiptBatch:null,activeLesson:null,actualHoursManual:false};
+const state={mode:"live",enabledRoles:["teacher"],lessonRatings:{focus:null,mood:null},role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",paymentBatches:[],paymentBatchItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",studentInvites:[],studentLinks:[],studentLegacyInvites:[],managedStudentId:null,studentSearch:"",studentAccountFilter:"all",studentPortal:{students:[],lessons:[],schedules:[]},sharedCourseDraft:null,sharedCourseHistory:{},receiptBatch:null,activeLesson:null,actualHoursManual:false};
 
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
@@ -227,20 +227,37 @@ async function saveMyWorkspace(rename=false){
  });
  if(ok){await loadTeacherPreferences();render();toast(rename?"空間名稱已更新":"家教空間已建立，現在可以新增學生")}
 }
+function renderAuthUI(){
+ const waiting=authPhase==="checking";
+ const failed=authPhase==="error";
+ $("#login-heading").textContent=waiting?"正在為你準備好好上課":failed?
+  "剛剛沒有成功開啟課程":"歡迎來到好好上課";
+ $("#login-description").textContent=waiting?
+  "稍等一下，我們正在整理你的課程和學習紀錄。":
+  failed?"你的課程暫時無法顯示，請再試一次。":
+  "老師安排課程、家長了解孩子的學習、學生回顧每次進步。從這裡開始就好。";
+ $("#login-progress").hidden=!waiting;
+ $("#google-login").hidden=waiting||failed;
+ $("#login-retry").hidden=!failed;
+ $("#login-help").hidden=waiting||failed;
+}
 function render(){
  const role=state.role,teacher=role==="teacher",student=role==="student";
  document.body?.classList?.toggle("student-mode",student);
- const identity=activeUser?roleFullName():"尚未登入";
+ const identity=authPhase==="checking"?"正在準備你的課程":activeUser?roleFullName():"尚未登入";
  $("#role-indicator-text").textContent=identity+" · "+ROLE_TITLE[role];
  $("#role-indicator-icon").textContent=teacher?"◈":student?"✎":"♧";
  $("#role-indicator").setAttribute("aria-label","目前使用："+identity+"，"+ROLE_TITLE[role]+"，點擊切換");
  $$("[data-role-choice]").forEach(el=>el.setAttribute("aria-pressed",String(el.dataset.roleChoice===role)));
- $("#greeting-title").innerHTML=teacher?"把每一堂課，<em>好好記下來。</em>":student?"我的學習，<em>一步一步進步。</em>":"每個成長時刻，<em>都值得珍惜。</em>";
- $("#greeting-copy").textContent=teacher?"從課程到收款，讓重要的小事都有自己的位置。":student?"這裡只顯示老師授權給我的課程及學習回饋。":"孩子的上課安排、請假和付款，打開就能看見。";
+ $("#greeting-title").innerHTML=teacher?"今天的課程，<em>從這裡開始。</em>":student?"我的學習，<em>一步一步進步。</em>":"孩子的每堂課，<em>都在這裡。</em>";
+ $("#greeting-copy").textContent=teacher?"先看看今天的課程、需要補寫的紀錄，以及等你確認的收款。":student?"在這裡查看你的課表和老師的課後回饋。":"下一堂課、最新學習紀錄和付款狀態，不用再四處尋找。";
  $("#top-add").style.display=teacher?"":"none";
- document.body?.classList?.toggle("login-required",!activeUser);
- $("#connection-status").classList.toggle("live",state.mode==="live"&&!!activeUser);
- $("#connection-status").innerHTML=activeUser?"<i></i> 已安全連線":"<i></i> 尚未登入";
+ document.body?.classList?.toggle("login-required",authPhase!=="ready"||!activeUser);
+ $("#connection-status").classList.toggle("live",authPhase==="ready"&&!!activeUser);
+ $("#connection-status").innerHTML=authPhase==="checking"?"<i></i> 正在準備課程":
+  authPhase==="error"?"<i></i> 課程暫時無法顯示":
+  activeUser?"<i></i> 已登入":"<i></i> 尚未登入";
+ renderAuthUI();
  $("#account-label").textContent=identity;
  $("#account-subtitle").textContent=activeUser?ROLE_TITLE[role]:"使用 Google 登入";
  $("#avatar").textContent=identity.slice(0,1);
@@ -279,7 +296,84 @@ function render(){
  ["待確認費用","◈",money(lessonSum(pending)),"","依課程付款狀態計算"]];
  $("#metrics").innerHTML=metrics.map(([label,icon,value,unit,foot])=>'<article class="metric-card"><div class="metric-label">'+label+'</div><div class="metric-icon">'+icon+'</div><div class="metric-value">'+esc(value)+(unit||"")+'</div><div class="metric-footer">'+foot+'</div></article>').join("");
  $("#money-reminder").textContent=teacher?"本月已確認收到 "+money(received)+"。":"目前有 "+pending.length+" 筆課程等待付款或收款確認。";
- renderNext();renderRecent();renderMiniCalendar();renderFullCalendar();renderBilling();renderStudents();refreshDaySheet();renderSharedPlanner();
+ renderNext();renderRecent();renderMiniCalendar();renderFullCalendar();renderBilling();renderStudents();refreshDaySheet();renderSharedPlanner();renderHomeFocus();
+}
+/* V3.5.4: answer a person's immediate questions before displaying the full dashboard.
+   Figures use the same linked lessons / payment ledger already shown elsewhere. */
+function renderHomeFocus(){
+ const root=$("#home-focus"),parent=state.role==="parent",teacher=state.role==="teacher";
+ $("#metrics").classList.toggle("hidden",parent);
+ $("#home-grid").classList.toggle("hidden",parent);
+ if(!activeUser||state.mode!=="live"||(!teacher&&!parent)){root.innerHTML="";return}
+ const today=dateKey(tick());
+ if(teacher){
+  const lessons=visibleLessons().filter(l=>l.type!=="leave"&&l.type!=="moved");
+  const todayLessons=lessons.filter(l=>l.lesson_date===today).sort((a,b)=>asText(a.start_time).localeCompare(asText(b.start_time)));
+  const unfinished=state.lessons.filter(l=>l.owner_id===activeUser.id&&l.type==="lesson"
+    &&sameMonth(l.lesson_date,tick())&&(!String(l.lesson_content||"").trim()
+      ||l.focus_rating==null||l.mood_rating==null))
+   .sort((a,b)=>String(b.lesson_date).localeCompare(String(a.lesson_date)));
+  const unconfirmedBatches=state.paymentBatches.filter(b=>b.teacher_id===activeUser.id&&b.status==="pending");
+  const unconfirmedRequests=state.requests.filter(r=>r.teacher_id===activeUser.id&&r.kind==="payment"&&r.status==="pending");
+  const unconfirmed=unconfirmedBatches.length+unconfirmedRequests.length;
+  const classDetail=todayLessons.length
+   ?esc((studentFor(todayLessons[0])?.name||todayLessons[0].student||"學生")+" · "+(todayLessons[0].subject||"課程"))
+    +" · "+esc(timeLabel(todayLessons[0].start_time))
+   :"今天沒有安排課程";
+  const notesAction=unfinished.length?
+   '<button type="button" class="home-focus-link" data-action="open-lesson" data-id="'+esc(unfinished[0].id)+'">補寫課後紀錄 ↗</button>':
+   '<button type="button" class="home-focus-link" data-view="calendar">查看課程月曆 ↗</button>';
+  root.innerHTML='<div class="home-focus-heading"><div><p class="mini-label">今天先看看</p>'+
+   '<h2>今天有什麼要處理？</h2><p>上課、課後紀錄與收款，從這裡就能開始。</p></div></div>'+
+   '<div class="home-focus-grid">'+
+   '<article class="home-focus-tile"><span class="home-focus-kicker">今天的課程</span><strong>'+
+    todayLessons.length+' 堂</strong><p>'+classDetail+'</p>'+
+    '<button type="button" class="home-focus-link" data-view="calendar" data-date="'+today+'">查看今天課程 ↗</button></article>'+
+   '<article class="home-focus-tile"><span class="home-focus-kicker">待補寫的上課紀錄</span><strong>'+
+    unfinished.length+' 堂</strong><p>'+(unfinished.length?"本月還有課後內容或評分尚未填寫。":"本月的課後紀錄都整理好了。")+
+    '</p>'+notesAction+'</article>'+
+   '<article class="home-focus-tile"><span class="home-focus-kicker">等你確認的收款</span><strong>'+
+    unconfirmed+' 筆</strong><p>'+(unconfirmed?"有家長回報付款，等你核對。":"目前沒有待確認的付款回報。")+
+    '</p><button type="button" class="home-focus-link" data-view="billing">查看收付款 ↗</button></article>'+
+   '</div>';
+  return;
+ }
+ const children=visibleStudents();
+ const allowed=new Set(children.map(s=>s.id));
+ const visible=visibleLessons().filter(l=>l.type!=="leave"&&l.type!=="moved");
+ const next=visible.filter(l=>l.type==="planned"&&l.lesson_date>=today)
+  .sort((a,b)=>(a.lesson_date+" "+asText(a.start_time)).localeCompare(b.lesson_date+" "+asText(b.start_time)))[0];
+ const completed=state.lessons.filter(l=>allowed.has(l.student_id)&&l.type==="lesson")
+  .sort((a,b)=>(b.lesson_date+" "+asText(b.start_time)).localeCompare(a.lesson_date+" "+asText(a.start_time)));
+ const latest=completed[0];
+ const monthRecords=completed.filter(l=>asText(l.lesson_date).slice(0,7)===today.slice(0,7));
+ const balance=monthRecords.reduce((a,l)=>{const b=lessonBalance(l);a.available+=b.available;a.pending+=b.pending;a.confirmed+=b.confirmed;return a},
+  {available:0,pending:0,confirmed:0});
+ const nextName=next?esc((studentFor(next)?.name||next.student||"孩子")+" · "+(next.subject||"課程")):"還沒有下一堂課的安排";
+ const nextTime=next?esc(prettyDate(next.lesson_date)+" · "+timeLabel(next.start_time)+"–"+timeLabel(next.end_time)):
+  "有新的課程安排時，會顯示在這裡。";
+ const content=latest?esc(latest.lesson_content||latest.remarks||"老師尚未填寫這堂課的學習內容。"):
+  "完成上課後，老師寫下的學習重點就會出現在這裡。";
+ const stars=latest?'<div class="home-focus-rating">專注度：'+compactStars(latest.focus_rating)+
+  '　學生心情：'+compactStars(latest.mood_rating)+'</div>':"";
+ const name=latest?esc((studentFor(latest)?.name||latest.student||"孩子")+" · "+(latest.subject||"課程")):"尚無學習紀錄";
+ const childrenLine=children.length?'<p>已連結：'+children.map(s=>esc(s.name)).join("、")+'</p>':
+  '<p>還沒有連結孩子的課程，請先接受老師的邀請。</p>';
+ root.innerHTML='<div class="home-focus-heading"><div><p class="mini-label">孩子的學習，一目了然</p>'+
+  '<h2>孩子最近的課程安排</h2><p>下一堂什麼時候上課、最近學了什麼、費用處理到哪裡。</p>'+childrenLine+
+  '</div><button type="button" class="home-focus-heading-link" data-view="students">查看孩子的學習 ↗</button></div>'+
+  '<div class="home-parent-grid"><article class="home-focus-tile home-parent-next"><span class="home-focus-kicker">下一堂課</span>'+
+   '<strong class="home-focus-lesson-name">'+nextName+'</strong><p>'+nextTime+'</p>'+
+   '<button type="button" class="home-focus-link" data-view="calendar"'+(next?' data-date="'+esc(next.lesson_date)+'"':'')+
+   '>查看課程安排 ↗</button></article>'+
+  '<article class="home-focus-tile home-parent-learning"><span class="home-focus-kicker">最近一次學習</span>'+
+   '<strong class="home-focus-lesson-name">'+name+'</strong><p>'+content+'</p>'+stars+
+   '<button type="button" class="home-focus-link" data-view="students">查看完整學習紀錄 ↗</button></article>'+
+  '<article class="home-focus-tile home-parent-payment"><span class="home-focus-kicker">本月費用</span>'+
+   '<div class="home-payment-lines"><div><span>尚待回報付款</span><strong>'+money(balance.available)+
+   '</strong></div><div><span>已回報，等老師確認</span><strong>'+money(balance.pending)+
+   '</strong></div><div><span>老師已確認收到</span><strong>'+money(balance.confirmed)+
+   '</strong></div></div><button type="button" class="home-focus-link" data-view="billing">查看付款紀錄 ↗</button></article></div>';
 }
 function rowHTML(l,full=false){
  const s=studentFor(l),name=s?.name||l.student||"學生",p=pillClass(l);
@@ -423,7 +517,8 @@ function learningRating(value){return value==null||value===""?"老師尚未評�
 function renderParentLearning(){
  const parent=state.role==="parent";
  $("#parent-learning-card").classList.toggle("hidden",!parent);
- $("#parent-learning-home").classList.toggle("hidden",!parent);
+ // The parent home now has its own next-class/learning/payment overview.
+ $("#parent-learning-home").classList.add("hidden");
  if(!parent)return;
  const ids=new Set(visibleStudents().map(s=>s.id));
  const lessons=state.lessons.filter(l=>ids.has(l.student_id)&&l.type==="lesson").sort((a,b)=>
@@ -719,17 +814,230 @@ async function acceptStudentInvite(id){
 async function removeStudentInvite(id){
  const inv=state.studentInvites.find(x=>x.id===id&&(state.mode==="demo"||x.teacher_id===activeUser?.id));
  if(!inv||state.role!=="teacher")return;
- if(!confirm("確定撤銷這位學生的邀請或查看權限？已完成的課程資料會保留。"))return;
- const ok=await persist(async()=>{
-  if(state.mode==="demo"){state.studentInvites=state.studentInvites.filter(x=>x.id!==id);state.studentLinks=state.studentLinks.filter(x=>x.invite_id!==id)}
-  else assertResult(await client.from("student_invites").delete().eq("id",id).eq("teacher_id",activeUser.id).select("id").single());
- });
- if(ok)toast("已撤銷學生登入連結，歷史課程保留");
+ // Deleting only student_invites cannot revoke a claimed student_links row.
+ await revokeManagedStudentAccount(inv.student_id,inv.email);
 }
+
+/* V3.5.4: one student is the organizing unit, not three separate invitation lists.
+   A student's accepted login lives in student_links and references legacy
+   student_invitations, NOT the newer student_invites table. */
+function teacherStudentAccountRows(studentId){
+ const teacherId=activeUser?.id;
+ const isMine=record=>record.student_id===studentId&&record.teacher_id===teacherId;
+ const current=state.studentInvites.filter(isMine);
+ const legacy=state.studentLegacyInvites.filter(isMine);
+ const byEmail=new Map();
+ const emailKey=value=>asText(value).trim().toLowerCase();
+ for(const inv of legacy){
+  const key=emailKey(inv.email);
+  byEmail.set(key,{email:inv.email,legacyId:inv.id,currentId:null});
+ }
+ for(const inv of current){
+  const key=emailKey(inv.email);
+  const previous=byEmail.get(key)||{email:inv.email,legacyId:null,currentId:null};
+  previous.currentId=inv.id;
+  byEmail.set(key,previous);
+ }
+ const rows=[...byEmail.values()].map(item=>{
+  const connected=Boolean(item.legacyId&&state.studentLinks.some(l=>
+   l.student_id===studentId&&l.teacher_id===teacherId&&l.invitation_id===item.legacyId));
+  return {...item,connected};
+ });
+ const known=new Set(legacy.map(inv=>inv.id));
+ const unknown=state.studentLinks.some(l=>l.student_id===studentId&&l.teacher_id===teacherId&&!known.has(l.invitation_id));
+ if(unknown)rows.push({email:"無法對應的已連結帳號",connected:true,unresolved:true,currentId:null,legacyId:null});
+ return rows.sort((a,b)=>Number(b.connected)-Number(a.connected)||a.email.localeCompare(b.email,"zh-TW"));
+}
+function teacherGuardianAccountRows(studentId){
+ const teacherId=activeUser?.id;
+ const invitations=state.invites.filter(i=>i.teacher_id===teacherId&&i.student_id===studentId);
+ return invitations.map(i=>({...i,connected:state.guardians.some(g=>
+  g.invite_id===i.id&&g.student_id===studentId&&g.teacher_id===teacherId)}))
+  .sort((a,b)=>Number(b.connected)-Number(a.connected)||asText(a.email).localeCompare(asText(b.email),"zh-TW"));
+}
+function accountStatusMarkup(label,connected){
+ return '<span class="pill '+(connected?"paid":"pending")+'">'+esc(label)+'</span>';
+}
+function renderTeacherStudentList(){
+ const root=$("#teacher-student-list");
+ if(state.role!=="teacher"||!activeUser){root.innerHTML="";$("#teacher-student-summary").innerHTML="";return}
+ const students=visibleStudents();
+ const statuses=students.map(s=>{
+  const studentAccounts=teacherStudentAccountRows(s.id),guardianAccounts=teacherGuardianAccountRows(s.id);
+  const studentLinked=studentAccounts.some(a=>a.connected),guardianLinked=guardianAccounts.some(a=>a.connected);
+  const pending=[...studentAccounts,...guardianAccounts].some(a=>!a.connected);
+  return {student:s,studentAccounts,guardianAccounts,studentLinked,guardianLinked,pending,
+   invited:studentAccounts.length>0||guardianAccounts.length>0};
+ });
+ const linkedParents=statuses.filter(s=>s.guardianLinked).length;
+ const pendingInvites=statuses.filter(s=>s.pending).length;
+ $("#teacher-student-summary").innerHTML=
+  '<div class="student-manager-stat"><strong>'+students.length+'</strong><span>學生總數</span></div>'+
+  '<div class="student-manager-stat"><strong>'+linkedParents+'</strong><span>已有家長連結</span></div>'+
+  '<div class="student-manager-stat"><strong>'+pendingInvites+'</strong><span>仍有待接受邀請</span></div>';
+ const q=asText(state.studentSearch).trim().toLowerCase();
+ const filter=state.studentAccountFilter;
+ const results=statuses.filter(x=>(!q||(x.student.name+" "+x.student.subject).toLowerCase().includes(q))&&
+  (filter==="all"||(filter==="linked"&&(x.studentLinked||x.guardianLinked))||
+   (filter==="pending"&&x.pending)||(filter==="uninvited"&&!x.invited)));
+ root.innerHTML=results.length?results.map(x=>{
+  const s=x.student;
+  const studentStatus=x.studentLinked?"已連結":x.studentAccounts.length?"等待接受":"尚未邀請";
+  const guardianStatus=x.guardianLinked?"已連結":x.guardianAccounts.length?"等待接受":"尚未邀請";
+  const enrolled=visibleLessons().filter(l=>l.student_id===s.id).length;
+  return '<article class="student-manager-row"><div class="student-manager-primary"><div class="student-manager-avatar" aria-hidden="true">✿</div>'+
+   '<div><strong>'+esc(s.name)+'</strong><span>'+esc(s.subject||"未設定科目")+' · 已安排 '+enrolled+' 堂</span></div></div>'+
+   '<div class="student-manager-rate"><small>未來課程預設時薪</small><strong>'+money(s.hourly_rate)+'/小時</strong></div>'+
+   '<div class="student-manager-links"><div><span>學生帳號</span>'+accountStatusMarkup(studentStatus,x.studentLinked)+'</div>'+
+    '<div><span>家長帳號</span>'+accountStatusMarkup(guardianStatus,x.guardianLinked)+'</div></div>'+
+   '<button type="button" class="secondary-button student-manager-open" data-action="manage-student" data-id="'+esc(s.id)+
+   '" aria-label="管理 '+esc(s.name)+' 的資料與連結">管理 ›</button></article>';
+ }).join(""):'<div class="card empty">'+(students.length?"沒有符合搜尋或篩選條件的學生。":"還沒有學生。點右上方「新增學生」就能開始。")+'</div>';
+}
+function managedAccountList(studentId){
+ const rows=teacherStudentAccountRows(studentId);
+ return rows.length?'<div class="student-account-rows">'+rows.map(item=>{
+  const stateLabel=item.unresolved?"連結待確認":item.connected?"已連結":"等待接受";
+  const info=item.connected?"這個帳號目前可以查看課程。":"對方尚未接受邀請。";
+  const button=item.unresolved?"":'<button type="button" class="secondary-button" data-action="revoke-managed-student" '+
+   'data-id="'+esc(item.currentId||item.legacyId)+'" data-email="'+esc(item.email)+'" data-student="'+esc(studentId)+'">'+
+   (item.connected?"解除連結":"撤銷邀請")+'</button>';
+  return '<div class="student-account-row"><div><strong>'+esc(item.email)+'</strong>'+
+   accountStatusMarkup(stateLabel,item.connected)+'<small>'+esc(item.unresolved?"請確認登入帳號與原邀請紀錄。":info)+'</small></div>'+
+   button+'</div>';
+ }).join("")+'</div>':'<div class="student-account-empty">尚未邀請學生登入。請輸入學生自己的 Google Email。</div>';
+}
+function managedGuardianList(studentId){
+ const rows=teacherGuardianAccountRows(studentId);
+ return rows.length?'<div class="student-account-rows">'+rows.map(item=>{
+  const buttons=item.connected?
+   '<button type="button" class="secondary-button" data-action="revoke-invite" data-id="'+esc(item.id)+'">解除連結</button>':
+   '<button type="button" class="secondary-button" data-action="edit-invite" data-id="'+esc(item.id)+'">修改 Email</button>'+
+   '<button type="button" class="secondary-button" data-action="revoke-invite" data-id="'+esc(item.id)+'">撤銷邀請</button>';
+  return '<div class="student-account-row"><div><strong>'+esc(item.email)+'</strong>'+
+   accountStatusMarkup(item.connected?"已連結":"等待接受",item.connected)+
+   '<small>'+(item.connected?"這位家長目前可以查看孩子的課程與付款。":"對方還沒接受這封邀請。")+'</small></div>'+
+   '<div class="student-account-actions">'+buttons+'</div></div>';
+ }).join("")+'</div>':'<div class="student-account-empty">還沒有家長帳號。可以邀請一位或多位家長。</div>';
+}
+function renderStudentManagerDetail(){
+ if(state.role!=="teacher"||!activeUser)return;
+ const s=visibleStudents().find(x=>x.id===state.managedStudentId);
+ if(!s){closeModal("student-management-modal");state.managedStudentId=null;return}
+ $("#student-management-heading").textContent=s.name+" · 學生資料";
+ for(const [id,value] of [["managed-student-name",s.name],["managed-student-subject",s.subject],
+  ["managed-student-rate",s.hourly_rate]]){
+  const element=$("#"+id);
+  if(document.activeElement!==element)element.value=String(value??"");
+ }
+ $("#managed-student-accounts").innerHTML=managedAccountList(s.id);
+ $("#managed-guardian-accounts").innerHTML=managedGuardianList(s.id);
+}
+function openStudentManager(studentId){
+ if(state.role!=="teacher"||!activeUser||!visibleStudents().some(s=>s.id===studentId))return;
+ state.managedStudentId=studentId;
+ $("#managed-student-email").value="";
+ $("#managed-guardian-email").value="";
+ renderStudentManagerDetail();
+ showModal("student-management-modal");
+}
+async function saveManagedStudent(ev){
+ ev.preventDefault();
+ if(state.role!=="teacher"||!activeUser)return;
+ const original=visibleStudents().find(s=>s.id===state.managedStudentId);
+ if(!original)return;
+ const name=$("#managed-student-name").value.trim();
+ const subject=$("#managed-student-subject").value.trim();
+ const rate=Number($("#managed-student-rate").value);
+ if(!name||name.length>80||!subject||subject.length>80||!Number.isFinite(rate)||rate<0||rate>999999){
+  toast("請確認姓名、科目和時薪都填寫正確。");return;
+ }
+ const patch={name,subject,hourly_rate:rate};
+ const ok=await persist(async()=>{
+  if(state.mode==="demo")Object.assign(original,patch);
+  else assertResult(await client.from("students").update(patch)
+   .eq("id",original.id).eq("teacher_id",activeUser.id).select("id").single());
+ });
+ if(ok)toast("學生資料已更新；先前課程的時數與金額不會變更。");
+}
+async function submitManagedStudentInvite(ev){
+ ev.preventDefault();
+ if(state.role!=="teacher"||!activeUser||!requireTeacherWorkspace())return;
+ const studentId=state.managedStudentId,email=$("#managed-student-email").value.trim().toLowerCase();
+ if(!visibleStudents().some(s=>s.id===studentId)||!email)return;
+ const duplicated=teacherStudentAccountRows(studentId).some(x=>x.email.toLowerCase()===email);
+ if(duplicated){toast("這位學生已經有這個帳號的邀請或連結。");return}
+ const teacherId=activeUser.id;
+ const ok=await persist(async()=>{
+  if(state.mode==="demo")state.studentInvites.push({id:uid(),teacher_id:teacherId,student_id:studentId,email});
+  else assertResult(await client.from("student_invites").insert({teacher_id:teacherId,student_id:studentId,email}));
+ });
+ if(ok){$("#managed-student-email").value="";toast("已建立學生邀請，請對方使用這個 Google 帳號接受。")}
+}
+async function submitManagedGuardianInvite(ev){
+ ev.preventDefault();
+ if(state.role!=="teacher"||!activeUser||!requireTeacherWorkspace())return;
+ const studentId=state.managedStudentId,email=$("#managed-guardian-email").value.trim().toLowerCase();
+ if(!visibleStudents().some(s=>s.id===studentId)||!email)return;
+ if(teacherGuardianAccountRows(studentId).some(x=>x.email.toLowerCase()===email)){
+  toast("這位家長已經在此學生的邀請或連結清單中。");return}
+ const ok=await persist(async()=>{
+  if(state.mode==="demo")state.invites.push({id:uid(),student_id:studentId,teacher_id:activeUser.id,email});
+  else assertResult(await client.from("guardian_invites").insert({student_id:studentId,teacher_id:activeUser.id,email}));
+ });
+ if(ok){$("#managed-guardian-email").value="";toast("已建立家長邀請，請家長使用這個 Google 帳號接受。")}
+}
+async function revokeManagedStudentAccount(studentId,email){
+ if(state.role!=="teacher"||!activeUser)return;
+ const s=visibleStudents().find(x=>x.id===studentId);
+ if(!s)return;
+ const account=teacherStudentAccountRows(studentId).find(x=>x.email.toLowerCase()===email.toLowerCase()&&!x.unresolved);
+ if(!account)return;
+ const action=account.connected?"解除連結":"撤銷邀請";
+ if(!confirm("確定要"+action+"「"+s.name+"」的學生帳號 "+account.email+"？\n"+
+  (account.connected?"對方將無法再查看這位學生的課程與學習紀錄。":"對方將無法再接受這封邀請。")+
+  "\n學生、課程、付款與課後紀錄都會保留。"))return;
+ // This RPC removes both invitation versions atomically; the FK cascade
+ // revokes the real student_links row rather than merely hiding the email.
+ const ok=await persist(async()=>{
+  if(state.mode==="demo"){
+   state.studentInvites=state.studentInvites.filter(i=>!(i.student_id===studentId&&i.email.toLowerCase()===email.toLowerCase()));
+   const legacy=state.studentLegacyInvites.filter(i=>i.student_id===studentId&&i.email.toLowerCase()===email.toLowerCase());
+   state.studentLegacyInvites=state.studentLegacyInvites.filter(i=>!(i.student_id===studentId&&i.email.toLowerCase()===email.toLowerCase()));
+   state.studentLinks=state.studentLinks.filter(l=>!legacy.some(i=>i.id===l.invitation_id));
+  }else{
+   const {error}=await client.rpc("revoke_student_account_connection",{
+    p_student_id:studentId,p_email:email});
+   if(error)throw error;
+  }
+ });
+ if(ok)toast(account.connected?"學生帳號已解除，舊課程與學習紀錄都保留。":"學生邀請已撤銷。");
+}
+function renderTeacherStudentManagement(){
+ const teacher=state.role==="teacher";
+ $("#teacher-student-manager").classList.toggle("hidden",!teacher);
+ $("#student-grid").classList.toggle("hidden",teacher);
+ $("#guardian-invite-card").classList.toggle("hidden",teacher);
+ $("#student-invite-teacher-card").classList.add("hidden");
+ $("#students-page-title").textContent=teacher?"學生管理":"學生與家長";
+ $("#students-page-subtitle").textContent=teacher?
+  "一眼看見學生、預設時薪，以及學生和家長的帳號連結。":
+  "在這裡查看孩子的學習紀錄和老師邀請。";
+ if(!teacher){
+  $("#teacher-student-list").innerHTML="";
+  if($("#student-management-modal").open)closeModal("student-management-modal");
+  state.managedStudentId=null;
+  return;
+ }
+ renderTeacherStudentList();
+ if($("#student-management-modal").open)renderStudentManagerDetail();
+}
+
 function renderStudents(){
  const st=visibleStudents();
  renderParentLearning();
  renderStudentInvitesForTeacher();
+ renderTeacherStudentManagement();
  $("#add-student").style.display=state.role==="teacher"?"":"none";
  $("#student-grid").innerHTML=st.length?st.map(s=>'<article class="student-card"><div class="student-icon">✿</div><h3>'+esc(s.name)+'</h3><p>'+esc(s.subject||"課程")+' · '+money(s.hourly_rate)+'／小時</p><div class="tag-line">已安排 '+visibleLessons().filter(l=>l.student_id===s.id).length+' 堂課</div></article>').join(""):'<div class="card empty">目前沒有學生資料。'+(state.role==="parent"?"請先接受老師的邀請。":"先新增一位學生吧。")+'</div>';
  const parent=state.role==="parent";
@@ -1621,11 +1929,13 @@ async function restoreLesson(id){
  if(ok){toast("已恢復原本的課程安排");refreshDaySheet()}
 }
 
-const LIVE_TABLES=["student_invites","student_links","students","lesson_records","guardian_invites","student_guardians","family_requests","recurring_schedules","schedule_exceptions","payment_batches","payment_batch_items","profiles","workspaces","workspace_members"];
-const LIVE_FIELDS=["studentInvites","studentLinks","students","lessons","invites","guardians","requests","schedules","exceptions","paymentBatches","paymentBatchItems","profiles","workspaces","workspaceMembers"];
+const LIVE_TABLES=["student_invites","student_links","student_invitations","students","lesson_records","guardian_invites","student_guardians","family_requests","recurring_schedules","schedule_exceptions","payment_batches","payment_batch_items","profiles","workspaces","workspace_members"];
+const LIVE_FIELDS=["studentInvites","studentLinks","studentLegacyInvites","students","lessons","invites","guardians","requests","schedules","exceptions","paymentBatches","paymentBatchItems","profiles","workspaces","workspaceMembers"];
 let authDataGeneration=0;
 // Ignore token refresh while a user-initiated logout is pending.
 let signOutRequested=false;
+// People should never see "not signed in" while we are still checking their account.
+let authPhase="checking";
 const SESSION_PRIVATE_DOM_IDS=[
  "student-portal-content","student-invites","shared-student-content","shared-parent-content",
  "parent-learning","parent-learning-home","billing-list","period-lesson-list",
@@ -1635,6 +1945,7 @@ const SESSION_PRIVATE_DOM_IDS=[
  "month-lesson-list","month-lesson-preview","next-lesson","period-overview",
  "period-student","receipt-details","recent-lessons","requests-list",
  "schedule-rules-list","student-grid","student-invite-teacher-content",
+ "teacher-student-summary","teacher-student-list","managed-student-accounts","managed-guardian-accounts",
  "lesson-content","lesson-feedback","lesson-focus-stars","lesson-mood-stars",
  "profile-display-name","workspace-name","invite-edit-email"
 ];
@@ -1655,6 +1966,9 @@ function clearUserSessionState(){
  state.role="teacher";
  state.view="home";
  state.parentTeacherFilter="all";
+ state.managedStudentId=null;
+ state.studentSearch="";
+ state.studentAccountFilter="all";
  teacherPreferences={};
  for(const id of SESSION_PRIVATE_DOM_IDS){
   const el=document.querySelector?.("#"+id);
@@ -1668,7 +1982,8 @@ function clearUserSessionState(){
  document.querySelectorAll?.("form")?.forEach(form=>form.reset?.());
  for(const id of ["lesson-form","shared-course-form","record-form","request-form","period-form",
   "profile-display-form","mode-settings-form","receipt-form","invite-edit-form",
-  "schedule-form","cancel-form","change-form","student-form"]){
+  "schedule-form","cancel-form","change-form","student-form",
+  "student-management-basics-form","managed-student-invite-form","managed-guardian-invite-form"]){
   document.querySelector?.("#"+id)?.reset?.();
  }
  document.querySelectorAll?.(".modal")?.forEach(dialog=>{
@@ -1717,6 +2032,7 @@ async function ensureClient(){
   const switchedAccounts=previousId&&nextUser&&previousId!==nextUser.id;
   const lostSession=previousId&&!nextUser;
   if(event==="SIGNED_OUT"||switchedAccounts||lostSession){
+   authPhase=nextUser?"checking":"signedOut";
    clearUserSessionState();
    activeUser=nextUser;
    state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
@@ -1732,6 +2048,9 @@ async function ensureClient(){
 async function initializeLive(){
  if(signOutRequested)return;
  const bootGeneration=authDataGeneration;
+ authPhase="checking";
+ renderAuthUI();
+ showModal("account-modal");
  try{
   await ensureClient();
   const {data,error}=await client.auth.getSession();
@@ -1771,10 +2090,12 @@ async function initializeLive(){
    state.view=state.role==="student"?"student":"home";
    await loadTeacherPreferences();
    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
+   authPhase="ready";
    closeModal("account-modal");
-   toast("已登入並同步課程");
+   toast("歡迎回來，課程都準備好了");
   }else{
    clearUserSessionState();
+   authPhase="signedOut";
   }
   render();
   if(!activeUser)showModal("account-modal");
@@ -1783,22 +2104,32 @@ async function initializeLive(){
   console.error(err);
   activeUser=null;
   clearUserSessionState();
+  authPhase="error";
   render();
-  toast("Supabase 連線失敗："+err.message);
+  toast("剛剛沒能開啟課程，請按「再試一次」。");
   showModal("account-modal");
  }
 }
 async function googleLogin(){
  try{
   signOutRequested=false;
+  authPhase="checking";
+  renderAuthUI();
   const db=await ensureClient();state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
   const {error}=await db.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname}});
   if(error)throw error;
- }catch(err){console.error(err);toast("Google 登入尚未完成："+err.message);showModal("account-modal")}
+ }catch(err){
+  console.error(err);
+  authPhase="signedOut";
+  render();
+  toast("這次沒有完成 Google 登入，請再試一次。");
+  showModal("account-modal");
+ }
 }
 async function signOut(){
  // Immediately erase private data before awaiting the remote Auth response.
  signOutRequested=true;
+ authPhase="signedOut";
  const db=client;
  activeUser=null;
  clearUserSessionState();
@@ -1839,6 +2170,11 @@ function bindEvents(){
   const switcher=ev.target.closest("[data-calendar-mode]");if(switcher){changeCalendarMode(switcher.dataset.calendarMode);return}
   const action=ev.target.closest("[data-action]");if(action){
    const id=action.dataset.id,kind=action.dataset.action;
+   if(kind==="manage-student"){openStudentManager(id);return}
+   if(kind==="revoke-managed-student"){
+    await revokeManagedStudentAccount(action.dataset.student,action.dataset.email);
+    return;
+   }
    if(kind==="shared-new-lesson"){openSharedCourseForm("new-lesson");return}
    if(kind==="shared-new-schedule"){openSharedCourseForm("new-schedule");return}
    if(kind==="shared-edit-lesson"){openSharedCourseForm("edit-lesson",id);return}
@@ -1917,6 +2253,15 @@ function bindEvents(){
  });
  $("#jump-today").onclick=()=>{state.month=new Date(tick().getFullYear(),tick().getMonth(),1);state.selected=dateKey(tick());render()};
  $("#record-form").addEventListener("submit",saveRecord);$("#student-form").addEventListener("submit",saveStudent);
+ $("#student-management-basics-form").addEventListener("submit",saveManagedStudent);
+ $("#managed-student-invite-form").addEventListener("submit",submitManagedStudentInvite);
+ $("#managed-guardian-invite-form").addEventListener("submit",submitManagedGuardianInvite);
+ $("#teacher-student-search").addEventListener("input",ev=>{
+  state.studentSearch=ev.target.value;renderTeacherStudentList();
+ });
+ $("#teacher-student-filter").addEventListener("change",ev=>{
+  state.studentAccountFilter=ev.target.value;renderTeacherStudentList();
+ });
  $("#record-repeat").addEventListener("change",updateRecordRepeatUI);
  $("#record-date").addEventListener("change",()=>{
   if(!state.editing&&["weekly","biweekly"].includes($("#record-repeat").value))
@@ -1943,6 +2288,7 @@ function bindEvents(){
  $("#profile-button").onclick=()=>activeUser?setView("settings"):showModal("account-modal");
  $("#account-action").onclick=()=>activeUser?setView("settings"):showModal("account-modal");
  $("#google-login").onclick=googleLogin;
+ $("#login-retry").onclick=initializeLive;
  $("#sign-out").onclick=signOut;
  $("#mode-settings-form").addEventListener("submit",saveEnabledRoles);
   $("#profile-display-form").addEventListener("submit",saveDisplayName);
@@ -1953,6 +2299,7 @@ function main(){
  state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
  for(const k of LIVE_FIELDS)state[k]=[];
  bindEvents();render();
+ showModal("account-modal");
  initializeLive();
 }
 main();

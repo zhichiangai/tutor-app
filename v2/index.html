@@ -48,8 +48,9 @@
  <article class="card"><div class="section-row"><h2>我的課程與學習紀錄</h2></div><div id="student-portal-content"></div></article>
  </section>
  <section id="view-home" class="page-view">
+          <section id="home-focus" class="home-focus" aria-live="polite" aria-label="今天的重要資訊"></section>
           <div class="metrics-grid" id="metrics"></div><article class="card parent-learning-home hidden" id="parent-learning-home"></article>
-          <div class="home-grid">
+          <div class="home-grid" id="home-grid">
             <div class="column-stack">
               <article class="card next-card"><div class="card-heading"><span class="mini-label">UP NEXT · 下一堂課</span><span class="tiny-sparkle">✳</span></div><div id="next-lesson"></div></article>
               <article class="card"><div class="section-row"><div><h2>最近的課程</h2><p class="section-sub">讓日常有條不紊地前進</p></div><button class="text-link" data-view="calendar">查看月曆 ↗</button></div><div id="recent-lessons"></div></article>
@@ -88,9 +89,17 @@
           <article class="card requests-card"><div class="section-row"><h2>請假與付款申請</h2><span class="muted-small">待確認會優先顯示</span></div><div id="requests-list"></div></article>
         </section>
         <section id="view-students" class="page-view hidden">
-          <div class="section-row page-head"><div><h2>學生與家長</h2><p class="section-sub">把每位學生的安排都收好</p></div><button class="secondary-button" id="add-student">＋ 新增學生</button></div>
+          <div class="section-row page-head"><div><h2 id="students-page-title">學生管理</h2><p class="section-sub" id="students-page-subtitle">學生、時薪與家長帳號都整理在這裡。</p></div><button class="secondary-button" id="add-student">＋ 新增學生</button></div>
+          <section class="student-manager hidden" id="teacher-student-manager" aria-label="老師學生管理">
+            <div id="teacher-student-summary" class="student-manager-summary" aria-live="polite"></div>
+            <div class="student-manager-controls">
+              <label class="student-manager-search"><span class="sr-only">搜尋學生姓名或科目</span><input type="search" id="teacher-student-search" placeholder="搜尋學生姓名或科目" autocomplete="off"></label>
+              <label class="student-manager-filter">帳號連結<select id="teacher-student-filter"><option value="all">全部學生</option><option value="linked">已連結</option><option value="pending">等待接受</option><option value="uninvited">尚未邀請</option></select></label>
+            </div>
+            <div class="student-manager-list" id="teacher-student-list" aria-live="polite"></div>
+          </section>
           <article class="card hidden" id="parent-learning-card"><div class="section-row"><div><h2>孩子的學習紀錄</h2><p class="section-sub">依科目查看老師記錄的專注度、學生心情與課後回饋</p></div></div><div id="parent-learning"></div></article><div class="student-grid" id="student-grid"></div><article class="card" id="student-invite-teacher-card"><div class="section-row"><div><h2>邀請學生自己查看課程</h2><p class="section-sub">學生須以受邀 Google Email 登入；僅能查看自己的課程、科目與回饋，不能操作帳務</p></div></div><div id="student-invite-teacher-content"></div></article>
-          <article class="card invite-card"><div class="section-row"><div><h2 id="invite-title">邀請家長加入</h2><p class="section-sub" id="invite-description">使用家長的 Google 帳號 Email 連結課程資料</p></div></div><div id="invite-content"></div></article>
+          <article class="card invite-card" id="guardian-invite-card"><div class="section-row"><div><h2 id="invite-title">邀請家長加入</h2><p class="section-sub" id="invite-description">使用家長的 Google 帳號 Email 連結課程資料</p></div></div><div id="invite-content"></div></article>
         </section>
         <section id="view-settings" class="page-view hidden">
           <div class="section-row page-head"><div><p class="eyebrow">SETTINGS · 個人偏好</p><h2>設定</h2><p class="section-sub">帳號、家教空間及啟用的角色模式都放在這裡。</p></div></div>
@@ -124,7 +133,7 @@
             </article>
           </div>
         </section>
-        <footer class="site-footer"><span>好好上課 © 2026</span><span><a href="./privacy.html">隱私權政策</a> · <a href="./terms.html">服務條款</a> · V3.5.3 · Made with care. <span aria-hidden="true">✳</span></span></footer>
+        <footer class="site-footer"><span>好好上課 © 2026</span><span><a href="./privacy.html">隱私權政策</a> · <a href="./terms.html">服務條款</a> · V3.5.4 · Made with care. <span aria-hidden="true">✳</span></span></footer>
       </div>
     </main>
     <nav class="mobile-nav" aria-label="手機導覽"><button data-view="home" class="active"><span>⌂</span>今天</button><button data-view="calendar"><span>▦</span>月曆</button><button data-view="billing"><span>◈</span>帳務</button><button data-view="students"><span>♧</span>學生</button><button data-view="settings"><span>⚙</span>設定</button></nav>
@@ -247,6 +256,41 @@
       <div class="form-actions"><button class="secondary-button" type="button" data-close="cancel-modal">返回</button><button class="primary-button" type="submit" id="cancel-submit">確認取消這一堂</button></div>
     </form>
   </dialog>
+  <dialog class="modal student-management-modal" id="student-management-modal" aria-labelledby="student-management-heading">
+    <div class="modal-inner">
+      <div class="modal-head"><div><p class="eyebrow">學生資料與帳號</p><h2 id="student-management-heading">學生資料</h2><p class="modal-description">資料、時薪、學生帳號與家長帳號，都可以在這裡管理。</p></div>
+        <button type="button" class="close-modal" data-close="student-management-modal" aria-label="關閉學生資料">×</button></div>
+      <form id="student-management-basics-form" class="student-management-section">
+        <h3>基本資料</h3>
+        <p class="section-sub">修改預設時薪不會改動先前已建立的課程與收款。</p>
+        <div class="form-row">
+          <label>學生姓名<input id="managed-student-name" maxlength="80" name="name" required></label>
+          <label>主要科目<input id="managed-student-subject" maxlength="80" name="subject" required></label>
+        </div>
+        <label>未來課程預設時薪（NT$／小時）<input id="managed-student-rate" name="hourly_rate" type="number" min="0" max="999999" step="0.01" required></label>
+        <button type="submit" class="secondary-button">儲存基本資料</button>
+      </form>
+      <section class="student-management-section">
+        <h3>學生登入帳號</h3>
+        <p class="section-sub">學生接受邀請後，就能用自己的 Google 帳號查看課程與學習紀錄，不會看到付款資料。</p>
+        <div id="managed-student-accounts"></div>
+        <form id="managed-student-invite-form" class="student-management-invite-form">
+          <label>學生 Google Email<input id="managed-student-email" type="email" maxlength="254" autocomplete="off" placeholder="student@gmail.com" required></label>
+          <button type="submit" class="secondary-button">邀請學生</button>
+        </form>
+      </section>
+      <section class="student-management-section">
+        <h3>家長登入帳號</h3>
+        <p class="section-sub">可以邀請多位家長；已連結的家長可查看這位孩子的課程與付款。</p>
+        <div id="managed-guardian-accounts"></div>
+        <form id="managed-guardian-invite-form" class="student-management-invite-form">
+          <label>家長 Google Email<input id="managed-guardian-email" type="email" maxlength="254" autocomplete="off" placeholder="parent@gmail.com" required></label>
+          <button type="submit" class="secondary-button">邀請家長</button>
+        </form>
+      </section>
+      <div class="form-actions"><button type="button" class="secondary-button" data-close="student-management-modal">完成</button></div>
+    </div>
+  </dialog>
   <dialog class="modal schedule-sheet" id="invite-edit-modal">
     <form class="modal-inner" id="invite-edit-form">
       <div class="modal-head"><div><p class="eyebrow">INVITATION</p><h2>修改家長邀請</h2><p id="invite-edit-student" class="modal-description"></p></div><button type="button" class="close-modal" data-close="invite-edit-modal" aria-label="關閉">×</button></div>
@@ -281,11 +325,19 @@
   <dialog class="modal" id="student-modal"><form id="student-form" class="modal-inner"><div class="modal-head"><div><p class="eyebrow">NEW STUDENT</p><h2>新增學生</h2></div><button type="button" class="close-modal" data-close="student-modal">×</button></div><label>學生稱呼<input id="student-name" name="name" maxlength="80" required placeholder="例如：小明"></label><label>常用科目<input name="subject" maxlength="80" value="數學" list="student-subject-options" required><datalist id="student-subject-options"></datalist></label><label>鐘點費（NT$）<input name="hourly_rate" type="number" min="0" value="500" step="1" list="student-rate-options" required><datalist id="student-rate-options"></datalist></label><div class="form-actions"><button type="button" class="secondary-button" data-close="student-modal">取消</button><button class="primary-button" type="submit">儲存學生</button></div></form></dialog>
   <dialog class="modal" id="request-modal"><form id="request-form" class="modal-inner"><div class="modal-head"><div><p class="eyebrow">LET US KNOW</p><h2 id="request-heading">送出申請</h2></div><button type="button" class="close-modal" data-close="request-modal">×</button></div><p class="modal-description" id="request-description"></p><input id="request-lesson-id" type="hidden"><input id="request-kind" type="hidden"><label>想補充的話（選填）<textarea id="request-note" rows="3" placeholder="例如：已於今天轉帳／當天需要請假"></textarea></label><div class="form-actions"><button class="secondary-button" type="button" data-close="request-modal">取消</button><button class="primary-button" type="submit">送出申請</button></div></form></dialog>
   <dialog class="modal account-modal login-modal" id="account-modal" aria-labelledby="login-heading">
-    <div class="modal-inner"><div class="modal-head"><div><p class="eyebrow">WELCOME · 好好上課</p>
-      <h2 id="login-heading">登入好好上課</h2><p class="modal-description" id="login-description">用 Google 帳號登入，開始管理你的課程與學習紀錄。</p></div>
-    </div>
-      <button class="google-button" id="google-login" type="button"><span class="google-g">G</span>使用 Google 登入</button>
-      <p class="helper-note">登入後可前往「設定」修改名稱、家教空間與啟用的角色模式。</p>
+    <div class="modal-inner">
+      <div class="login-illustration" aria-hidden="true"><span>✿</span></div>
+      <div class="login-welcome"><p class="eyebrow">好好上課 · 每一堂，都好好安排</p>
+        <h2 id="login-heading">歡迎來到好好上課</h2>
+        <p class="modal-description" id="login-description">老師安排課程、家長了解孩子的學習、學生回顧每次進步。從這裡開始就好。</p>
+      </div>
+      <div id="login-progress" class="login-progress" role="status" aria-live="polite" hidden>
+        <span class="login-spinner" aria-hidden="true"></span>
+        <div><strong id="login-progress-title">正在為你準備課程</strong><p id="login-progress-copy">稍等一下，馬上就能看到你的安排。</p></div>
+      </div>
+      <button class="google-button" id="google-login" type="button"><span class="google-g" aria-hidden="true">G</span>使用 Google 帳號繼續</button>
+      <button class="secondary-button wide" id="login-retry" type="button" hidden>再試一次</button>
+      <p class="login-helper" id="login-help">第一次使用？老師先建立自己的教學空間，再新增學生；家長和學生收到老師邀請後，就能查看自己的課程。</p>
     </div>
   </dialog>
   <dialog class="modal schedule-sheet" id="shared-course-modal" aria-labelledby="shared-course-heading">
