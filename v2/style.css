@@ -677,3 +677,16 @@
  .recent-change-row{flex-direction:column;gap:4px}
  .recent-change-row small{white-space:normal}
 }
+
+/* V3.5.9: do not paint a teacher workspace while the OAuth callback and
+   account role are still unresolved. The static gate exists before JS runs. */
+.auth-loading-screen{display:none}
+body.auth-pending .app-shell{visibility:hidden;pointer-events:none}
+body.auth-pending .auth-loading-screen{display:flex;position:fixed;inset:0;z-index:9999;
+  align-items:center;justify-content:center;background:#faf8f4;text-align:center;
+  padding:24px}
+.auth-loading-content{display:grid;justify-items:center;gap:12px;max-width:350px}
+.auth-loading-content strong{font-size:18px;color:#4a4b43}
+.auth-loading-content p{margin:0;color:#8a8983;font-size:13px;line-height:1.7}
+.auth-loading-symbol{display:grid;place-items:center;width:56px;height:56px;
+  background:#fbece5;border-radius:50%;font-size:30px;color:#bc7464}

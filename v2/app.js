@@ -28,7 +28,7 @@ const timeLabel = (s) => asText(s).slice(0,5);
 const tick = ()=>new Date();
 const uid = ()=>crypto.randomUUID();
 let client=null, activeUser=null, loading=false, teacherPreferences={};
-const state={mode:"live",enabledRoles:["teacher"],lessonRatings:{focus:null,mood:null},role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",studentCalendarMode:"month",recentChangesOpen:false,historyReadFailed:false,paymentBatches:[],paymentBatchItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",studentInvites:[],studentLinks:[],studentLegacyInvites:[],managedStudentId:null,studentSearch:"",studentAccountFilter:"all",studentPortal:{students:[],lessons:[],schedules:[]},sharedCourseDraft:null,sharedCourseHistory:{},receiptBatch:null,activeLesson:null,actualHoursManual:false};
+const state={mode:"live",enabledRoles:["teacher"],lessonRatings:{focus:null,mood:null},role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:"month",studentCalendarMode:"month",recentChangesOpen:false,historyReadFailed:false,paymentBatches:[],paymentBatchItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",studentInvites:[],studentLinks:[],studentLegacyInvites:[],managedStudentId:null,studentSearch:"",studentAccountFilter:"all",studentPortal:{students:[],lessons:[],schedules:[]},sharedCourseDraft:null,sharedCourseHistory:{},receiptBatch:null,activeLesson:null,actualHoursManual:false};
 
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
@@ -226,6 +226,7 @@ function setRole(role){
  if(!VALID_ROLES.includes(role)||!enabledRoles().includes(role))return;
  const roleChanged=state.role!==role;
  state.role=role;
+ restoreCalendarMode();
  if(roleChanged){
   state.recentChangesOpen=false;
   state.sharedCourseHistory={};
@@ -333,6 +334,7 @@ async function saveMyWorkspace(rename=false){
 function renderAuthUI(){
  const waiting=authPhase==="checking";
  const failed=authPhase==="error";
+ const identified=authPhase==="ready"&&!!activeUser;
  $("#login-heading").textContent=waiting?"正在為你準備好好上課":failed?
   "剛剛沒有成功開啟課程":"歡迎來到好好上課";
  $("#login-description").textContent=waiting?
@@ -346,26 +348,29 @@ function renderAuthUI(){
  // OAuth and profile data are not resolved yet. Never label a previous or
  // cached role as the current account while authentication is still pending.
  const indicator=$("#role-indicator");
- indicator.disabled=waiting||!activeUser;
- if(waiting){
-  $("#role-indicator-text").textContent="正在確認登入身分";
+ indicator.disabled=!identified;
+ if(!identified){
+  const message=waiting?"正在確認登入身分":"尚未登入";
+  $("#role-indicator-text").textContent=message;
   $("#role-indicator-icon").textContent="◌";
-  indicator.setAttribute("aria-label","正在確認登入身分");
+  indicator.setAttribute("aria-label",message);
   indicator.setAttribute("aria-expanded","false");
   $("#role-menu").classList.add("hidden");
  }
 }
 function render(){
  const role=state.role,teacher=role==="teacher",student=role==="student";
- document.body?.classList?.toggle("student-mode",student);
+ const identified=authPhase==="ready"&&!!activeUser;
+ document.body?.classList?.toggle("auth-pending",authPhase==="checking");
+ document.body?.classList?.toggle("student-mode",identified&&student);
  // Login initialization sets state.view directly; always sync the visible page
  // and highlighted tabs, not only when someone manually clicks navigation.
  syncCurrentView();
- const identity=authPhase==="checking"?"正在確認登入身分":activeUser?roleFullName():"尚未登入";
- $("#role-indicator-text").textContent=authPhase==="checking"?identity:identity+" · "+ROLE_TITLE[role];
- $("#role-indicator-icon").textContent=authPhase==="checking"?"◌":teacher?"◈":student?"✎":"♧";
- $("#role-indicator").setAttribute("aria-label",authPhase==="checking"?
-  "正在確認登入身分":"目前使用："+identity+"，"+ROLE_TITLE[role]+"，點擊切換");
+ const identity=authPhase==="checking"?"正在確認登入身分":identified?roleFullName():"尚未登入";
+ $("#role-indicator-text").textContent=identified?identity+" · "+ROLE_TITLE[role]:identity;
+ $("#role-indicator-icon").textContent=identified?(teacher?"◈":student?"✎":"♧"):"◌";
+ $("#role-indicator").setAttribute("aria-label",identified?
+  "目前使用："+identity+"，"+ROLE_TITLE[role]+"，點擊切換":identity);
  $$("[data-role-choice]").forEach(el=>el.setAttribute("aria-pressed",String(el.dataset.roleChoice===role)));
  $("#greeting-title").innerHTML=teacher?"今天的課程，<em>從這裡開始。</em>":student?"我的學習，<em>一步一步進步。</em>":"孩子的每堂課，<em>都在這裡。</em>";
  $("#greeting-copy").textContent=teacher?"先看看今天的課程、需要補寫的紀錄，以及等你確認的收款。":student?"在這裡查看你的課表和老師的課後回饋。":"下一堂課、最新學習紀錄和付款狀態，不用再四處尋找。";
@@ -377,10 +382,10 @@ function render(){
   activeUser?"<i></i> 已登入":"<i></i> 尚未登入";
  renderAuthUI();
  $("#account-label").textContent=identity;
- $("#account-subtitle").textContent=authPhase==="checking"?"正在確認登入身分":activeUser?ROLE_TITLE[role]:"使用 Google 登入";
+ $("#account-subtitle").textContent=authPhase==="checking"?"正在確認登入身分":identified?ROLE_TITLE[role]:"使用 Google 登入";
  $("#avatar").textContent=identity.slice(0,1);
- $("#account-current").textContent=activeUser?.email||"尚未使用 Google 登入";
- if(document.activeElement!==$("#profile-display-name"))$("#profile-display-name").value=state.mode==="live"&&activeUser?userDisplayName():"";
+ $("#account-current").textContent=identified?activeUser.email:"尚未使用 Google 登入";
+ if(document.activeElement!==$("#profile-display-name"))$("#profile-display-name").value=state.mode==="live"&&identified?userDisplayName():"";
  $("#profile-display-form").classList.toggle("hidden",!activeUser);
  renderRoleSettings();
  $("#settings-role-card").classList.toggle("hidden",!activeUser);
@@ -555,9 +560,20 @@ function renderCalendarDisplay(){
   if(n){const mark=document.createElement("span");mark.className="mobile-lesson-count";mark.setAttribute("aria-hidden","true");mark.textContent=n+"堂";cell.appendChild(mark)}
  });
 }
+function calendarModeStorageKey(){
+ return activeUser?.id&&["teacher","parent"].includes(state.role)
+  ?CALENDAR_MODE_STORAGE+"_"+activeUser.id+"_"+state.role:null;
+}
+function restoreCalendarMode(){
+ const key=calendarModeStorageKey();
+ state.calendarMode=key&&localStorage.getItem(key)==="list"?"list":"month";
+}
 function changeCalendarMode(mode){
  if(mode!=="month"&&mode!=="list")return;
- state.calendarMode=mode;localStorage.setItem(CALENDAR_MODE_STORAGE,mode);renderFullCalendar();
+ state.calendarMode=mode;
+ const key=calendarModeStorageKey();
+ if(key)localStorage.setItem(key,mode);
+ renderFullCalendar();
 }
 
 function renderStudentBilling(lessons){
@@ -2230,6 +2246,7 @@ function clearUserSessionState(){
  state.enabledRoles=["teacher"];
  state.preferredLoginRole=null;
  state.role="teacher";
+ state.calendarMode="month";
  state.view="home";
  state.parentTeacherFilter="all";
  state.managedStudentId=null;
@@ -2315,6 +2332,8 @@ async function initializeLive(){
  if(signOutRequested)return;
  const bootGeneration=authDataGeneration;
  authPhase="checking";
+ // Close the first-paint race: show a neutral gate even before getSession resolves.
+ document.body?.classList?.toggle("auth-pending",true);
  renderAuthUI();
  showModal("account-modal");
  try{
@@ -2353,6 +2372,7 @@ async function initializeLive(){
    }else state.enabledRoles=normalizedRoles(profile.enabled_roles);
    if(!state.enabledRoles.length)state.enabledRoles=["teacher"];
    state.role=resolveLoginRole({remote,cached,pending,isStudent,guardian,invited});
+   restoreCalendarMode();
    state.preferredLoginRole=state.role;
    localStorage.setItem(roleKey,state.role);
    // A previously interrupted user choice may need retrying. Do not write
@@ -2392,6 +2412,7 @@ async function googleLogin(){
  try{
   signOutRequested=false;
   authPhase="checking";
+  document.body?.classList?.toggle("auth-pending",true);
   renderAuthUI();
   const db=await ensureClient();state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
   const {error}=await db.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname}});

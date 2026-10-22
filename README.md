@@ -1,10 +1,18 @@
-# 好好上課（tutor-app）｜家教課程與收付款管理 V3.5.8
+# 好好上課（tutor-app）｜家教課程與收付款管理 V3.5.9
 
 **正式網站：** https://tutor.rapid4grad.com/  
 **程式碼：** https://github.com/zhichiangai/tutor-app  
-**目前版本：** V3.5.8（2026-10-23），部署基準為 GitHub `main`。 
+**目標版本：** V3.5.9（修補候選，尚待 PR 驗收與正式發布），正式 Production 仍以 main 為準。，部署基準為 GitHub `main`。 
 
 > 本 README 說明**目前正式運行的 Vercel + Supabase 版**。舊 GAS、Google Sheets 和 GitHub Pages 專案仍保存在程式庫內，但**不是本網域 V3.3 使用的後端**。舊版記錄見 [歷史 README](docs/legacy-readme-20261019.md)。
+
+## V3.5.9 OAuth 首次載入與月曆偏好隔離（修補候選）
+
+- 修正首次載入或 Google OAuth 回跳時，原 HTML 曾預設顯示「老師模式」及「尚未登入」的矛盾狀態。現在 HTML 在任何 JS 啟動前先顯示中性身份畫面，直到 Session 及 Profile 完成確認才露出完整工作區。
+- 未完成身分驗證時，角色指示器禁用且不顯示老師、家長或學生的角色標題；不更動真正角色推斷與授權。
+- 老師/家長原本共用瀏覽器 `calendarMode` localStorage key，現改按 Google Auth User ID＋角色分開保存。未設定的帳號預設進入月份月曆；登出清空暫存模式。
+- 新增 `tests/v359-auth-bootstrap-account-calendar-regression.mjs`。無 Supabase schema、RLS、付款或課程寫入調整。
+- Codex 正式網站 V3.5.8 核心月曆與最近變更已實測 PASS，但本修補仍須在真實 Google OAuth 及手機尺寸複驗，RLS 越權/Network 尚未驗證。
 
 ## V3.5.8 三方月曆與最近變更
 
