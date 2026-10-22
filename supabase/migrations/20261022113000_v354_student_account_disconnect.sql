@@ -11,7 +11,7 @@ set search_path to ''
 as $$
 declare
   v_teacher uuid := auth.uid();
-  v_email text := pg_catalog.lower(pg_catalog.btrim(pg_catalog.coalesce(p_email,'')));
+  v_email text := pg_catalog.lower(pg_catalog.btrim(coalesce(p_email,'')));
   v_removed_current integer := 0;
   v_removed_legacy integer := 0;
 begin
