@@ -28,7 +28,7 @@ const timeLabel = (s) => asText(s).slice(0,5);
 const tick = ()=>new Date();
 const uid = ()=>crypto.randomUUID();
 let client=null, activeUser=null, loading=false, teacherPreferences={};
-const state={mode:"live",enabledRoles:["teacher"],lessonRatings:{focus:null,mood:null},role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",paymentBatches:[],paymentBatchItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",studentInvites:[],studentLinks:[],studentLegacyInvites:[],managedStudentId:null,studentSearch:"",studentAccountFilter:"all",studentPortal:{students:[],lessons:[],schedules:[]},sharedCourseDraft:null,sharedCourseHistory:{},receiptBatch:null,activeLesson:null,actualHoursManual:false};
+const state={mode:"live",enabledRoles:["teacher"],lessonRatings:{focus:null,mood:null},role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:localStorage.getItem(CALENDAR_MODE_STORAGE)==="list"?"list":"month",studentCalendarMode:"month",recentChangesOpen:false,historyReadFailed:false,paymentBatches:[],paymentBatchItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",studentInvites:[],studentLinks:[],studentLegacyInvites:[],managedStudentId:null,studentSearch:"",studentAccountFilter:"all",studentPortal:{students:[],lessons:[],schedules:[]},sharedCourseDraft:null,sharedCourseHistory:{},receiptBatch:null,activeLesson:null,actualHoursManual:false};
 
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
@@ -224,13 +224,23 @@ function queueLastRoleSave(role){
 }
 function setRole(role){
  if(!VALID_ROLES.includes(role)||!enabledRoles().includes(role))return;
+ const roleChanged=state.role!==role;
  state.role=role;
+ if(roleChanged){
+  state.recentChangesOpen=false;
+  state.sharedCourseHistory={};
+ }
  state.preferredLoginRole=role;
  const menu=$("#role-menu");menu.classList.add("hidden");$("#role-indicator").setAttribute("aria-expanded","false");
  const id=state.mode==="live"&&activeUser?activeUser.id:null;
  const storageKey=id?ROLE_STORAGE+"_"+id:ROLE_STORAGE;
  localStorage.setItem(storageKey,role);
  setView(role==="student"?"student-today":"home");
+ if(roleChanged&&id){
+  void loadSharedCourseHistory().then(()=>{
+   if(activeUser?.id===id&&state.role===role)renderRecentChanges();
+  }).catch(err=>console.warn("無法讀取最近變更",err));
+ }
  if(id){
   localStorage.setItem(ROLE_PENDING_STORAGE+"_"+id,"1");
   queueLastRoleSave(role).then(saved=>{
@@ -382,6 +392,8 @@ function render(){
   }
   renderStudentPortal();
   renderSharedPlanner();
+  renderStudentCalendar();
+  renderRecentChanges();
   renderStudentToday();
   return;
  }
@@ -400,7 +412,7 @@ function render(){
  ["待確認費用","◈",money(lessonSum(pending)),"","依課程付款狀態計算"]];
  $("#metrics").innerHTML=metrics.map(([label,icon,value,unit,foot])=>'<article class="metric-card"><div class="metric-label">'+label+'</div><div class="metric-icon">'+icon+'</div><div class="metric-value">'+esc(value)+(unit||"")+'</div><div class="metric-footer">'+foot+'</div></article>').join("");
  $("#money-reminder").textContent=teacher?"本月已確認收到 "+money(received)+"。":"目前有 "+pending.length+" 筆課程等待付款或收款確認。";
- renderNext();renderRecent();renderMiniCalendar();renderFullCalendar();renderBilling();renderStudents();refreshDaySheet();renderSharedPlanner();renderHomeFocus();
+ renderNext();renderRecent();renderMiniCalendar();renderFullCalendar();renderBilling();renderStudents();refreshDaySheet();renderSharedPlanner();renderRecentChanges();renderHomeFocus();
 }
 /* V3.5.4: answer a person's immediate questions before displaying the full dashboard.
    Figures use the same linked lessons / payment ledger already shown elsewhere. */
@@ -694,15 +706,10 @@ function renderSharedPlanner(){
  esc(l.lesson_date)+' '+esc(timeLabel(l.start_time))+'–'+esc(timeLabel(l.end_time))+' · '+(l.type==="lesson"?"已完成":l.type==="leave"?"已取消":"已安排")+'</small></div>'+
  (l.type==="planned"?'<div class="shared-course-actions"><button type="button" class="mini-action" data-action="shared-edit-lesson" data-id="'+esc(l.id)+'">改期／修改</button>'+
  '<button type="button" class="mini-action" data-action="shared-cancel-lesson" data-id="'+esc(l.id)+'">取消這堂</button></div>':"")+'</div>').join("");
- const history=st.flatMap(s=>(state.sharedCourseHistory[s.id]||[]).map(h=>({...h,studentName:s.name})))
-  .sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,8);
  $(dest).innerHTML=buttons+'<p class="helper-note">三方操作的是同一份課表，修改後直接生效。已完成與已付款課程受保護；鐘點費與收款仍由老師管理。</p>'+
  '<h3 class="shared-course-heading">固定課表</h3>'+(ruleRows||'<p class="muted-small">目前沒有進行中的固定課表。</p>')+
  '<h3 class="shared-course-heading">本月及後續課程</h3>'+(lessonRows||'<p class="muted-small">目前沒有課程安排。</p>')+
- (history.length?'<h3 class="shared-course-heading">最近變更</h3>'+history.map(h=>
-  '<p class="shared-history-row">'+esc(h.studentName)+' · '+esc({teacher:"老師",guardian:"家長",student:"學生"}[h.actor_role]||"共同管理")+
-  ' · '+esc(h.summary)+(h.cancellation_reason?'（'+esc(h.cancellation_reason)+'）':"")+
-  ' <small>'+esc(String(h.created_at).slice(0,16).replace("T"," "))+'</small></p>').join(""):"");
+ '';
 }
 async function loadSharedCourseHistory(){
  state.sharedCourseHistory={};
@@ -842,6 +849,106 @@ async function cancelSharedCourse(kind,id){
 
 /* Student home is deliberately read-only and never renders rates, invoices or
    teacher-only fields. Linked student_portal_data is the only data source. */
+/* V3.5.8 student calendar uses the authorized student portal (not teacher
+ * lesson tables). This renderer intentionally never displays payment fields. */
+function studentCalendarLessons(){
+ return sharedCourseLessons()
+  .filter(l=>l.type!=="moved"&&/^\\d{4}-\\d{2}-\\d{2}$/.test(String(l.lesson_date||"")))
+  .sort((a,b)=>(String(a.lesson_date)+" "+timeLabel(a.start_time))
+   .localeCompare(String(b.lesson_date)+" "+timeLabel(b.start_time)));
+}
+function studentLessonSummary(l){
+ return esc(l.subject||"課程")+" · "+esc(timeLabel(l.start_time))+"–"+
+  esc(timeLabel(l.end_time))+" · "+esc(l.type==="lesson"?"已完成":l.type==="leave"?"已取消":"已安排");
+}
+function renderStudentCalendar(){
+ if(state.role!=="student")return;
+ const month=state.month,monthStart=dateKey(new Date(month.getFullYear(),month.getMonth(),1));
+ const lessons=studentCalendarLessons();
+ const monthItems=lessons.filter(l=>sameMonth(l.lesson_date,month));
+ const selectedDay=String(state.selected||"");
+ $("#student-calendar-month").textContent=month.getFullYear()+" 年 "+(month.getMonth()+1)+" 月";
+ $("#student-calendar-overview").textContent="本月 "+monthItems.length+" 堂課 · 點日期查看詳細安排";
+ const counts=new Map();
+ for(const l of lessons)counts.set(l.lesson_date,(counts.get(l.lesson_date)||0)+1);
+ $("#student-calendar-grid").innerHTML=daysForMonth(month).map(d=>{
+  const day=dateKey(d),count=counts.get(day)||0;
+  const items=lessons.filter(l=>l.lesson_date===day);
+  return '<div class="calendar-cell student-calendar-cell '+(d.getMonth()!==month.getMonth()?"outside ":"")+
+   (day===selectedDay?"selected ":"")+(count?"has-events":"")+
+   '" data-student-day="'+day+'" role="button" tabindex="0" aria-label="'+esc(prettyDate(day))+
+   '，'+count+' 堂課"><div class="day-number '+(day===dateKey(tick())?"today":"")+'">'+
+   d.getDate()+'</div>'+
+   items.slice(0,2).map(l=>'<span class="student-calendar-event">'+esc(l.subject||"課程")+
+     ' '+esc(timeLabel(l.start_time))+'</span>').join("")+
+   (count?'<span class="student-calendar-count" aria-hidden="true">'+count+' 堂</span>':"")+
+   '</div>';
+ }).join("");
+ const listed=state.studentCalendarMode==="list";
+ $("#student-calendar-month-view").classList.toggle("hidden",listed);
+ $("#student-calendar-list-view").classList.toggle("hidden",!listed);
+ $("[data-student-calendar-mode]").forEach(btn=>{
+  const yes=btn.dataset.studentCalendarMode===state.studentCalendarMode;
+  btn.classList.toggle("active",yes);btn.setAttribute("aria-pressed",String(yes));
+ });
+ const names=new Map(sharedCourseStudents().map(person=>[person.id,person.name]));
+ $("#student-calendar-list-view").innerHTML=monthItems.length?monthItems.map(l=>
+  '<button type="button" class="student-month-list-row" data-student-day="'+esc(l.lesson_date)+'">'+
+  '<strong>'+esc(l.lesson_date)+'</strong><span>'+studentLessonSummary(l)+'</span></button>').join(""):
+  '<p class="empty">本月沒有已安排或已記錄的課程。</p>';
+ $("#student-selected-date-title").textContent=prettyDate(selectedDay)+" 的課程";
+ const dayItems=lessons.filter(l=>l.lesson_date===selectedDay);
+ $("#student-day-lessons").innerHTML=dayItems.length?dayItems.map(l=>
+  '<details class="student-day-lesson"><summary><span><strong>'+esc(l.subject||"課程")+
+  '</strong><small>'+esc(timeLabel(l.start_time))+'–'+esc(timeLabel(l.end_time))+
+  ' · '+esc(l.type==="lesson"?"已完成":l.type==="leave"?"已取消":"已安排")+
+  '</small></span><span aria-hidden="true">⌄</span></summary><div class="student-day-detail">'+
+  '<p>'+esc(l.type==="lesson"?(l.lesson_content||l.remarks||"已完成課程"):l.type==="leave"?"這堂課已取消":"課程已安排")+'</p>'+
+  (l.type==="planned"?'<p class="muted-small">如需改期或取消，請使用下方的課程管理。</p>':"")+
+  '</div></details>').join(""):'<p class="empty">這一天沒有課程。</p>';
+}
+function moveStudentMonth(direction){
+ const date=direction==="today"?new Date():new Date(state.month.getFullYear(),state.month.getMonth()+Number(direction),1);
+ if(!Number.isFinite(date.getTime()))return;
+ state.month=new Date(date.getFullYear(),date.getMonth(),1);
+ state.selected=direction==="today"?dateKey(date):dateKey(state.month);
+ renderStudentCalendar();
+ renderSharedPlanner();
+}
+function selectStudentDay(date){
+ if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date))return;
+ const d=parseDate(date);
+ if(!Number.isFinite(d.getTime())||dateKey(d)!==date)return;
+ state.selected=date;
+ if(!sameMonth(date,state.month))
+  state.month=new Date(d.getFullYear(),d.getMonth(),1);
+ renderStudentCalendar();
+ renderSharedPlanner();
+}
+/* Latest authorized changes remain independent of the month being browsed. */
+function renderRecentChanges(){
+ const student=state.role==="student",id=student?"student-recent-changes":"calendar-recent-changes";
+ for(const rootId of ["student-recent-changes","calendar-recent-changes"]){
+  if(rootId!==id)$("#"+rootId).innerHTML="";
+ }
+ const root=$("#"+id),visible=student?sharedCourseStudents():visibleStudents();
+ const history=visible.flatMap(st=>(state.sharedCourseHistory[st.id]||[]).map(item=>({
+  ...item,studentName:st.name
+ }))).sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||""))).slice(0,8);
+ const label="recent-changes-body-"+(student?"student":"standard");
+ const opened=state.recentChangesOpen;
+ const rows=history.length?history.map(h=>
+  '<div class="recent-change-row"><strong>'+esc(h.studentName||"學生")+' · '+esc(h.summary||"課程異動")+
+  '</strong><small>'+esc(String(h.created_at||"").slice(0,16).replace("T"," "))+'</small></div>').join(""):
+  '<p class="empty">目前沒有最近變更。</p>';
+ root.innerHTML='<button type="button" class="recent-changes-toggle" data-recent-changes-toggle aria-expanded="'+
+  String(opened)+'" aria-controls="'+label+'"><span>◷ 最近變更 <small>'+
+  history.length+' 筆</small></span><span class="recent-changes-hint">'+
+  (opened?"收合 ↑":"展開 ↓")+'</span></button><div id="'+label+'" class="recent-changes-content"'+
+  (opened?"":" hidden")+'>'+rows+
+  (state.historyReadFailed?'<p class="muted-small">部分紀錄暫時無法讀取，請稍後重試。</p>':"")+'</div>';
+}
+
 function renderStudentToday(){
  const root=$("#student-today-content");
  if(state.role!=="student"||state.mode!=="live"||!activeUser){root.innerHTML="";return}
@@ -2098,6 +2205,9 @@ function clearUserSessionState(){
  for(const field of LIVE_FIELDS)state[field]=[];
  state.studentPortal={students:[],lessons:[],schedules:[],exceptions:[]};
  state.sharedCourseHistory={};
+ state.recentChangesOpen=false;
+ state.studentCalendarMode="month";
+ state.historyReadFailed=false;
  state.sharedCourseDraft=null;
  state.activeLesson=null;
  state.receiptBatch=null;
@@ -2150,7 +2260,7 @@ async function fetchAllRows(table){
  }
  throw Error(table+" 的資料超過單次安全載入上限，請改用日期範圍查詢");
 }
-async function refreshLive(){
+async function refreshLive({withHistory=true}={}){
  if(!client||!activeUser)return;
  const userId=activeUser.id,generation=authDataGeneration;
  const belongsToThisSession=()=>state.mode==="live"&&
@@ -2162,7 +2272,7 @@ async function refreshLive(){
  if(!belongsToThisSession())return;
  if(portal.error)throw Error("學生資料讀取失敗："+portal.error.message);
  state.studentPortal=portal.data||{students:[],lessons:[],schedules:[]};
- if(typeof loadSharedCourseHistory==="function")await loadSharedCourseHistory();
+ if(withHistory)await loadSharedCourseHistory();
 }
 async function ensureClient(){
  if(client)return client;
@@ -2206,7 +2316,7 @@ async function initializeLive(){
    const initializingUserId=activeUser.id,initializingGeneration=authDataGeneration;
    await ensureMyProfile();
    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
-   await refreshLive();
+   await refreshLive({withHistory:false});
    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    const profile=state.profiles.find(p=>p.id===activeUser.id);
    const guardian=state.guardians.some(g=>g.guardian_id===activeUser.id);
@@ -2243,6 +2353,8 @@ async function initializeLive(){
    }
    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    state.view=state.role==="student"?"student-today":"home";
+   await loadSharedCourseHistory();
+   if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    await loadTeacherPreferences();
    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    authPhase="ready";
@@ -2322,6 +2434,17 @@ function bindEvents(){
   if(!ev.target.closest("#role-menu")){$("#role-menu").classList.add("hidden");$("#role-indicator").setAttribute("aria-expanded","false")}
   const nav=ev.target.closest("[data-view]");if(nav){setView(nav.dataset.view);if(nav.dataset.date){state.selected=nav.dataset.date;state.month=parseDate(state.selected);render()}return}
   const close=ev.target.closest("[data-close]");if(close){closeModal(close.dataset.close);return}
+  const recentToggle=ev.target.closest("[data-recent-changes-toggle]");
+  if(recentToggle){state.recentChangesOpen=!state.recentChangesOpen;renderRecentChanges();return}
+  const studentMode=ev.target.closest("[data-student-calendar-mode]");
+  if(studentMode){
+   state.studentCalendarMode=studentMode.dataset.studentCalendarMode==="list"?"list":"month";
+   renderStudentCalendar();return;
+  }
+  const studentNav=ev.target.closest("[data-student-month-nav]");
+  if(studentNav){moveStudentMonth(studentNav.dataset.studentMonthNav);return}
+  const studentDay=ev.target.closest("[data-student-day]");
+  if(studentDay){selectStudentDay(studentDay.dataset.studentDay);return}
   const switcher=ev.target.closest("[data-calendar-mode]");if(switcher){changeCalendarMode(switcher.dataset.calendarMode);return}
   const action=ev.target.closest("[data-action]");if(action){
    const id=action.dataset.id,kind=action.dataset.action;
@@ -2359,7 +2482,16 @@ function bindEvents(){
   }
   const day=ev.target.closest("[data-day]");if(day){openDay(day.dataset.day);return}
  });
- document.addEventListener("keydown",ev=>{const el=ev.target.closest("[data-day]");if(el&&!ev.target.closest("[data-action]")&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();openDay(el.dataset.day)}});
+ document.addEventListener("keydown",ev=>{
+  const studentDay=ev.target.closest("[data-student-day]");
+  if(studentDay&&!ev.target.closest("button")&&(ev.key==="Enter"||ev.key===" ")){
+   ev.preventDefault();selectStudentDay(studentDay.dataset.studentDay);return;
+  }
+  const el=ev.target.closest("[data-day]");
+  if(el&&!ev.target.closest("[data-action]")&&(ev.key==="Enter"||ev.key===" ")){
+   ev.preventDefault();openDay(el.dataset.day);
+  }
+ });
  $("#account-modal").addEventListener("cancel",ev=>{if(!activeUser)ev.preventDefault()});
  $("#lesson-form").addEventListener("submit",saveLessonOutcome);
  $("#lesson-learning-save").addEventListener("click",saveOnlyLessonLearning);
