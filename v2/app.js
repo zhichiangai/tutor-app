@@ -821,10 +821,227 @@ async function removeStudentInvite(id){
  });
  if(ok)toast("已撤銷學生登入連結，歷史課程保留");
 }
+
+/* V3.5.4: one student is the organizing unit, not three separate invitation lists.
+   A student's accepted login lives in student_links and references legacy
+   student_invitations, NOT the newer student_invites table. */
+function teacherStudentAccountRows(studentId){
+ const teacherId=activeUser?.id;
+ const isMine=record=>record.student_id===studentId&&record.teacher_id===teacherId;
+ const current=state.studentInvites.filter(isMine);
+ const legacy=state.studentLegacyInvites.filter(isMine);
+ const byEmail=new Map();
+ const emailKey=value=>asText(value).trim().toLowerCase();
+ for(const inv of legacy){
+  const key=emailKey(inv.email);
+  byEmail.set(key,{email:inv.email,legacyId:inv.id,currentId:null});
+ }
+ for(const inv of current){
+  const key=emailKey(inv.email);
+  const previous=byEmail.get(key)||{email:inv.email,legacyId:null,currentId:null};
+  previous.currentId=inv.id;
+  byEmail.set(key,previous);
+ }
+ const rows=[...byEmail.values()].map(item=>{
+  const connected=Boolean(item.legacyId&&state.studentLinks.some(l=>
+   l.student_id===studentId&&l.teacher_id===teacherId&&l.invitation_id===item.legacyId));
+  return {...item,connected};
+ });
+ const known=new Set(legacy.map(inv=>inv.id));
+ const unknown=state.studentLinks.some(l=>l.student_id===studentId&&l.teacher_id===teacherId&&!known.has(l.invitation_id));
+ if(unknown)rows.push({email:"無法對應的已連結帳號",connected:true,unresolved:true,currentId:null,legacyId:null});
+ return rows.sort((a,b)=>Number(b.connected)-Number(a.connected)||a.email.localeCompare(b.email,"zh-TW"));
+}
+function teacherGuardianAccountRows(studentId){
+ const teacherId=activeUser?.id;
+ const invitations=state.invites.filter(i=>i.teacher_id===teacherId&&i.student_id===studentId);
+ return invitations.map(i=>({...i,connected:state.guardians.some(g=>
+  g.invite_id===i.id&&g.student_id===studentId&&g.teacher_id===teacherId)}))
+  .sort((a,b)=>Number(b.connected)-Number(a.connected)||asText(a.email).localeCompare(asText(b.email),"zh-TW"));
+}
+function accountStatusMarkup(label,connected){
+ return '<span class="pill '+(connected?"paid":"pending")+'">'+esc(label)+'</span>';
+}
+function renderTeacherStudentList(){
+ const root=$("#teacher-student-list");
+ if(state.role!=="teacher"||!activeUser){root.innerHTML="";$("#teacher-student-summary").innerHTML="";return}
+ const students=visibleStudents();
+ const statuses=students.map(s=>{
+  const studentAccounts=teacherStudentAccountRows(s.id),guardianAccounts=teacherGuardianAccountRows(s.id);
+  const studentLinked=studentAccounts.some(a=>a.connected),guardianLinked=guardianAccounts.some(a=>a.connected);
+  const pending=[...studentAccounts,...guardianAccounts].some(a=>!a.connected);
+  return {student:s,studentAccounts,guardianAccounts,studentLinked,guardianLinked,pending,
+   invited:studentAccounts.length>0||guardianAccounts.length>0};
+ });
+ const linkedParents=statuses.filter(s=>s.guardianLinked).length;
+ const pendingInvites=statuses.filter(s=>s.pending).length;
+ $("#teacher-student-summary").innerHTML=
+  '<div class="student-manager-stat"><strong>'+students.length+'</strong><span>學生總數</span></div>'+
+  '<div class="student-manager-stat"><strong>'+linkedParents+'</strong><span>已有家長連結</span></div>'+
+  '<div class="student-manager-stat"><strong>'+pendingInvites+'</strong><span>仍有待接受邀請</span></div>';
+ const q=asText(state.studentSearch).trim().toLowerCase();
+ const filter=state.studentAccountFilter;
+ const results=statuses.filter(x=>(!q||(x.student.name+" "+x.student.subject).toLowerCase().includes(q))&&
+  (filter==="all"||(filter==="linked"&&(x.studentLinked||x.guardianLinked))||
+   (filter==="pending"&&x.pending)||(filter==="uninvited"&&!x.invited)));
+ root.innerHTML=results.length?results.map(x=>{
+  const s=x.student;
+  const studentStatus=x.studentLinked?"已連結":x.studentAccounts.length?"等待接受":"尚未邀請";
+  const guardianStatus=x.guardianLinked?"已連結":x.guardianAccounts.length?"等待接受":"尚未邀請";
+  const enrolled=visibleLessons().filter(l=>l.student_id===s.id).length;
+  return '<article class="student-manager-row"><div class="student-manager-primary"><div class="student-manager-avatar" aria-hidden="true">✿</div>'+
+   '<div><strong>'+esc(s.name)+'</strong><span>'+esc(s.subject||"未設定科目")+' · 已安排 '+enrolled+' 堂</span></div></div>'+
+   '<div class="student-manager-rate"><small>未來課程預設時薪</small><strong>'+money(s.hourly_rate)+'/小時</strong></div>'+
+   '<div class="student-manager-links"><div><span>學生帳號</span>'+accountStatusMarkup(studentStatus,x.studentLinked)+'</div>'+
+    '<div><span>家長帳號</span>'+accountStatusMarkup(guardianStatus,x.guardianLinked)+'</div></div>'+
+   '<button type="button" class="secondary-button student-manager-open" data-action="manage-student" data-id="'+esc(s.id)+
+   '" aria-label="管理 '+esc(s.name)+' 的資料與連結">管理 ›</button></article>';
+ }).join(""):'<div class="card empty">'+(students.length?"沒有符合搜尋或篩選條件的學生。":"還沒有學生。點右上方「新增學生」就能開始。")+'</div>';
+}
+function managedAccountList(studentId){
+ const rows=teacherStudentAccountRows(studentId);
+ return rows.length?'<div class="student-account-rows">'+rows.map(item=>{
+  const stateLabel=item.unresolved?"連結待確認":item.connected?"已連結":"等待接受";
+  const info=item.connected?"這個帳號目前可以查看課程。":"對方尚未接受邀請。";
+  const button=item.unresolved?"":'<button type="button" class="secondary-button" data-action="revoke-managed-student" '+
+   'data-id="'+esc(item.currentId||item.legacyId)+'" data-email="'+esc(item.email)+'" data-student="'+esc(studentId)+'">'+
+   (item.connected?"解除連結":"撤銷邀請")+'</button>';
+  return '<div class="student-account-row"><div><strong>'+esc(item.email)+'</strong>'+
+   accountStatusMarkup(stateLabel,item.connected)+'<small>'+esc(item.unresolved?"請確認登入帳號與原邀請紀錄。":info)+'</small></div>'+
+   button+'</div>';
+ }).join("")+'</div>':'<div class="student-account-empty">尚未邀請學生登入。請輸入學生自己的 Google Email。</div>';
+}
+function managedGuardianList(studentId){
+ const rows=teacherGuardianAccountRows(studentId);
+ return rows.length?'<div class="student-account-rows">'+rows.map(item=>{
+  const buttons=item.connected?
+   '<button type="button" class="secondary-button" data-action="revoke-invite" data-id="'+esc(item.id)+'">解除連結</button>':
+   '<button type="button" class="secondary-button" data-action="edit-invite" data-id="'+esc(item.id)+'">修改 Email</button>'+
+   '<button type="button" class="secondary-button" data-action="revoke-invite" data-id="'+esc(item.id)+'">撤銷邀請</button>';
+  return '<div class="student-account-row"><div><strong>'+esc(item.email)+'</strong>'+
+   accountStatusMarkup(item.connected?"已連結":"等待接受",item.connected)+
+   '<small>'+(item.connected?"這位家長目前可以查看孩子的課程與付款。":"對方還沒接受這封邀請。")+'</small></div>'+
+   '<div class="student-account-actions">'+buttons+'</div></div>';
+ }).join("")+'</div>':'<div class="student-account-empty">還沒有家長帳號。可以邀請一位或多位家長。</div>';
+}
+function renderStudentManagerDetail(){
+ if(state.role!=="teacher"||!activeUser)return;
+ const s=visibleStudents().find(x=>x.id===state.managedStudentId);
+ if(!s){closeModal("student-management-modal");state.managedStudentId=null;return}
+ $("#student-management-heading").textContent=s.name+" · 學生資料";
+ for(const [id,value] of [["managed-student-name",s.name],["managed-student-subject",s.subject],
+  ["managed-student-rate",s.hourly_rate]]){
+  const element=$("#"+id);
+  if(document.activeElement!==element)element.value=String(value??"");
+ }
+ $("#managed-student-accounts").innerHTML=managedAccountList(s.id);
+ $("#managed-guardian-accounts").innerHTML=managedGuardianList(s.id);
+}
+function openStudentManager(studentId){
+ if(state.role!=="teacher"||!activeUser||!visibleStudents().some(s=>s.id===studentId))return;
+ state.managedStudentId=studentId;
+ $("#managed-student-email").value="";
+ $("#managed-guardian-email").value="";
+ renderStudentManagerDetail();
+ showModal("student-management-modal");
+}
+async function saveManagedStudent(ev){
+ ev.preventDefault();
+ if(state.role!=="teacher"||!activeUser)return;
+ const original=visibleStudents().find(s=>s.id===state.managedStudentId);
+ if(!original)return;
+ const name=$("#managed-student-name").value.trim();
+ const subject=$("#managed-student-subject").value.trim();
+ const rate=Number($("#managed-student-rate").value);
+ if(!name||name.length>80||!subject||subject.length>80||!Number.isFinite(rate)||rate<0||rate>999999){
+  toast("請確認姓名、科目和時薪都填寫正確。");return;
+ }
+ const patch={name,subject,hourly_rate:rate};
+ const ok=await persist(async()=>{
+  if(state.mode==="demo")Object.assign(original,patch);
+  else assertResult(await client.from("students").update(patch)
+   .eq("id",original.id).eq("teacher_id",activeUser.id).select("id").single());
+ });
+ if(ok)toast("學生資料已更新；先前課程的時數與金額不會變更。");
+}
+async function submitManagedStudentInvite(ev){
+ ev.preventDefault();
+ if(state.role!=="teacher"||!activeUser||!requireTeacherWorkspace())return;
+ const studentId=state.managedStudentId,email=$("#managed-student-email").value.trim().toLowerCase();
+ if(!visibleStudents().some(s=>s.id===studentId)||!email)return;
+ const duplicated=teacherStudentAccountRows(studentId).some(x=>x.email.toLowerCase()===email);
+ if(duplicated){toast("這位學生已經有這個帳號的邀請或連結。");return}
+ const teacherId=activeUser.id;
+ const ok=await persist(async()=>{
+  if(state.mode==="demo")state.studentInvites.push({id:uid(),teacher_id:teacherId,student_id:studentId,email});
+  else assertResult(await client.from("student_invites").insert({teacher_id:teacherId,student_id:studentId,email}));
+ });
+ if(ok){$("#managed-student-email").value="";toast("已建立學生邀請，請對方使用這個 Google 帳號接受。")}
+}
+async function submitManagedGuardianInvite(ev){
+ ev.preventDefault();
+ if(state.role!=="teacher"||!activeUser||!requireTeacherWorkspace())return;
+ const studentId=state.managedStudentId,email=$("#managed-guardian-email").value.trim().toLowerCase();
+ if(!visibleStudents().some(s=>s.id===studentId)||!email)return;
+ if(teacherGuardianAccountRows(studentId).some(x=>x.email.toLowerCase()===email)){
+  toast("這位家長已經在此學生的邀請或連結清單中。");return}
+ const ok=await persist(async()=>{
+  if(state.mode==="demo")state.invites.push({id:uid(),student_id:studentId,teacher_id:activeUser.id,email});
+  else assertResult(await client.from("guardian_invites").insert({student_id:studentId,teacher_id:activeUser.id,email}));
+ });
+ if(ok){$("#managed-guardian-email").value="";toast("已建立家長邀請，請家長使用這個 Google 帳號接受。")}
+}
+async function revokeManagedStudentAccount(studentId,email){
+ if(state.role!=="teacher"||!activeUser)return;
+ const s=visibleStudents().find(x=>x.id===studentId);
+ if(!s)return;
+ const account=teacherStudentAccountRows(studentId).find(x=>x.email.toLowerCase()===email.toLowerCase()&&!x.unresolved);
+ if(!account)return;
+ const action=account.connected?"解除連結":"撤銷邀請";
+ if(!confirm("確定要"+action+"「"+s.name+"」的學生帳號 "+account.email+"？\n"+
+  (account.connected?"對方將無法再查看這位學生的課程與學習紀錄。":"對方將無法再接受這封邀請。")+
+  "\n學生、課程、付款與課後紀錄都會保留。"))return;
+ // This RPC removes both invitation versions atomically; the FK cascade
+ // revokes the real student_links row rather than merely hiding the email.
+ const ok=await persist(async()=>{
+  if(state.mode==="demo"){
+   state.studentInvites=state.studentInvites.filter(i=>!(i.student_id===studentId&&i.email.toLowerCase()===email.toLowerCase()));
+   const legacy=state.studentLegacyInvites.filter(i=>i.student_id===studentId&&i.email.toLowerCase()===email.toLowerCase());
+   state.studentLegacyInvites=state.studentLegacyInvites.filter(i=>!(i.student_id===studentId&&i.email.toLowerCase()===email.toLowerCase()));
+   state.studentLinks=state.studentLinks.filter(l=>!legacy.some(i=>i.id===l.invitation_id));
+  }else{
+   const {error}=await client.rpc("revoke_student_account_connection",{
+    p_student_id:studentId,p_email:email});
+   if(error)throw error;
+  }
+ });
+ if(ok)toast(account.connected?"學生帳號已解除，舊課程與學習紀錄都保留。":"學生邀請已撤銷。");
+}
+function renderTeacherStudentManagement(){
+ const teacher=state.role==="teacher";
+ $("#teacher-student-manager").classList.toggle("hidden",!teacher);
+ $("#student-grid").classList.toggle("hidden",teacher);
+ $("#guardian-invite-card").classList.toggle("hidden",teacher);
+ $("#student-invite-teacher-card").classList.add("hidden");
+ $("#students-page-title").textContent=teacher?"學生管理":"學生與家長";
+ $("#students-page-subtitle").textContent=teacher?
+  "一眼看見學生、預設時薪，以及學生和家長的帳號連結。":
+  "在這裡查看孩子的學習紀錄和老師邀請。";
+ if(!teacher){
+  $("#teacher-student-list").innerHTML="";
+  if($("#student-management-modal").open)closeModal("student-management-modal");
+  state.managedStudentId=null;
+  return;
+ }
+ renderTeacherStudentList();
+ if($("#student-management-modal").open)renderStudentManagerDetail();
+}
+
 function renderStudents(){
  const st=visibleStudents();
  renderParentLearning();
  renderStudentInvitesForTeacher();
+ renderTeacherStudentManagement();
  $("#add-student").style.display=state.role==="teacher"?"":"none";
  $("#student-grid").innerHTML=st.length?st.map(s=>'<article class="student-card"><div class="student-icon">✿</div><h3>'+esc(s.name)+'</h3><p>'+esc(s.subject||"課程")+' · '+money(s.hourly_rate)+'／小時</p><div class="tag-line">已安排 '+visibleLessons().filter(l=>l.student_id===s.id).length+' 堂課</div></article>').join(""):'<div class="card empty">目前沒有學生資料。'+(state.role==="parent"?"請先接受老師的邀請。":"先新增一位學生吧。")+'</div>';
  const parent=state.role==="parent";
