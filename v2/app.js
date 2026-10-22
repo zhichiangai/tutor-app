@@ -897,7 +897,7 @@ function renderStudentCalendar(){
  const listed=state.studentCalendarMode==="list";
  $("#student-calendar-month-view").classList.toggle("hidden",listed);
  $("#student-calendar-list-view").classList.toggle("hidden",!listed);
- $("[data-student-calendar-mode]").forEach(btn=>{
+ $$("[data-student-calendar-mode]").forEach(btn=>{
   const yes=btn.dataset.studentCalendarMode===state.studentCalendarMode;
   btn.classList.toggle("active",yes);btn.setAttribute("aria-pressed",String(yes));
  });
