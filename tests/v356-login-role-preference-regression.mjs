@@ -6,8 +6,8 @@ import {expandSchedules} from "../v2/scheduling.js";
 import {lessonAllocation} from "../v2/payment-ledger.js";
 
 const source=readFileSync(new URL("../v2/app.js",import.meta.url),"utf8")
- .replace(/^import .* from "\\.\\/[^"]+";/gm,"")
- .replace(/\\nmain\\(\\);\\s*$/,"");
+ .replace(/^import .* from "\.\/[^"]+";/gm,"")
+ .replace(/\nmain\(\);\s*$/,"");
 
 function harness({role=null,cached=null,pending=false,roles=["teacher","student"],
  student=true,parent=false,teacherWorkspace=true,account="qa-student"}={}){
@@ -55,10 +55,10 @@ function harness({role=null,cached=null,pending=false,roles=["teacher","student"
   "state.guardians=parent?[{guardian_id:user.id,student_id:'qa-child'}]:[];",
   "state.invites=[];};",
   "return {state,initializeLive,setRole,changeDefaultLoginRole,setClient(v){client=v}};"
- ].join("\\n");
+ ].join("\n");
  const app=new Function("document","localStorage","window","crypto","setTimeout",
   "FormData","expandSchedules","lessonAllocation","profile","user","student","parent",
-  "teacherWorkspace",source+"\\n"+overrides)(
+  "teacherWorkspace",source+"\n"+overrides)(
    doc,storage,{}, {randomUUID:()=> "qa-id"},setTimeout,FormData,
    expandSchedules,lessonAllocation,profile,user,student,parent,teacherWorkspace
   );
