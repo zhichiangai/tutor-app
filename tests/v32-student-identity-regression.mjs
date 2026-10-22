@@ -73,7 +73,8 @@ test("Student claim calls protected RPC with selected invitation ID",async()=>{
 test("Cross-device restoration prefers profile.last_role over browser localStorage",()=>{
  const code=read("../v2/app.js");
  assert.ok(code.includes("const remote=profile?.last_role"));
- assert.ok(code.includes("state.enabledRoles.includes(r)"));
+ assert.ok(code.includes("resolveLoginRole({remote,cached,pending,isStudent,guardian,invited})"));
+ assert.ok(code.includes("state.enabledRoles.includes(remote)"));
  assert.ok(code.includes('client.from("profiles").update({last_role:role})'));
  assert.ok(code.includes('state.view=state.role==="student"?"student-today":"home"'));
 });
