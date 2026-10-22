@@ -10,6 +10,7 @@ const SUPABASE_URL = "https://vctisuglfoxyuwlvyjee.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_QR8An_jEnMEZTPuTHebFDA_xg46FLit";
 const STORAGE = "tutor_v2_preview_data_20261019";
 const ROLE_STORAGE = "tutor_v2_role";
+const ROLE_PENDING_STORAGE = "tutor_v2_role_pending";
 const MODE_STORAGE = "tutor_v2_mode";
 const CALENDAR_MODE_STORAGE = "tutor_v22_calendar_mode";
 const NAMES = ["日","一","二","三","四","五","六"];
@@ -146,12 +147,26 @@ function enabledRoles(){
  const selected=normalizedRoles(state.enabledRoles);
  return selected.length?selected:["teacher"];
 }
+// The role shown after login is a preference, not a permission grant. A pending
+// local choice wins only when its cross-device save was interrupted.
+function resolveLoginRole({remote,cached,pending,isStudent,guardian,invited}){
+ if(pending&&state.enabledRoles.includes(cached))return cached;
+ if(state.enabledRoles.includes(remote))return remote;
+ if(state.enabledRoles.includes(cached))return cached;
+ const discovered=[isStudent?"student":null,(guardian||invited)?"parent":null,"teacher",...state.enabledRoles];
+ return discovered.find(role=>state.enabledRoles.includes(role))||"teacher";
+}
 function renderRoleSettings(){
  const modes=enabledRoles();
  $$('[data-role-choice]').forEach(item=>item.classList.toggle("hidden",!modes.includes(item.dataset.roleChoice)));
  $$('input[name="enabled-role"]').forEach(input=>input.checked=modes.includes(input.value));
  $("#role-indicator").setAttribute("aria-haspopup",String(modes.length>1));
  $("#settings-back-student").classList.toggle("hidden",state.role!=="student");
+ const select=$("#default-login-role");
+ if(select){
+  select.innerHTML=modes.map(role=>'<option value="'+role+'">'+ROLE_TITLE[role]+'</option>').join("");
+  select.value=modes.includes(state.preferredLoginRole)?state.preferredLoginRole:state.role;
+ }
 }
 async function saveEnabledRoles(event){
  event.preventDefault();
@@ -166,8 +181,18 @@ async function saveEnabledRoles(event){
  state.enabledRoles=selected;
  if(!selected.includes(state.role)){
   state.role=selected[0];
-  await saveLastRole(state.role);
   state.view=state.role==="student"?"student-today":"settings";
+ }
+ if(!selected.includes(state.preferredLoginRole)){
+  const selectedRole=state.role,id=activeUser.id;
+  state.preferredLoginRole=selectedRole;
+  localStorage.setItem(ROLE_STORAGE+"_"+id,selectedRole);
+  localStorage.setItem(ROLE_PENDING_STORAGE+"_"+id,"1");
+  try{
+   await saveLastRole(selectedRole);
+   if(activeUser?.id===id&&localStorage.getItem(ROLE_STORAGE+"_"+id)===selectedRole)
+    localStorage.setItem(ROLE_PENDING_STORAGE+"_"+id,"0");
+  }catch(error){console.error(error);toast("角色已儲存，但登入預設模式尚未完成同步");}
  }
  render();
  toast("已儲存模式設定；上方只顯示勾選的模式");
@@ -188,11 +213,42 @@ async function saveLastRole(role){
 function setRole(role){
  if(!VALID_ROLES.includes(role)||!enabledRoles().includes(role))return;
  state.role=role;
+ state.preferredLoginRole=role;
  const menu=$("#role-menu");menu.classList.add("hidden");$("#role-indicator").setAttribute("aria-expanded","false");
- localStorage.setItem(state.mode==="live"&&activeUser?ROLE_STORAGE+"_"+activeUser.id:ROLE_STORAGE,role);
+ const id=state.mode==="live"&&activeUser?activeUser.id:null;
+ const storageKey=id?ROLE_STORAGE+"_"+id:ROLE_STORAGE;
+ localStorage.setItem(storageKey,role);
  setView(role==="student"?"student-today":"home");
- if(state.mode==="live"&&activeUser)saveLastRole(role).catch(err=>{console.error(err);toast("模式已切換，但跨裝置同步失敗："+err.message)});
+ if(id){
+  localStorage.setItem(ROLE_PENDING_STORAGE+"_"+id,"1");
+  saveLastRole(role).then(()=>{
+   if(localStorage.getItem(storageKey)===role)
+    localStorage.setItem(ROLE_PENDING_STORAGE+"_"+id,"0");
+  }).catch(err=>{
+   console.error(err);
+   if(activeUser?.id===id)toast("模式已切換，但跨裝置同步失敗："+err.message);
+  });
+ }
  toast("已切換到"+ROLE_TITLE[role]);
+}
+async function changeDefaultLoginRole(){
+ if(!activeUser||state.mode!=="live")return;
+ const role=$("#default-login-role").value;
+ if(!enabledRoles().includes(role))return;
+ const id=activeUser.id;
+ state.preferredLoginRole=role;
+ localStorage.setItem(ROLE_STORAGE+"_"+id,role);
+ localStorage.setItem(ROLE_PENDING_STORAGE+"_"+id,"1");
+ try{
+  await saveLastRole(role);
+  if(activeUser?.id!==id)return;
+  if(localStorage.getItem(ROLE_STORAGE+"_"+id)===role)
+   localStorage.setItem(ROLE_PENDING_STORAGE+"_"+id,"0");
+  toast("已設定下次登入優先進入"+ROLE_TITLE[role]);
+ }catch(err){
+  console.error(err);
+  if(activeUser?.id===id)toast("已儲存於這台裝置，跨裝置同步尚未完成");
+ }
 }
 async function saveDisplayName(ev){
  ev.preventDefault();if(state.mode!=="live"||!activeUser){toast("請先 Google 登入以儲存姓名");return}
@@ -2027,6 +2083,7 @@ function clearUserSessionState(){
  state.actualHoursManual=false;
  state.lessonRatings={focus:null,mood:null};
  state.enabledRoles=["teacher"];
+ state.preferredLoginRole=null;
  state.role="teacher";
  state.view="home";
  state.parentTeacherFilter="all";
@@ -2132,7 +2189,10 @@ async function initializeLive(){
    const invited=state.invites.some(i=>i.email===activeUser.email?.toLowerCase());
    const isStudent=state.studentLinks.some(l=>l.user_id===activeUser.id)||
      state.studentInvites.some(i=>i.email===activeUser.email?.toLowerCase());
-   const cached=localStorage.getItem(ROLE_STORAGE+"_"+activeUser.id);
+   const roleKey=ROLE_STORAGE+"_"+activeUser.id;
+   const pendingKey=ROLE_PENDING_STORAGE+"_"+activeUser.id;
+   const cached=localStorage.getItem(roleKey);
+   const pending=localStorage.getItem(pendingKey)==="1";
    const remote=profile?.last_role;
    if(!profile?.roles_configured){
     const initial=normalizedRoles([
@@ -2147,9 +2207,16 @@ async function initializeLive(){
     if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    }else state.enabledRoles=normalizedRoles(profile.enabled_roles);
    if(!state.enabledRoles.length)state.enabledRoles=["teacher"];
-   state.role=[remote,cached,...state.enabledRoles].find(r=>state.enabledRoles.includes(r))||state.enabledRoles[0];
-   localStorage.setItem(ROLE_STORAGE+"_"+activeUser.id,state.role);
-   if(remote!==state.role)await saveLastRole(state.role);
+   state.role=resolveLoginRole({remote,cached,pending,isStudent,guardian,invited});
+   state.preferredLoginRole=state.role;
+   localStorage.setItem(roleKey,state.role);
+   // A previously interrupted user choice may need retrying. Do not write
+   // inferred defaults as if the user had explicitly selected them.
+   if(pending){
+    if(remote!==state.role)await saveLastRole(state.role);
+    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
+    if(localStorage.getItem(roleKey)===state.role)localStorage.setItem(pendingKey,"0");
+   }
    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    state.view=state.role==="student"?"student-today":"home";
    await loadTeacherPreferences();
@@ -2355,6 +2422,7 @@ function bindEvents(){
  $("#login-retry").onclick=initializeLive;
  $("#sign-out").onclick=signOut;
  $("#mode-settings-form").addEventListener("submit",saveEnabledRoles);
+ $("#default-login-role").addEventListener("change",changeDefaultLoginRole);
   $("#profile-display-form").addEventListener("submit",saveDisplayName);
  $$(".modal").forEach(d=>d.addEventListener("click",e=>{if(e.target===d)d.close()}));
 }
