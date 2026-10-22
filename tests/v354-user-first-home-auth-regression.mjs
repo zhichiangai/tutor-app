@@ -61,6 +61,9 @@ test("initial session check shows friendly loading instead of misleading signed-
  assert.match(el("#login-heading").textContent,/正在為你準備/);
  assert.ok(!el("#login-description").textContent.includes("OAuth"));
  assert.equal(el("#account-modal").open,true);
+ // initializeLive() awaits ensureClient() before invoking the mocked getSession.
+ await Promise.resolve();
+ assert.equal(typeof complete,"function");
  complete({data:{session:null},error:null});
  await start;
  assert.equal(api.getAuthPhase(),"signedOut");
