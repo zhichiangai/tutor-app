@@ -6,6 +6,7 @@ import { expandSchedules, isVirtualOccurrence, findTimeConflicts, originalOccurr
 import { monthAgendaMarkup, monthSummary } from "./calendar-view.js";
 import { lessonAllocation, eligiblePeriodLessons, allocateOldestFirst, amount } from "./payment-ledger.js";
 import { durationHours, actualDefaults, validateActual, isPaymentLocked } from "./lesson-actual.js";
+import { createV4Connections } from "./v4-connections.js";
 const SUPABASE_URL = "https://vctisuglfoxyuwlvyjee.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_QR8An_jEnMEZTPuTHebFDA_xg46FLit";
 const STORAGE = "tutor_v2_preview_data_20261019";
@@ -30,6 +31,8 @@ const uid = ()=>crypto.randomUUID();
 let client=null, activeUser=null, loading=false, teacherPreferences={};
 const state={mode:"live",enabledRoles:["teacher"],lessonRatings:{focus:null,mood:null},role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:"month",studentCalendarMode:"month",recentChangesOpen:false,historyReadFailed:false,paymentBatches:[],paymentBatchItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",studentInvites:[],studentLinks:[],studentLegacyInvites:[],managedStudentId:null,studentSearch:"",studentAccountFilter:"all",studentPortal:{students:[],lessons:[],schedules:[]},sharedCourseDraft:null,sharedCourseHistory:{},receiptBatch:null,activeLesson:null,actualHoursManual:false};
 
+const v4ConnectionUI=createV4Connections({getClient:()=>client,getUser:()=>activeUser,
+ getRole:()=>state.role,getStudents:()=>state.students,notify:message=>toast(message)});
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
  const demoStudents=[
@@ -1312,6 +1315,7 @@ function renderTeacherStudentManagement(){
 }
 
 function renderStudents(){
+ v4ConnectionUI.render();
  const st=visibleStudents();
  renderParentLearning();
  renderStudentInvitesForTeacher();
@@ -2229,6 +2233,7 @@ const SESSION_PRIVATE_DOM_IDS=[
 ];
 function clearUserSessionState(){
  authDataGeneration++;
+ v4ConnectionUI.clear();
  for(const field of LIVE_FIELDS)state[field]=[];
  state.studentPortal={students:[],lessons:[],schedules:[],exceptions:[]};
  state.sharedCourseHistory={};
@@ -2396,6 +2401,7 @@ async function initializeLive(){
    authPhase="signedOut";
   }
   render();
+  if(activeUser)void v4ConnectionUI.refresh();
   if(!activeUser)showModal("account-modal");
  }catch(err){
   if(bootGeneration!==authDataGeneration)return;
@@ -2415,7 +2421,7 @@ async function googleLogin(){
   document.body?.classList?.toggle("auth-pending",true);
   renderAuthUI();
   const db=await ensureClient();state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
-  const {error}=await db.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname}});
+  const {error}=await db.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname+location.search}});
   if(error)throw error;
  }catch(err){
   console.error(err);
@@ -2450,6 +2456,7 @@ async function signOut(){
 }
 function bindEvents(){
  document.addEventListener("click",async ev=>{
+  if(ev.target.closest("[data-v4-action]")){await v4ConnectionUI.handleClick(ev.target);return}
   const star=ev.target.closest("[data-lesson-star]");
   if(star){
    const key=star.dataset.lessonStar,score=Number(star.dataset.starValue);
@@ -2598,7 +2605,7 @@ function bindEvents(){
   ["shared-course-weekdays","shared-weekday-hint","shared-course-date"]
  ])$("#"+group).addEventListener("change",()=>syncRecurringWeekdays(date,group,hint));
  $("#request-form").addEventListener("submit",submitRequest);
- document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e);if(e.target.id==="student-invite-form")saveStudentInvite(e)});
+ document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e);if(e.target.id==="student-invite-form")saveStudentInvite(e);if(e.target.id==="v4-parent-request-form")void v4ConnectionUI.handleSubmit(e)});
  $("#invite-edit-form").addEventListener("submit",submitInviteEdit);
  $("#workspace-start").onclick=()=>setView("settings");
  $("#workspace-create").onclick=()=>saveMyWorkspace(false);
