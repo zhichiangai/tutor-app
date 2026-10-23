@@ -34,7 +34,7 @@ declare
  v_email text:=pg_catalog.lower(pg_catalog.btrim(coalesce(p_email,'')));
 begin
  if v_actor is null then raise exception '請先登入'; end if;
- if p_my_role not in ('teacher','parent') then raise exception '請選擇老師或家長身分'; end if;
+ if p_my_role is null or p_my_role not in ('teacher','parent') then raise exception '請選擇老師或家長身分'; end if;
  if pg_catalog.length(v_email)<5 or pg_catalog.length(v_email)>254 or
    v_email not like '%@%.%' then raise exception '請輸入有效的 Email'; end if;
  perform tutor_private.v4_limit('v4_contact_request',10);
@@ -79,7 +79,7 @@ returns text language plpgsql security definer set search_path='' as $$
 declare v_actor uuid:=(select auth.uid()); v_link public.v4_account_contacts%rowtype; v_next text;
 begin
  if v_actor is null then raise exception '請先登入'; end if;
- if p_action not in ('approve','decline','cancel','disconnect') then
+ if p_action is null or p_action not in ('approve','decline','cancel','disconnect') then
   raise exception '不支援的操作';
  end if;
  select * into v_link from public.v4_account_contacts c where c.id=p_id for update;
