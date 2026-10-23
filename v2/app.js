@@ -9,10 +9,17 @@ import { durationHours, actualDefaults, validateActual, isPaymentLocked } from "
 import { createV4Connections } from "./v4-connections.js";
 // V4 dev must never fall back to the V3 production project.
 const V4_CONFIG=(typeof window!=="undefined"&&window.V4_BACKEND)||{};
-const V4_CONFIG_VALID=V4_CONFIG.isolated===true&&/^[a-z]{20}$/.test(V4_CONFIG.projectRef||'')&&
+const V4_LOCAL_HOST=typeof window!=="undefined"&&
+ ["localhost","127.0.0.1"].includes(window.location?.hostname)&&window.location?.protocol==="http:";
+const V4_LOCAL_CONFIG_VALID=V4_LOCAL_HOST&&V4_CONFIG.isolated===true&&
+ V4_CONFIG.projectRef==="local"&&
+ /^http:\/\/(?:localhost|127\.0\.0\.1):54321$/.test(V4_CONFIG.url||"")&&
+ /^(?:sb_publishable_[A-Za-z0-9_-]+|eyJ[A-Za-z0-9._-]+)$/.test(V4_CONFIG.publishableKey||"");
+const V4_REMOTE_CONFIG_VALID=V4_CONFIG.isolated===true&&/^[a-z]{20}$/.test(V4_CONFIG.projectRef||'')&&
  V4_CONFIG.projectRef!=='vctisuglfoxyuwlvyjee'&&
  V4_CONFIG.url==='https://'+V4_CONFIG.projectRef+'.supabase.co'&&
  /^sb_publishable_[A-Za-z0-9_-]+$/.test(V4_CONFIG.publishableKey||'');
+const V4_CONFIG_VALID=V4_LOCAL_CONFIG_VALID||V4_REMOTE_CONFIG_VALID;
 const SUPABASE_URL = V4_CONFIG_VALID?V4_CONFIG.url:'';
 const SUPABASE_PUBLISHABLE_KEY = V4_CONFIG_VALID?V4_CONFIG.publishableKey:'';
 const STORAGE = "tutor_v2_preview_data_20261019";
