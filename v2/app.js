@@ -87,6 +87,20 @@ function visibleLessons(){
  const virtual=expandSchedules({schedules:state.schedules,exceptions:state.exceptions,lessons:real,allowedStudents:[...allowed],month:state.month,today:dateKey(tick())});
  return [...real,...virtual];
 }
+// Saved history is separate from this month's expanded future calendar.
+function studentCourseCounts(studentId){
+ const history=state.lessons.filter(l=>l.student_id===studentId&&
+  (state.mode==="demo"||state.role==="parent"||l.owner_id===activeUser?.id));
+ const today=dateKey(tick()),monthKey=String(state.month.getFullYear())+"-"+String(state.month.getMonth()+1).padStart(2,"0");
+ const future=visibleLessons().filter(l=>l.student_id===studentId&&l.type==="planned"&&
+   l.lesson_date>=today&&l.lesson_date.slice(0,7)===monthKey);
+ return {completed:history.filter(l=>l.type==="lesson").length,
+  leave:history.filter(l=>l.type==="leave").length,future:future.length};
+}
+function studentCourseSummary(studentId){
+ const n=studentCourseCounts(studentId);
+ return "已完成 "+n.completed+" 堂 · 本月未來預排 "+n.future+" 堂 · 已請假／取消 "+n.leave+" 堂";
+}
 function resolveLesson(id){return visibleLessons().find(l=>l.id===id)}
 function studentFor(lesson){return state.students.find(s=>s.id===lesson.student_id)}
 function isPast(s){return s<dateKey(tick())}
@@ -1181,9 +1195,9 @@ function renderTeacherStudentList(){
   const s=x.student;
   const studentStatus=x.studentLinked?"學生已連結":x.studentAccounts.length?"等待學生接受":"尚未邀請";
   const guardianStatus=x.guardianLinked?"家長已連結":x.guardianAccounts.length?"等待家長接受":"尚未邀請";
-  const enrolled=visibleLessons().filter(l=>l.student_id===s.id).length;
+  const courseSummary=studentCourseSummary(s.id);
   return '<article class="student-manager-row"><div class="student-manager-primary"><div class="student-manager-avatar" aria-hidden="true">✿</div>'+
-   '<div><strong>'+esc(s.name)+'</strong><span>'+esc(s.subject||"未設定科目")+' · 已安排 '+enrolled+' 堂</span></div></div>'+
+   '<div><strong>'+esc(s.name)+'</strong><span>'+esc(s.subject||"未設定科目")+' · '+esc(courseSummary)+'</span></div></div>'+
    '<div class="student-manager-rate"><small>未來課程預設時薪</small><strong>'+money(s.hourly_rate)+'/小時</strong></div>'+
    '<div class="student-manager-links"><div><span>學生帳號</span>'+accountStatusMarkup(studentStatus,x.studentLinked)+'</div>'+
     '<div><span>家長帳號</span>'+accountStatusMarkup(guardianStatus,x.guardianLinked)+'</div></div>'+
@@ -1337,7 +1351,7 @@ function renderStudents(){
  renderStudentInvitesForTeacher();
  renderTeacherStudentManagement();
  $("#add-student").style.display=state.role==="teacher"?"":"none";
- $("#student-grid").innerHTML=st.length?st.map(s=>'<article class="student-card"><div class="student-icon">✿</div><h3>'+esc(s.name)+'</h3><p>'+esc(s.subject||"課程")+' · '+money(s.hourly_rate)+'／小時</p><div class="tag-line">已安排 '+visibleLessons().filter(l=>l.student_id===s.id).length+' 堂課</div></article>').join(""):'<div class="card empty">目前沒有學生資料。'+(state.role==="parent"?"請先接受老師的邀請。":"先新增一位學生吧。")+'</div>';
+ $("#student-grid").innerHTML=st.length?st.map(s=>'<article class="student-card"><div class="student-icon">✿</div><h3>'+esc(s.name)+'</h3><p>'+esc(s.subject||"課程")+' · '+money(s.hourly_rate)+'／小時</p><div class="tag-line">'+esc(studentCourseSummary(s.id))+'</div></article>').join(""):'<div class="card empty">目前沒有學生資料。'+(state.role==="parent"?"請先接受老師的邀請。":"先新增一位學生吧。")+'</div>';
  const parent=state.role==="parent";
  $("#invite-title").textContent=parent?"家長邀請":"家長邀請與權限管理";
  $("#invite-description").textContent=parent?"老師邀請你後，可以在這裡確認連結。":"新增邀請、修改待接受 Email、撤銷邀請或解除已加入的家長。";
