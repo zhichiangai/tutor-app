@@ -7,6 +7,7 @@ import { monthAgendaMarkup, monthSummary } from "./calendar-view.js";
 import { lessonAllocation, eligiblePeriodLessons, allocateOldestFirst, amount } from "./payment-ledger.js";
 import { durationHours, actualDefaults, validateActual, isPaymentLocked } from "./lesson-actual.js";
 import { createV4Connections } from "./v4-connections.js";
+import { createV4AccountContacts } from "./v4-contacts.js";
 // V4 dev must never fall back to the V3 production project.
 const V4_CONFIG=(typeof window!=="undefined"&&window.V4_BACKEND)||{};
 const V4_LOCAL_HOST=typeof window!=="undefined"&&
@@ -49,6 +50,9 @@ const v4ConnectionUI=typeof createV4Connections==="function"?createV4Connections
  getRole:()=>state.role,getStudents:()=>state.students,getLinks:()=>state.guardians,
  onChanged:async()=>{await refreshLive({withHistory:false});render()},notify:message=>toast(message)}):
  {render(){},clear(){},refresh(){},handleClick(){return false},handleSubmit(){return false}};
+const v4ContactsUI=typeof createV4AccountContacts==="function"?createV4AccountContacts({
+ getClient:()=>client,getUser:()=>activeUser,getRole:()=>state.role,notify:message=>toast(message)
+}):{render(){},refresh(){},clear(){},handleClick(){return false},handleSubmit(){return false}};
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
  const demoStudents=[
@@ -1352,6 +1356,7 @@ function renderTeacherStudentManagement(){
 
 function renderStudents(){
  v4ConnectionUI.render();
+ v4ContactsUI.render();
  const st=visibleStudents();
  renderParentLearning();
  renderStudentInvitesForTeacher();
@@ -2272,6 +2277,7 @@ const SESSION_PRIVATE_DOM_IDS=[
 function clearUserSessionState(){
  authDataGeneration++;
  v4ConnectionUI.clear();
+ v4ContactsUI.clear();
  for(const field of LIVE_FIELDS)state[field]=[];
  state.studentPortal={students:[],lessons:[],schedules:[],exceptions:[]};
  state.sharedCourseHistory={};
@@ -2441,7 +2447,7 @@ async function initializeLive(){
    authPhase="signedOut";
   }
   render();
-  if(activeUser)void v4ConnectionUI.refresh();
+  if(activeUser){void v4ConnectionUI.refresh();void v4ContactsUI.refresh();}
   if(!activeUser)showModal("account-modal");
  }catch(err){
   if(bootGeneration!==authDataGeneration)return;
@@ -2497,6 +2503,7 @@ async function signOut(){
 function bindEvents(){
  document.addEventListener("click",async ev=>{
   if(ev.target.closest("[data-v4-action]")){await v4ConnectionUI.handleClick(ev.target);return}
+  if(ev.target.closest("[data-contact-action]")){await v4ContactsUI.handleClick(ev.target);return}
   const star=ev.target.closest("[data-lesson-star]");
   if(star){
    const key=star.dataset.lessonStar,score=Number(star.dataset.starValue);
@@ -2651,7 +2658,7 @@ function bindEvents(){
   ["shared-course-weekdays","shared-weekday-hint","shared-course-date"]
  ])$("#"+group).addEventListener("change",()=>syncRecurringWeekdays(date,group,hint));
  $("#request-form").addEventListener("submit",submitRequest);
- document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e);if(e.target.id==="student-invite-form")saveStudentInvite(e);if(e.target.id==="v4-parent-request-form")void v4ConnectionUI.handleSubmit(e)});
+ document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e);if(e.target.id==="student-invite-form")saveStudentInvite(e);if(e.target.id==="v4-parent-request-form")void v4ConnectionUI.handleSubmit(e);if(e.target.id==="v4-account-contact-form")void v4ContactsUI.handleSubmit(e)});
  $("#invite-edit-form").addEventListener("submit",submitInviteEdit);
  $("#workspace-start").onclick=()=>setView("settings");
  $("#workspace-create").onclick=()=>saveMyWorkspace(false);
