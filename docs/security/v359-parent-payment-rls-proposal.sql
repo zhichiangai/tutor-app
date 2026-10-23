@@ -63,4 +63,28 @@ using (
 -- 7) Direct PostgREST select, joins, RPCs, nested filters, service_role
 --    behavior, and session refresh must be verified.
 -- 8) RLS revoke must not DELETE archived financial records or alter amounts.
--- 9) Review and scope legacy family_requests payment visibility separately.
+-- Restrict family_requests too: payment requests and their notes can contain
+-- payment details. Teachers retain access to their own request/audit history.
+drop policy if exists requests_teacher_or_parent_view on public.family_requests;
+create policy requests_teacher_or_parent_view
+on public.family_requests for select to authenticated
+using (
+ teacher_id=(select auth.uid())
+ or (
+   parent_id=(select auth.uid())
+   and exists (
+     select 1 from public.student_guardians g
+     where g.guardian_id=(select auth.uid())
+       and g.teacher_id=family_requests.teacher_id
+       and g.student_id=family_requests.student_id
+       and g.workspace_id=family_requests.workspace_id
+   )
+ )
+);
+
+-- Staging-only checks for family_requests:
+-- 9) A parent can read requests only while the exact student+teacher+workspace
+--    guardian relation is active; the teacher retains historical request access.
+-- 10) Inspect family request SECURITY DEFINER/INVOKER RPCs and execute grants;
+--     verify no RPC bypasses the link check or exposes payment notes after unlink.
+
