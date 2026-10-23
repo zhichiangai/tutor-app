@@ -63,3 +63,7 @@ test("outgoing pending invitations cannot reveal registered email or display nam
  assert.match(privacy,/c\.status='pending' and c\.requested_by<>v_actor/);
  assert.match(privacy,/revoke all on function public\.v4_contact_inbox\(\) from public,anon/);
 });
+test("incoming parent contact remains visible before a child or parent mode exists",()=>{
+ assert.match(ui,/const displayed=rows;/);
+ assert.match(ui,/r\.my_role==="parent"\?"老師聯絡人"/);
+});

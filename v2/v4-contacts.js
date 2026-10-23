@@ -28,10 +28,12 @@ export function createV4AccountContacts({getClient,getUser,getRole,notify}){
    card.classList.toggle("hidden",!allowed);
    if(!allowed)return;
    const title=role==="teacher"?"家長":"老師";
-   const displayed=rows.filter(r=>r.my_role===role);
+   // Contact invitations can arrive before a parent has any child or parent
+   // mode configured. Show the recipient's invitations in either account mode.
+   const displayed=rows;
    const connections=displayed.map(r=>{
      const name=escapeContact(r.other_name||"另一位使用者"),id=escapeContact(r.id);
-     const label=escapeContact(contactStatus[r.status]||r.status);
+     const label=escapeContact((r.my_role==="parent"?"老師聯絡人":"家長聯絡人")+" · "+(contactStatus[r.status]||r.status));
      const row='<div class="v4-request-row"><div><strong>'+name+'</strong><small>'+label+
        (r.status==="connected"?" · 尚未指定學生":"")+'</small></div><div class="v4-actions">';
      const actions=r.status==="pending"?
@@ -56,8 +58,9 @@ export function createV4AccountContacts({getClient,getUser,getRole,notify}){
        '<button class="primary-button" type="submit"'+((busy||!enabled)?' disabled':'')+'>邀請'+title+'連結</button>'+
      '</form>'+
      '<p class="section-sub">聯絡人連結只代表雙方同意保持聯繫，<strong>不會自動開放任何課程、學生或帳務。</strong>寄出的邀請會在對方接受後出現在清單；要共同管理孩子，仍須另行取得該學生的授權。</p>'+
+     (role==="teacher"&&displayed.some(r=>r.my_role==="parent")?'<p class="section-sub">你也有家長身分的聯絡人。接受邀請不必切換模式；需要使用家長頁面時，可到「設定 → 角色與帳號」啟用家長模式。</p>':'')+
      (notice?'<p class="v4-error" role="status">'+escapeContact(notice)+'</p>':'')+
-     '<h3>我的'+title+'聯絡人</h3>'+
+     '<h3>我的聯絡人</h3>'+
      (enabled?(connections||'<p class="section-sub">還沒有聯絡人，可以先透過 Email 邀請。</p>'):
        '<p class="section-sub">聯絡人功能尚待本機 Supabase Migration 與測試環境啟用。</p>');
  }
