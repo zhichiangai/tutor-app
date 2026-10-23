@@ -1728,8 +1728,34 @@ function paymentHistoryHTML(batches){
   parts.map(({item,lesson})=>'<div class="period-line"><div><strong>'+esc(lesson?.lesson_date||"")+' · '+esc(lesson?.subject||"課程")+'</strong><small>'+esc(timeLabel(lesson?.start_time||""))+'–'+esc(timeLabel(lesson?.end_time||""))+'</small></div><span>'+money(item.allocated_amount)+'</span></div>').join("")+'</details>'+
   (state.role==="teacher"&&batch.status==="pending"?
     '<div class="period-batch-actions"><button type="button" class="primary-button" data-action="confirm-batch" data-id="'+esc(batch.id)+'">確認這段期間已收款</button>'+
-    '<button type="button" class="secondary-button" data-action="decline-batch" data-id="'+esc(batch.id)+'">退回付款回報</button></div>':"")+'</section>';
+    '<button type="button" class="secondary-button" data-action="decline-batch" data-id="'+esc(batch.id)+'">退回付款回報</button></div>':"")+
+   (state.role==="teacher"&&batch.status==="confirmed"&&V4_CONFIG_VALID?
+    '<div class="period-batch-actions"><button type="button" class="secondary-button" data-action="preview-correction" data-id="'+esc(batch.id)+'">查看可更正金額（唯讀）</button></div>'+
+    '<div class="period-correction-preview" data-correction-preview="'+esc(batch.id)+'" aria-live="polite"></div>':"")+'</section>';
  }).join("");
+}
+// Preview does not change balances or initiate any financial write.
+async function previewConfirmedBatchCorrection(id){
+ const batch=visiblePaymentBatches().find(b=>b.id===id&&b.status==="confirmed");
+ if(state.mode!=="live"||state.role!=="teacher"||!V4_CONFIG_VALID||!activeUser||!batch){
+  toast("目前無法查看更正預覽");return;
+ }
+ const owner=activeUser.id,generation=authDataGeneration;
+ const root=[...document.querySelectorAll("[data-correction-preview]")]
+   .find(n=>n.dataset.correctionPreview===id);
+ if(!root)return;
+ root.textContent="正在核對付款分配…";
+ const {data,error}=await client.rpc("v4_payment_correction_preview",{p_batch_id:id});
+ if(authDataGeneration!==generation||activeUser?.id!==owner||state.role!=="teacher")return;
+ if(error){root.textContent="無法讀取預覽："+error.message;return;}
+ if(data?.batch_id!==id||!Array.isArray(data.lines)){root.textContent="更正預覽資料不完整";return;}
+ const rows=data.lines.map(line=>{
+  const lesson=state.lessons.find(l=>l.id===line.lesson_id);
+  return '<div class="period-line"><span>'+esc(lesson?.lesson_date||"課程")+' · '+esc(lesson?.subject||"")+
+   '</span><span>原額 '+money(line.original)+' · 已更正 '+money(line.corrected)+' · 尚可更正 '+money(line.net)+'</span></div>';
+ }).join("");
+ root.innerHTML='<div class="section-sub"><strong>僅供核對：原確認 '+money(data.original)+
+  '，目前可更正 '+money(data.remaining)+'</strong><p>沖銷功能尚未啟用；不會變更任何帳務資料。</p></div>'+rows;
 }
 function visiblePaymentBatches(){
  return state.paymentBatches.filter(b=>(state.mode==="demo"||(state.role==="teacher"?b.teacher_id===activeUser?.id:
@@ -2504,6 +2530,8 @@ function bindEvents(){
  document.addEventListener("click",async ev=>{
   if(ev.target.closest("[data-v4-action]")){await v4ConnectionUI.handleClick(ev.target);return}
   if(ev.target.closest("[data-contact-action]")){await v4ContactsUI.handleClick(ev.target);return}
+  const correctionPreview=ev.target.closest('[data-action="preview-correction"]');
+  if(correctionPreview){await previewConfirmedBatchCorrection(correctionPreview.dataset.id);return}
   const star=ev.target.closest("[data-lesson-star]");
   if(star){
    const key=star.dataset.lessonStar,score=Number(star.dataset.starValue);
