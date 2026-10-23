@@ -116,6 +116,17 @@ function setBusy(yes){
 }
 function showModal(id){const dialog=$("#"+id);if(dialog&&!dialog.open)dialog.showModal()}
 function closeModal(id){const dialog=$("#"+id);if(dialog?.open)dialog.close()}
+function confirmInApp({title,message,confirmLabel="確認"}){
+ const dialog=$("#action-confirm-modal");
+ if(!dialog)return Promise.resolve(false);
+ $("#action-confirm-title").textContent=title;
+ $("#action-confirm-message").textContent=message;
+ $("#action-confirm-submit").textContent=confirmLabel;
+ return new Promise(resolve=>{
+  dialog.addEventListener("close",()=>resolve(dialog.returnValue==="confirm"),{once:true});
+  showModal("action-confirm-modal");
+ });
+}
 const STUDENT_VIEWS=["student-today","student-calendar","student-learning"];
 function normalizeView(view){
  if(state.role==="student"){
@@ -1383,7 +1394,12 @@ async function revokeInvite(id){
  if(!i||state.role!=="teacher")return;
  const linked=acceptedInvite(id);
  const who=state.students.find(s=>s.id===i.student_id)?.name||"學生";
- if(!confirm("確定"+(linked?"解除":"撤銷")+"「"+who+"」家長 "+i.email+" 的"+(linked?"查看權限":"邀請")+"？\n"+(linked?"此操作將立即解除課程查看權限，但不刪除學生、已完成課程、付款與回饋歷史。":"舊邀請將不能再接受。")))return;
+ const confirmed=await confirmInApp({
+  title:linked?"確定要解除這筆家長連結嗎？":"確定要撤銷這筆家長邀請嗎？",
+  message:linked?"解除後，對方將無法繼續查看這位學生的課程。原本的上課與收付款紀錄會保留。":"撤銷後，對方將無法接受這筆邀請。",
+  confirmLabel:linked?"確認解除":"確認撤銷"
+ });
+ if(!confirmed)return;
  const ok=await persist(async()=>{
   // student_guardians.invite_id has an ON DELETE CASCADE FK: deleting the invite atomically revokes accepted access.
   if(state.mode==="demo"){
@@ -1391,7 +1407,7 @@ async function revokeInvite(id){
    state.guardians=state.guardians.filter(g=>g.invite_id!==id);
   }else assertResult(await client.from("guardian_invites").delete().eq("id",id).eq("teacher_id",activeUser.id).select("id").single());
  });
- if(ok)toast(linked?"已解除家長連結，查看權限立即停止":"已撤銷邀請，原 Email 不再有加入權限");
+ if(ok)toast(linked?"已解除連結。":"已撤銷邀請。");
 }
 // V3: Only teacher-owned, non-sensitive form defaults are synchronized across devices.
 function recentCourseForStudent(studentId){
@@ -1700,8 +1716,14 @@ function paymentHistoryHTML(batches){
  }).join("");
 }
 function visiblePaymentBatches(){
+ // Privacy defense-in-depth: a prior payer may retain a historical batch in the
+ // API response until the RLS hotfix is deployed. Show parents ONLY currently
+ // linked student+teacher pairs; teacher-owned accounting remains unchanged.
+ const pairs=new Set(state.guardians.filter(g=>g.guardian_id===activeUser?.id)
+  .map(g=>g.workspace_id+"|"+g.teacher_id+"|"+g.student_id));
  return state.paymentBatches.filter(b=>state.mode==="demo"||(state.role==="teacher"?b.teacher_id===activeUser?.id:
-  b.parent_id===activeUser?.id&&(state.parentTeacherFilter==="all"||b.teacher_id===state.parentTeacherFilter)))
+  b.parent_id===activeUser?.id&&pairs.has(b.workspace_id+"|"+b.teacher_id+"|"+b.student_id)&&
+    (state.parentTeacherFilter==="all"||b.teacher_id===state.parentTeacherFilter)))
   .sort((a,b)=>asText(b.created_at).localeCompare(asText(a.created_at)));
 }
 function renderPaymentHistory(){

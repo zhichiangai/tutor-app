@@ -19,7 +19,7 @@ function createApp(){
   id,style:{},dataset:{},value:"",textContent:"",innerHTML:"",checked:false,disabled:false,open:false,
   classList:{s:new Set(),toggle(k,v){if(v===undefined)v=!this.s.has(k);v?this.s.add(k):this.s.delete(k);return v},
    add(k){this.s.add(k)},remove(k){this.s.delete(k)},contains(k){return this.s.has(k)}},
-  showModal(){this.open=true},close(){this.open=false},setAttribute(){},addEventListener(){}
+  showModal(){this.open=true},close(value=""){this.open=false;this.returnValue=value;for(const fn of this.listeners?.close||[])fn()},setAttribute(){},addEventListener(type,fn){this.listeners??={};(this.listeners[type]??=[]).push(fn)}
  });
  const get=id=>{if(!nodes.has(id))nodes.set(id,node(id));return nodes.get(id)};
  const document={querySelector:get,querySelectorAll:()=>[],addEventListener(){},activeElement:null};
@@ -106,11 +106,13 @@ test("Teacher per-student billing splits confirmed, pending and unpaid amounts",
 });
 
 test("Guardian revocation removes both invitation and connection, but preserves lessons",async()=>{
- const {app}=fixture();
+ const {app,get}=fixture();
  app.state.invites=[{id:"invite-a",student_id:"student-a",teacher_id:"teacher-a",email:"p@example.test"}];
  app.state.guardians=[{id:"link-a",invite_id:"invite-a",student_id:"student-a",teacher_id:"teacher-a",guardian_id:"parent-a"}];
  app.state.lessons=[{id:"paid-history",owner_id:"teacher-a",student_id:"student-a",type:"lesson",status:"老師已收到",total_amount:500}];
- await app.revokeInvite("invite-a");
+ const pending=app.revokeInvite("invite-a");
+ get("#action-confirm-modal").close("confirm");
+ await pending;
  assert.equal(app.state.invites.length,0);
  assert.equal(app.state.guardians.length,0);
  assert.equal(app.state.lessons.length,1);
@@ -148,4 +150,15 @@ test("Previously saved future planned rows disappear from the calendar without d
  assert.ok(!app.visibleLessons().some(l=>l.id==="future-planned"));
  assert.ok(app.visibleLessons().some(l=>l.id==="completed-history"));
  assert.equal(app.state.lessons.length,2,"Cancelling a schedule must not destroy stored records");
+});
+
+test("Guardian revocation can be cancelled without changing access or history",async()=>{
+ const {app,get}=fixture();
+ app.state.invites=[{id:"invite-a",student_id:"student-a",teacher_id:"teacher-a",email:"p@example.test"}];
+ app.state.guardians=[{id:"link-a",invite_id:"invite-a",student_id:"student-a",teacher_id:"teacher-a",guardian_id:"parent-a"}];
+ const pending=app.revokeInvite("invite-a");
+ get("#action-confirm-modal").close("cancel");
+ await pending;
+ assert.equal(app.state.invites.length,1);
+ assert.equal(app.state.guardians.length,1);
 });

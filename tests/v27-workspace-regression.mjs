@@ -64,8 +64,8 @@ test("Guardian may filter courses and payments by teacher while using one login"
  {student_id:"sb",teacher_id:"b",guardian_id:"parent"}
  ];
  app.state.paymentBatches=[
- {id:"pa",teacher_id:"a",parent_id:"parent",created_at:"2026-10-20"},
- {id:"pb",teacher_id:"b",parent_id:"parent",created_at:"2026-10-19"}
+ {id:"pa",teacher_id:"a",student_id:"sa",parent_id:"parent",created_at:"2026-10-20"},
+ {id:"pb",teacher_id:"b",student_id:"sb",parent_id:"parent",created_at:"2026-10-19"}
  ];
  app.renderWorkspaceUI();
  assert.equal(element("parent-teacher-bar").classList.contains("hidden"),false);
