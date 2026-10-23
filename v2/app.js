@@ -1700,8 +1700,14 @@ function paymentHistoryHTML(batches){
  }).join("");
 }
 function visiblePaymentBatches(){
+ // Privacy defense-in-depth: a prior payer may retain a historical batch in the
+ // API response until the RLS hotfix is deployed. Show parents ONLY currently
+ // linked student+teacher pairs; teacher-owned accounting remains unchanged.
+ const pairs=new Set(state.guardians.filter(g=>g.guardian_id===activeUser?.id)
+  .map(g=>g.teacher_id+"|"+g.student_id));
  return state.paymentBatches.filter(b=>state.mode==="demo"||(state.role==="teacher"?b.teacher_id===activeUser?.id:
-  b.parent_id===activeUser?.id&&(state.parentTeacherFilter==="all"||b.teacher_id===state.parentTeacherFilter)))
+  b.parent_id===activeUser?.id&&pairs.has(b.teacher_id+"|"+b.student_id)&&
+    (state.parentTeacherFilter==="all"||b.teacher_id===state.parentTeacherFilter)))
   .sort((a,b)=>asText(b.created_at).localeCompare(asText(a.created_at)));
 }
 function renderPaymentHistory(){
