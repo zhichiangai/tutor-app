@@ -43,3 +43,21 @@ test("SQL staging proposal requires exact student+teacher+workspace guardian lin
  assert.match(draft,/g\.workspace_id=b\.workspace_id/);
  assert.match(draft,/REVIEW-ONLY PROPOSAL/);
 });
+test("family request reads require the exact current student+teacher+workspace link",()=>{
+ assert.match(draft,/drop policy if exists requests_teacher_or_parent_view/);
+ assert.match(draft,/g\.teacher_id=family_requests\.teacher_id/);
+ assert.match(draft,/g\.student_id=family_requests\.student_id/);
+ assert.match(draft,/g\.workspace_id=family_requests\.workspace_id/);
+ assert.match(draft,/teacher_id=\(select auth\.uid\(\)\)/);
+});
+test("application confirmation is in-app and success follows persistence",()=>{
+ const from=code.indexOf("async function revokeInvite(id){");
+ const fn=code.slice(from,code.indexOf("// V3: Only teacher-owned",from));
+ assert.match(fn,/await confirmInApp/);
+ assert.doesNotMatch(fn,/\bconfirm\(/);
+ assert.ok(fn.indexOf("await persist")<fn.indexOf('toast(linked?"已解除連結。"'));
+});
+test("payment batch client defense includes workspace in the active-link key",()=>{
+ assert.match(snippet,/g\.workspace_id\+"\\|"+g\.teacher_id\+"\\|"+g\.student_id/);
+ assert.match(snippet,/b\.workspace_id\+"\\|"+b\.teacher_id\+"\\|"+b\.student_id/);
+});
