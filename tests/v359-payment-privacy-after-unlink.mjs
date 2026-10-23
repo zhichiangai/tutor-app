@@ -58,6 +58,6 @@ test("application confirmation is in-app and success follows persistence",()=>{
  assert.ok(fn.indexOf("await persist")<fn.indexOf('toast(linked?"已解除連結。"'));
 });
 test("payment batch client defense includes workspace in the active-link key",()=>{
- assert.match(snippet,/g\.workspace_id\+"\\|"+g\.teacher_id\+"\\|"+g\.student_id/);
- assert.match(snippet,/b\.workspace_id\+"\\|"+b\.teacher_id\+"\\|"+b\.student_id/);
+ assert.ok(snippet.includes('g.workspace_id+"|"+g.teacher_id+"|"+g.student_id'));
+ assert.ok(snippet.includes('b.workspace_id+"|"+b.teacher_id+"|"+b.student_id'));
 });
