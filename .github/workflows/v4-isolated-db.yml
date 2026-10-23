@@ -1,7 +1,7 @@
 name: V4 isolated PostgreSQL contract
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feat/v4-bidirectional-invites-qr-gas-20261023]
     paths: ['supabase/**', 'tests/sql/v4_*', '.github/workflows/v4-isolated-db.yml']
 permissions:
   contents: read

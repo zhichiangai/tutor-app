@@ -3,7 +3,7 @@ on:
   push:
     branches: ["main", "feat/v3-human-friendly-course-billing-guardian-20261020"]
   pull_request:
-    branches: ["main"]
+    branches: ["main", "feat/v4-bidirectional-invites-qr-gas-20261023"]
 permissions:
   contents: read
 jobs:

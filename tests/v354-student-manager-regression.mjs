@@ -165,7 +165,7 @@ test("editing student defaults is teacher-owned and does not mutate historic les
  el("#managed-student-subject").value="物理";
  el("#managed-student-rate").value="750";
  await api.saveManagedStudent({preventDefault(){}});
- assert.deepEqual(updated,{name:"王同學",subject:"物理",hourly_rate:750});
+ assert.deepEqual(updated,{name:"王同學",subject:"物理",hourly_rate:750,is_qa:false});
  assert.deepEqual(where,[["id","s1"],["teacher_id","teacher-a"]]);
  assert.equal(api.state.lessons[0].total_amount,1000);
  assert.equal(api.state.lessons[0].hourly_rate,500);
