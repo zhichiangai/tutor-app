@@ -63,3 +63,14 @@ test("Existing Google OAuth flow preserves shared invitation links",()=>{
  assert.match(app,/v4ConnectionUI\.clear\(\)/);
  assert.match(app,/void v4ConnectionUI\.refresh\(\)/);
 });
+
+test("V4 browser module parses as native ES module",async()=>{
+ const module=await import("data:text/javascript;charset=utf-8,"+encodeURIComponent(ui));
+ assert.equal(typeof module.createV4Connections,"function");
+ const controller=module.createV4Connections({
+  getClient:()=>null,getUser:()=>null,getRole:()=>"parent",
+  getStudents:()=>[],getLinks:()=>[],onChanged:async()=>{},notify:()=>{}
+ });
+ assert.equal(typeof controller.refresh,"function");
+ assert.equal(typeof controller.handleClick,"function");
+});
