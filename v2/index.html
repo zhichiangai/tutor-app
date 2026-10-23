@@ -122,6 +122,7 @@
         </section>
         <section id="view-billing" class="page-view hidden">
           <div class="section-row page-head"><div><h2 id="billing-title">收付款整理</h2><p class="section-sub">清楚對帳，不再一筆一筆慢慢算</p></div><div class="month-controls"><button id="billing-prev" aria-label="上個月">‹</button><strong id="billing-month"></strong><button id="billing-next" aria-label="下個月">›</button></div></div>
+          <label id="qa-accounting-control" class="section-sub hidden"><input id="qa-accounting-toggle" type="checkbox"> 在帳務中顯示已標記的 QA 測試資料（正式總計預設排除）</label>
           <div class="billing-summary" id="billing-summary"></div><article class="card" id="billing-student-card"><div class="section-row"><div><h2>每位學生的本月收款</h2><p class="section-sub">依科目與學生彙總，點開查看每堂課；已確認與家長回報分開計算</p></div></div><div id="billing-student-summary"></div></article>
           <article class="card period-records-card"><div class="section-row"><div><h2>期間付款／收款紀錄</h2><p class="section-sub">保留每筆課程期間、付款日期與老師確認日期</p></div></div><div id="payment-batch-history"></div></article>
           <article class="card"><div class="section-row"><div><h2>課程與付款明細</h2><p class="section-sub">家長回報與老師收款分開紀錄</p></div><button class="secondary-button" id="batch-action" type="button">選擇付款期間</button></div><div id="billing-list"></div></article>
@@ -321,6 +322,7 @@
           <label>主要科目<input id="managed-student-subject" maxlength="80" name="subject" required></label>
         </div>
         <label>未來課程預設時薪（NT$／小時）<input id="managed-student-rate" name="hourly_rate" type="number" min="0" max="999999" step="0.01" required></label>
+        <label><input id="managed-student-qa" type="checkbox"> 標記為 QA 測試學生；正式帳務總計預設排除其課程和付款</label>
         <button type="submit" class="secondary-button">儲存基本資料</button>
       </form>
       <section class="student-management-section">
@@ -367,7 +369,7 @@
     <label>科目<input name="subject" id="record-subject" required maxlength="80" list="record-subject-options" placeholder="例如：數學"><datalist id="record-subject-options"></datalist></label>
     <div class="form-row"><label>日期<input type="date" name="date" id="record-date" required></label><label>鐘點費（NT$）<input type="number" name="rate" id="record-rate" min="0" step="1" list="record-rate-options" required><datalist id="record-rate-options"></datalist><small class="helper-note">可直接輸入，或選擇這位學生最近使用的金額。</small></label></div>
     <div class="form-row"><label>開始時間<input type="time" name="start" id="record-start" required></label><label>結束時間<input type="time" name="end" id="record-end" required></label></div>
-    <div class="form-row"><label>專注程度（選填）<select id="record-focus"><option value="">不填寫</option><option value="5">★★★★★ 非常投入</option><option value="4">★★★★☆ 不錯</option><option value="3">★★★☆☆ 普通</option><option value="2">★★☆☆☆ 待加強</option><option value="1">★☆☆☆☆ 需協助</option></select></label><label>學習態度（選填）<select id="record-attitude"><option value="">不填寫</option><option value="5">★★★★★ 非常積極</option><option value="4">★★★★☆ 不錯</option><option value="3">★★★☆☆ 普通</option><option value="2">★★☆☆☆ 待加強</option><option value="1">★☆☆☆☆ 需協助</option></select></label></div><label>課程備註（選填）<textarea name="remarks" id="record-remarks" rows="2" placeholder="今天上了哪些內容？"></textarea></label>
+    <div class="form-row"><label>專注程度（選填）<select id="record-focus"><option value="">不填寫</option><option value="5">★★★★★ 非常投入</option><option value="4">★★★★☆ 不錯</option><option value="3">★★★☆☆ 普通</option><option value="2">★★☆☆☆ 待加強</option><option value="1">★☆☆☆☆ 需協助</option></select></label><label>學習態度（選填）<select id="record-attitude"><option value="">不填寫</option><option value="5">★★★★★ 非常積極</option><option value="4">★★★★☆ 不錯</option><option value="3">★★★☆☆ 普通</option><option value="2">★★☆☆☆ 待加強</option><option value="1">★☆☆☆☆ 需協助</option></select></label></div><label><input id="record-estimated" type="checkbox"> 這堂課的開始及結束時間是估計的</label><label>課程備註（選填）<textarea name="remarks" id="record-remarks" rows="2" placeholder="今天上了哪些內容？"></textarea></label>
     <label id="repeat-label">重複排課<select name="repeat" id="record-repeat"><option value="none">僅這一堂</option><option value="weekly">每週（可複選星期）</option><option value="biweekly">每兩週（可複選星期）</option><option value="monthly">每月（依當月日期）</option></select></label>
     <div class="record-weekdays hidden" id="record-weekdays-wrap"><span class="form-label">上課星期（可複選）</span><div class="weekday-selector" id="record-weekdays">
       <label><input type="checkbox" value="1"><span>一</span></label><label><input type="checkbox" value="2"><span>二</span></label><label><input type="checkbox" value="3"><span>三</span></label><label><input type="checkbox" value="4"><span>四</span></label><label><input type="checkbox" value="5"><span>五</span></label><label><input type="checkbox" value="6"><span>六</span></label><label><input type="checkbox" value="7"><span>日</span></label>
