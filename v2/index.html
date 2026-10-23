@@ -1,11 +1,12 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
+  <meta name="referrer" content="no-referrer">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#F9F7F3">
   <meta name="description" content="好好上課：老師與家長都能輕鬆使用的課程月曆、請假與收付款管理工具。">
-  <title>好好上課 · V3.5.9 家教課程管理</title>
+  <title>好好上課 · V4.0.0-dev.2 家教課程管理</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -138,7 +139,7 @@
           </section>
           <article class="card hidden" id="parent-learning-card"><div class="section-row"><div><h2>孩子的學習紀錄</h2><p class="section-sub">依科目查看老師記錄的專注度、學生心情與課後回饋</p></div></div><div id="parent-learning"></div></article><div class="student-grid" id="student-grid"></div><article class="card" id="student-invite-teacher-card"><div class="section-row"><div><h2>邀請學生自己查看課程</h2><p class="section-sub">學生須以受邀 Google Email 登入；僅能查看自己的課程、科目與回饋，不能操作帳務</p></div></div><div id="student-invite-teacher-content"></div></article>
           <article class="card invite-card" id="guardian-invite-card"><div class="section-row"><div><h2 id="invite-title">邀請家長加入</h2><p class="section-sub" id="invite-description">使用家長的 Google 帳號 Email 連結課程資料</p></div></div><div id="invite-content"></div></article>
-          <article class="card v4-connection-card hidden" id="v4-connection-card"><div class="section-row"><div><h2 id="v4-connections-title">課程連結與邀請</h2><p class="section-sub">老師、家長都可以提出連結。雙方確認後，才會開放指定學生的課程。</p></div></div><div id="v4-connection-content" aria-live="polite"></div><div id="v4-share-result" class="v4-share-result" aria-live="polite"></div></article>
+          <article class="card v4-connection-card hidden" id="v4-connection-card"><div class="section-row"><div><h2 id="v4-connections-title">課程連結與邀請</h2><p class="section-sub">老師、家長都可以提出連結。雙方確認後，才會開放指定學生的課程。</p></div></div><p class="section-sub">V4.0.0-dev.2 · 隔離測試版，尚未正式發布</p><div id="v4-connection-content" aria-live="polite"></div><div id="v4-share-result" class="v4-share-result" aria-live="polite"></div></article>
         </section>
         <section id="view-settings" class="page-view hidden">
           <div class="section-row page-head"><div><p class="eyebrow">SETTINGS · 個人偏好</p><h2>設定</h2><p class="section-sub">帳號、家教空間及啟用的角色模式都放在這裡。</p></div></div>
@@ -175,7 +176,7 @@
             </article>
           </div>
         </section>
-        <footer class="site-footer"><span>好好上課 © 2026</span><span><a href="./privacy.html">隱私權政策</a> · <a href="./terms.html">服務條款</a> · V3.5.9 · Made with care. <span aria-hidden="true">✳</span></span></footer>
+        <footer class="site-footer"><span>好好上課 © 2026</span><span><a href="./privacy.html">隱私權政策</a> · <a href="./terms.html">服務條款</a> · V4.0.0-dev.2 · Made with care. <span aria-hidden="true">✳</span></span></footer>
       </div>
     </main>
     <nav class="mobile-nav" aria-label="手機導覽">
@@ -423,6 +424,7 @@
   <div id="toast" role="status" aria-live="polite" class="toast" hidden></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" crossorigin="anonymous"></script>
+  <script src="./v4-config.js"></script>
   <script type="module" src="./app.js"></script>
 </body>
 </html>

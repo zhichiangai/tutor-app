@@ -1,4 +1,4 @@
-# 好好上課 V4.0.0-dev.1 — 雙向連結、QR Code、Google Apps Script 通知
+# 好好上課 V4.0.0-dev.2 — 雙向連結、QR Code、Google Apps Script 通知
 
 **狀態：僅 GitHub 開發分支，未合併 main；SQL、Edge、GAS 均未部署。**
 
@@ -32,3 +32,33 @@
 8. 保持 V3.5.9 正式網站、正式 Supabase、Vercel Production、現有 Workspace 設定不動；Production merge、migration、Email worker 啟用均須用戶明確授權。
 
 **開發分支：feat/v4-bidirectional-invites-qr-gas-20261023。版本標示 V4.0.0-dev.1，尚非正式 V4.0。**
+
+## V4.0.0-dev.2 接續修正（2026-10-23）
+
+保留上方 dev.1 歷史。此輪仍為 Draft，不可發布 Production。
+
+- 修正 SQL `v4_cancel_connection_request` 的 dollar quote 語法、NULL 驗證、撤回者限制；一次性 token 改存 SHA-256 摘要，私有新表啟用 RLS。
+- Email／QR 操作新增序列化限流與配對鎖，未知 Email 的通用成功回應仍計入頻率。核准、拒絕、撤回、重複／過期處理需經隔離 DB 驗證。
+- 通知入列失敗僅留下無敏感資料的告警，不回滾合法連結。租約逾時改標 `uncertain`，不自動重寄；ACK 帶 lease token，受控人工重試僅 service_role 可呼叫且不重置次數。
+- GAS 加 Script Lock、持久 ACK 紀錄、嚴格寄件者、隔離專案及 QA 收件者白名單；未啟用設定時不 claim、不寄信。寄送結果不明需人工比對 Gmail，不能承諾 exactly-once。
+- `inspectV4MailSettings` 不需要 Bridge secrets，可先以 GAS 實際查 alias 是否可用及當日剩餘收件者額度。需由使用者親自完成首次 Gmail 授權；不能假定 Workspace 方案對應固定額度。
+- V4 前端移除正式 Supabase 預設連線，改讀 `v2/v4-config.js`；未核對獨立 staging 時保持空白／關閉。此檔僅可放公開 publishable key，不能放 Service Role。
+- 修正根路徑缺少 `v4-connections.js` rewrite；補掃描入口、手動貼連結、原生分享與相機拒絕／不支援替代；同頁標題與按鈕延用既有導覽。
+- 加入 GAS／Edge 行為測試，以及 GitHub Actions 拋棄式 PostgreSQL contract 測試。合成 fixture 只涵蓋 V4 依賴契約，不代表正式 Supabase 全 schema 或真實 Google JWT 已驗收。
+
+### 安全設定順序
+
+1. 先取得使用者可用的獨立 Supabase staging（不得使用正式 Ref `vctisuglfoxyuwlvyjee`，也不得借用另一產品）。本輪 Branching API 回報需 Pro，未升級或購買；本機 CLI 被 SIGKILL、Docker API 無權限，因此尚未由 CLI 正式整理 migration。
+2. 在可用環境執行 `supabase --version`、`supabase migration new --help`，用 CLI 正式產生 staging migration，再審查既有草稿並執行 DB／JWT 驗收。不要把此草稿已存在誤認成 CLI 產生或已套用。
+3. `v2/v4-config.js` 填隔離專案的 `projectRef`、`url`、`publishableKey`，確認後才設 `isolated:true`。Google OAuth 需使用 staging 的回跳設定，保留 `v4invite`，不可改 Production Auth。
+4. staging Edge secrets：`V4_GAS_BRIDGE_SECRET`（至少 32 字元高熵隨機值）、`V4_STAGING_PROJECT_REF`。Service Role 僅伺服器環境。Bridge 拒絕 Production endpoint 與瀏覽器 Origin。
+5. Edge gateway JWT 策略須明確設定：GAS 只傳 shared secret，若停用 gateway JWT 必須保留 handler 的 secret 驗證並實測無金鑰 401；這不是公開寄信 API。不部署 Production Edge。
+6. 使用獨立「好好上課通知」GAS 專案，貼入 `Code.gs` 及提供的 manifest。GmailApp 需要 Gmail 權限，首次 OAuth 由使用者親自審查。不是 GAS Web App，不部署任何 doGet／doPost。
+7. 先執行 `inspectV4MailSettings`。若 `senderAvailable:false`，到 Workspace 管理員使用者的「替代電子郵件」確認既有付費帳號別名，再到 Gmail「帳戶／以這個地址寄送」設定；不要購買新帳號、替換寄件者或更動 DNS。管理員與新增別名操作由使用者確認。
+8. Script Properties 填 `V4_BRIDGE_URL`、`V4_BRIDGE_SECRET`、`V4_FROM_EMAIL=tutor-notify@rapid4grad.com`、`V4_STAGING_PROJECT_REF`、`V4_TEST_RECIPIENTS`。保持 `V4_MAIL_ENABLED` 關閉，直到明確核准的 QA 收件者與單次寄信測試就緒。
+9. 單次測試前暫設 `V4_MAIL_ENABLED=true`，執行 `processV4MailQueue`；核對收件、寄件者名稱／地址、佇列 ACK。失敗時關閉啟用設定，不反覆重寄。通過後才執行 `installV4MailTrigger`，其五分鐘排程會拒絕重複建立。
+10. ACK 失敗先檢查 GAS `V4_DELIVERY_*` journal；有成功寄送紀錄只補 ACK。伺服器 `uncertain` 訊息必須比對 Gmail、確認沒有送達後，管理員才能呼叫 `v4_mail_retry(id,true)`。超過三次不自動清零；不得盲目刪 journal。
+
+### 目前驗收界線
+
+Node 行為測試與 CI PostgreSQL contract 的結果以最新 CI 為準。真實一般使用者 JWT、iPhone Safari／Chrome、完整跨裝置 OAuth／掃碼、GAS 真實寄信仍未通過；獨立 GAS 專案已建立，但首次授權與寄件別名檢查待使用者完成。正式 V3.5.9、正式資料庫及另一產品通知設定未修改。

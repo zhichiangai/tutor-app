@@ -149,5 +149,5 @@ test("teacher and parent dashboard layout remains readable on narrow screens",()
  assert.match(css,/@media\(max-width:650px\)\s*\{[\s\S]*?\.home-focus-grid,\.home-parent-grid\{grid-template-columns:minmax\(0,1fr\)/);
  assert.ok(html.includes('id="home-focus"'));
  assert.ok(html.includes('id="home-grid"'));
- assert.ok(html.includes("V3.5.9 · Made with care."));
+ assert.ok(html.includes("V4.0.0-dev.2 · Made with care."));
 });

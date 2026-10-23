@@ -7,8 +7,14 @@ import { monthAgendaMarkup, monthSummary } from "./calendar-view.js";
 import { lessonAllocation, eligiblePeriodLessons, allocateOldestFirst, amount } from "./payment-ledger.js";
 import { durationHours, actualDefaults, validateActual, isPaymentLocked } from "./lesson-actual.js";
 import { createV4Connections } from "./v4-connections.js";
-const SUPABASE_URL = "https://vctisuglfoxyuwlvyjee.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_QR8An_jEnMEZTPuTHebFDA_xg46FLit";
+// V4 dev must never fall back to the V3 production project.
+const V4_CONFIG=(typeof window!=="undefined"&&window.V4_BACKEND)||{};
+const V4_CONFIG_VALID=V4_CONFIG.isolated===true&&/^[a-z]{20}$/.test(V4_CONFIG.projectRef||'')&&
+ V4_CONFIG.projectRef!=='vctisuglfoxyuwlvyjee'&&
+ V4_CONFIG.url==='https://'+V4_CONFIG.projectRef+'.supabase.co'&&
+ /^sb_publishable_[A-Za-z0-9_-]+$/.test(V4_CONFIG.publishableKey||'');
+const SUPABASE_URL = V4_CONFIG_VALID?V4_CONFIG.url:'';
+const SUPABASE_PUBLISHABLE_KEY = V4_CONFIG_VALID?V4_CONFIG.publishableKey:'';
 const STORAGE = "tutor_v2_preview_data_20261019";
 const ROLE_STORAGE = "tutor_v2_role";
 const ROLE_PENDING_STORAGE = "tutor_v2_role_pending";
@@ -2313,6 +2319,7 @@ async function refreshLive({withHistory=true}={}){
 async function ensureClient(){
  if(client)return client;
  const createClient=window.supabase?.createClient;
+ if(!SUPABASE_URL&&window.location)throw Error("V4 尚未設定隔離測試資料庫，暫時無法登入或寫入。正式 V3.5.9 不受影響。");
  if(!createClient)throw Error("登入元件載入失敗，請重新整理頁面後再試");
  client=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
  client.auth.onAuthStateChange((event,session)=>{

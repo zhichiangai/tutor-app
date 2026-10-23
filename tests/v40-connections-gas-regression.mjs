@@ -26,7 +26,7 @@ test("V4 requests use authenticated RPC; QR codes store only opaque token links"
    "v4_preview_connection_link","v4_disconnect_guardian"]){
    assert.ok(migration.includes("function public."+fn),fn);
  }
- assert.match(migration,/token_digest=md5\(p_token\)/);
+ assert.match(migration,/token_digest=encode\(sha256\(convert_to\(p_token/);
  assert.match(migration,/used_at is null and expires_at>now\(\)/);
  assert.match(ui,/v4invite/);
  assert.doesNotMatch(ui,/\bservice_role\b/i);
