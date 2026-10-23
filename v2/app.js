@@ -1178,7 +1178,7 @@ function renderTeacherStudentList(){
   const guardianStatus=x.guardianLinked?"家長已連結":x.guardianAccounts.length?"等待家長接受":"尚未邀請";
   const courseSummary=studentCourseSummary(s.id);
   return '<article class="student-manager-row"><div class="student-manager-primary"><div class="student-manager-avatar" aria-hidden="true">✿</div>'+
-   '<div><strong>'+esc(s.name)+'</strong><span>'+esc(s.subject||"未設定科目")+' · '+esc(courseSummary)</span></div></div>'+
+   '<div><strong>'+esc(s.name)+'</strong><span>'+esc(s.subject||"未設定科目")+' · '+esc(courseSummary)+'</span></div></div>'+
    '<div class="student-manager-rate"><small>未來課程預設時薪</small><strong>'+money(s.hourly_rate)+'/小時</strong></div>'+
    '<div class="student-manager-links"><div><span>學生帳號</span>'+accountStatusMarkup(studentStatus,x.studentLinked)+'</div>'+
     '<div><span>家長帳號</span>'+accountStatusMarkup(guardianStatus,x.guardianLinked)+'</div></div>'+
