@@ -128,9 +128,9 @@ export function createV4Connections({getClient,getUser,getRole,getStudents,notif
      return true;
    }
    if(kind==="qr"||kind==="share"){
+     const side=getRole();
+     const student=side==="teacher"?$("v4-link-student")?.value:null;
      await perform(async()=>{
-       const side=getRole();
-       const student=side==="teacher"?$("v4-link-student")?.value:null;
        if(side==="teacher"&&!guid.test(student||""))throw Error("請先建立並選擇學生");
        const newToken=await rpc("v4_create_connection_link",{
           p_side:side,p_student_id:student||null,p_share:kind==="share"});
@@ -139,10 +139,10 @@ export function createV4Connections({getClient,getUser,getRole,getStudents,notif
      });return true;
    }
    if(kind==="claim"){
+     const child=preview?.side==="teacher"?$("v4-claim-child")?.value?.trim()||"":"";
+     const student=preview?.side==="parent"?$("v4-claim-student")?.value:null;
      await perform(async()=>{
        if(!preview||!token)throw Error("請先開啟有效邀請連結");
-       const child=preview.side==="teacher"?$("v4-claim-child")?.value?.trim()||"":"";
-       const student=preview.side==="parent"?$("v4-claim-student")?.value:null;
        if(preview.side==="teacher"&&!child)throw Error("請填寫孩子的稱呼");
        if(preview.side==="parent"&&!student)throw Error("請先選擇學生");
        await rpc("v4_claim_connection_link",{p_token:token,p_child_label:child,p_student_id:student||null});
@@ -152,10 +152,10 @@ export function createV4Connections({getClient,getUser,getRole,getStudents,notif
      });return true;
    }
    if(["approve","decline","cancel"].includes(kind)){
+     const student=$("v4-connection-content")?.querySelector('[data-v4-student="'+id+'"]')?.value||null;
      await perform(async()=>{
        if(kind==="cancel")await rpc("v4_cancel_connection_request",{p_request_id:id});
        else{
-         const student=$("v4-connection-content").querySelector('[data-v4-student="'+id+'"]')?.value||null;
          if(kind==="approve"&&getRole()==="teacher"&&!student)throw Error("請先選擇學生");
          await rpc("v4_decide_connection_request",{p_request_id:id,p_approve:kind==="approve",p_student_id:student});
        }
