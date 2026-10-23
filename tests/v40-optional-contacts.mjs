@@ -59,6 +59,7 @@ test("UI provides a deliberate two-step disconnect with historical data preserve
  assert.doesNotMatch(ui,/window\.confirm/);
 });
 test("outgoing pending invitations cannot reveal registered email or display name",()=>{
- assert.match(privacy,/c\.status='connected' or \(c\.status='pending' and c\.requested_by<>v_actor\)/);
+ assert.match(privacy,/c\.status in \('connected','disconnected'\)/);
+ assert.match(privacy,/c\.status='pending' and c\.requested_by<>v_actor/);
  assert.match(privacy,/revoke all on function public\.v4_contact_inbox\(\) from public,anon/);
 });

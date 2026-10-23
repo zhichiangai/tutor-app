@@ -43,13 +43,13 @@ await request(tA,pB,'teacher');let pairC=(await inbox(pB,1))[0].id;
 assert.equal(await ok(pB,'v4_contact_action',{p_id:pairC,p_action:'approve'}),'connected');count++;
 await request(tA,pA,'teacher');assert.equal(sql(`select count(*) from public.v4_account_contacts where teacher_id='${tA.id}' and parent_id='${pA.id}' and status='connected'`),'1');count++;
 assert.equal(await ok(pA,'v4_contact_action',{p_id:pairA,p_action:'disconnect'}),'disconnected');count++;
-assert.equal((await inbox(pA,1))[0].id,pairB);count++;
-assert.equal((await inbox(tA,1))[0].id,pairC);count++;
+assert.deepEqual((await inbox(pA,2)).map(x=>x.status).sort(),['connected','disconnected']);count++;
+assert.deepEqual((await inbox(tA,2)).map(x=>x.status).sort(),['connected','disconnected']);count++;
 await denied(pA,'v4_contact_action',{p_id:pairA,p_action:'disconnect'});
-await request(pA,tA,'parent');const pairD=(await inbox(tA,2)).find(r=>r.status==='pending').id;
+await request(pA,tA,'parent');const pairD=(await inbox(tA,3)).find(r=>r.status==='pending').id;
 assert.equal(await ok(pA,'v4_contact_action',{p_id:pairD,p_action:'cancel'}),'cancelled');count++;
 await denied(tA,'v4_contact_action',{p_id:pairD,p_action:'approve'});
-await request(tA,pA,'teacher');const pairE=(await inbox(pA,2)).find(r=>r.status==='pending').id;
+await request(tA,pA,'teacher');const pairE=(await inbox(pA,3)).find(r=>r.status==='pending').id;
 assert.equal(await ok(pA,'v4_contact_action',{p_id:pairE,p_action:'decline'}),'declined');count++;
 await denied(pA,'v4_contact_action',{p_id:pairE,p_action:'approve'});
 assert.equal((await inbox(stA,0)).length,0);count++;
@@ -77,7 +77,7 @@ assert.equal((await restRows(pB,`payment_batches?select=id&id=eq.${batch}`)).len
 assert.equal((await restRows(pA,`payment_batches?select=id&id=eq.${batch}`)).length,0);count++;
 assert.equal((await restRows(stA,`payment_batches?select=id&id=eq.${batch}`)).length,0);count++;
 // Row locking serializes competing approvals: exactly one may succeed.
-await request(tB,pB,'teacher');const concurrent=(await inbox(pB,1))[0].id;
+await request(tB,pB,'teacher');const concurrent=(await inbox(pB,2)).find(r=>r.status==='pending').id;
 const racing=await Promise.all([call(pB,'v4_contact_action',{p_id:concurrent,p_action:'approve'}),call(pB,'v4_contact_action',{p_id:concurrent,p_action:'approve'})]);
 assert.equal(racing.filter(x=>x.status===200).length,1);count++;
 assert.equal(racing.filter(x=>x.status!==200).length,1);count++;

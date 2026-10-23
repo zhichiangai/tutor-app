@@ -18,7 +18,8 @@ begin
  left join public.profiles p
    on p.id=(case when c.teacher_id=v_actor then c.parent_id else c.teacher_id end)
  where (c.teacher_id=v_actor or c.parent_id=v_actor)
-   and (c.status='connected' or (c.status='pending' and c.requested_by<>v_actor));
+   and (c.status in ('connected','disconnected')
+     or (c.status='pending' and c.requested_by<>v_actor));
  return v_rows;
 end $$;
 revoke all on function public.v4_contact_inbox() from public,anon;
