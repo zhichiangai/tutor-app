@@ -53,7 +53,7 @@ export function createV4AccountContacts({getClient,getUser,getRole,notify}){
      '<p class="section-sub">可以先跟'+title+'建立聯絡人關係，不必建立學生帳號，也不必先指定孩子。</p>'+
      '<form id="v4-account-contact-form" class="v4-form">'+
        '<label>對方的 Google Email<input name="email" type="email" maxlength="254" autocomplete="off" placeholder="example@gmail.com" required></label>'+
-       '<button class="primary-button" type="submit"'+(busy?' disabled':'')+'>邀請'+title+'連結</button>'+
+       '<button class="primary-button" type="submit"'+((busy||!enabled)?' disabled':'')+'>邀請'+title+'連結</button>'+
      '</form>'+
      '<p class="section-sub">聯絡人連結只代表雙方同意保持聯繫，<strong>不會自動開放任何課程、學生或帳務。</strong>要共同管理孩子，仍須另行取得該學生的授權。</p>'+
      (notice?'<p class="v4-error" role="status">'+escapeContact(notice)+'</p>':'')+
