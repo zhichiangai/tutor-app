@@ -217,6 +217,10 @@ begin
     then raise exception '沒有處理這筆申請的權限'; end if;
   if not p_approve then
     update public.v4_connection_requests set status='declined',updated_at=now() where id=p_request_id;
+    perform tutor_private.v4_enqueue('v4:declined:'||r.id::text,
+       (select email from auth.users where id=case when v_uid=r.teacher_id then r.parent_id else r.teacher_id end),
+       '好好上課｜這筆連結申請未獲確認',
+       '您好，'||chr(10)||'這筆課程連結申請沒有通過。若仍需要連結，可以直接與對方確認。'||chr(10)||'https://tutor.rapid4grad.com/');
     return 'declined';
   end if;
   v_student:=coalesce(r.student_id,p_student_id);
@@ -227,6 +231,8 @@ begin
     then raise exception '不能變更原本同意的學生'; end if;
   select lower(email) into v_parent_email from auth.users where id=r.parent_id;
   select lower(email) into v_teacher_email from auth.users where id=r.teacher_id;
+  -- V4 sends its own approval notification, so suppress duplicate V3 legacy-trigger mail.
+  perform set_config('tutor.v4_managed','true',true);
   if v_parent_email is null then raise exception '找不到家長帳號'; end if;
   select id into v_invite from public.guardian_invites
      where teacher_id=r.teacher_id and student_id=v_student and email=v_parent_email limit 1;
@@ -252,15 +258,19 @@ grant execute on function public.v4_decide_connection_request(uuid,boolean,uuid)
 
 create or replace function public.v4_cancel_connection_request(p_request_id uuid)
 returns void language plpgsql security definer set search_path=''
-as $$
-declare v_uid uuid:=(select auth.uid());
+as $
+declare v_uid uuid:=(select auth.uid()); v_request record;
 begin
   if v_uid is null then raise exception '請先登入'; end if;
-  update public.v4_connection_requests
-  set status='cancelled',updated_at=now()
-  where id=p_request_id and status in ('pending_teacher','pending_parent')
-  and (parent_id=v_uid or teacher_id=v_uid);
-  if not found then raise exception '這筆申請無法撤回'; end if;
+  select * into v_request from public.v4_connection_requests where id=p_request_id for update;
+  if not found or v_request.status not in ('pending_teacher','pending_parent')
+    or v_uid not in (v_request.parent_id,v_request.teacher_id)
+    then raise exception '這筆申請無法撤回'; end if;
+  update public.v4_connection_requests set status='cancelled',updated_at=now() where id=p_request_id;
+  perform tutor_private.v4_enqueue('v4:cancelled:'||p_request_id::text,
+     (select email from auth.users where id=case when v_uid=v_request.teacher_id then v_request.parent_id else v_request.teacher_id end),
+     '好好上課｜這筆連結申請已取消',
+     '您好，'||chr(10)||'對方已取消這筆課程連結申請，不需要再處理。'||chr(10)||'https://tutor.rapid4grad.com/');
 end;
 $$;
 revoke all on function public.v4_cancel_connection_request(uuid) from public,anon;
@@ -304,3 +314,67 @@ end;
 $$;
 revoke all on function public.v4_mail_ack(uuid,boolean,text) from public,anon,authenticated;
 grant execute on function public.v4_mail_ack(uuid,boolean,text) to service_role;
+
+-- Notification hooks for the already-supported V3 teacher-initiated invites.
+-- V4 approvals set a transaction-local flag to avoid sending duplicate emails.
+create or replace function tutor_private.v4_notify_legacy_invitation()
+returns trigger language plpgsql security definer set search_path=''
+as $$
+declare v_teacher_email text; v_parent_email text; v_parent_id uuid; v_student_label text;
+begin
+  if current_setting('tutor.v4_managed',true)='true' then return coalesce(new,old); end if;
+  if tg_table_name='guardian_invites' and tg_op='INSERT' then
+    perform tutor_private.v4_enqueue('v4:legacy-invite:'||new.id::text,new.email,
+      '好好上課｜老師邀請您一起查看課程',
+      '您好，'||chr(10)||'老師已邀請您一起查看孩子的課程。登入好好上課後，可以在「學生」頁面確認。'||chr(10)||
+      'https://tutor.rapid4grad.com/');
+  elsif tg_table_name='student_guardians' and tg_op='INSERT' then
+    select email into v_teacher_email from auth.users where id=new.teacher_id;
+    select email into v_parent_email from auth.users where id=new.guardian_id;
+    perform tutor_private.v4_enqueue('v4:legacy-linked-teacher:'||new.id::text,v_teacher_email,
+      '好好上課｜家長已完成課程連結',
+      '您好，'||chr(10)||'家長已接受您的邀請，現在可以一起查看課程安排。'||chr(10)||'https://tutor.rapid4grad.com/');
+    perform tutor_private.v4_enqueue('v4:legacy-linked-parent:'||new.id::text,v_parent_email,
+      '好好上課｜課程連結已完成',
+      '您好，'||chr(10)||'已經連結成功，可以登入好好上課查看課程安排。'||chr(10)||'https://tutor.rapid4grad.com/');
+  elsif tg_table_name='guardian_invites' and tg_op='DELETE' then
+    if exists(select 1 from public.student_guardians where invite_id=old.id) then
+      select email into v_teacher_email from auth.users where id=old.teacher_id;
+      perform tutor_private.v4_enqueue('v4:legacy-unlinked-parent:'||old.id::text,old.email,
+        '好好上課｜課程連結已解除',
+        '您好，'||chr(10)||'這筆課程連結已解除，之後將無法繼續查看該課程。過往課程和付款紀錄仍由原老師保留。');
+      perform tutor_private.v4_enqueue('v4:legacy-unlinked-teacher:'||old.id::text,v_teacher_email,
+        '好好上課｜家長課程連結已解除',
+        '您好，'||chr(10)||'這位家長與課程的連結已解除。原本的上課與帳務資料仍會保留。');
+    end if;
+  end if;
+  return coalesce(new,old);
+end;
+$$;
+revoke all on function tutor_private.v4_notify_legacy_invitation() from public,anon,authenticated;
+drop trigger if exists v4_legacy_guardian_invite_created on public.guardian_invites;
+create trigger v4_legacy_guardian_invite_created after insert on public.guardian_invites
+for each row execute function tutor_private.v4_notify_legacy_invitation();
+drop trigger if exists v4_legacy_guardian_invite_revoked on public.guardian_invites;
+create trigger v4_legacy_guardian_invite_revoked before delete on public.guardian_invites
+for each row execute function tutor_private.v4_notify_legacy_invitation();
+drop trigger if exists v4_legacy_guardian_connected on public.student_guardians;
+create trigger v4_legacy_guardian_connected after insert on public.student_guardians
+for each row execute function tutor_private.v4_notify_legacy_invitation();
+
+-- Guardian may leave the relationship without changing paid lesson history.
+create or replace function public.v4_disconnect_guardian(p_student_guardian_id uuid)
+returns void language plpgsql security definer set search_path=''
+as $$
+declare v_uid uuid:=(select auth.uid()); v_invite uuid;
+begin
+  if v_uid is null then raise exception '請先登入'; end if;
+  select g.invite_id into v_invite from public.student_guardians g
+  where g.id=p_student_guardian_id and (g.guardian_id=v_uid or g.teacher_id=v_uid);
+  if v_invite is null then raise exception '找不到可解除的課程連結'; end if;
+  delete from public.guardian_invites where id=v_invite;
+  if not found then raise exception '連結解除失敗'; end if;
+end;
+$$;
+revoke all on function public.v4_disconnect_guardian(uuid) from public,anon;
+grant execute on function public.v4_disconnect_guardian(uuid) to authenticated;
