@@ -6,8 +6,22 @@ import { expandSchedules, isVirtualOccurrence, findTimeConflicts, originalOccurr
 import { monthAgendaMarkup, monthSummary } from "./calendar-view.js";
 import { lessonAllocation, eligiblePeriodLessons, allocateOldestFirst, amount } from "./payment-ledger.js";
 import { durationHours, actualDefaults, validateActual, isPaymentLocked } from "./lesson-actual.js";
-const SUPABASE_URL = "https://vctisuglfoxyuwlvyjee.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_QR8An_jEnMEZTPuTHebFDA_xg46FLit";
+import { createV4Connections } from "./v4-connections.js";
+// V4 dev must never fall back to the V3 production project.
+const V4_CONFIG=(typeof window!=="undefined"&&window.V4_BACKEND)||{};
+const V4_LOCAL_HOST=typeof window!=="undefined"&&
+ ["localhost","127.0.0.1"].includes(window.location?.hostname)&&window.location?.protocol==="http:";
+const V4_LOCAL_CONFIG_VALID=V4_LOCAL_HOST&&V4_CONFIG.isolated===true&&
+ V4_CONFIG.projectRef==="local"&&
+ /^http:\/\/(?:localhost|127\.0\.0\.1):54321$/.test(V4_CONFIG.url||"")&&
+ /^(?:sb_publishable_[A-Za-z0-9_-]+|eyJ[A-Za-z0-9._-]+)$/.test(V4_CONFIG.publishableKey||"");
+const V4_REMOTE_CONFIG_VALID=V4_CONFIG.isolated===true&&/^[a-z]{20}$/.test(V4_CONFIG.projectRef||'')&&
+ V4_CONFIG.projectRef!=='vctisuglfoxyuwlvyjee'&&
+ V4_CONFIG.url==='https://'+V4_CONFIG.projectRef+'.supabase.co'&&
+ /^sb_publishable_[A-Za-z0-9_-]+$/.test(V4_CONFIG.publishableKey||'');
+const V4_CONFIG_VALID=V4_LOCAL_CONFIG_VALID||V4_REMOTE_CONFIG_VALID;
+const SUPABASE_URL = V4_CONFIG_VALID?V4_CONFIG.url:'';
+const SUPABASE_PUBLISHABLE_KEY = V4_CONFIG_VALID?V4_CONFIG.publishableKey:'';
 const STORAGE = "tutor_v2_preview_data_20261019";
 const ROLE_STORAGE = "tutor_v2_role";
 const ROLE_PENDING_STORAGE = "tutor_v2_role_pending";
@@ -30,6 +44,11 @@ const uid = ()=>crypto.randomUUID();
 let client=null, activeUser=null, loading=false, teacherPreferences={};
 const state={mode:"live",enabledRoles:["teacher"],lessonRatings:{focus:null,mood:null},role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:"month",studentCalendarMode:"month",recentChangesOpen:false,historyReadFailed:false,paymentBatches:[],paymentBatchItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",studentInvites:[],studentLinks:[],studentLegacyInvites:[],managedStudentId:null,studentSearch:"",studentAccountFilter:"all",studentPortal:{students:[],lessons:[],schedules:[]},sharedCourseDraft:null,sharedCourseHistory:{},receiptBatch:null,activeLesson:null,actualHoursManual:false};
 
+// Older Node harnesses evaluate app.js with imports stripped. Keep the V4 adapter optional there.
+const v4ConnectionUI=typeof createV4Connections==="function"?createV4Connections({getClient:()=>client,getUser:()=>activeUser,
+ getRole:()=>state.role,getStudents:()=>state.students,getLinks:()=>state.guardians,
+ onChanged:async()=>{await refreshLive({withHistory:false});render()},notify:message=>toast(message)}):
+ {render(){},clear(){},refresh(){},handleClick(){return false},handleSubmit(){return false}};
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
  const demoStudents=[
@@ -1326,6 +1345,7 @@ function renderTeacherStudentManagement(){
 }
 
 function renderStudents(){
+ v4ConnectionUI.render();
  const st=visibleStudents();
  renderParentLearning();
  renderStudentInvitesForTeacher();
@@ -2243,6 +2263,7 @@ const SESSION_PRIVATE_DOM_IDS=[
 ];
 function clearUserSessionState(){
  authDataGeneration++;
+ v4ConnectionUI.clear();
  for(const field of LIVE_FIELDS)state[field]=[];
  state.studentPortal={students:[],lessons:[],schedules:[],exceptions:[]};
  state.sharedCourseHistory={};
@@ -2319,6 +2340,7 @@ async function refreshLive({withHistory=true}={}){
 async function ensureClient(){
  if(client)return client;
  const createClient=window.supabase?.createClient;
+ if(!SUPABASE_URL&&window.location)throw Error("V4 尚未設定隔離測試資料庫，暫時無法登入或寫入。正式 V3.5.9 不受影響。");
  if(!createClient)throw Error("登入元件載入失敗，請重新整理頁面後再試");
  client=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
  client.auth.onAuthStateChange((event,session)=>{
@@ -2410,6 +2432,7 @@ async function initializeLive(){
    authPhase="signedOut";
   }
   render();
+  if(activeUser)void v4ConnectionUI.refresh();
   if(!activeUser)showModal("account-modal");
  }catch(err){
   if(bootGeneration!==authDataGeneration)return;
@@ -2429,7 +2452,7 @@ async function googleLogin(){
   document.body?.classList?.toggle("auth-pending",true);
   renderAuthUI();
   const db=await ensureClient();state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
-  const {error}=await db.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname}});
+  const {error}=await db.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname+location.search}});
   if(error)throw error;
  }catch(err){
   console.error(err);
@@ -2464,6 +2487,7 @@ async function signOut(){
 }
 function bindEvents(){
  document.addEventListener("click",async ev=>{
+  if(ev.target.closest("[data-v4-action]")){await v4ConnectionUI.handleClick(ev.target);return}
   const star=ev.target.closest("[data-lesson-star]");
   if(star){
    const key=star.dataset.lessonStar,score=Number(star.dataset.starValue);
@@ -2612,7 +2636,7 @@ function bindEvents(){
   ["shared-course-weekdays","shared-weekday-hint","shared-course-date"]
  ])$("#"+group).addEventListener("change",()=>syncRecurringWeekdays(date,group,hint));
  $("#request-form").addEventListener("submit",submitRequest);
- document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e);if(e.target.id==="student-invite-form")saveStudentInvite(e)});
+ document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e);if(e.target.id==="student-invite-form")saveStudentInvite(e);if(e.target.id==="v4-parent-request-form")void v4ConnectionUI.handleSubmit(e)});
  $("#invite-edit-form").addEventListener("submit",submitInviteEdit);
  $("#workspace-start").onclick=()=>setView("settings");
  $("#workspace-create").onclick=()=>saveMyWorkspace(false);
