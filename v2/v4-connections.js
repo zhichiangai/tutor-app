@@ -7,7 +7,7 @@ const allowedStatuses={pending_teacher:"等老師確認",pending_parent:"等家�
 const safeUrl=token=>{const url=new URL(location.origin+location.pathname);url.searchParams.set("v4invite",token);return url.toString()};
 const currentToken=()=>new URLSearchParams(location.search).get("v4invite")||"";
 const guid=/^[a-f0-9-]{36}$/i;
-export function createV4Connections({getClient,getUser,getRole,getStudents,notify}){
+export function createV4Connections({getClient,getUser,getRole,getStudents,getLinks,onChanged,notify}){
  const $=id=>document.getElementById(id);
  let inbox=[],enabled=false,loading=false,preview=null,token="",shareUrl="",seq=0,errorText="";
  const sessionKey=()=>getUser()?.id||"";
@@ -39,6 +39,12 @@ export function createV4Connections({getClient,getUser,getRole,getStudents,notif
    }
    const pending=inbox.filter(r=>["pending_teacher","pending_parent"].includes(r.status));
    const others=inbox.filter(r=>!pending.includes(r)).slice(0,8);
+   const linked=getLinks().filter(g=>role==="parent"&&g.guardian_id===sessionKey());
+   const linkList=linked.length?'<div class="v4-linked"><h3>已連結的課程</h3>'+linked.map(g=>{
+     const student=getStudents().find(s=>s.id===g.student_id);
+     return '<div class="v4-request-row"><strong>'+esc(student?.name||"學生")+'</strong><div class="v4-actions">'+
+       '<button class="secondary-button" type="button" data-v4-action="unlink" data-id="'+esc(g.id)+'">解除這筆連結</button></div></div>';
+   }).join("")+'</div>':"";
    const parentForm=role==="parent"?'<form id="v4-parent-request-form" class="v4-form">'+
      '<label>老師的 Google Email<input name="email" type="email" maxlength="254" placeholder="teacher@example.com" required></label>'+
      '<label>孩子怎麼稱呼？<input name="child" maxlength="80" placeholder="例如：小明" required></label>'+
@@ -71,7 +77,7 @@ export function createV4Connections({getClient,getUser,getRole,getStudents,notif
      parentForm+teacherForm+
      '<div class="v4-actions"><button class="secondary-button" type="button" data-v4-action="qr">產生 QR Code</button>'+
      '<button class="secondary-button" type="button" data-v4-action="share">取得分享連結</button></div>'+
-     '</div><div><h3>連結申請</h3>'+pendingList+history+'</div></div>'+
+     linkList+'</div><div><h3>連結申請</h3>'+pendingList+history+'</div></div>'+
      (preview?'<div class="v4-link-preview"><strong>有人分享了邀請連結</strong><p>來自：'+esc(preview.name||"一位使用者")+
        '。請先確認對方身分，送出後還要經過對方同意。</p>'+
        (preview.side==="teacher"?'<label>孩子的稱呼<input id="v4-claim-child" maxlength="80" placeholder="例如：小明"></label>':
@@ -150,6 +156,10 @@ export function createV4Connections({getClient,getUser,getRole,getStudents,notif
        const u=new URL(location.href);u.searchParams.delete("v4invite");history.replaceState(null,"",u.toString());
        notify("已送出申請，等待對方確認");
      });return true;
+   }
+   if(kind==="unlink"){
+     if(!window.confirm("確定解除這筆課程連結？解除後將無法繼續查看這位學生的課程，但歷史課程及帳務不會被刪除。"))return true;
+     await perform(async()=>{await rpc("v4_disconnect_guardian",{p_student_guardian_id:id});await onChanged();notify("已解除連結");});return true;
    }
    if(["approve","decline","cancel"].includes(kind)){
      const student=$("v4-connection-content")?.querySelector('[data-v4-student="'+id+'"]')?.value||null;
