@@ -168,6 +168,7 @@ export function createV4Connections({getClient,getUser,getRole,getStudents,getLi
        else{
          if(kind==="approve"&&getRole()==="teacher"&&!student)throw Error("請先選擇學生");
          await rpc("v4_decide_connection_request",{p_request_id:id,p_approve:kind==="approve",p_student_id:student});
+         if(kind==="approve")await onChanged();
        }
        notify(kind==="approve"?"已完成連結":kind==="decline"?"已婉拒申請":"已撤回申請");
      });return true;
