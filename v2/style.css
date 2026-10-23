@@ -690,3 +690,26 @@ body.auth-pending .auth-loading-screen{display:flex;position:fixed;inset:0;z-ind
 .auth-loading-content p{margin:0;color:#8a8983;font-size:13px;line-height:1.7}
 .auth-loading-symbol{display:grid;place-items:center;width:56px;height:56px;
   background:#fbece5;border-radius:50%;font-size:30px;color:#bc7464}
+
+/* V4: keep teacher/parent invitation actions in the existing Students page. */
+.v4-connection-card .v4-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.v4-connection-card .v4-columns>div{min-width:0}
+.v4-connection-card h3{font-size:1.05rem;margin:0 0 12px}
+.v4-connection-card .v4-form{display:grid;gap:12px;margin:12px 0}
+.v4-connection-card label{display:grid;gap:6px;margin:10px 0}
+.v4-connection-card input,.v4-connection-card select{width:100%;max-width:100%;min-height:44px;box-sizing:border-box}
+.v4-connection-card .v4-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.v4-connection-card .v4-actions button{min-height:44px}
+.v4-request-row{padding:12px 0;border-bottom:1px solid var(--border,#e7e9ec)}
+.v4-request-row strong,.v4-request-row small{display:block}
+.v4-request-row small{margin-top:4px}
+.v4-request-row p{font-size:.9rem;margin:8px 0}
+.v4-history{margin-top:16px}
+.v4-history summary{cursor:pointer}
+.v4-history p{font-size:.9rem;padding:6px 0}
+.v4-link-preview,.v4-share-result:not(:empty){border:1px solid var(--border,#e7e9ec);border-radius:12px;padding:16px;margin-top:18px}
+.v4-link-preview>strong{display:block}
+.v4-error{color:#a12c2c}
+#v4-qr-output{display:flex;justify-content:flex-start;align-items:center;min-height:180px;margin-top:14px}
+#v4-qr-output img{max-width:100%;height:auto}
+@media(max-width:720px){.v4-connection-card .v4-columns{grid-template-columns:minmax(0,1fr)}}
