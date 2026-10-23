@@ -33,5 +33,6 @@ jobs:
           -f tests/sql/v4_isolated_fixture.sql
           -f supabase/migrations/20261023090000_v4_bidirectional_invites_gas.sql
           -f supabase/migrations/20261024033000_v4_account_contacts.sql
+          -f supabase/migrations/20261024035831_v4_contact_privacy_hardening.sql
           -f tests/sql/v4_contact_assertions.sql
           -f tests/sql/v4_isolated_assertions.sql

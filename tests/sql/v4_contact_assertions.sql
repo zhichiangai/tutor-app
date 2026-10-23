@@ -8,6 +8,7 @@ select public.qa_expect_error(
  'select public.v4_contact_request(''parent1@example.test'',''teacher'')','anon cannot invite');
 set local role authenticated;
 select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000001',true);
+select public.qa_assert(pg_catalog.jsonb_array_length(public.v4_contact_inbox())=0,'sender cannot infer registered email from outgoing inbox');
 select public.qa_expect_error(
  'select * from public.v4_account_contacts','browser cannot query contact table');
 select public.qa_expect_error(

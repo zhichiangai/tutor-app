@@ -4,6 +4,7 @@ import {readFileSync} from "node:fs";
 
 const read=path=>readFileSync(new URL(path,import.meta.url),"utf8");
 const sql=read("../supabase/migrations/20261024033000_v4_account_contacts.sql");
+const privacy=read("../supabase/migrations/20261024035831_v4_contact_privacy_hardening.sql");
 const ui=read("../v2/v4-contacts.js");
 const app=read("../v2/app.js");
 const html=read("../v2/index.html");
@@ -56,4 +57,8 @@ test("UI provides a deliberate two-step disconnect with historical data preserve
  assert.match(ui,/data-contact-action="keep"/);
  assert.match(ui,/課程與帳務資料保留/);
  assert.doesNotMatch(ui,/window\.confirm/);
+});
+test("outgoing pending invitations cannot reveal registered email or display name",()=>{
+ assert.match(privacy,/c\.status='connected' or \(c\.status='pending' and c\.requested_by<>v_actor\)/);
+ assert.match(privacy,/revoke all on function public\.v4_contact_inbox\(\) from public,anon/);
 });

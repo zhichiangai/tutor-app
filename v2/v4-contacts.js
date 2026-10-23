@@ -55,7 +55,7 @@ export function createV4AccountContacts({getClient,getUser,getRole,notify}){
        '<label>對方的 Google Email<input name="email" type="email" maxlength="254" autocomplete="off" placeholder="example@gmail.com" required></label>'+
        '<button class="primary-button" type="submit"'+((busy||!enabled)?' disabled':'')+'>邀請'+title+'連結</button>'+
      '</form>'+
-     '<p class="section-sub">聯絡人連結只代表雙方同意保持聯繫，<strong>不會自動開放任何課程、學生或帳務。</strong>要共同管理孩子，仍須另行取得該學生的授權。</p>'+
+     '<p class="section-sub">聯絡人連結只代表雙方同意保持聯繫，<strong>不會自動開放任何課程、學生或帳務。</strong>寄出的邀請會在對方接受後出現在清單；要共同管理孩子，仍須另行取得該學生的授權。</p>'+
      (notice?'<p class="v4-error" role="status">'+escapeContact(notice)+'</p>':'')+
      '<h3>我的'+title+'聯絡人</h3>'+
      (enabled?(connections||'<p class="section-sub">還沒有聯絡人，可以先透過 Email 邀請。</p>'):
@@ -83,7 +83,7 @@ export function createV4AccountContacts({getClient,getUser,getRole,notify}){
      if(turn!==epoch||current!==userId())return;
      confirmDisconnect=null;
      await refresh();
-     if(current===userId())notify(success);
+     if(current===userId())notify(enabled?success:"操作已提交，但清單重新載入失敗，請稍後再試。");
    }catch(e){
      if(current===userId()&&turn===epoch){notice=e.message;render();notify(e.message);}
    }finally{
