@@ -10,7 +10,7 @@ create table if not exists public.v4_connection_requests (
   student_id uuid references public.students(id),
   child_label text not null default '',
   origin text not null check (origin in ('parent_email','teacher_qr','parent_qr','teacher_link','parent_link')),
-  status text not null default 'pending_teacher' check (status in ('pending_teacher','pending_parent','approved','declined','cancelled')),
+  status text not null default 'pending_teacher' check (status in ('pending_teacher','pending_parent','approved','declined','cancelled','disconnected')),
   created_at timestamptz not null default now(),
   expires_at timestamptz not null default (now() + interval '7 days'),
   updated_at timestamptz not null default now(),
@@ -77,13 +77,33 @@ end;
 $$;
 revoke all on function tutor_private.v4_limit(text,integer) from public,anon,authenticated;
 
+-- Service-only staging email origin. Without it, omit clickable links entirely.
+create table if not exists tutor_private.v4_mail_settings (
+  singleton boolean primary key default true check(singleton), app_url text not null
+);
+alter table tutor_private.v4_mail_settings enable row level security;
+revoke all on tutor_private.v4_mail_settings from public,anon,authenticated;
+create or replace function public.v4_mail_set_app_url(p_app_url text)
+returns void language plpgsql security definer set search_path=''
+as $$
+begin
+ if p_app_url is null or p_app_url !~ '^https://[a-zA-Z0-9.-]+(:[0-9]+)?/$'
+    or lower(p_app_url)='https://tutor.rapid4grad.com/' then raise exception 'Use the verified isolated staging origin'; end if;
+ insert into tutor_private.v4_mail_settings(singleton,app_url) values(true,p_app_url)
+ on conflict(singleton) do update set app_url=excluded.app_url;
+end;
+$$;
+revoke all on function public.v4_mail_set_app_url(text) from public,anon,authenticated;
+grant execute on function public.v4_mail_set_app_url(text) to service_role;
+
 create or replace function tutor_private.v4_enqueue(p_event_key text,p_recipient text,p_subject text,p_body text)
 returns void language plpgsql security definer set search_path=''
 as $$
 begin
   if p_recipient is null or p_recipient !~* '^[^@\s]+@[^@\s]+\.[^@\s]+$' then return; end if;
   insert into tutor_private.v4_email_outbox(event_key,recipient,subject,body)
-  values(p_event_key,lower(p_recipient),p_subject,p_body)
+  values(p_event_key,lower(p_recipient),p_subject,replace(p_body,'https://tutor.rapid4grad.com/',
+    coalesce((select app_url from tutor_private.v4_mail_settings where singleton),'')))
   on conflict(event_key) do nothing;
 exception when others then
   raise warning 'V4 notification enqueue failed; relationship retained';
@@ -401,6 +421,9 @@ begin
       '您好，'||chr(10)||'已經連結成功，可以登入好好上課查看課程安排。'||chr(10)||'https://tutor.rapid4grad.com/');
   elsif tg_table_name='guardian_invites' and tg_op='DELETE' then
     if exists(select 1 from public.student_guardians where invite_id=old.id) then
+      update public.v4_connection_requests r set status='disconnected',updated_at=now()
+      where r.teacher_id=old.teacher_id and r.student_id=old.student_id and r.status='approved'
+        and r.parent_id in (select u.id from auth.users u where lower(u.email)=lower(old.email));
       select email into v_teacher_email from auth.users where id=old.teacher_id;
       perform tutor_private.v4_enqueue('v4:legacy-unlinked-parent:'||old.id::text,old.email,
         '好好上課｜課程連結已解除',

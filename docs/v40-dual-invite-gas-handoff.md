@@ -61,4 +61,8 @@
 
 ### 目前驗收界線
 
-Node 行為測試與 CI PostgreSQL contract 的結果以最新 CI 為準。真實一般使用者 JWT、iPhone Safari／Chrome、完整跨裝置 OAuth／掃碼、GAS 真實寄信仍未通過；獨立 GAS 專案已建立，但首次授權與寄件別名檢查待使用者完成。正式 V3.5.9、正式資料庫及另一產品通知設定未修改。
+Node 行為測試與 CI PostgreSQL contract 的結果以最新 CI 為準。真實一般使用者 JWT、iPhone Safari／Chrome、完整跨裝置 OAuth／掃碼、GAS 真實寄信仍未通過；獨立 GAS 專案已建立並存入 worker，首次只讀檢查已成功：指定別名不可用，當下剩餘收件者額度 1500；管理入口需使用者重新驗證密碼。正式 V3.5.9、正式資料庫及另一產品通知設定未修改。
+
+完整驗證與限制見 [dev.2 驗證報告](v40-dev2-validation.md)。解除關聯會同步將新申請歷史標為已解除；失效 Token 不再隱藏手動輸入復原入口。
+
+通知佇列新增 service-only `v4_mail_set_app_url(staging根網址)`；未設定時移除正式站入口，避免 QA 郵件導回正式環境。一般使用者不可更改寄信入口。

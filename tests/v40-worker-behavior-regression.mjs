@@ -82,3 +82,16 @@ test('dev frontend public configuration never defaults to production',()=>{
  assert.equal(config({isolated:true,projectRef:'vctisuglfoxyuwlvyjee',url:'https://vctisuglfoxyuwlvyjee.supabase.co',publishableKey:'sb_publishable_qa'}).url,'');
  const ref='abcdefghijklmnopqrst';assert.equal(config({isolated:true,projectRef:ref,url:'https://'+ref+'.supabase.co',publishableKey:'sb_publishable_qa'}).url,'https://'+ref+'.supabase.co');
 });
+
+test('invalid invitation keeps manual recovery controls available',async()=>{
+ const nodes=new Map();
+ const node=id=>{if(!nodes.has(id))nodes.set(id,{innerHTML:'',textContent:'',classList:{toggle(){}}});return nodes.get(id);};
+ const savedDocument=globalThis.document,savedLocation=globalThis.location;
+ globalThis.document={getElementById:node};globalThis.location={origin:'https://qa.example.test',search:'?v4invite=bad'};
+ try{
+  const controller=ui.createV4Connections({getClient:()=>({rpc:async()=>({data:[],error:null})}),getUser:()=>({id:'qa'}),
+   getRole:()=> 'parent',getStudents:()=>[],getLinks:()=>[],onChanged:async()=>{},notify:()=>{}});
+  await controller.refresh();assert.match(node('v4-connection-content').innerHTML,/v4-manual-link/);
+  assert.match(node('v4-connection-content').innerHTML,/role="alert"/);
+ }finally{globalThis.document=savedDocument;globalThis.location=savedLocation;}
+});

@@ -8,6 +8,7 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000003',true);
 select public.qa_expect_error('select * from public.v4_connection_requests','browser cannot read raw requests');
 select public.qa_expect_error('select public.v4_mail_claim(1)','authenticated cannot claim mail');
+select public.qa_expect_error($q$select public.v4_mail_set_app_url('https://staging.example.test/')$q$,'authenticated cannot change mail origin');
 select public.qa_expect_error('select public.v4_mail_retry(gen_random_uuid(),true)','authenticated cannot retry mail');
 select public.v4_request_teacher('teacher1@example.test','QA child');
 select (public.v4_connection_inbox()->0->>'id') as req1 \gset
@@ -53,6 +54,7 @@ select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000003'
 select public.v4_disconnect_guardian(:'link1');
 reset role;
 select public.qa_assert(not exists(select 1 from public.student_guardians where id=:'link1'),'disconnect removes targeted permission row');
+select public.qa_assert((select status='disconnected' from public.v4_connection_requests where id=:'req1'),'request history reflects disconnected permission');
 select public.qa_assert((select count(*)=1 and bool_and(hours=1.5 and amount=999 and paid) from public.qa_course_snapshot),'synthetic paid course snapshot unchanged');
 select public.qa_assert((select count(*)=3 from public.students),'no students deleted');
 -- Cancellation and decline cannot later be accepted.
@@ -85,6 +87,11 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000003',true);
 select public.qa_assert(public.v4_preview_connection_link(:'expired_token') is null,'expired preview is null');
 select public.qa_expect_error(format('select public.v4_claim_connection_link(%L,%L)',:'expired_token','QA'),'expired token cannot claim');
+reset role;
+select public.qa_assert(not exists(select 1 from tutor_private.v4_email_outbox where body like '%https://tutor.rapid4grad.com/%'),'staging email never points to production');
+set local role service_role;
+select public.qa_expect_error($q$select public.v4_mail_set_app_url('https://tutor.rapid4grad.com/')$q$,'service cannot configure production origin in dev');
+select public.v4_mail_set_app_url('https://staging.example.test/');
 -- Claim and ACK lease behavior under actual PostgreSQL execution.
 set local role service_role;
 select * from public.v4_mail_claim(1) \gset mail_

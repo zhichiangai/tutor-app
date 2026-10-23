@@ -3,7 +3,7 @@
  * A browser role switch never confers authorization: every operation checks auth.uid() server-side.
  */
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const allowedStatuses={pending_teacher:"等老師確認",pending_parent:"等家長確認",approved:"已連結",declined:"未通過",cancelled:"已撤回",expired:"已過期"};
+const allowedStatuses={pending_teacher:"等老師確認",pending_parent:"等家長確認",approved:"已連結",declined:"未通過",cancelled:"已撤回",expired:"已過期",disconnected:"已解除"};
 const safeUrl=token=>{const url=new URL(location.origin+location.pathname);url.searchParams.set("v4invite",token);return url.toString()};
 const currentToken=()=>new URLSearchParams(location.search).get("v4invite")||"";
 export function invitationToken(value,origin){
@@ -130,10 +130,15 @@ export function createV4Connections({getClient,getUser,getRole,getStudents,getLi
      inbox=Array.isArray(data)?data:[];enabled=true;errorText="";
      const incoming=currentToken();
      if(incoming&&incoming!==token){
-       token=invitationToken(incoming,location.origin);
-       preview=await rpc("v4_preview_connection_link",{p_token:token});
-       if(turn!==seq||sessionKey()!==user)return;
-       if(!preview)errorText="這個邀請連結可能已使用或過期。";
+       token=incoming;
+       try{
+         const candidate=invitationToken(incoming,location.origin);
+         const result=await rpc("v4_preview_connection_link",{p_token:candidate});
+         if(turn!==seq||sessionKey()!==user)return;
+         preview=result;
+         if(!preview)errorText="這個邀請連結可能已使用或過期。請對方重新分享，或貼上新的邀請連結。";
+       }catch(e){preview=null;errorText=e.message;}
+
      }
    }catch(e){
      if(turn!==seq||sessionKey()!==user)return;
