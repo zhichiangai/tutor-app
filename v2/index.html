@@ -419,6 +419,12 @@
         <button class="primary-button" type="submit" id="shared-course-save">儲存共同課程</button></div>
     </form>
   </dialog>
+  <dialog class="modal schedule-sheet" id="action-confirm-modal" aria-labelledby="action-confirm-title" aria-describedby="action-confirm-message">
+    <form method="dialog" class="modal-inner">
+      <div class="modal-head"><div><p class="eyebrow">確認操作</p><h2 id="action-confirm-title">確定要解除這筆家長連結嗎？</h2><p class="modal-description" id="action-confirm-message"></p></div></div>
+      <div class="form-actions"><button type="submit" class="secondary-button" value="cancel">先不要</button><button type="submit" class="primary-button" id="action-confirm-submit" value="confirm">確認解除</button></div>
+    </form>
+  </dialog>
   <div id="toast" role="status" aria-live="polite" class="toast" hidden></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js" crossorigin="anonymous"></script>
   <script type="module" src="./app.js"></script>
