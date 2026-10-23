@@ -54,6 +54,16 @@ test("per-lesson prior corrections reduce maximum remaining correction",()=>{
  assert.throws(()=>prepareCorrection({...base,requested:[{lesson_id:"l1",amount:"250.00"}]}));
  assert.equal(prepareCorrection({...base,requested:[{lesson_id:"l1",amount:"200.00"}]}).amount,"200.00");
 });
+test("teacher sees preview only in isolated V4 and no correction write button",()=>{
+ const app=readFileSync(new URL("../v2/app.js",import.meta.url),"utf8");
+ assert.match(app,/batch\.status==="confirmed"&&V4_CONFIG_VALID/);
+ assert.match(app,/data-action="preview-correction"/);
+ assert.match(app,/async function previewConfirmedBatchCorrection/);
+ assert.match(app,/client\.rpc\("v4_payment_correction_preview"/);
+ assert.match(app,/authDataGeneration!==generation/);
+ assert.match(app,/沖銷功能尚未啟用/);
+ assert.doesNotMatch(app,/client\.rpc\("v4_apply_payment_correction"/);
+});
 test("new schema cannot be edited by browser roles and has no exposed mutation RPC",()=>{
  const sql=readFileSync(new URL("../supabase/migrations/20261024043000_v40_payment_correction_foundation.sql",import.meta.url),"utf8");
  assert.match(sql,/create table public.payment_batch_corrections/);
