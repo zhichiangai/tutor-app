@@ -106,12 +106,12 @@ test("Teacher per-student billing splits confirmed, pending and unpaid amounts",
 });
 
 test("Guardian revocation removes both invitation and connection, but preserves lessons",async()=>{
- const {app}=fixture();
+ const {app,get}=fixture();
  app.state.invites=[{id:"invite-a",student_id:"student-a",teacher_id:"teacher-a",email:"p@example.test"}];
  app.state.guardians=[{id:"link-a",invite_id:"invite-a",student_id:"student-a",teacher_id:"teacher-a",guardian_id:"parent-a"}];
  app.state.lessons=[{id:"paid-history",owner_id:"teacher-a",student_id:"student-a",type:"lesson",status:"老師已收到",total_amount:500}];
  const pending=app.revokeInvite("invite-a");
- get("action-confirm-modal").close("confirm");
+ get("#action-confirm-modal").close("confirm");
  await pending;
  assert.equal(app.state.invites.length,0);
  assert.equal(app.state.guardians.length,0);
@@ -157,7 +157,7 @@ test("Guardian revocation can be cancelled without changing access or history",a
  app.state.invites=[{id:"invite-a",student_id:"student-a",teacher_id:"teacher-a",email:"p@example.test"}];
  app.state.guardians=[{id:"link-a",invite_id:"invite-a",student_id:"student-a",teacher_id:"teacher-a",guardian_id:"parent-a"}];
  const pending=app.revokeInvite("invite-a");
- get("action-confirm-modal").close("cancel");
+ get("#action-confirm-modal").close("cancel");
  await pending;
  assert.equal(app.state.invites.length,1);
  assert.equal(app.state.guardians.length,1);
