@@ -1,7 +1,7 @@
 name: V4 isolated PostgreSQL contract
 on:
   pull_request:
-    branches: [main, feat/v4-bidirectional-invites-qr-gas-20261023]
+    branches: [main, feat/v4-bidirectional-invites-qr-gas-20261023, feat/v4-qa-time-metadata-20261024]
     paths: ['supabase/**', 'tests/sql/v4_*', '.github/workflows/v4-isolated-db.yml']
 permissions:
   contents: read
@@ -32,4 +32,6 @@ jobs:
           psql -v ON_ERROR_STOP=1
           -f tests/sql/v4_isolated_fixture.sql
           -f supabase/migrations/20261023090000_v4_bidirectional_invites_gas.sql
+          -f supabase/migrations/20261024033000_v4_account_contacts.sql
+          -f tests/sql/v4_contact_assertions.sql
           -f tests/sql/v4_isolated_assertions.sql
