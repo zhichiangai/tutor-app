@@ -726,3 +726,11 @@ body.auth-pending .auth-loading-screen{display:flex;position:fixed;inset:0;z-ind
 #v4-account-contact-content .v4-request-row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:center}
 .v4-contact-warning{padding:10px;border:1px solid var(--border,#e7e9ec);border-radius:12px}
 .v4-contact-warning p{margin:0 0 8px}
+.period-line [data-correction-lesson] { width: min(8rem, 100%); min-height: 44px; flex: 0 0 auto; }
+@media (max-width: 625px) {
+ .period-batch-head { flex-wrap: wrap; }
+ .period-batch-head > div { min-width: 0; max-width: 100%; }
+ .period-batch-amount { white-space: normal; overflow-wrap: anywhere; }
+ .period-line span, .period-line span:last-child { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+}
+@media (max-width: 375px) { #correction-lines .period-line { flex-wrap: wrap; gap: .5rem; } }

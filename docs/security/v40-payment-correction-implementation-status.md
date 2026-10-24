@@ -1,6 +1,6 @@
-# V4 已確認付款批次更正 — 第一階段安全底座
+# V4 已確認付款批次更正 — 本機整合驗收
 
-> **DRAFT，尚未開放沖銷操作，也不得合併正式 main。**
+> **DRAFT。沖銷寫入僅在隔離的 V4 測試後端啟用；尚不得合併正式 main 或套用正式資料庫。**
 
 ## 已完成的程式（本 PR）
 
@@ -12,14 +12,18 @@
 - `v2/payment-correction.js`：整數分金額驗證及兩堂課、多筆部分更正的純函式規劃工具。
 - Node 靜態／計算測試；**不是資料庫 JWT 或完整 E2E 測試**。
 
-## 尚未完成，禁止聲稱沖銷可使用
+## 2026-10-24 本機後續實作
 
-1. 以 `supabase migration new` 正式整理本 Migration，從 Mac localhost 乾淨庫重播 34 份（依目前 PR #34 的 33 份 + 本 PR 1 份核對）。
-2. 開發 server-side `v4_apply_payment_correction` 原子交易 RPC；驗老師身分、已確認批次、原因長度、UUID 冪等、逐堂分配、同筆總額，鎖住 batch/student/lesson，並防止跨 workspace、超額與併發。
-3. 將更正淨額同步整合到 `submit_range_payment`、`review_range_payment`、`guard_paid_lesson`、`payment-ledger.js`、老師與家長的月報，否則**不得啟用寫入 RPC**。
-4. 更正歷史與餘額進入 UI，並保留老師可見、家長僅在現行學生連結下可見、學生不得看到金額。
-5. GoTrue JWT／PostgREST 實測：兩堂各 1000、批次 1500；先更正 250、再更正 500；重覆 idempotency、並行超額、付款重新提交、老師權限、家長解除後無權、已收款課程變動保護。
-6. iPhone／三角色及現有 V3.5.9 功能回歸，所有權限與正式資料隔離。
-7. 家長邀請追蹤、到期、重新寄送仍屬 PR #34 後續工作。
+- 新增 `20261024050000_v40_apply_payment_corrections.sql`：僅原老師可更正已確認批次；逐堂、總額、原因、冪等與並行驗證；原始收款不可變。
+- 校正 `submit_range_payment`、`review_range_payment`、課程狀態 Trigger，使用一次性交易內授權而非放寬直接 UPDATE；前端帳本與月總計採淨額。
+- 老師更正視窗包含逐堂上限、原因與第二次確認；完成後原額／更正／淨額及歷史可見。家長僅在有效學生連結下可讀更正；學生端不讀帳務。
+- 新增 `20261024053000_v4_contact_outgoing_tracking.sql`：不論 Email 是否存在都產生相同待處理回執；可撤回、到期、重新邀請；不授予課程權限。
+- 乾淨本機 Supabase 重播 36 筆 Migration；GoTrue JWT／REST 付款測試 5 人、56 斷言，邀請追蹤 3 人、34 斷言；合成 SQL 55 PASS 訊息。
+
+## 尚未完成，禁止正式發布
+
+1. 真實 Google OAuth 和 iPhone Safari／Chrome 實機，以及三角色完整瀏覽器 E2E 尚未完成；本機 JWT 不能替代。
+2. 所有 V3.5.9 核心操作與 GAS 寄件者、重試的端到端驗收尚未完成；不可啟用正式寄信。
+3. 正式 schema 相容性、備份、回滾與資料稽核計畫須審查，GitHub CI 的全套 Supabase 整合亦須通過。
 
 **不得變更真實 2026/10/20 NT$1,300 付款狀態、QA NT$625 或任何正式資料。**

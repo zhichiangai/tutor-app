@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {exactCents,asAmount,correctionLedger,prepareCorrection} from "../v2/payment-correction.js";
+import {lessonAllocation,eligiblePeriodLessons} from "../v2/payment-ledger.js";
 
 const uuid="f18a3a4d-6074-4828-bf15-2a4abf1c3604";
 const batch={id:"batch1",status:"confirmed",paid_amount:"1500.00"};
@@ -54,15 +55,25 @@ test("per-lesson prior corrections reduce maximum remaining correction",()=>{
  assert.throws(()=>prepareCorrection({...base,requested:[{lesson_id:"l1",amount:"250.00"}]}));
  assert.equal(prepareCorrection({...base,requested:[{lesson_id:"l1",amount:"200.00"}]}).amount,"200.00");
 });
-test("teacher sees preview only in isolated V4 and no correction write button",()=>{
+test("live ledger and parent payment picker use net allocations after corrections",()=>{
+ const lesson={id:"l1",student_id:"s1",lesson_date:"2026-09-01",type:"lesson",status:"未付款",total_amount:1000};
+ const corrections=[{id:"c1",batch_id:"batch1"}];
+ const lines=[{correction_id:"c1",batch_id:"batch1",lesson_id:"l1",amount:250}];
+ const balance=lessonAllocation(lesson,[batch],allocations,[],corrections,lines);
+ assert.deepEqual([balance.confirmed,balance.available],[750,250]);
+ const eligible=eligiblePeriodLessons({lessons:[lesson],batches:[batch],items:allocations,
+  corrections,correctionItems:lines,studentId:"s1",start:"2026-09-01",end:"2026-09-02"});
+ assert.equal(eligible[0].allocation.available,250);
+});
+test("teacher sees preview and guarded correction flow in isolated V4",()=>{
  const app=readFileSync(new URL("../v2/app.js",import.meta.url),"utf8");
  assert.match(app,/batch\.status==="confirmed"&&V4_CONFIG_VALID/);
  assert.match(app,/data-action="preview-correction"/);
  assert.match(app,/async function previewConfirmedBatchCorrection/);
  assert.match(app,/client\.rpc\("v4_payment_correction_preview"/);
  assert.match(app,/authDataGeneration!==generation/);
- assert.match(app,/沖銷功能尚未啟用/);
- assert.doesNotMatch(app,/client\.rpc\("v4_apply_payment_correction"/);
+ assert.match(app,/client\.rpc\("v4_apply_payment_correction"/);
+ assert.match(app,/correctionRequest=null/);
 });
 test("new schema cannot be edited by browser roles and has no exposed mutation RPC",()=>{
  const sql=readFileSync(new URL("../supabase/migrations/20261024043000_v40_payment_correction_foundation.sql",import.meta.url),"utf8");

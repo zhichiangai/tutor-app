@@ -1,0 +1,43 @@
+name: V4 isolated Supabase Auth acceptance
+on:
+  push:
+    branches: [feat/v4-batch-corrections-foundation-20261024]
+  pull_request:
+    branches: [feat/v4-contact-only-links-20261024]
+    paths: ['supabase/**', 'tests/local/**', 'v2/**', '.github/workflows/v4-local-auth-acceptance.yml']
+permissions:
+  contents: read
+jobs:
+  local-auth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.107.0
+      - name: Verify the repository targets isolated localhost
+        run: grep -q '^project_id = "tutor_v4_isolated"$' supabase/config.toml
+      - name: Start local Supabase and replay migrations
+        run: |
+          supabase start
+          supabase db reset --local --no-seed
+      - name: Run GoTrue JWT and REST assertions using only synthetic data
+        env:
+          V359_LOCAL_RLS_TEST: '1'
+          V359_RLS_PREAPPLIED: '1'
+          V40_LOCAL_METADATA_TEST: '1'
+          V40_LOCAL_CONTACT_TEST: '1'
+          V40_LOCAL_CORRECTION_TEST: '1'
+          V40_LOCAL_CONTACT_TRACKING_TEST: '1'
+        run: |
+          node tests/local/v40-contact-rest.mjs
+          node tests/local/v359-parent-payment-rest.mjs
+          node tests/local/v40-qa-time-rest.mjs
+          node tests/local/v40-payment-correction-rest.mjs
+          node tests/local/v40-contact-tracking-rest.mjs

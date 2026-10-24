@@ -222,6 +222,19 @@
   </dialog>
 
 
+  <dialog class="modal schedule-sheet" id="correction-modal" aria-labelledby="correction-heading">
+    <form id="correction-form" class="modal-inner">
+      <div class="modal-head"><div><p class="eyebrow">PAYMENT CORRECTION</p><h2 id="correction-heading">更正收款</h2>
+        <p class="modal-description">原收款紀錄會保留，請依實際對帳逐堂填寫需要沖銷的金額。</p></div>
+        <button type="button" class="close-modal" data-close="correction-modal" aria-label="關閉">×</button></div>
+      <div id="correction-details" class="period-summary"></div>
+      <div id="correction-lines"></div>
+      <label>更正原因（至少 10 字）<textarea id="correction-reason" rows="3" minlength="10" maxlength="500" required></textarea></label>
+      <div id="correction-confirmation" role="status" aria-live="polite"></div>
+      <div class="form-actions"><button type="button" class="secondary-button" data-close="correction-modal">先不要</button>
+        <button type="submit" class="primary-button" id="correction-submit">檢查更正內容</button></div>
+    </form>
+  </dialog>
   <dialog class="modal lesson-dialog" id="lesson-modal" aria-labelledby="lesson-modal-heading">
     <form id="lesson-form" class="modal-inner">
       <div class="modal-head"><div><p class="eyebrow">LESSON · 課程紀錄</p>
