@@ -1,0 +1,68 @@
+name: V4 isolated Supabase Auth acceptance
+on:
+  push:
+    branches: [feat/v4-batch-corrections-foundation-20261024]
+  pull_request:
+    branches: [feat/v4-contact-only-links-20261024]
+    paths: ['supabase/**', 'tests/local/**', 'v2/**', '.github/workflows/v4-local-auth-acceptance.yml']
+permissions:
+  contents: read
+jobs:
+  local-auth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.107.0
+      - name: Verify the repository targets isolated localhost
+        run: grep -q '^project_id = "tutor_v4_isolated"$' supabase/config.toml
+      - name: Start local Supabase and replay migrations without credential logs
+        shell: bash
+        run: |
+          set -uo pipefail
+          start_log="${RUNNER_TEMP}/supabase-start.log"
+          reset_log="${RUNNER_TEMP}/supabase-reset.log"
+          cleanup() { rm -f "$start_log" "$reset_log"; }
+          trap cleanup EXIT
+
+          if supabase start >"$start_log" 2>&1; then
+            echo "Supabase local startup succeeded; CLI output was suppressed."
+          else
+            rc=$?
+            echo "::error::Supabase local startup failed (exit ${rc}); CLI output was suppressed."
+            docker ps -a --filter name=tutor_v4_isolated --format 'container={{.Names}} status={{.Status}}' || true
+            exit "$rc"
+          fi
+
+          if supabase db reset --local --no-seed >"$reset_log" 2>&1; then
+            migration_count="$(grep -c '^Applying migration ' "$reset_log" || true)"
+            last_version="$(grep '^Applying migration ' "$reset_log" | tail -n 1 | sed -E 's/^Applying migration ([0-9]{14})_.*/\1/' || true)"
+            echo "Migration replay succeeded: count=${migration_count}, last_version=${last_version:-unknown}."
+          else
+            rc=$?
+            echo "::error::Migration replay failed (exit ${rc}); CLI output was suppressed."
+            grep '^Applying migration ' "$reset_log" | tail -n 5 | sed -E 's/^Applying migration ([0-9]{14})_.*/Applying migration version \1/' || true
+            docker ps -a --filter name=tutor_v4_isolated --format 'container={{.Names}} status={{.Status}}' || true
+            exit "$rc"
+          fi
+      - name: Run GoTrue JWT and REST assertions using only synthetic data
+        env:
+          V359_LOCAL_RLS_TEST: '1'
+          V359_RLS_PREAPPLIED: '1'
+          V40_LOCAL_METADATA_TEST: '1'
+          V40_LOCAL_CONTACT_TEST: '1'
+          V40_LOCAL_CORRECTION_TEST: '1'
+          V40_LOCAL_CONTACT_TRACKING_TEST: '1'
+        run: |
+          node tests/local/v40-contact-rest.mjs
+          node tests/local/v359-parent-payment-rest.mjs
+          node tests/local/v40-qa-time-rest.mjs
+          node tests/local/v40-payment-correction-rest.mjs
+          node tests/local/v40-contact-tracking-rest.mjs

@@ -24,10 +24,11 @@ function createApp(){
  const get=id=>{if(!nodes.has(id))nodes.set(id,node(id));return nodes.get(id)};
  const document={querySelector:get,querySelectorAll:()=>[],addEventListener(){},activeElement:null};
  const localStorage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,String(v)),removeItem:k=>values.delete(k)};
+ const window={__tutorSiteConfirm:async options=>{await options.action();return true}};
  const app=new Function("document","localStorage","crypto","confirm","console","setTimeout","FormData","window",...Object.keys(modules),
   appSource+"\nrender=()=>{};return {state,visibleLessons,renderStudentBilling,renderParentLearning,openCancel,submitCancel,submitInviteEdit,revokeInvite,setRole,"+
   "setUser(v){activeUser=v},setClient(v){client=v}}")(
-  document,localStorage,{randomUUID:()=> "fixture-"+Math.random()},()=>true,console,()=>0,FormData,{},...Object.values(modules));
+  document,localStorage,{randomUUID:()=> "fixture-"+Math.random()},()=>true,console,()=>0,FormData,window,...Object.values(modules));
  return {app,get};
 }
 const rule=()=>({id:"rule-a",teacher_id:"teacher-a",student_id:"student-a",subject:"數學",

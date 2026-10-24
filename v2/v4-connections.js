@@ -16,7 +16,7 @@ export function invitationToken(value,origin){
  return token;
 }
 const guid=/^[a-f0-9-]{36}$/i;
-export function createV4Connections({getClient,getUser,getRole,getStudents,getLinks,onChanged,notify}){
+export function createV4Connections({getClient,getUser,getRole,getStudents,getLinks,getProfiles=()=>[],onChanged,notify}){
  const $=id=>document.getElementById(id);
  let stream=null,scanTurn=0,epoch=0;
  let inbox=[],enabled=false,loading=false,preview=null,token="",shareUrl="",seq=0,errorText="";
@@ -57,9 +57,11 @@ export function createV4Connections({getClient,getUser,getRole,getStudents,getLi
    const pending=inbox.filter(r=>r.role===role&&["pending_teacher","pending_parent"].includes(r.status));
    const others=inbox.filter(r=>r.role===role&&!pending.includes(r)).slice(0,8);
    const linked=getLinks().filter(g=>role==="parent"?g.guardian_id===sessionKey():g.teacher_id===sessionKey());
+   const profileName=(id,fallback)=>getProfiles().find(p=>p.id===id)?.display_name?.trim()||fallback;
    const linkList=linked.length?'<div class="v4-linked"><h3>已連結的課程</h3>'+linked.map(g=>{
      const student=getStudents().find(s=>s.id===g.student_id);
      return '<div class="v4-request-row"><strong>'+esc(student?.name||"學生")+'</strong><div class="v4-actions">'+
+       '<small>老師：'+esc(profileName(g.teacher_id,g.teacher_id===sessionKey()?"目前帳號":"已連結老師"))+' · 家長：'+esc(profileName(g.guardian_id,g.guardian_id===sessionKey()?"目前帳號":"已連結家長"))+'</small>'+
        '<button class="secondary-button" type="button" data-v4-action="unlink" data-id="'+esc(g.id)+'">解除這筆連結</button></div></div>';
    }).join("")+'</div>':"";
    const parentForm=role==="parent"?'<form id="v4-parent-request-form" class="v4-form">'+
@@ -233,8 +235,41 @@ export function createV4Connections({getClient,getUser,getRole,getStudents,getLi
      });return true;
    }
    if(kind==="unlink"){
-     if(!window.confirm("確定解除這筆課程連結？解除後將無法繼續查看這位學生的課程，但歷史課程及帳務不會被刪除。"))return true;
-     await perform(async()=>{await rpc("v4_disconnect_guardian",{p_student_guardian_id:id});await onChanged();notify("已解除連結");});return true;
+     const link=getLinks().find(g=>g.id===id);
+     const student=getStudents().find(s=>s.id===link?.student_id);
+     const profileName=(id,fallback)=>getProfiles().find(p=>p.id===id)?.display_name?.trim()||fallback;
+     const confirm=typeof window!=="undefined"&&window.__tutorSiteConfirm;
+     if(typeof confirm!=="function"){notify("確認視窗尚未載入，為保護資料本次未解除連結");return true;}
+     const done=await confirm({
+       title:"確認解除課程連結",
+       description:"解除後，這段關係將停止查看指定學生的課程與付款資料。",
+       details:[
+         "學生："+(student?.name||"未命名學生"),
+         "老師："+profileName(link?.teacher_id,link?.teacher_id===sessionKey()?"目前帳號":"已連結老師"),
+         "家長："+profileName(link?.guardian_id,link?.guardian_id===sessionKey()?"目前帳號":"已連結家長"),
+         "已完成課程、付款與稽核紀錄仍會保留，不會被刪除。"
+       ],
+       confirmLabel:"確認解除",
+       cancelLabel:"保留連結",
+       busyLabel:"正在解除…",
+       action:async()=>{
+         if(!enabled||loading)throw Error("資料仍在同步，請稍後再試");
+         const owner=sessionKey(),generation=epoch;
+         loading=true;errorText="";display();
+         try{
+           await rpc("v4_disconnect_guardian",{p_student_guardian_id:id});
+           try{await onChanged();await refresh();}catch(refreshError){console.warn("解除連結後重新整理失敗",refreshError);}
+         }catch(error){
+           errorText=error.message||"解除連結失敗，原有關係仍保留。";
+           display();
+           throw Error(errorText);
+         }finally{
+           if(owner===sessionKey()&&generation===epoch){loading=false;display();}
+         }
+       }
+     });
+     if(done)notify("已解除連結");
+     return true;
    }
    if(["approve","decline","cancel"].includes(kind)){
      const student=$("v4-connection-content")?.querySelector('[data-v4-student="'+id+'"]')?.value||null;

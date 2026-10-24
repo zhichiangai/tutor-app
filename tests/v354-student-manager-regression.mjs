@@ -35,6 +35,7 @@ function harness(){
   [...elements.values()].filter(el=>el.id==="student-management-modal"||el.id==="account-modal"):[],
   body:{classList:{toggle(){}}},activeElement:null};
  const code=source.replace(/^import .* from "\.\/[^"]+";/gm,"").replace(/\nmain\(\);\s*$/,"");
+ const window={__tutorSiteConfirm:async options=>{await options.action();return true}};
  const api=new Function("document","localStorage","window","crypto","setTimeout","FormData",
   "expandSchedules","lessonAllocation","confirm",
   code+"\npersist=async(op)=>{await op();return true};render=()=>{};return {"+
@@ -43,7 +44,7 @@ function harness(){
     "saveManagedStudent,submitManagedStudentInvite,submitManagedGuardianInvite,"+
     "revokeManagedStudentAccount,removeStudentInvite,clearUserSessionState,"+
     "setUser(u){activeUser=u},setClient(c){client=c}};")(
-   document,{getItem(){return null},setItem(){}},{},{randomUUID:()=>"test-id"},
+   document,{getItem(){return null},setItem(){}},window,{randomUUID:()=>"test-id"},
    ()=>0,FormData,expandSchedules,lessonAllocation,()=>true);
  return {api,el:querySelector};
 }

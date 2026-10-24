@@ -65,5 +65,5 @@ test("outgoing pending invitations cannot reveal registered email or display nam
 });
 test("incoming parent contact remains visible before a child or parent mode exists",()=>{
  assert.match(ui,/const displayed=rows;/);
- assert.match(ui,/r\.my_role==="parent"\?"老師聯絡人"/);
+ assert.match(ui,/r\.kind==="outgoing"\?"寄出的邀請"/);
 });

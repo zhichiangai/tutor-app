@@ -22,13 +22,13 @@ async function call(who,name,args={}){
 }
 async function ok(who,name,args={}){const r=await call(who,name,args);assert.equal(r.status,200,JSON.stringify(r.body));count++;return r.body;}
 async function denied(who,name,args={}){const r=await call(who,name,args);assert.notEqual(r.status,200,JSON.stringify(r.body));count++;}
-async function inbox(who,n){const rows=await ok(who,'v4_contact_inbox');assert.equal(rows.length,n,JSON.stringify(rows));count++;return rows;}
+async function inbox(who,n){const rows=(await ok(who,'v4_contact_inbox')).filter(r=>r.kind!=='outgoing');assert.equal(rows.length,n,JSON.stringify(rows));count++;return rows;}
 async function request(sender,recipient,role){assert.deepEqual(await ok(sender,'v4_contact_request',{p_email:recipient.email,p_my_role:role}),{submitted:true});count++}
 await denied(null,'v4_contact_inbox');await denied(null,'v4_contact_request',{p_email:pA.email,p_my_role:'teacher'});
 await request(tA,pA,'teacher');
 const unknown={email:`unknown-${randomUUID()}@local.invalid`};
 assert.deepEqual(await ok(tA,'v4_contact_request',{p_email:unknown.email,p_my_role:'teacher'}),{submitted:true});count++;
-await inbox(tA,0); // A registered address and an unknown address are indistinguishable to the sender.
+await inbox(tA,0); // Sender tracking is separately tested for identical pending receipts.
 let rows=await inbox(pA,1);const pairA=rows[0].id;
 await denied(tA,'v4_contact_action',{p_id:pairA,p_action:'approve'});
 await denied(pB,'v4_contact_action',{p_id:pairA,p_action:'approve'});
