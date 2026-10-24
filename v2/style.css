@@ -718,6 +718,32 @@ body.auth-pending .auth-loading-screen{display:flex;position:fixed;inset:0;z-ind
 #v4-scanner-video{display:block;width:100%;max-height:320px;object-fit:cover;border-radius:12px}
 .v4-actions button{min-height:44px}.v4-form input,#v4-manual-link{min-width:0;width:100%;box-sizing:border-box}
 
+/* Shared relationship/account confirmation; keep dangerous actions explicit and keyboard friendly. */
+.site-confirm-modal{max-width:min(560px,calc(100vw - 28px));width:100%;border:0;border-radius:20px;padding:0;color:var(--ink);background:var(--white);box-shadow:0 24px 70px rgba(58,48,40,.22)}
+.site-confirm-modal::backdrop{background:rgba(47,48,45,.38)}
+.site-confirm-modal .modal-inner{max-height:min(90vh,720px);overflow:auto}
+.site-confirm-details{display:grid;gap:8px;margin:16px 0;padding:14px 16px;border:1px solid var(--border);border-radius:14px;background:var(--paper)}
+.site-confirm-details p{margin:0;line-height:1.6;overflow-wrap:anywhere}
+.site-confirm-error{margin:12px 0;color:#a12c2c;line-height:1.6}
+.site-confirm-modal .form-actions{gap:10px}
+.site-confirm-modal .form-actions button{min-height:44px}
+@media(max-width:625px){
+ .site-confirm-modal{max-width:calc(100vw - 20px);border-radius:16px}
+ .site-confirm-modal .modal-inner{padding:20px 16px}
+ .site-confirm-modal .form-actions{display:grid;grid-template-columns:1fr;gap:8px}
+}
+
+/* Mobile accessibility: keep every visible primary control at a 44px touch target. */
+@media(max-width:650px){
+ button{min-height:44px}
+ .round-icon,.round-icon.small{width:44px;height:44px;min-width:44px;min-height:44px}
+ .role-indicator{min-height:44px}
+ .greeting .primary-button{height:44px;width:44px;min-height:44px}
+ .close-modal{width:44px;height:44px;min-width:44px;min-height:44px}
+ .month-controls button,#view-calendar .calendar-date-controls button{width:44px;min-width:44px;min-height:44px}
+ .home-focus-link,.home-focus-heading .home-focus-heading-link{min-height:44px}
+}
+
 /* V4 optional contacts, independent of student/course permissions. */
 #v4-account-contact-content .v4-form{margin:12px 0;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
 #v4-account-contact-content .v4-form label{flex:1 1 220px;min-width:0}

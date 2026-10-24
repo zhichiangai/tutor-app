@@ -44,7 +44,9 @@ test("V4 never grants student data through role selection or prior to approval",
  assert.match(migration,/and s\.teacher_id=r\.teacher_id/);
  assert.match(migration,/v_uid not in \(v_request.parent_id,v_request.teacher_id\)/);
  assert.match(migration,/insert into public\.student_guardians/);
- assert.match(ui,/confirm\("確定解除這筆課程連結/);
+ assert.doesNotMatch(ui,/window\.confirm/);
+ assert.match(ui,/window\.__tutorSiteConfirm/);
+ assert.match(ui,/確認解除課程連結/);
 });
 
 test("GAS notifications have protected access and no stored secret in repository",()=>{
