@@ -1,0 +1,40 @@
+name: V4 isolated PostgreSQL contract
+on:
+  push:
+    branches: [codex/v4-beta-integration-20261025, feat/v4-batch-corrections-foundation-20261024]
+  pull_request:
+    branches: [main, codex/v4-beta-integration-20261025, feat/v4-bidirectional-invites-qr-gas-20261023, feat/v4-qa-time-metadata-20261024]
+    paths: ['supabase/**', 'tests/sql/v4_*', '.github/workflows/v4-isolated-db.yml']
+permissions:
+  contents: read
+jobs:
+  postgres-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ephemeral-qa-only
+          POSTGRES_DB: tutor_v4_contract
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run synthetic contract fixture and V4 draft on disposable PostgreSQL
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: ephemeral-qa-only
+          PGDATABASE: tutor_v4_contract
+        run: >-
+          psql -v ON_ERROR_STOP=1
+          -f tests/sql/v4_isolated_fixture.sql
+          -f supabase/migrations/20261023090000_v4_bidirectional_invites_gas.sql
+          -f supabase/migrations/20261024033000_v4_account_contacts.sql
+          -f supabase/migrations/20261024035831_v4_contact_privacy_hardening.sql
+          -f tests/sql/v4_contact_assertions.sql
+          -f tests/sql/v4_isolated_assertions.sql

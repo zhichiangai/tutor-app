@@ -1,9 +1,9 @@
 name: V3 Regression Tests
 on:
   push:
-    branches: ["main", "feat/v3-human-friendly-course-billing-guardian-20261020"]
+    branches: ["main", "feat/v3-human-friendly-course-billing-guardian-20261020", "feat/v4-batch-corrections-foundation-20261024"]
   pull_request:
-    branches: ["main"]
+    branches: ["main", "feat/v4-bidirectional-invites-qr-gas-20261023", "feat/v4-qa-time-metadata-20261024"]
 permissions:
   contents: read
 jobs:

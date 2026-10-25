@@ -690,3 +690,73 @@ body.auth-pending .auth-loading-screen{display:flex;position:fixed;inset:0;z-ind
 .auth-loading-content p{margin:0;color:#8a8983;font-size:13px;line-height:1.7}
 .auth-loading-symbol{display:grid;place-items:center;width:56px;height:56px;
   background:#fbece5;border-radius:50%;font-size:30px;color:#bc7464}
+
+/* V4: keep teacher/parent invitation actions in the existing Students page. */
+.v4-connection-card .v4-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.v4-connection-card .v4-columns>div{min-width:0}
+.v4-connection-card h3{font-size:1.05rem;margin:0 0 12px}
+.v4-connection-card .v4-form{display:grid;gap:12px;margin:12px 0}
+.v4-connection-card label{display:grid;gap:6px;margin:10px 0}
+.v4-connection-card input,.v4-connection-card select{width:100%;max-width:100%;min-height:44px;box-sizing:border-box}
+.v4-connection-card .v4-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.v4-connection-card .v4-actions button{min-height:44px}
+.v4-request-row{padding:12px 0;border-bottom:1px solid var(--border,#e7e9ec)}
+.v4-request-row strong,.v4-request-row small{display:block}
+.v4-request-row small{margin-top:4px}
+.v4-request-row p{font-size:.9rem;margin:8px 0}
+.v4-history{margin-top:16px}
+.v4-history summary{cursor:pointer}
+.v4-history p{font-size:.9rem;padding:6px 0}
+.v4-link-preview,.v4-share-result:not(:empty){border:1px solid var(--border,#e7e9ec);border-radius:12px;padding:16px;margin-top:18px}
+.v4-link-preview>strong{display:block}
+.v4-error{color:#a12c2c}
+#v4-qr-output{display:flex;justify-content:flex-start;align-items:center;min-height:180px;margin-top:14px}
+#v4-qr-output img{max-width:100%;height:auto}
+@media(max-width:720px){.v4-connection-card .v4-columns{grid-template-columns:minmax(0,1fr)}}
+
+/* V4 scanner stays within the existing connection card. */
+#v4-scanner-video{display:block;width:100%;max-height:320px;object-fit:cover;border-radius:12px}
+.v4-actions button{min-height:44px}.v4-form input,#v4-manual-link{min-width:0;width:100%;box-sizing:border-box}
+
+/* Shared relationship/account confirmation; keep dangerous actions explicit and keyboard friendly. */
+.site-confirm-modal{max-width:min(560px,calc(100vw - 28px));width:100%;border:0;border-radius:20px;padding:0;color:var(--ink);background:var(--white);box-shadow:0 24px 70px rgba(58,48,40,.22)}
+.site-confirm-modal::backdrop{background:rgba(47,48,45,.38)}
+.site-confirm-modal .modal-inner{max-height:min(90vh,720px);overflow:auto}
+.site-confirm-details{display:grid;gap:8px;margin:16px 0;padding:14px 16px;border:1px solid var(--border);border-radius:14px;background:var(--paper)}
+.site-confirm-details p{margin:0;line-height:1.6;overflow-wrap:anywhere}
+.site-confirm-error{margin:12px 0;color:#a12c2c;line-height:1.6}
+.site-confirm-modal .form-actions{gap:10px}
+.site-confirm-modal .form-actions button{min-height:44px}
+@media(max-width:625px){
+ .site-confirm-modal{max-width:calc(100vw - 20px);border-radius:16px}
+ .site-confirm-modal .modal-inner{padding:20px 16px}
+ .site-confirm-modal .form-actions{display:grid;grid-template-columns:1fr;gap:8px}
+}
+
+/* Mobile accessibility: keep every visible primary control at a 44px touch target. */
+@media(max-width:650px){
+ button{min-height:44px}
+ .round-icon,.round-icon.small{width:44px;height:44px;min-width:44px;min-height:44px}
+ .role-indicator{min-height:44px}
+ .greeting .primary-button{height:44px;width:44px;min-height:44px}
+ .close-modal{width:44px;height:44px;min-width:44px;min-height:44px}
+ .month-controls button,#view-calendar .calendar-date-controls button{width:44px;min-width:44px;min-height:44px}
+ .home-focus-link,.home-focus-heading .home-focus-heading-link{min-height:44px}
+}
+
+/* V4 optional contacts, independent of student/course permissions. */
+#v4-account-contact-content .v4-form{margin:12px 0;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+#v4-account-contact-content .v4-form label{flex:1 1 220px;min-width:0}
+#v4-account-contact-content .v4-form input{width:100%;min-width:0;box-sizing:border-box}
+#v4-account-contact-content .v4-form button{min-height:44px}
+#v4-account-contact-content .v4-request-row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:center}
+.v4-contact-warning{padding:10px;border:1px solid var(--border,#e7e9ec);border-radius:12px}
+.v4-contact-warning p{margin:0 0 8px}
+.period-line [data-correction-lesson] { width: min(8rem, 100%); min-height: 44px; flex: 0 0 auto; }
+@media (max-width: 625px) {
+ .period-batch-head { flex-wrap: wrap; }
+ .period-batch-head > div { min-width: 0; max-width: 100%; }
+ .period-batch-amount { white-space: normal; overflow-wrap: anywhere; }
+ .period-line span, .period-line span:last-child { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+}
+@media (max-width: 375px) { #correction-lines .period-line { flex-wrap: wrap; gap: .5rem; } }

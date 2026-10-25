@@ -35,6 +35,7 @@ function harness(){
   [...elements.values()].filter(el=>el.id==="student-management-modal"||el.id==="account-modal"):[],
   body:{classList:{toggle(){}}},activeElement:null};
  const code=source.replace(/^import .* from "\.\/[^"]+";/gm,"").replace(/\nmain\(\);\s*$/,"");
+ const window={__tutorSiteConfirm:async options=>{await options.action();return true}};
  const api=new Function("document","localStorage","window","crypto","setTimeout","FormData",
   "expandSchedules","lessonAllocation","confirm",
   code+"\npersist=async(op)=>{await op();return true};render=()=>{};return {"+
@@ -43,7 +44,7 @@ function harness(){
     "saveManagedStudent,submitManagedStudentInvite,submitManagedGuardianInvite,"+
     "revokeManagedStudentAccount,removeStudentInvite,clearUserSessionState,"+
     "setUser(u){activeUser=u},setClient(c){client=c}};")(
-   document,{getItem(){return null},setItem(){}},{},{randomUUID:()=>"test-id"},
+   document,{getItem(){return null},setItem(){}},window,{randomUUID:()=>"test-id"},
    ()=>0,FormData,expandSchedules,lessonAllocation,()=>true);
  return {api,el:querySelector};
 }
@@ -165,7 +166,7 @@ test("editing student defaults is teacher-owned and does not mutate historic les
  el("#managed-student-subject").value="物理";
  el("#managed-student-rate").value="750";
  await api.saveManagedStudent({preventDefault(){}});
- assert.deepEqual(updated,{name:"王同學",subject:"物理",hourly_rate:750});
+ assert.deepEqual(updated,{name:"王同學",subject:"物理",hourly_rate:750,is_qa:false});
  assert.deepEqual(where,[["id","s1"],["teacher_id","teacher-a"]]);
  assert.equal(api.state.lessons[0].total_amount,1000);
  assert.equal(api.state.lessons[0].hourly_rate,500);

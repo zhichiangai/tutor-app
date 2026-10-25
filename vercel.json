@@ -35,6 +35,14 @@
     {
       "source": "/terms.html",
       "destination": "/v2/terms.html"
+    },
+    {
+      "source": "/v4-connections.js",
+      "destination": "/v2/v4-connections.js"
+    },
+    {
+      "source": "/v4-config.js",
+      "destination": "/v2/v4-config.js"
     }
   ]
 }
