@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {createRequire} from "node:module";
+import {readFileSync} from "node:fs";
 
 const require=createRequire(import.meta.url);
 const handler=require("../api/v4-config.js");
@@ -65,4 +66,14 @@ test("endpoint allows only GET and never answers arbitrary hosts",t=>{
  setEnv({VERCEL_ENV:"production"});
  assert.equal(call("POST","tutor.rapid4grad.com").statusCode,405);
  assert.equal(call("GET","example.com").statusCode,404);
+});
+
+test("Vercel keeps the config handler at the project root and does not rewrite API paths",()=>{
+ const vercel=JSON.parse(readFileSync(new URL("../vercel.json",import.meta.url),"utf8"));
+ const apiPath=new URL("../api/v4-config.js",import.meta.url);
+ assert.equal(typeof handler,"function");
+ assert.ok(readFileSync(apiPath,"utf8").includes("module.exports"));
+ assert.ok(Array.isArray(vercel.rewrites));
+ assert.equal(vercel.rewrites.some(({source=""})=>
+  source==="/api"||source.startsWith("/api/")||source==="/:path*"||source==="/(.*)"),false);
 });
