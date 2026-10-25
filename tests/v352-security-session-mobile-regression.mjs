@@ -22,7 +22,9 @@ function browserHarness({realInitialize=false}={}){
   querySelector:element,querySelectorAll:()=>[],addEventListener(){},activeElement:null,
   body:{classList:{toggle(){}}}
  };
- const window={};
+ const window={location:{hostname:"localhost",protocol:"http:"},V4_CONFIG_READY:Promise.resolve({
+  environment:"local",isolated:true,projectRef:"local",url:"http://127.0.0.1:54321",publishableKey:"eyJ.synthetic-local-test-key"
+ })};
  const localStorage={
   getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,String(v)),removeItem:k=>storage.delete(k)
  };
@@ -175,7 +177,7 @@ test("a getSession response from a signed-out account cannot rehydrate the old p
   auth:{onAuthStateChange(cb){onAuthEvent=cb},getSession:()=>staleSession}
  })};
  const initializing=app.initializeLive();
- await Promise.resolve();
+ await new Promise(resolve=>setImmediate(resolve));
  app.setUser({id:"old-student"});
  app.state.studentPortal={students:[{id:"private-old",name:"Former account"}],lessons:[],schedules:[]};
  node("#student-portal-content").innerHTML="Former account";
@@ -276,5 +278,5 @@ test("V3.5.3 narrow month agenda buttons can shrink inside a 320px viewport",()=
  assert.match(css,/#view-calendar \.month-agenda-row \.pill\s*\{[^}]*max-width:42%;[^}]*min-width:0;/);
  // Actual viewport hitboxes and document.scrollWidth must still be checked by Codex browser.
  assert.ok(!css.includes("body{overflow-x:hidden}"),"do not cover up overflow instead of fixing it");
- assert.ok(html.includes("V4.0.0-dev.2 · Made with care."));
+ assert.ok(html.includes("V4 Beta · Made with care."));
 });

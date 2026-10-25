@@ -1,9 +1,9 @@
 name: V4 isolated PostgreSQL contract
 on:
   push:
-    branches: [feat/v4-batch-corrections-foundation-20261024]
+    branches: [codex/v4-beta-integration-20261025, feat/v4-batch-corrections-foundation-20261024]
   pull_request:
-    branches: [main, feat/v4-bidirectional-invites-qr-gas-20261023, feat/v4-qa-time-metadata-20261024]
+    branches: [main, codex/v4-beta-integration-20261025, feat/v4-bidirectional-invites-qr-gas-20261023, feat/v4-qa-time-metadata-20261024]
     paths: ['supabase/**', 'tests/sql/v4_*', '.github/workflows/v4-isolated-db.yml']
 permissions:
   contents: read

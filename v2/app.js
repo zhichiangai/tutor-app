@@ -10,21 +10,34 @@ import { createV4Connections } from "./v4-connections.js";
 import { runSiteConfirmation } from "./site-confirm.js";
 import { createV4AccountContacts } from "./v4-contacts.js";
 import { exactCents, prepareCorrection } from "./payment-correction.js";
-// V4 dev must never fall back to the V3 production project.
-const V4_CONFIG=(typeof window!=="undefined"&&window.V4_BACKEND)||{};
-const V4_LOCAL_HOST=typeof window!=="undefined"&&
- ["localhost","127.0.0.1"].includes(window.location?.hostname)&&window.location?.protocol==="http:";
-const V4_LOCAL_CONFIG_VALID=V4_LOCAL_HOST&&V4_CONFIG.isolated===true&&
- V4_CONFIG.projectRef==="local"&&
- /^http:\/\/(?:localhost|127\.0\.0\.1):54321$/.test(V4_CONFIG.url||"")&&
- /^(?:sb_publishable_[A-Za-z0-9_-]+|eyJ[A-Za-z0-9._-]+)$/.test(V4_CONFIG.publishableKey||"");
-const V4_REMOTE_CONFIG_VALID=V4_CONFIG.isolated===true&&/^[a-z]{20}$/.test(V4_CONFIG.projectRef||'')&&
- V4_CONFIG.projectRef!=='vctisuglfoxyuwlvyjee'&&
- V4_CONFIG.url==='https://'+V4_CONFIG.projectRef+'.supabase.co'&&
- /^sb_publishable_[A-Za-z0-9_-]+$/.test(V4_CONFIG.publishableKey||'');
-const V4_CONFIG_VALID=V4_LOCAL_CONFIG_VALID||V4_REMOTE_CONFIG_VALID;
-const SUPABASE_URL = V4_CONFIG_VALID?V4_CONFIG.url:'';
-const SUPABASE_PUBLISHABLE_KEY = V4_CONFIG_VALID?V4_CONFIG.publishableKey:'';
+// Backend settings are resolved before the first Auth request. Production is
+// delivered only by the hostname- and Vercel-environment-guarded config API.
+const V4_PRODUCTION_HOST="tutor.rapid4grad.com";
+const V4_PRODUCTION_REF="vctisuglfoxyuwlvyjee";
+let V4_CONFIG=null,V4_CONFIG_VALID=false,SUPABASE_URL="",SUPABASE_PUBLISHABLE_KEY="";
+let V4_CONFIG_INITIALIZED=false;
+function validateV4Backend(config){
+ const host=window.location?.hostname||"",protocol=window.location?.protocol||"";
+ const publicKey=/^sb_publishable_[A-Za-z0-9_-]+$/.test(config?.publishableKey||"");
+ if(protocol==="http:"&&["localhost","127.0.0.1"].includes(host))
+  return config?.environment==="local"&&config?.isolated===true&&config?.projectRef==="local"&&
+   /^http:\/\/(?:localhost|127\.0\.0\.1):54321$/.test(config?.url||"")&&
+   (publicKey||/^eyJ[A-Za-z0-9._-]+$/.test(config?.publishableKey||""));
+ if(protocol!=="https:"||!publicKey)return false;
+ if(host===V4_PRODUCTION_HOST)return config?.environment==="production"&&config?.isolated===false&&
+  config?.projectRef===V4_PRODUCTION_REF&&config?.url===`https://${V4_PRODUCTION_REF}.supabase.co`;
+ return host.endsWith(".vercel.app")&&config?.environment==="preview"&&config?.isolated===true&&
+  /^[a-z]{20}$/.test(config?.projectRef||"")&&config.projectRef!==V4_PRODUCTION_REF&&
+  config?.url===`https://${config.projectRef}.supabase.co`;
+}
+async function initializeV4BackendConfig(){
+ if(V4_CONFIG_INITIALIZED)return V4_CONFIG_VALID;
+ const config=await window.V4_CONFIG_READY;
+ if(!config||!validateV4Backend(config))throw Error(window.V4_CONFIG_ERROR||"此環境未通過資料庫隔離檢查，已停止登入。");
+ V4_CONFIG=config;V4_CONFIG_VALID=true;SUPABASE_URL=config.url;SUPABASE_PUBLISHABLE_KEY=config.publishableKey;
+ V4_CONFIG_INITIALIZED=true;
+ return true;
+}
 const STORAGE = "tutor_v2_preview_data_20261019";
 const ROLE_STORAGE = "tutor_v2_role";
 const ROLE_PENDING_STORAGE = "tutor_v2_role_pending";
@@ -2451,8 +2464,9 @@ async function refreshLive({withHistory=true}={}){
 }
 async function ensureClient(){
  if(client)return client;
+ await initializeV4BackendConfig();
  const createClient=window.supabase?.createClient;
- if(!SUPABASE_URL&&window.location)throw Error("V4 尚未設定隔離測試資料庫，暫時無法登入或寫入。正式 V3.5.9 不受影響。");
+ if(!V4_CONFIG_VALID||!SUPABASE_URL)throw Error(window.V4_CONFIG_ERROR||"資料庫環境尚未通過驗證，已停止登入。");
  if(!createClient)throw Error("登入元件載入失敗，請重新整理頁面後再試");
  client=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
  client.auth.onAuthStateChange((event,session)=>{
@@ -2553,7 +2567,10 @@ async function initializeLive(){
   clearUserSessionState();
   authPhase="error";
   render();
-  toast("剛剛沒能開啟課程，請按「再試一次」。");
+  const configError=window.V4_CONFIG_ERROR||"";
+  const description=$("#login-description");
+  if(configError&&description)description.textContent=configError;
+  toast(configError||"剛剛沒能開啟課程，請按「再試一次」。");
   showModal("account-modal");
  }
 }

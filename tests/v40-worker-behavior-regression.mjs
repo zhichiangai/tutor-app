@@ -75,12 +75,21 @@ test('manual invitation input accepts opaque token and rejects off-origin URLs',
  assert.throws(()=>ui.invitationToken('https://evil.example/?v4invite='+token,origin));
  assert.throws(()=>ui.invitationToken(origin+'/?v4invite=bad',origin));
 });
-test('dev frontend public configuration never defaults to production',()=>{
+test('frontend backend configuration remains empty until a validated environment is initialized',async()=>{
  const prefix=read('v2/app.js').split('const STORAGE')[0].replace(/^import .*$/gm,'');
- const config=backend=>new Function('window',prefix+'return {url:SUPABASE_URL,key:SUPABASE_PUBLISHABLE_KEY};')({V4_BACKEND:backend});
- assert.equal(config(undefined).url,'');
- assert.equal(config({isolated:true,projectRef:'vctisuglfoxyuwlvyjee',url:'https://vctisuglfoxyuwlvyjee.supabase.co',publishableKey:'sb_publishable_qa'}).url,'');
- const ref='abcdefghijklmnopqrst';assert.equal(config({isolated:true,projectRef:ref,url:'https://'+ref+'.supabase.co',publishableKey:'sb_publishable_qa'}).url,'https://'+ref+'.supabase.co');
+ const ref='abcdefghijklmnopqrst';
+ const backend={environment:'local',isolated:true,projectRef:'local',url:'http://127.0.0.1:54321',publishableKey:'eyJ.synthetic-local-test-key'};
+ const window={location:{hostname:'localhost',protocol:'http:'},V4_CONFIG_READY:Promise.resolve(backend)};
+ const api=new Function('window',prefix+'return {initializeV4BackendConfig,getConfig:()=>({url:SUPABASE_URL,key:SUPABASE_PUBLISHABLE_KEY})};')(window);
+ assert.deepEqual(api.getConfig(),{url:'',key:''});
+ await api.initializeV4BackendConfig();
+ assert.deepEqual(api.getConfig(),{url:backend.url,key:backend.publishableKey});
+ const deniedWindow={location:{hostname:'localhost',protocol:'http:'},V4_CONFIG_READY:Promise.resolve({
+  environment:'local',isolated:true,projectRef:'vctisuglfoxyuwlvyjee',url:'https://vctisuglfoxyuwlvyjee.supabase.co',publishableKey:'sb_publishable_synthetic'
+ })};
+ const denied=new Function('window',prefix+'return {initializeV4BackendConfig,getConfig:()=>({url:SUPABASE_URL,key:SUPABASE_PUBLISHABLE_KEY})};')(deniedWindow);
+ await assert.rejects(denied.initializeV4BackendConfig(),/隔離檢查/);
+ assert.deepEqual(denied.getConfig(),{url:'',key:''});
 });
 
 test('invalid invitation keeps manual recovery controls available',async()=>{

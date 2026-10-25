@@ -2,9 +2,10 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 assert.equal(process.env.V40_LOCAL_METADATA_TEST,'1');
-const root=new URL('../../',import.meta.url).pathname;
+const root=fileURLToPath(new URL('../../',import.meta.url));
 const s=JSON.parse(execFileSync('supabase',['status','-o','json'],{cwd:root,encoding:'utf8'}));
 assert.equal(s.API_URL,'http://127.0.0.1:54321');
 assert.match(s.DB_URL,/127\.0\.0\.1:54322\/postgres$/);

@@ -1,9 +1,9 @@
 name: V4 isolated Supabase Auth acceptance
 on:
   push:
-    branches: [feat/v4-batch-corrections-foundation-20261024]
+    branches: [codex/v4-beta-integration-20261025, feat/v4-batch-corrections-foundation-20261024]
   pull_request:
-    branches: [feat/v4-contact-only-links-20261024]
+    branches: [main, codex/v4-beta-integration-20261025, feat/v4-contact-only-links-20261024]
     paths: ['supabase/**', 'tests/local/**', 'v2/**', '.github/workflows/v4-local-auth-acceptance.yml']
 permissions:
   contents: read

@@ -85,7 +85,7 @@ test("HTML has four student tabs in desktop and mobile, without student billing"
  assert.match(css,/\.student-mode \.nav-standard\{display:none!important\}/);
  assert.match(css,/\.student-mode \.mobile-nav \.nav-student\{display:flex!important\}/);
  assert.doesNotMatch(css,/\.student-mode \.side-nav,\.student-mode \.mobile-nav\{display:none!important\}/);
- assert.ok(html.includes("V4.0.0-dev.2 · Made with care."));
+ assert.ok(html.includes("V4 Beta · Made with care."));
 });
 test("student login immediately shows Today and selected tab",()=>{
  const {app,get,nav}=harness();

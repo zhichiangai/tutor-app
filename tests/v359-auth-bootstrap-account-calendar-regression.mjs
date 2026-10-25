@@ -52,7 +52,7 @@ test("HTML starts on a neutral opaque auth screen before app.js loads",()=>{
  assert.match(css,/body\.auth-pending \.app-shell\{visibility:hidden/);
  assert.match(css,/body\.auth-pending \.auth-loading-screen\{display:flex/);
  assert.match(html,/<title>好好上課 · V4\.0\.0-dev\.2 家教課程管理<\/title>/);
- assert.match(html,/V4\.0\.0-dev\.2 · Made with care/);
+ assert.match(html,/V4 Beta · Made with care/);
 });
 test("checking and signed-out states never announce a teacher mode",()=>{
  const {api,node,classes}=createHarness();
