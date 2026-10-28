@@ -82,7 +82,7 @@ jobs:
         with:
           name: v4-browser-e2e-failures
           path: |
-            test-results/v4-e2e-report/
-            test-results/v4-e2e-artifacts/
+            tests/e2e/test-results/v4-e2e-report/
+            tests/e2e/test-results/v4-e2e-artifacts/
           retention-days: 7
           if-no-files-found: ignore
