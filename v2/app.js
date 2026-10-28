@@ -45,7 +45,7 @@ const MODE_STORAGE = "tutor_v2_mode";
 const CALENDAR_MODE_STORAGE = "tutor_v22_calendar_mode";
 const NAMES = ["日","一","二","三","四","五","六"];
 const $ = (s) => document.querySelector(s);
-const $ = (s) => [...document.querySelectorAll(s)];
+const $$ = (s) => [...document.querySelectorAll(s)];
 const asText = (s) => String(s??"");
 const esc = (s) => asText(s).replace(/[&<>"']/g,x=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[x]));
 const money = (n) => {const value=Number(n||0);return "NT$ "+value.toLocaleString("zh-TW",{minimumFractionDigits:Number.isInteger(value)?0:2,maximumFractionDigits:2})};
@@ -2901,7 +2901,7 @@ function bindEvents(){
  $("#mode-settings-form").addEventListener("submit",saveEnabledRoles);
  $("#default-login-role").addEventListener("change",changeDefaultLoginRole);
   $("#profile-display-form").addEventListener("submit",saveDisplayName);
- $(".modal").forEach(d=>d.addEventListener("click",e=>{if(e.target===d)d.close()}));
+ $$(".modal").forEach(d=>d.addEventListener("click",e=>{if(e.target===d)d.close()}));
 }
 function moveMonth(offset){state.month=new Date(state.month.getFullYear(),state.month.getMonth()+offset,1);render();applyPreviewReadOnlyControls()}
 function main(){
