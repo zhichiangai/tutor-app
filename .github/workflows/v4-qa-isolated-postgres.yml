@@ -39,10 +39,8 @@ jobs:
       PGDATABASE: postgres
     steps:
       - uses: actions/checkout@v4
-      - name: Verify Node candidate QA calculations
-        run: |
-          node --test tests/v4-qa-ledger-allocation-regression.mjs
-          node --test tests/v4-qa-payment-classification-contract.mjs tests/v4-qa-lesson-classification-contract.mjs
+      - name: Verify complete Node regression suite, including QA candidate integration
+        run: node --test tests/*.mjs
       - name: Install PostgreSQL client if absent
         run: |
           if ! command -v psql >/dev/null; then
