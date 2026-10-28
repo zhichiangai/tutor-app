@@ -144,7 +144,7 @@ function isQaBatch(batch){
   batchLessons(batch).some(({lesson})=>lesson&&officialQaTags().qaLessonIds.includes(lesson.id)));
 }
 function lessonBalance(l){return lessonAllocation(l,state.paymentBatches,state.paymentBatchItems,state.requests,state.paymentCorrections,state.paymentCorrectionItems,officialQaTags())}
-function inOfficialAccounting(l){return !studentFor(l)?.is_qa && !officialQaTags().qaLessonIds.includes(l.id)}
+function inOfficialAccounting(l){return !studentFor(l)?.is_qa && !(state.qaTags?.qaLessonIds||[]).includes(l.id)}
 function lessonSum(list){return list.filter(l=>l.type==="lesson").reduce((v,l)=>v+lessonBalance(l).total,0)}
 function monthLessons(){return visibleLessons().filter(l=>sameMonth(l.lesson_date,state.month))}
 function hourTotal(list){return list.filter(l=>l.type==="lesson").reduce((v,l)=>v+num(l.hours),0)}
