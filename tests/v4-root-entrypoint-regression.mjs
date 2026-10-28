@@ -1,5 +1,5 @@
-// Root entry fallback must not reopen the legacy timer when Vercel serves a physical index.html.
-// This test only verifies the client-side fallback; browser/Preview behavior still needs E2E.
+// Physical root fallback should serve V4 on Tutor Vercel, preserving legacy GitHub Pages V1.
+// This tests browser redirect code, not the live Preview routing or login environment.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -15,6 +15,7 @@ function redirect(from) {
   let redirected = '';
   const window = {
     location: {
+      hostname: loc.hostname,
       href: loc.href,
       search: loc.search,
       hash: loc.hash,
@@ -25,17 +26,18 @@ function redirect(from) {
   return redirected;
 }
 
-test('physical root entry fallback enters V4 instead of legacy timer', () => {
+test('Tutor Vercel root fallback opens V4, not the old timer', () => {
   assert.equal(redirect('https://preview.example.vercel.app/'), 'https://preview.example.vercel.app/v2/index.html');
-  assert.doesNotMatch(html, /frontend\/index\.html|家教計時器/);
+  assert.equal(redirect('https://tutor.rapid4grad.com/'), 'https://tutor.rapid4grad.com/v2/index.html');
   assert.deepEqual(vercel.rewrites.find(x => x.source === '/'), {source:'/',destination:'/v2/index.html'});
 });
 
-test('invitation token and OAuth hash are preserved across fallback', () => {
-  const url = redirect('https://preview.example.vercel.app/?v4invite=testopaque#access_token=synthetic');
-  assert.equal(url, 'https://preview.example.vercel.app/v2/index.html?v4invite=testopaque#access_token=synthetic');
+test('invitation URL and OAuth hash are preserved across fallback', () => {
+  assert.equal(redirect('https://preview.example.vercel.app/?v4invite=testopaque#access_token=synthetic'),
+    'https://preview.example.vercel.app/v2/index.html?v4invite=testopaque#access_token=synthetic');
 });
 
-test('GitHub Pages subpath keeps a relative V4 route', () => {
-  assert.equal(redirect('https://example.github.io/tutor-app/?v4invite=abc'), 'https://example.github.io/tutor-app/v2/index.html?v4invite=abc');
+test('GitHub Pages still points at historical V1 instead of V4', () => {
+  assert.ok(html.includes('frontend/index.html'));
+  assert.equal(redirect('https://example.github.io/tutor-app/'), 'https://example.github.io/tutor-app/frontend/index.html');
 });
