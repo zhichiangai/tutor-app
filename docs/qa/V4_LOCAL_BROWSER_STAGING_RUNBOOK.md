@@ -29,6 +29,8 @@
    - `url: "http://127.0.0.1:54321"`
    - `publishableKey`：**僅本機 Supabase `supabase status -o json` 的 public ANON_KEY**，不可使用 Service Role、Secret Key 或正式專案 Key。
    可以在**拷貝出來的臨時網站目錄**加入本機專用 config script（置於 `v4-config.js` 前）；**不得提交包含任何 key 的檔案，也不可修改正式部署 config**。
+**特別注意：正式 V4 登入頁目前只有 Google OAuth 按鈕，沒有 email/password 表單。** 因此即使建立合成 Auth 使用者，仍須在**臨時網站副本**提供只在 localhost 出現的合成登入方式，或用瀏覽器 DevTools 在相同 origin 建立相同 Supabase 客戶端後執行 `signInWithPassword`；一切僅限 `127.0.0.1`，不可把 email/password 登入介面部署到 Preview／Production。登入後須確認原本 app `getSession()` 能接到同一個 JWT／Auth storage key。若不能，請回報 BLOCKED，不可偷用正式 Google OAuth。
+
 8. 本機用例如 `python3 -m http.server 3000 --bind 127.0.0.1` 從 repo 根目錄提供靜態頁面；應確認網頁／API 的 request 只能到 localhost 及固定的既有靜態 CDN（若有）。若 Codex 的內建瀏覽器不能連 localhost，明確標記 BLOCKED，不得改用正式 Supabase。
 9. 用瀏覽器和各自獨立 profile／context 驗證老師、家長、學生：首次登入／登出清空、共享課表新增修改取消、老師／家長付款回報確認更正、QA 部分付款與舊式收款隔離、解除連結後家長不再可讀、學生不顯示金額。不論測試是否通過，所有資料都留在 local。
 10. 不運行 GAS 寄信與外部 Trigger；不更動正式網站、Production Migration 或 main。完成後給出 PASS／FAIL／BLOCKED 及可重現步驟、截圖／Console、SQL 版本 SHA、瀏覽器來源，不洩漏密鑰；**未獲授權不要清理、刪除或重設任何非本次新建資源**。
