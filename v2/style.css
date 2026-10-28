@@ -762,6 +762,12 @@ body.auth-pending .auth-loading-screen{display:flex;position:fixed;inset:0;z-ind
 @media (max-width: 375px) { #correction-lines .period-line { flex-wrap: wrap; gap: .5rem; } }
 
 /* A missing Preview-only backend may show the shell without exposing any data operations. */
-body.preview-readonly .app-shell{pointer-events:none;user-select:none}
+/* Navigation remains operable for visual QA; all edit controls are disabled in JS. */
+body.preview-readonly .app-shell{pointer-events:auto}
+body.preview-readonly .app-shell button:disabled,
+body.preview-readonly .app-shell input:disabled,
+body.preview-readonly .app-shell select:disabled,
+body.preview-readonly .app-shell textarea:disabled{opacity:.45;cursor:not-allowed}
+body.preview-readonly .app-shell [aria-disabled="true"]{cursor:not-allowed}
 .preview-readonly-banner{position:sticky;top:0;z-index:999;display:block;background:#f2eee7;color:#49443b;padding:12px 20px;text-align:center;font-size:13px;font-weight:600;line-height:1.6}
 .preview-readonly-banner[hidden]{display:none}
