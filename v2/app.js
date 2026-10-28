@@ -1777,21 +1777,24 @@ function batchLessons(batch){
 function paymentHistoryHTML(batches){
  if(!batches.length)return '<div class="empty">還沒有期間付款紀錄。家長可指定課程日期，回報整筆或部分款項。</div>';
  return batches.map(batch=>{
-  const student=state.students.find(s=>s.id===batch.student_id),parts=batchLessons(batch),p=paymentBatchStatus(batch);
+  const student=state.students.find(s=>s.id===batch.student_id),parts=batchLessons(batch),qa=isQaBatch(batch);
+  const p=qa?"QA 模擬付款 · 非實際銀行入帳":paymentBatchStatus(batch);
   const corrections=state.paymentCorrections.filter(c=>c.batch_id===batch.id);
   const corrected=corrections.reduce((sum,c)=>sum+num(c.amount),0);
   return '<section class="period-batch"><div class="period-batch-head"><div><strong>'+esc(student?.name||"學生")+(student?.is_qa?' · QA 測試資料':'')+' · '+esc(batch.period_start)+' ～ '+esc(batch.period_end)+'</strong>'+
-  '<small>家長實際付款：'+esc(batch.paid_on)+' · '+parts.length+' 堂課'+(batch.received_on?' · 老師實際收款：'+esc(batch.received_on):'')+'</small></div><div class="period-batch-amount">原額 '+money(batch.paid_amount)+(corrected?' · 更正 '+money(corrected)+' · 淨額 '+money(num(batch.paid_amount)-corrected):'')+'</div></div>'+
-  '<div class="period-batch-rows"><span class="pill '+(batch.status==="confirmed"?"paid":batch.status==="pending"?"pending":"")+'">'+p+'</span>'+
+  '<small>家長回報付款日期：'+esc(batch.paid_on)+' · '+parts.length+' 堂課'+(batch.received_on?' · 老師登錄收款日期：'+esc(batch.received_on):'')+'</small></div><div class="period-batch-amount">原額 '+money(batch.paid_amount)+(corrected?' · 更正 '+money(corrected)+' · 淨額 '+money(num(batch.paid_amount)-corrected):'')+'</div></div>'+
+  '<div class="period-batch-rows"><span class="pill '+(!qa&&batch.status==="confirmed"?"paid":batch.status==="pending"?"pending":"")+'">'+p+'</span>'+
+  (qa?'<span class="muted-small">QA 測試紀錄 · 不列入正式入帳／應收統計</span>':
+     batch.status==="confirmed"?'<span class="muted-small">系統確認狀態，銀行實際入帳應由老師核對</span>':"")+
   (batch.note?'<span class="muted-small">'+esc(batch.note)+'</span>':"")+'</div>'+
   '<details><summary class="text-link">查看各堂金額分配</summary>'+
   parts.map(({item,lesson})=>{const lineCorrection=state.paymentCorrectionItems.filter(ci=>ci.batch_id===batch.id&&ci.lesson_id===item.lesson_id).reduce((sum,ci)=>sum+num(ci.amount),0);
    return '<div class="period-line"><div><strong>'+esc(lesson?.lesson_date||"")+' · '+esc(lesson?.subject||"課程")+'</strong><small>'+esc(timeLabel(lesson?.start_time||""))+'–'+esc(timeLabel(lesson?.end_time||""))+'</small></div><span>原額 '+money(item.allocated_amount)+(lineCorrection?' · 已更正 '+money(lineCorrection)+' · 淨額 '+money(num(item.allocated_amount)-lineCorrection):'')+'</span></div>'}).join("")+'</details>'+
   (corrections.length?'<details><summary class="text-link">查看更正紀錄（'+corrections.length+'）</summary>'+corrections.map(c=>'<div class="period-line"><span>'+esc(c.created_at?.slice(0,10)||'')+' · '+esc(c.reason)+'</span><strong>更正 '+money(c.amount)+'</strong></div>').join('')+'</details>':'')+
-  (state.role==="teacher"&&batch.status==="pending"?
+  (state.role==="teacher"&&!qa&&batch.status==="pending"?
     '<div class="period-batch-actions"><button type="button" class="primary-button" data-action="confirm-batch" data-id="'+esc(batch.id)+'">確認這段期間已收款</button>'+
     '<button type="button" class="secondary-button" data-action="decline-batch" data-id="'+esc(batch.id)+'">退回付款回報</button></div>':"")+
-   (state.role==="teacher"&&batch.status==="confirmed"&&V4_CONFIG_VALID?
+   (state.role==="teacher"&&!qa&&batch.status==="confirmed"&&V4_CONFIG_VALID?
     '<div class="period-batch-actions"><button type="button" class="secondary-button" data-action="preview-correction" data-id="'+esc(batch.id)+'">更正收款</button></div>'+
     '<div class="period-correction-preview" data-correction-preview="'+esc(batch.id)+'" aria-live="polite"></div>':"")+'</section>';
  }).join("");
@@ -1861,7 +1864,7 @@ function visiblePaymentBatches(){
  return state.paymentBatches.filter(b=>(state.mode==="demo"||(state.role==="teacher"?b.teacher_id===activeUser?.id:
   b.parent_id===activeUser?.id&&(state.parentTeacherFilter==="all"||b.teacher_id===state.parentTeacherFilter)))&&
   (state.role==="teacher"&&state.showQaAccounting||!isQaBatch(b)))
-  .sort((a,b)=>asText(b.created_at).localeCompare(a.created_at));
+  .sort((a,b)=>asText(b.created_at).localeCompare(asText(a.created_at)));
 }
 function renderPaymentHistory(){
  $("#payment-batch-history").innerHTML=paymentHistoryHTML(visiblePaymentBatches());
