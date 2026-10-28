@@ -56,8 +56,8 @@ test('Preview config fails closed with helpful wording on 503 or network failure
 test('Preview denial can be dismissed read-only, regular unauthenticated login still guards Escape', () => {
  assert.match(html,/id="login-preview-dismiss"/);
  assert.match(html,/id="preview-readonly-banner"/);
- assert.match(css,/preview-readonly \.app-shell\{pointer-events:none/);
- assert.match(app,/if\(previewBackendUnavailable\(\)\).*preview-readonly/);
+ assert.match(css,/preview-readonly \.app-shell\{pointer-events:auto/);
+ assert.match(app,/if\(previewBackendUnavailable\(\)\)\{enterPreviewReadOnly\(\)/);
  assert.match(app,/if\(!activeUser\)ev\.preventDefault\(\)/);
  assert.match(app,/\$\("#login-retry"\)\.hidden=!failed\|\|previewUnavailable/);
 });
@@ -68,4 +68,41 @@ test('teacher period modal excludes tagged QA when hidden and ignores stale mont
  assert.match(app,/validSavedDates\?last\.start/);
  assert.match(app,/validSavedDates\?last\.end/);
  assert.match(html,/id="payment-history-scope"/);
+});
+
+test('Preview allows navigation and month buttons but disables native write controls', () => {
+ const source=app.match(/const PREVIEW_SAFE_BUTTONS=[^\n]+\nfunction isPreviewSafeControl\([\s\S]*?\n\}\nfunction applyPreviewReadOnlyControls\([\s\S]*?\n\}/);
+ assert.ok(source,'readonly controls implementation exists');
+ const controls=[
+  {id:'nav',tagName:'BUTTON',safe:true},
+  {id:'month',tagName:'BUTTON',safe:true},
+  {id:'create',tagName:'BUTTON',safe:false},
+  {id:'pay',tagName:'BUTTON',safe:false},
+  {id:'amount',tagName:'INPUT',safe:false}
+ ].map(p=>({...p,disabled:null,title:'',attributes:{},
+   matches(){return this.safe},
+   setAttribute(k,v){this.attributes[k]=v},
+   removeAttribute(k){delete this.attributes[k]}}));
+ const calendarCell={tabIndex:0,attributes:{},setAttribute(k,v){this.attributes[k]=v}};
+ const document={
+  body:{classList:{contains:()=>true}},
+  querySelectorAll(q){return q.includes('[data-day]')?[calendarCell]:controls}
+ };
+ vm.runInNewContext(source[0]+'\napplyPreviewReadOnlyControls();',{document});
+ assert.equal(controls[0].disabled,false);
+ assert.equal(controls[1].disabled,false);
+ for(const control of controls.slice(2)){
+  assert.equal(control.disabled,true,control.id);
+  assert.equal(control.attributes['aria-disabled'],'true',control.id);
+ }
+ assert.equal(calendarCell.tabIndex,-1);
+ assert.equal(calendarCell.attributes['aria-disabled'],'true');
+});
+
+test('Preview capture gate blocks write clicks and submissions before app handlers', () => {
+ assert.match(app,/document\.addEventListener\("click",ev=>\{[\s\S]*?ev\.stopImmediatePropagation\(\);\s*\},true\);/);
+ assert.match(app,/document\.addEventListener\("submit",ev=>\{[\s\S]*?ev\.preventDefault\(\);ev\.stopImmediatePropagation\(\);\s*\},true\);/);
+ assert.match(app,/function setView\(view\)\{[\s\S]*?applyPreviewReadOnlyControls\(\);/);
+ assert.match(app,/function moveMonth\(offset\)\{[^\n]+applyPreviewReadOnlyControls\(\)/);
+ assert.doesNotMatch(css,/preview-readonly \.app-shell\{pointer-events:none/);
 });
