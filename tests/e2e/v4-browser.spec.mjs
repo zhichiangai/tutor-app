@@ -17,6 +17,11 @@ function db(query){
 }
 async function login(page,role){
  const actor=f.actors[role];
+ // Keep the test self-contained: serve the pinned local UMD bundle instead
+ // of requiring a live third-party CDN during each browser test.
+ await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
+   route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
+    contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
  await page.addInitScript(({apiUrl,anonKey})=>{
   window.V4_LOCAL_BACKEND={
    environment:'local',isolated:true,projectRef:'local',
