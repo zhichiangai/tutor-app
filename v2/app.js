@@ -196,6 +196,7 @@ function syncCurrentView(){
 function setView(view){
  state.view=normalizeView(view);
  render();
+ applyPreviewReadOnlyControls();
 }
 const VALID_ROLES=["teacher","parent","student"];
 const ROLE_SUFFIX={teacher:"老師",parent:"家長",student:"同學"};
@@ -395,6 +396,36 @@ async function saveMyWorkspace(rename=false){
 function previewBackendUnavailable(){
  return authPhase==="error"&&(window.location?.hostname||"").endsWith(".vercel.app")&&
   /Preview 尚未|預覽環境/.test(window.V4_CONFIG_ERROR||"");
+}
+// Read-only Preview enables navigation for visual QA, never simulated authorization.
+// All data operations stay blocked by the missing validated backend.
+const PREVIEW_SAFE_BUTTONS='[data-view], #prev-month, #next-month, #billing-prev, #billing-next, #jump-today, #show-full-month, [data-calendar-mode]';
+function isPreviewSafeControl(el){
+ return Boolean(el?.matches?.(PREVIEW_SAFE_BUTTONS));
+}
+function applyPreviewReadOnlyControls(){
+ if(!document.body?.classList.contains("preview-readonly"))return;
+ for(const el of document.querySelectorAll(".app-shell button, .app-shell input, .app-shell select, .app-shell textarea")){
+  const allowed=el.tagName==="BUTTON"&&isPreviewSafeControl(el);
+  el.disabled=!allowed;
+  if(!allowed){
+   el.title="預覽模式：未連接測試資料庫，不能操作";
+   el.setAttribute("aria-disabled","true");
+  }else{
+   el.removeAttribute("aria-disabled");
+   el.removeAttribute("title");
+  }
+ }
+ for(const el of document.querySelectorAll('.app-shell [data-day][role="button"]')){
+  el.tabIndex=-1;
+  el.setAttribute("aria-disabled","true");
+ }
+}
+function enterPreviewReadOnly(){
+ if(!previewBackendUnavailable())return;
+ document.body.classList.add("preview-readonly");
+ $("#preview-readonly-banner").hidden=false;
+ applyPreviewReadOnlyControls();
 }
 function renderAuthUI(){
  const waiting=authPhase==="checking";
@@ -644,6 +675,7 @@ function changeCalendarMode(mode){
  const key=calendarModeStorageKey();
  if(key)localStorage.setItem(key,mode);
  renderFullCalendar();
+ applyPreviewReadOnlyControls();
 }
 
 function renderStudentBilling(lessons){
@@ -2632,6 +2664,27 @@ async function signOut(){
  }
 }
 function bindEvents(){
+ // Capture-phase safety gate: even dynamically inserted controls cannot bypass
+ // the Preview lock by looking enabled, submitting forms, or calling handlers.
+ document.addEventListener("click",ev=>{
+  if(!document.body.classList.contains("preview-readonly"))return;
+  const target=ev.target.closest?.(".app-shell");
+  if(!target)return;
+  const control=ev.target.closest?.("button");
+  if(control&&isPreviewSafeControl(control))return;
+  ev.preventDefault();
+  ev.stopImmediatePropagation();
+ },true);
+ document.addEventListener("submit",ev=>{
+  if(!document.body.classList.contains("preview-readonly"))return;
+  ev.preventDefault();ev.stopImmediatePropagation();
+ },true);
+ document.addEventListener("keydown",ev=>{
+  if(!document.body.classList.contains("preview-readonly"))return;
+  if(ev.target.closest?.(".app-shell [data-day][role='button']")){
+   ev.preventDefault();ev.stopImmediatePropagation();
+  }
+ },true);
  document.addEventListener("click",async ev=>{
   if(ev.target.closest("[data-v4-action]")){await v4ConnectionUI.handleClick(ev.target);return}
   if(ev.target.closest("[data-contact-action]")){await v4ContactsUI.handleClick(ev.target);return}
@@ -2716,7 +2769,7 @@ function bindEvents(){
    ev.preventDefault();openDay(el.dataset.day);
   }
  });
- $("#account-modal").addEventListener("cancel",ev=>{if(previewBackendUnavailable()){document.body.classList.add("preview-readonly");$("#preview-readonly-banner").hidden=false;return}if(!activeUser)ev.preventDefault()});
+ $("#account-modal").addEventListener("cancel",ev=>{if(previewBackendUnavailable()){enterPreviewReadOnly();return}if(!activeUser)ev.preventDefault()});
  $("#lesson-form").addEventListener("submit",saveLessonOutcome);
  $("#correction-form").addEventListener("submit",submitCorrection);
  $("#correction-form").addEventListener("input",()=>{
@@ -2768,7 +2821,7 @@ function bindEvents(){
   const r=periodFormRows(),value=amount($("#period-paid-amount").value);
   $("#period-submit").disabled=!r.valid||r.total<=0||!Number.isFinite(value)||value<=0||value>r.total+0.005;
  });
- $("#jump-today").onclick=()=>{state.month=new Date(tick().getFullYear(),tick().getMonth(),1);state.selected=dateKey(tick());render()};
+ $("#jump-today").onclick=()=>{state.month=new Date(tick().getFullYear(),tick().getMonth(),1);state.selected=dateKey(tick());render();applyPreviewReadOnlyControls()};
  $("#record-form").addEventListener("submit",saveRecord);$("#student-form").addEventListener("submit",saveStudent);
  $("#student-management-basics-form").addEventListener("submit",saveManagedStudent);
  $("#managed-student-invite-form").addEventListener("submit",submitManagedStudentInvite);
@@ -2806,14 +2859,14 @@ function bindEvents(){
  $("#account-action").onclick=()=>activeUser?setView("settings"):showModal("account-modal");
  $("#google-login").onclick=googleLogin;
  $("#login-retry").onclick=initializeLive;
- $("#login-preview-dismiss").onclick=()=>{if(!previewBackendUnavailable())return;document.body.classList.add("preview-readonly");$("#preview-readonly-banner").hidden=false;closeModal("account-modal")};
+ $("#login-preview-dismiss").onclick=()=>{if(!previewBackendUnavailable())return;enterPreviewReadOnly();closeModal("account-modal")};
  $("#sign-out").onclick=signOut;
  $("#mode-settings-form").addEventListener("submit",saveEnabledRoles);
  $("#default-login-role").addEventListener("change",changeDefaultLoginRole);
   $("#profile-display-form").addEventListener("submit",saveDisplayName);
  $$(".modal").forEach(d=>d.addEventListener("click",e=>{if(e.target===d)d.close()}));
 }
-function moveMonth(offset){state.month=new Date(state.month.getFullYear(),state.month.getMonth()+offset,1);render()}
+function moveMonth(offset){state.month=new Date(state.month.getFullYear(),state.month.getMonth()+offset,1);render();applyPreviewReadOnlyControls()}
 function main(){
  state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
  for(const k of LIVE_FIELDS)state[k]=[];
