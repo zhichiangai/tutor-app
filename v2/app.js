@@ -124,8 +124,12 @@ function resolveLesson(id){return visibleLessons().find(l=>l.id===id)}
 function studentFor(lesson){return state.students.find(s=>s.id===lesson.student_id)}
 function isPast(s){return s<dateKey(tick())}
 function typeLabel(l){return l.type==="leave"?"已請假":l.type==="planned"?"預排課程":"已上課"}
-function statusLabel(l){if(l.type==="lesson"){const balance=lessonBalance(l);if(balance.pending>0&&balance.confirmed>0)return "部分已收／待確認";if(balance.pending>0)return balance.pending>=balance.total-0.005?"家長已付款":"部分付款待確認";if(balance.confirmed>0)return balance.confirmed>=balance.total-0.005?"老師已收到":"部分已收款"}return l.type==="moved"?"已改期":l.type==="leave"?(l.leave_source==="teacher"?"老師停課":"學生請假"):l.type==="planned"?"預計上課":l.status||"未付款"}
-function pillClass(l){if(l.type==="lesson"){const b=lessonBalance(l);if(b.pending>0)return "pending";if(b.confirmed>=b.total-0.005&&b.total>0)return "paid"}return l.type==="moved"?"pending":l.type==="leave"?"leave":l.type==="planned"?"":l.status==="老師已收到"?"paid":l.status==="家長已付款"?"pending":""}
+function statusLabel(l){if(l.type==="lesson"){
+ if(officialQaTags().qaLessonIds.includes(l.id))return "QA 模擬課程（不列正式帳務）";
+ if(officialQaTags().qaLegacyReceiptLessonIds.includes(l.id))return "QA 模擬收款（非銀行入帳）";
+ const balance=lessonBalance(l);if(balance.pending>0&&balance.confirmed>0)return "部分已收／待確認";if(balance.pending>0)return balance.pending>=balance.total-0.005?"家長已付款":"部分付款待確認";if(balance.confirmed>0)return balance.confirmed>=balance.total-0.005?"老師已收到":"部分已收款"}return l.type==="moved"?"已改期":l.type==="leave"?(l.leave_source==="teacher"?"老師停課":"學生請假"):l.type==="planned"?"預計上課":l.status||"未付款"}
+function pillClass(l){if(l.type==="lesson"){if(officialQaTags().qaLessonIds.includes(l.id)||
+ officialQaTags().qaLegacyReceiptLessonIds.includes(l.id))return "";const b=lessonBalance(l);if(b.pending>0)return "pending";if(b.confirmed>=b.total-0.005&&b.total>0)return "paid"}return l.type==="moved"?"pending":l.type==="leave"?"leave":l.type==="planned"?"":l.status==="老師已收到"?"paid":l.status==="家長已付款"?"pending":""}
 function officialQaTags(){
  const tagged=new Set(state.qaTags?.qaLessonIds||[]);
  const simulatedStudents=new Set(state.students.filter(s=>s.is_qa===true).map(s=>s.id));
