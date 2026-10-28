@@ -404,7 +404,7 @@ function isPreviewSafeControl(el){
  return Boolean(el?.matches?.(PREVIEW_SAFE_BUTTONS));
 }
 function applyPreviewReadOnlyControls(){
- if(!document.body?.classList.contains("preview-readonly"))return;
+ if(!document.body?.classList?.contains?.("preview-readonly"))return;
  for(const el of document.querySelectorAll(".app-shell button, .app-shell input, .app-shell select, .app-shell textarea")){
   const allowed=el.tagName==="BUTTON"&&isPreviewSafeControl(el);
   el.disabled=!allowed;
