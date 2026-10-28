@@ -5,6 +5,7 @@ on:
       - 'v2/payment-ledger.js'
       - 'v2/app.js'
       - 'v2/qa-ledger-synthetic.html'
+      - 'v2/qa-ledger-synthetic.js'
       - 'supabase/candidates/*v4*qa*.sql'
       - 'tests/sql/v4_qa_*.sql'
       - 'tests/v4-qa-*.mjs'
