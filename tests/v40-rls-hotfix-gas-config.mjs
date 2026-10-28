@@ -32,11 +32,14 @@ test('P0 hotfix is an explicitly guarded transaction outside migration history',
 });
 
 test('only the GAS bridge disables gateway JWT and retains handler-side authorization', () => {
-  const sections = [...toml.matchAll(/^\[functions\.([^\]]+)\]([\s\S]*?)(?=^\[|$)/gm)];
-  const bridgeSection = sections.find(match => match[1] === 'v4-gas-bridge');
-  assert.ok(bridgeSection, 'specific bridge function config must exist');
-  assert.match(bridgeSection[2], /^verify_jwt\s*=\s*false\s*$/m);
-  assert.ok(!sections.some(match => match[1] !== 'v4-gas-bridge' && /verify_jwt\s*=\s*false/.test(match[2])));
+  const marker = '[functions.v4-gas-bridge]';
+  const start = toml.indexOf(marker);
+  assert.ok(start >= 0, 'specific bridge function config must exist');
+  const next = toml.indexOf('\n[', start + marker.length);
+  const stop = next < 0 ? toml.length : next;
+  const bridgeSection = toml.slice(start, stop);
+  assert.match(bridgeSection, /^verify_jwt\s*=\s*false\s*$/m);
+  assert.doesNotMatch(toml.slice(0, start) + toml.slice(stop), /^verify_jwt\s*=\s*false\s*$/m);
   assert.match(bridge, /request\.headers\.get\("x-v4-mail-key"\)/);
   assert.match(bridge, /if\(!supplied\|\|supplied!==bridgeSecret\)/);
   assert.match(bridge, /stagingRef===\"vctisuglfoxyuwlvyjee\"/);
