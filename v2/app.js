@@ -2716,7 +2716,7 @@ function bindEvents(){
    ev.preventDefault();openDay(el.dataset.day);
   }
  });
- $("#account-modal").addEventListener("cancel",ev=>{if(previewBackendUnavailable()){document.body.classList.add("preview-readonly");return}if(!activeUser)ev.preventDefault()});
+ $("#account-modal").addEventListener("cancel",ev=>{if(previewBackendUnavailable()){document.body.classList.add("preview-readonly");$("#preview-readonly-banner").hidden=false;return}if(!activeUser)ev.preventDefault()});
  $("#lesson-form").addEventListener("submit",saveLessonOutcome);
  $("#correction-form").addEventListener("submit",submitCorrection);
  $("#correction-form").addEventListener("input",()=>{
@@ -2806,7 +2806,7 @@ function bindEvents(){
  $("#account-action").onclick=()=>activeUser?setView("settings"):showModal("account-modal");
  $("#google-login").onclick=googleLogin;
  $("#login-retry").onclick=initializeLive;
- $("#login-preview-dismiss").onclick=()=>{if(!previewBackendUnavailable())return;document.body.classList.add("preview-readonly");closeModal("account-modal")};
+ $("#login-preview-dismiss").onclick=()=>{if(!previewBackendUnavailable())return;document.body.classList.add("preview-readonly");$("#preview-readonly-banner").hidden=false;closeModal("account-modal")};
  $("#sign-out").onclick=signOut;
  $("#mode-settings-form").addEventListener("submit",saveEnabledRoles);
  $("#default-login-role").addEventListener("change",changeDefaultLoginRole);
