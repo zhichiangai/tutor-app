@@ -5,6 +5,9 @@ on:
       - 'supabase/candidates/*v4*qa*.sql'
       - 'supabase/candidates/20261029_v4_accounting_qa_snapshot_rpc.sql'
       - 'tests/local/v4-qa-classification-rest.mjs'
+      - 'tests/local/v4-payment-date-taipei-rest.mjs'
+      - 'tests/v4-payment-date-taipei-contract.mjs'
+      - 'supabase/migrations/20261029024000_v4_payment_date_taipei.sql'
       - '.github/workflows/v4-qa-local-gotrue.yml'
   workflow_dispatch:
 
@@ -20,6 +23,7 @@ jobs:
       SUPABASE_TELEMETRY_DISABLED: '1'
       SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io
       V4_QA_LOCAL_JWT_TEST: '1'
+      V4_PAYMENT_TAIPEI_LOCAL_TEST: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -63,3 +67,5 @@ jobs:
           echo "Three QA SQL candidates applied only to localhost"
       - name: Real GoTrue JWT and PostgREST QA classification, RLS and unlink acceptance
         run: node tests/local/v4-qa-classification-rest.mjs
+      - name: Real GoTrue JWT Taipei-date parent payment and teacher receipt E2E
+        run: node tests/local/v4-payment-date-taipei-rest.mjs
