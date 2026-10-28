@@ -58,7 +58,7 @@ const timeLabel = (s) => asText(s).slice(0,5);
 const tick = ()=>new Date();
 const uid = ()=>crypto.randomUUID();
 let client=null, activeUser=null, loading=false, teacherPreferences={};
-const state={mode:"live",enabledRoles:["teacher"],lessonRatings:{focus:null,mood:null},role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:"month",studentCalendarMode:"month",recentChangesOpen:false,historyReadFailed:false,paymentBatches:[],paymentBatchItems:[],paymentCorrections:[],paymentCorrectionItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",studentInvites:[],studentLinks:[],studentLegacyInvites:[],managedStudentId:null,studentSearch:"",studentAccountFilter:"all",studentPortal:{students:[],lessons:[],schedules:[]},sharedCourseDraft:null,sharedCourseHistory:{},receiptBatch:null,activeLesson:null,actualHoursManual:false,showQaAccounting:false};
+const state={mode:"live",enabledRoles:["teacher"],lessonRatings:{focus:null,mood:null},role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:"month",studentCalendarMode:"month",recentChangesOpen:false,historyReadFailed:false,paymentBatches:[],paymentBatchItems:[],paymentCorrections:[],paymentCorrectionItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",studentInvites:[],studentLinks:[],studentLegacyInvites:[],managedStudentId:null,studentSearch:"",studentAccountFilter:"all",studentPortal:{students:[],lessons:[],schedules:[]},sharedCourseDraft:null,sharedCourseHistory:{},receiptBatch:null,activeLesson:null,actualHoursManual:false,showQaAccounting:false,qaTags:{qaBatchIds:[],qaLessonIds:[],qaLegacyReceiptLessonIds:[]},qaClassificationReady:false};
 
 // Older Node harnesses evaluate app.js with imports stripped. Keep the V4 adapter optional there.
 const v4ConnectionUI=typeof createV4Connections==="function"?createV4Connections({getClient:()=>client,getUser:()=>activeUser,
@@ -126,9 +126,22 @@ function isPast(s){return s<dateKey(tick())}
 function typeLabel(l){return l.type==="leave"?"已請假":l.type==="planned"?"預排課程":"已上課"}
 function statusLabel(l){if(l.type==="lesson"){const balance=lessonBalance(l);if(balance.pending>0&&balance.confirmed>0)return "部分已收／待確認";if(balance.pending>0)return balance.pending>=balance.total-0.005?"家長已付款":"部分付款待確認";if(balance.confirmed>0)return balance.confirmed>=balance.total-0.005?"老師已收到":"部分已收款"}return l.type==="moved"?"已改期":l.type==="leave"?(l.leave_source==="teacher"?"老師停課":"學生請假"):l.type==="planned"?"預計上課":l.status||"未付款"}
 function pillClass(l){if(l.type==="lesson"){const b=lessonBalance(l);if(b.pending>0)return "pending";if(b.confirmed>=b.total-0.005&&b.total>0)return "paid"}return l.type==="moved"?"pending":l.type==="leave"?"leave":l.type==="planned"?"":l.status==="老師已收到"?"paid":l.status==="家長已付款"?"pending":""}
-function lessonBalance(l){return lessonAllocation(l,state.paymentBatches,state.paymentBatchItems,state.requests,state.paymentCorrections,state.paymentCorrectionItems)}
-function inOfficialAccounting(l){return state.role!=="teacher"||state.showQaAccounting||!studentFor(l)?.is_qa}
-function lessonSum(list){return list.filter(l=>l.type==="lesson").reduce((v,l)=>v+num(l.total_amount),0)}
+function officialQaTags(){
+ const tagged=new Set(state.qaTags?.qaLessonIds||[]);
+ const simulatedStudents=new Set(state.students.filter(s=>s.is_qa===true).map(s=>s.id));
+ for(const lesson of state.lessons)if(simulatedStudents.has(lesson.student_id))tagged.add(lesson.id);
+ return {qaBatchIds:state.qaTags?.qaBatchIds||[],
+  qaLessonIds:[...tagged],
+  qaLegacyReceiptLessonIds:state.qaTags?.qaLegacyReceiptLessonIds||[]};
+}
+function isQaBatch(batch){
+ return Boolean(state.qaTags?.qaBatchIds?.includes(batch.id)||
+  state.students.some(s=>s.id===batch.student_id&&s.is_qa===true)||
+  batchLessons(batch).some(({lesson})=>lesson&&officialQaTags().qaLessonIds.includes(lesson.id)));
+}
+function lessonBalance(l){return lessonAllocation(l,state.paymentBatches,state.paymentBatchItems,state.requests,state.paymentCorrections,state.paymentCorrectionItems,officialQaTags())}
+function inOfficialAccounting(l){return !studentFor(l)?.is_qa && !officialQaTags().qaLessonIds.includes(l.id)}
+function lessonSum(list){return list.filter(l=>l.type==="lesson").reduce((v,l)=>v+lessonBalance(l).total,0)}
 function monthLessons(){return visibleLessons().filter(l=>sameMonth(l.lesson_date,state.month))}
 function hourTotal(list){return list.filter(l=>l.type==="lesson").reduce((v,l)=>v+num(l.hours),0)}
 function toast(message,duration=3500){
@@ -496,7 +509,7 @@ function renderHomeFocus(){
     &&sameMonth(l.lesson_date,tick())&&(!String(l.lesson_content||"").trim()
       ||l.focus_rating==null||l.mood_rating==null))
    .sort((a,b)=>String(b.lesson_date).localeCompare(String(a.lesson_date)));
-  const unconfirmedBatches=state.paymentBatches.filter(b=>b.teacher_id===activeUser.id&&b.status==="pending");
+  const unconfirmedBatches=state.paymentBatches.filter(b=>b.teacher_id===activeUser.id&&b.status==="pending"&&!isQaBatch(b));
   const unconfirmedRequests=state.requests.filter(r=>r.teacher_id===activeUser.id&&r.kind==="payment"&&r.status==="pending");
   const unconfirmed=unconfirmedBatches.length+unconfirmedRequests.length;
   const classDetail=todayLessons.length
@@ -684,12 +697,16 @@ function learningPaymentLine(lesson,due=null){
   '<small>'+esc(statusLabel(lesson))+'</small></div></div>';
 }
 function renderBilling(){
- const ls=monthLessons().filter(l=>l.type==="lesson"&&inOfficialAccounting(l)).sort((a,b)=>a.lesson_date.localeCompare(b.lesson_date));
+ const monthCompleted=monthLessons().filter(l=>l.type==="lesson");
+ const official=monthCompleted.filter(inOfficialAccounting);
+ const ls=(state.role==="teacher"&&state.showQaAccounting?monthCompleted:official)
+  .sort((a,b)=>a.lesson_date.localeCompare(b.lesson_date));
  $("#qa-accounting-control").classList.toggle("hidden",state.role!=="teacher");
  $("#qa-accounting-toggle").checked=state.showQaAccounting;
- const billed=ls.reduce((sum,l)=>sum+lessonBalance(l).total,0);
- const confirmed=ls.reduce((sum,l)=>sum+lessonBalance(l).confirmed,0);
- const pending=ls.reduce((sum,l)=>sum+lessonBalance(l).pending,0);
+ // The QA toggle reveals test rows only; it MUST NOT add test money to official totals.
+ const billed=official.reduce((sum,l)=>sum+lessonBalance(l).total,0);
+ const confirmed=official.reduce((sum,l)=>sum+lessonBalance(l).confirmed,0);
+ const pending=official.reduce((sum,l)=>sum+lessonBalance(l).pending,0);
  $("#billing-title").textContent=state.role==="teacher"?"收付款整理":"付款與對帳";
  $("#billing-month").textContent=state.month.getFullYear()+"年 "+(state.month.getMonth()+1)+"月";
  $("#billing-summary").innerHTML=[
@@ -697,7 +714,7 @@ function renderBilling(){
   ["老師已確認收款","✓",money(confirmed)],
   ["尚未確認收款","◷",money(Math.max(0,billed-confirmed))]
  ].map(([label,icon,value])=>'<div class="metric-card"><span class="metric-label">'+label+'</span><span class="metric-icon">'+icon+'</span><div class="metric-value">'+value+'</div></div>').join("");
- renderStudentBilling(ls);
+ renderStudentBilling(official);
  $("#batch-action").classList.remove("hidden");
  $("#batch-action").textContent=state.role==="teacher"?"查看指定期間收款":"選擇期間回報已付款";
  $("#billing-list").innerHTML=ls.length?
@@ -1843,8 +1860,8 @@ async function submitCorrection(ev){
 function visiblePaymentBatches(){
  return state.paymentBatches.filter(b=>(state.mode==="demo"||(state.role==="teacher"?b.teacher_id===activeUser?.id:
   b.parent_id===activeUser?.id&&(state.parentTeacherFilter==="all"||b.teacher_id===state.parentTeacherFilter)))&&
-  (state.role!=="teacher"||state.showQaAccounting||!state.students.find(s=>s.id===b.student_id)?.is_qa))
-  .sort((a,b)=>asText(b.created_at).localeCompare(asText(a.created_at)));
+  (state.role==="teacher"&&state.showQaAccounting||!isQaBatch(b)))
+  .sort((a,b)=>asText(b.created_at).localeCompare(a.created_at));
 }
 function renderPaymentHistory(){
  $("#payment-batch-history").innerHTML=paymentHistoryHTML(visiblePaymentBatches());
@@ -1890,7 +1907,7 @@ function periodFormRows(){
  const studentId=$("#period-student").value,start=$("#period-start").value,end=$("#period-end").value;
  if(!start||!end||start>end)return {valid:false,message:"請選擇正確的課程起訖日期。",rows:[],total:0};
  if((parseDate(end)-parseDate(start))/86400000>730)return {valid:false,message:"每次最多結算約兩年的課程，請縮小日期區間。",rows:[],total:0};
- const rows=eligiblePeriodLessons({lessons:state.lessons,batches:state.paymentBatches,items:state.paymentBatchItems,requests:state.requests,corrections:state.paymentCorrections,correctionItems:state.paymentCorrectionItems,studentId,start,end});
+ const rows=eligiblePeriodLessons({lessons:state.lessons,batches:state.paymentBatches,items:state.paymentBatchItems,requests:state.requests,corrections:state.paymentCorrections,correctionItems:state.paymentCorrectionItems,studentId,start,end,qaTags:officialQaTags()});
  return {valid:true,studentId,start,end,rows,total:rows.reduce((sum,r)=>sum+r.allocation.available,0)};
 }
 function renderPeriodPreview(resetAmount=false){
@@ -2389,6 +2406,8 @@ function clearUserSessionState(){
  v4ConnectionUI.clear();
  v4ContactsUI.clear();
  for(const field of LIVE_FIELDS)state[field]=[];
+ state.qaTags={qaBatchIds:[],qaLessonIds:[],qaLegacyReceiptLessonIds:[]};
+ state.qaClassificationReady=false;
  state.studentPortal={students:[],lessons:[],schedules:[],exceptions:[]};
  state.sharedCourseHistory={};
  state.recentChangesOpen=false;
@@ -2455,7 +2474,18 @@ async function refreshLive({withHistory=true}={}){
   activeUser?.id===userId&&generation===authDataGeneration;
  const results=await Promise.all(LIVE_TABLES.map(fetchAllRows));
  if(!belongsToThisSession())return;
+ // A missing or unauthorized QA snapshot must never be mistaken for zero QA money.
+ // The auth gate remains closed rather than rendering unverified "confirmed" totals.
+ const {data:qaData,error:qaError}=await client.rpc("v4_accounting_qa_snapshot");
+ if(!belongsToThisSession())return;
+ if(qaError)throw Error("帳務 QA 分類資料無法驗證："+qaError.message);
+ if(!qaData||!["qaBatchIds","qaLessonIds","qaLegacyReceiptLessonIds"].every(
+   key=>Array.isArray(qaData[key])&&qaData[key].every(id=>typeof id==="string")))
+  throw Error("帳務 QA 分類資料格式不完整，已停止正式帳務載入");
  LIVE_FIELDS.forEach((key,i)=>{state[key]=results[i]});
+ state.qaTags={qaBatchIds:qaData.qaBatchIds,qaLessonIds:qaData.qaLessonIds,
+  qaLegacyReceiptLessonIds:qaData.qaLegacyReceiptLessonIds};
+ state.qaClassificationReady=true;
  const portal=await client.rpc("student_portal_data");
  if(!belongsToThisSession())return;
  if(portal.error)throw Error("學生資料讀取失敗："+portal.error.message);
