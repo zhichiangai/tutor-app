@@ -56,6 +56,10 @@ jobs:
             else
               echo "::notice::Supabase startup category: undetermined; inspect CI runner and container health"
             fi
+            echo "::notice::Sanitized Supabase error summary (first five matching lines):"
+            grep -iE '(error|failed|invalid|unknown|panic|docker|cannot|timeout)' "$start_log" |
+              sed -E 's/eyJ[A-Za-z0-9_.-]+/[JWT_REDACTED]/g; s/sb_(publishable|secret)_[A-Za-z0-9_-]+/[KEY_REDACTED]/g; s#postgres(ql)?://[^ ]+#[DB_URI_REDACTED]#g; s#https?://[^ ]+#[URL_REDACTED]#g; s/[A-Za-z0-9_+\/=-]{80,}/[LONG_TOKEN_REDACTED]/g' |
+              head -n 5 || true
             docker ps -a --filter name=tutor_v4_isolated --format 'container={{.Names}} state={{.Status}}' || true
             exit 1
           fi
