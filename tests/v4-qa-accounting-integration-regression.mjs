@@ -5,6 +5,7 @@ const load=(f)=>readFileSync(new URL('../'+f,import.meta.url),'utf8');
 const app=load('v2/app.js');
 const rpc=load('supabase/candidates/20261029_v4_accounting_qa_snapshot_rpc.sql');
 const preview=load('v2/qa-ledger-synthetic.html');
+const previewScript=load('v2/qa-ledger-synthetic.js');
 
 test('all financial lesson calculations receive database-validated QA tags',()=>{
  assert.match(app,/function lessonBalance\(l\)\{return lessonAllocation\(l,[^\n]*officialQaTags\(\)\)\}/);
@@ -49,10 +50,14 @@ test('synthetic preview cannot connect to a real database or post form data',()=
  assert.match(preview,/form-action 'none'/);
  assert.match(preview,/robots" content="noindex,nofollow"/);
  assert.match(preview,/非正式帳務資料/);
- assert.match(preview,/import \{lessonAllocation\} from '\.\/payment-ledger\.js'/);
+ assert.match(preview,/<script type="module" src="\.\/qa-ledger-synthetic\.js"><\/script>/);
+ assert.match(preview,/script-src 'self'/);
+ assert.doesNotMatch(preview,/<script(?![^>]*\bsrc=)[^>]*>/i,'inline JavaScript would be blocked by the CSP');
+ assert.match(previewScript,/import \{lessonAllocation\} from '\.\/payment-ledger\.js'/);
  for(const item of ['qa-part-400','real-part-600','qa-full-300','qa-full-700',
                     'legacy-oct','cross-month-800','顯示 QA 測試明細']){
-  assert.ok(preview.includes(item),'Missing synthetic case '+item);
+  assert.ok((preview+previewScript).includes(item),'Missing synthetic case '+item);
  }
  assert.doesNotMatch(preview,/https?:\/\/[^'"]*(supabase\.co|tutor\.rapid4grad\.com)/);
+ assert.doesNotMatch(previewScript,/\b(fetch|XMLHttpRequest|WebSocket)\b|supabase\.co/);
 });
