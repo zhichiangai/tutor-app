@@ -48,7 +48,7 @@ const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 const asText = (s) => String(s??"");
 const esc = (s) => asText(s).replace(/[&<>"']/g,x=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[x]));
-const money = (n) => "NT$ " + Number(n||0).toLocaleString("zh-TW",{maximumFractionDigits:0});
+const money = (n) => {const value=Number(n||0);return "NT$ "+value.toLocaleString("zh-TW",{minimumFractionDigits:Number.isInteger(value)?0:2,maximumFractionDigits:2})};
 const num = (n) => Number(n||0);
 const dateKey = (d) => {const x=new Date(d);return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0")};
 const parseDate = (s) => new Date(asText(s).slice(0,10)+"T12:00:00");
@@ -392,19 +392,26 @@ async function saveMyWorkspace(rename=false){
  });
  if(ok){await loadTeacherPreferences();render();toast(rename?"空間名稱已更新":"家教空間已建立，現在可以新增學生")}
 }
+function previewBackendUnavailable(){
+ return authPhase==="error"&&(window.location?.hostname||"").endsWith(".vercel.app")&&
+  /Preview 尚未|預覽環境/.test(window.V4_CONFIG_ERROR||"");
+}
 function renderAuthUI(){
  const waiting=authPhase==="checking";
  const failed=authPhase==="error";
+ const previewUnavailable=previewBackendUnavailable();
  const identified=authPhase==="ready"&&!!activeUser;
- $("#login-heading").textContent=waiting?"正在為你準備好好上課":failed?
-  "剛剛沒有成功開啟課程":"歡迎來到好好上課";
+ $("#login-heading").textContent=waiting?"正在為你準備好好上課":previewUnavailable?
+  "預覽環境尚未開放登入":failed?"剛剛沒有成功開啟課程":"歡迎來到好好上課";
  $("#login-description").textContent=waiting?
   "稍等一下，我們正在整理你的課程和學習紀錄。":
+  previewUnavailable?"此預覽尚未連接獨立測試資料庫，不能登入或修改課程與帳務。":
   failed?"你的課程暫時無法顯示，請再試一次。":
   "老師安排課程、家長了解孩子的學習、學生回顧每次進步。從這裡開始就好。";
  $("#login-progress").hidden=!waiting;
  $("#google-login").hidden=waiting||failed;
- $("#login-retry").hidden=!failed;
+ $("#login-retry").hidden=!failed||previewUnavailable;
+ $("#login-preview-dismiss").hidden=!previewUnavailable;
  $("#login-help").hidden=waiting||failed;
  // OAuth and profile data are not resolved yet. Never label a previous or
  // cached role as the current account while authentication is still pending.
@@ -1847,7 +1854,13 @@ function visiblePaymentBatches(){
   .sort((a,b)=>asText(b.created_at).localeCompare(asText(a.created_at)));
 }
 function renderPaymentHistory(){
- $("#payment-batch-history").innerHTML=paymentHistoryHTML(visiblePaymentBatches());
+ const first=dateKey(new Date(state.month.getFullYear(),state.month.getMonth(),1));
+ const last=dateKey(new Date(state.month.getFullYear(),state.month.getMonth()+1,0));
+ // History follows the selected lesson period, not payment/receipt date.
+ // Keep visiblePaymentBatches() unfiltered for period queries and ledger calculations.
+ const matches=visiblePaymentBatches().filter(b=>b.period_start<=last&&b.period_end>=first);
+ $("#payment-history-scope").textContent=first+" 至 "+last+" 的課程期間（跨月付款可能同時出現在相鄰月份）";
+ $("#payment-batch-history").innerHTML=paymentHistoryHTML(matches);
 }
 function periodPreferenceKey(){
  return "tutor_v3_period_"+(state.mode==="live"?activeUser?.id||"guest":"demo")+"_"+state.role;
