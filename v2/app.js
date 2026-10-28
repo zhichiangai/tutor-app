@@ -1875,15 +1875,19 @@ function rememberPeriodPreference(){
  try{localStorage.setItem(periodPreferenceKey(),JSON.stringify(p))}catch{}
 }
 function openPeriodModal(studentId=null,start=null,end=null){
- const st=visibleStudents();if(!st.length){toast("目前沒有可結算的學生，請先完成學生與家長授權");return}
+ const all=visibleStudents();
+ const st=state.role==="teacher"&&!state.showQaAccounting?all.filter(s=>s.is_qa!==true):all;
+ if(!st.length){toast(all.length?"目前僅有 QA 學生，請先勾選顯示 QA 測試資料":"目前沒有可結算的學生，請先完成學生與家長授權");return}
  $("#period-heading").textContent=state.role==="parent"?"回報指定期間已付款":"查詢指定期間收款";
  $("#period-help").textContent=state.role==="parent"?"選好學生與上課日期後，系統自動計算已完成且尚未結清的課程。":"選擇學生與日期，查看期間內的家長付款回報及收款狀態。";
  const last=getPeriodPreference();
+ const currentMonth=dateKey(state.month).slice(0,7);
+ const validSavedDates=last.start?.slice(0,7)===currentMonth&&last.end?.slice(0,7)===currentMonth&&last.start<=last.end;
  $("#period-student").innerHTML=st.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join("");
  $("#period-student").value=(studentId&&st.some(x=>x.id===studentId)?studentId:
   (st.some(x=>x.id===last.studentId)?last.studentId:st[0].id));
- $("#period-start").value=start||last.start||dateKey(new Date(state.month.getFullYear(),state.month.getMonth(),1));
- $("#period-end").value=end||last.end||dateKey(new Date(state.month.getFullYear(),state.month.getMonth()+1,0));
+ $("#period-start").value=start||(validSavedDates?last.start:dateKey(new Date(state.month.getFullYear(),state.month.getMonth(),1)));
+ $("#period-end").value=end||(validSavedDates?last.end:dateKey(new Date(state.month.getFullYear(),state.month.getMonth()+1,0)));
  $("#period-paid-on").value=dateKey(tick());
  $("#period-paid-on").max=dateKey(tick());
  $("#period-note").value="";
@@ -2712,7 +2716,7 @@ function bindEvents(){
    ev.preventDefault();openDay(el.dataset.day);
   }
  });
- $("#account-modal").addEventListener("cancel",ev=>{if(!activeUser)ev.preventDefault()});
+ $("#account-modal").addEventListener("cancel",ev=>{if(previewBackendUnavailable()){document.body.classList.add("preview-readonly");return}if(!activeUser)ev.preventDefault()});
  $("#lesson-form").addEventListener("submit",saveLessonOutcome);
  $("#correction-form").addEventListener("submit",submitCorrection);
  $("#correction-form").addEventListener("input",()=>{
@@ -2802,6 +2806,7 @@ function bindEvents(){
  $("#account-action").onclick=()=>activeUser?setView("settings"):showModal("account-modal");
  $("#google-login").onclick=googleLogin;
  $("#login-retry").onclick=initializeLive;
+ $("#login-preview-dismiss").onclick=()=>{if(!previewBackendUnavailable())return;document.body.classList.add("preview-readonly");closeModal("account-modal")};
  $("#sign-out").onclick=signOut;
  $("#mode-settings-form").addEventListener("submit",saveEnabledRoles);
  $("#default-login-role").addEventListener("change",changeDefaultLoginRole);
