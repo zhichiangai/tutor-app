@@ -124,7 +124,7 @@
           <div class="section-row page-head"><div><h2 id="billing-title">收付款整理</h2><p class="section-sub">清楚對帳，不再一筆一筆慢慢算</p></div><div class="month-controls"><button id="billing-prev" aria-label="上個月">‹</button><strong id="billing-month"></strong><button id="billing-next" aria-label="下個月">›</button></div></div>
           <label id="qa-accounting-control" class="section-sub hidden"><input id="qa-accounting-toggle" type="checkbox"> 在帳務中顯示已標記的 QA 測試資料（正式總計預設排除）</label>
           <div class="billing-summary" id="billing-summary"></div><article class="card" id="billing-student-card"><div class="section-row"><div><h2>每位學生的本月收款</h2><p class="section-sub">依科目與學生彙總，點開查看每堂課；已確認與家長回報分開計算</p></div></div><div id="billing-student-summary"></div></article>
-          <article class="card period-records-card"><div class="section-row"><div><h2>期間付款／收款紀錄</h2><p class="section-sub">保留每筆課程期間、付款日期與老師確認日期</p></div></div><div id="payment-batch-history"></div></article>
+          <article class="card period-records-card"><div class="section-row"><div><h2>期間付款／收款紀錄</h2><p class="section-sub">依所選月份的課程期間顯示，保留付款與收款日期</p><p class="helper-note" id="payment-history-scope" aria-live="polite"></p></div></div><div id="payment-batch-history"></div></article>
           <article class="card"><div class="section-row"><div><h2>課程與付款明細</h2><p class="section-sub">家長回報與老師收款分開紀錄</p></div><button class="secondary-button" id="batch-action" type="button">選擇付款期間</button></div><div id="billing-list"></div></article>
           <article class="card requests-card"><div class="section-row"><h2>請假與付款申請</h2><span class="muted-small">待確認會優先顯示</span></div><div id="requests-list"></div></article>
         </section>
@@ -406,6 +406,7 @@
       </div>
       <button class="google-button" id="google-login" type="button"><span class="google-g" aria-hidden="true">G</span>使用 Google 帳號繼續</button>
       <button class="secondary-button wide" id="login-retry" type="button" hidden>再試一次</button>
+      <button class="secondary-button wide" id="login-preview-dismiss" type="button" hidden>查看無資料的預覽畫面</button>
       <p class="login-helper" id="login-help">第一次使用？老師先建立自己的教學空間，再新增學生；家長和學生收到老師邀請後，就能查看自己的課程。</p>
     </div>
   </dialog>
