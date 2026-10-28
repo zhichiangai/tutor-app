@@ -20,6 +20,7 @@ export default defineConfig({
  },
  webServer:{
   command:'python3 -m http.server 3000 --bind 127.0.0.1',
+  cwd:process.cwd(),
   url:'http://127.0.0.1:3000/v2/index.html',
   timeout:30_000,
   reuseExistingServer:false
