@@ -14,7 +14,7 @@ export default defineConfig({
   baseURL:'http://127.0.0.1:3000',
   timezoneId:'Asia/Taipei',
   headless:true,
-  trace:'retain-on-failure',
+  trace:'off',
   screenshot:'only-on-failure',
   viewport:{width:1280,height:800}
  },
