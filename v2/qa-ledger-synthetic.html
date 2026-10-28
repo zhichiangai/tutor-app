@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; font-src 'none'; base-uri 'none'; form-action 'none'">
+<title>好好上課 · QA 帳務合成資料驗收（非正式帳務）</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;color:#364139;background:#f8f7f3}
+*{box-sizing:border-box}body{margin:0}main{max-width:1100px;margin:auto;padding:24px}
+header{background:#f2e7dc;border-bottom:1px solid #d6c8ba;padding:12px 24px}
+header strong{font-size:19px}header span{margin-left:12px;font-size:13px}
+h1{font-size:28px;margin:10px 0 8px}h2{font-size:19px;margin:0 0 14px}
+p{line-height:1.6}.notice{border:2px solid #9b5d38;background:#fff5ec;border-radius:12px;padding:12px 16px;font-weight:600}
+.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin:20px 0}
+button{padding:10px 16px;border-radius:10px;border:1px solid #b0b9b1;background:#fff;color:#243b30;font:inherit;font-weight:600;cursor:pointer}
+button:hover,button:focus-visible{outline:2px solid #638875}button:disabled{opacity:.45;cursor:not-allowed}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.card{background:#fff;border:1px solid #e4e0d8;border-radius:14px;padding:18px;margin-bottom:16px}
+.card .k{font-size:13px;color:#65746d}.number{font-size:26px;font-weight:750;margin:8px 0}
+table{border-collapse:collapse;width:100%}th,td{padding:12px 10px;border-bottom:1px solid #eee8df;text-align:left;vertical-align:top}
+th{background:#f6f5f0;font-size:12px;color:#596d61}td:last-child,th:last-child{text-align:right}
+small,.subtle{color:#66766c}.tag{font-size:12px;background:#e3efe7;border-radius:10px;padding:4px 7px;display:inline-block}
+.tag.qa{background:#fff0da;color:#815522}
+.scroll{overflow-x:auto}fieldset{border:0;padding:0}label{cursor:pointer}label input{margin-right:6px}
+@media(max-width:650px){main{padding:12px}h1{font-size:22px}.grid{grid-template-columns:1fr}th,td{font-size:12px;padding:9px 6px}.number{font-size:22px}header span{display:block;margin:2px 0 0}.controls{justify-content:flex-start}}
+</style>
+</head>
+<body>
+<header><strong>✳ 好好上課</strong><span>QA 帳務視覺驗收專頁 · 僅合成資料</span></header>
+<main>
+<h1>收付款整理 · 模擬驗收</h1>
+<p class="notice" role="status">非正式帳務資料。此頁不登入、不讀取 Supabase、不提供付款／課程寫入，僅用於檢查帳務分類、金額與月份顯示。</p>
+<div class="controls">
+<div><button id="previous" type="button">上個月</button> <strong id="month-label" aria-live="polite"></strong> <button id="next" type="button">下個月</button></div>
+<label><input id="show-qa" type="checkbox">顯示 QA 測試明細（不影響正式統計）</label>
+</div>
+<div class="grid" id="summary" aria-live="polite"></div>
+<section class="card"><h2>課程與學生收款明細</h2><div class="scroll"><table><thead><tr><th>課程</th><th>學生與科目</th><th>分類</th><th>本月應收</th><th>已確認</th><th>仍需付款</th></tr></thead><tbody id="lesson-rows"></tbody></table></div></section>
+<section class="card"><h2>期間付款／部分分配</h2><p id="history-scope" class="subtle"></p>
+<div class="scroll"><table><thead><tr><th>付款批次</th><th>課程期間</th><th>付款分配</th><th>分類</th><th>是否計入銀行收款</th></tr></thead><tbody id="batch-rows"></tbody></table></div></section>
+<p class="subtle">內含：同堂兩筆部分付款（一筆 QA、一筆真正付款）、整堂 QA 模擬課程、舊式單堂模擬收款、跨月期間付款。每個案例的金額和日期都是合成測試資料。</p>
+</main>
+<script type="module">
+import {lessonAllocation} from './payment-ledger.js';
+const months=['2026-09','2026-10','2026-11'];let pos=1;
+const lessons=[
+ {id:'real-oct',type:'lesson',student_id:'sample-a',student:'模擬學生 A',subject:'數學',lesson_date:'2026-10-16',total_amount:1000,status:'老師已收到'},
+ {id:'qa-oct',type:'lesson',student_id:'sample-b',student:'模擬學生 B',subject:'理化',lesson_date:'2026-10-18',total_amount:1000,status:'老師已收到'},
+ {id:'legacy-oct',type:'lesson',student_id:'sample-a',student:'模擬學生 A',subject:'英文',lesson_date:'2026-10-20',total_amount:700,status:'老師已收到'},
+ {id:'cross-sep',type:'lesson',student_id:'sample-c',student:'模擬學生 C',subject:'數學',lesson_date:'2026-09-30',total_amount:800,status:'未付款'}
+];
+const batches=[
+ {id:'qa-part-400',status:'confirmed',period_start:'2026-10-16',period_end:'2026-10-16',paid_amount:400,received_on:'2026-10-19',subject:'real-oct'},
+ {id:'real-part-600',status:'confirmed',period_start:'2026-10-16',period_end:'2026-10-16',paid_amount:600,received_on:'2026-10-20',subject:'real-oct'},
+ {id:'qa-full-300',status:'confirmed',period_start:'2026-10-18',period_end:'2026-10-18',paid_amount:300,received_on:'2026-10-19',subject:'qa-oct'},
+ {id:'qa-full-700',status:'confirmed',period_start:'2026-10-18',period_end:'2026-10-18',paid_amount:700,received_on:'2026-10-20',subject:'qa-oct'},
+ {id:'cross-month-800',status:'confirmed',period_start:'2026-09-29',period_end:'2026-10-02',paid_amount:800,received_on:'2026-10-04',subject:'cross-sep'}
+];
+const items=batches.map(b=>({batch_id:b.id,lesson_id:b.subject,allocated_amount:b.paid_amount}));
+const qaTags={qaBatchIds:['qa-part-400','qa-full-300','qa-full-700'],
+ qaLessonIds:['qa-oct'],qaLegacyReceiptLessonIds:['legacy-oct']};
+const money=x=>'NT$ '+Number(x).toLocaleString('zh-TW',{maximumFractionDigits:2});
+const qaBatch=b=>qaTags.qaBatchIds.includes(b.id);
+const qaLesson=l=>qaTags.qaLessonIds.includes(l.id);
+const escapeHTML=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const el=id=>document.getElementById(id);
+function render(){
+ const month=months[pos],from=month+'-01';
+ const end=month==='2026-09'?'2026-09-30':month==='2026-10'?'2026-10-31':'2026-11-30';
+ el('month-label').textContent=month.slice(0,4)+' 年 '+Number(month.slice(5))+' 月';
+ el('previous').disabled=pos===0;el('next').disabled=pos===months.length-1;
+ const all=lessons.filter(l=>l.lesson_date.startsWith(month));
+ const official=all.filter(l=>!qaLesson(l));
+ const subtotal=official.reduce((a,l)=>a+lessonAllocation(l,batches,items,[],[],[],qaTags).total,0);
+ const paid=official.reduce((a,l)=>a+lessonAllocation(l,batches,items,[],[],[],qaTags).confirmed,0);
+ el('summary').innerHTML=[
+  ['本月正式應收',money(subtotal)],
+  ['正式已確認收款',money(paid)],
+  ['尚未收款',money(subtotal-paid)]
+ ].map(([key,value])=>'<article class="card"><div class="k">'+key+'</div><div class="number">'+value+'</div></article>').join('');
+ const showing=el('show-qa').checked?all:official;
+ el('lesson-rows').innerHTML=showing.length?showing.map(l=>{
+  const a=lessonAllocation(l,batches,items,[],[],[],qaTags),qa=qaLesson(l),legacy=qaTags.qaLegacyReceiptLessonIds.includes(l.id);
+  const classification=qa?'整堂模擬課程':legacy?'舊式模擬收款':'正式課程';
+  return '<tr><td>'+escapeHTML(l.lesson_date)+'</td><td>'+escapeHTML(l.student+' · '+l.subject)+'</td>'+
+   '<td><span class="tag '+(qa||legacy?'qa':'')+'">'+classification+'</span></td><td>'+money(a.total)+'</td><td>'+money(a.confirmed)+'</td><td>'+money(a.available)+'</td></tr>';
+ }).join(''):'<tr><td colspan="6">本月沒有課程紀錄。</td></tr>';
+ const matching=batches.filter(b=>b.period_start<=end&&b.period_end>=from)
+  .filter(b=>el('show-qa').checked||!qaBatch(b));
+ el('history-scope').textContent=from+' 至 '+end+' 的課程期間；跨月批次可在相鄰月份出現。';
+ el('batch-rows').innerHTML=matching.length?matching.map(b=>{
+  const qa=qaBatch(b);
+  return '<tr><td>'+escapeHTML(b.id)+'</td><td>'+escapeHTML(b.period_start+' 至 '+b.period_end)+'</td>'+
+    '<td>'+escapeHTML(b.subject)+' · '+money(b.paid_amount)+'</td><td><span class="tag '+(qa?'qa':'')+'">'+
+    (qa?'QA 模擬付款':'正式付款')+'</span></td><td>'+(qa?'否（不計入）':'是（合成已確認）')+'</td></tr>';
+ }).join(''):'<tr><td colspan="5">此期間沒有符合篩選的付款批次。</td></tr>';
+}
+el('previous').addEventListener('click',()=>{if(pos>0){pos--;render()}});
+el('next').addEventListener('click',()=>{if(pos<months.length-1){pos++;render()}});
+el('show-qa').addEventListener('change',render);
+render();
+</script>
+</body>
+</html>
