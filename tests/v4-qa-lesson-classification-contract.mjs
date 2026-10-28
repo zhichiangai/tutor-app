@@ -26,9 +26,9 @@ test('teacher-only RLS prevents parent/student/self-assigned QA classification',
 
 test('whole simulated lesson cannot silently hide unclassified confirmed real cash',()=>{
  assert.match(sql,/left join public\.v4_payment_batch_qa_marks m/);
- assert.match(sql,/b\.status='confirmed'/);
+ assert.match(sql,/b\.status in \('confirmed','pending'\)/);
  assert.match(sql,/coalesce\(m\.is_qa,false\)=false/);
- assert.match(sql,/Classify confirmed simulated payment batches/);
+ assert.match(sql,/Classify pending\/confirmed simulated payment batches/);
  assert.match(batchSql,/create table public\.v4_payment_batch_qa_marks/);
 });
 
