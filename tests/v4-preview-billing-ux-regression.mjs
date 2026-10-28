@@ -111,7 +111,7 @@ test('payment dates are clearly reported vs bank-verified and QA is visibly dist
  assert.match(app,/家長回報付款日期/);
  assert.match(app,/老師登錄收款日期/);
  assert.match(app,/系統確認狀態，銀行實際入帳應由老師核對/);
- assert.match(app,/QA 測試學生 · 此紀錄不是實際入帳證明/);
+ assert.match(app,/QA 測試紀錄 · 不列入正式入帳／應收統計/);
  assert.doesNotMatch(app,/家長實際付款：/);
  assert.doesNotMatch(app,/老師實際收款：/);
 });
