@@ -65,7 +65,8 @@ test("Supabase read pages include rows past initial 1,000 and preserve all data"
  payment_batch_items:Array.from({length:1100},(_,i)=>({batch_id:"b"+i,lesson_id:"l"+i}))
  };
  const calls={};
- const client={rpc:async()=>({data:{students:[],lessons:[],schedules:[]},error:null}),from(table){return{select(){return this},order(){return this},async range(a,b){
+ const client={rpc:async(name)=>({data:name==="v4_accounting_qa_snapshot"?
+  {qaBatchIds:[],qaLessonIds:[],qaLegacyReceiptLessonIds:[]}: {students:[],lessons:[],schedules:[]},error:null}),from(table){return{select(){return this},order(){return this},async range(a,b){
  calls[table]=(calls[table]||0)+1;
  return {data:(pages[table]||[]).slice(a,b+1),error:null};
  }}}};
