@@ -50,7 +50,7 @@ insert into public.lesson_records
  (id,owner_id,student_id,lesson_date,type,start_time,end_time,hours,hourly_rate,total_amount,status)
  values
  ('${ids.lesson}','${t.id}','${ids.student}','${day}','lesson','17:00','19:00',2,500,1000,'未付款'),
- ('${ids.qaLesson}','${t.id}','${ids.qaStudent}','${day}','lesson','18:00','19:00',1,500,500,'未付款');
+ ('${ids.qaLesson}','${t.id}','${ids.qaStudent}','${day}','lesson','19:00','20:00',1,500,500,'未付款');
 insert into public.profiles(id,display_name,last_role,enabled_roles,roles_configured)
  values
  ('${t.id}','CI Teacher','teacher',array['teacher']::text[],true),
