@@ -35,8 +35,13 @@
       config=await response.json();
       if(!validRemote(config,location))throw Error("正式資料庫設定未通過網域與專案核對，已停止登入。");
     }else if(location.protocol==="https:"&&(location.hostname||"").endsWith(".vercel.app")){
-      const response=await global.fetch("/api/v4-config",{method:"GET",credentials:"omit",cache:"no-store",redirect:"error"});
-      if(!response.ok)throw Error("Preview 尚未設定隔離測試資料庫，已停止登入。");
+      let response;
+      try{
+        response=await global.fetch("/api/v4-config",{method:"GET",credentials:"omit",cache:"no-store",redirect:"error"});
+      }catch{
+        throw Error("Preview 尚未設定隔離測試資料庫，登入功能暫不可用。");
+      }
+      if(!response.ok)throw Error("Preview 尚未設定隔離測試資料庫，登入功能暫不可用。");
       config=await response.json();
       if(!validRemote(config,location))throw Error("Preview 資料庫未通過隔離檢查，已停止登入。");
     }else{
