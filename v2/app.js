@@ -1803,8 +1803,10 @@ function paymentHistoryHTML(batches){
   const corrections=state.paymentCorrections.filter(c=>c.batch_id===batch.id);
   const corrected=corrections.reduce((sum,c)=>sum+num(c.amount),0);
   return '<section class="period-batch"><div class="period-batch-head"><div><strong>'+esc(student?.name||"學生")+(student?.is_qa?' · QA 測試資料':'')+' · '+esc(batch.period_start)+' ～ '+esc(batch.period_end)+'</strong>'+
-  '<small>家長實際付款：'+esc(batch.paid_on)+' · '+parts.length+' 堂課'+(batch.received_on?' · 老師實際收款：'+esc(batch.received_on):'')+'</small></div><div class="period-batch-amount">原額 '+money(batch.paid_amount)+(corrected?' · 更正 '+money(corrected)+' · 淨額 '+money(num(batch.paid_amount)-corrected):'')+'</div></div>'+
+  '<small>家長回報付款日期：'+esc(batch.paid_on)+' · '+parts.length+' 堂課'+(batch.received_on?' · 老師登錄收款日期：'+esc(batch.received_on):'')+'</small></div><div class="period-batch-amount">原額 '+money(batch.paid_amount)+(corrected?' · 更正 '+money(corrected)+' · 淨額 '+money(num(batch.paid_amount)-corrected):'')+'</div></div>'+
   '<div class="period-batch-rows"><span class="pill '+(batch.status==="confirmed"?"paid":batch.status==="pending"?"pending":"")+'">'+p+'</span>'+
+  (student?.is_qa?'<span class="muted-small">QA 測試學生 · 此紀錄不是實際入帳證明</span>':
+    batch.status==="confirmed"?'<span class="muted-small">系統確認狀態，銀行實際入帳應由老師核對</span>':"")+
   (batch.note?'<span class="muted-small">'+esc(batch.note)+'</span>':"")+'</div>'+
   '<details><summary class="text-link">查看各堂金額分配</summary>'+
   parts.map(({item,lesson})=>{const lineCorrection=state.paymentCorrectionItems.filter(ci=>ci.batch_id===batch.id&&ci.lesson_id===item.lesson_id).reduce((sum,ci)=>sum+num(ci.amount),0);
