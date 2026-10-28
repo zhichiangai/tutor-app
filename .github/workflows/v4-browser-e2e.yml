@@ -1,0 +1,88 @@
+name: V4 isolated Playwright browser E2E
+
+on:
+  pull_request:
+    paths:
+      - 'v2/**'
+      - 'tests/e2e/**'
+      - 'supabase/migrations/**'
+      - 'supabase/candidates/**'
+      - '.github/workflows/v4-browser-e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-e2e:
+    name: disposable-supabase-chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      CI: 'true'
+      V4_E2E_LOCAL: '1'
+      SUPABASE_TELEMETRY_DISABLED: '1'
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io
+      V4_E2E_FIXTURE_FILE: /tmp/v4-e2e-fixture.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.107.0
+      - name: Enforce disposable localhost scope
+        run: |
+          set -euo pipefail
+          grep -q '^project_id = "tutor_v4_isolated"$' supabase/config.toml
+          test ! -f supabase/.temp/project-ref
+          test ! -f supabase/.branches/_current_branch
+          test "$V4_E2E_LOCAL" = "1"
+      - name: Start local Supabase and replay V4 migrations only
+        run: |
+          set -euo pipefail
+          start_log="$RUNNER_TEMP/v4-browser-start.log"
+          reset_log="$RUNNER_TEMP/v4-browser-reset.log"
+          trap 'rm -f "$start_log" "$reset_log"' EXIT
+          if ! supabase start >"$start_log" 2>&1; then
+            echo "::error::Disposable Supabase failed to start (output suppressed)"
+            exit 1
+          fi
+          if ! supabase db reset --local --no-seed >"$reset_log" 2>&1; then
+            echo "::error::Disposable Supabase migration replay failed (output suppressed)"
+            exit 1
+          fi
+          echo "Disposable local Supabase ready; no hosted project touched"
+      - name: Apply proposed QA classification SQL only to disposable database
+        run: |
+          set -euo pipefail
+          for file in \
+            supabase/candidates/20261028_v4_payment_batch_qa_classification.sql \
+            supabase/candidates/20261029_v4_qa_lesson_and_legacy_receipt.sql \
+            supabase/candidates/20261029_v4_accounting_qa_snapshot_rpc.sql; do
+            docker exec -i supabase_db_tutor_v4_isolated psql \
+              -v ON_ERROR_STOP=1 -U postgres -d postgres < "$file" >/dev/null
+          done
+      - name: Install pinned Playwright and site Supabase bundle
+        run: |
+          npm install --no-save --no-package-lock \
+            @playwright/test@1.64.1 @supabase/supabase-js@2.76.1
+          npx playwright install --with-deps chromium
+      - name: Seed only synthetic teachers, parents, students and lessons
+        run: node tests/e2e/seed-v4-local.mjs
+      - name: Verify real Chromium teacher-parent-student flows
+        run: npx playwright test --config tests/e2e/playwright.config.mjs
+      - name: Remove ephemeral auth fixture
+        if: always()
+        run: rm -f "$V4_E2E_FIXTURE_FILE"
+      - name: Upload sanitized failure screenshots and report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v4-browser-e2e-failures
+          path: |
+            test-results/v4-e2e-report/
+            test-results/v4-e2e-artifacts/
+          retention-days: 7
+          if-no-files-found: ignore
