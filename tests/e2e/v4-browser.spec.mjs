@@ -117,7 +117,7 @@ test('student mobile navigation never exposes financial information',async ({pag
  const dims=await page.evaluate(()=>({viewport:document.documentElement.clientWidth,
   scroll:document.documentElement.scrollWidth}));
  expect(dims.scroll).toBeLessThanOrEqual(dims.viewport);
- await page.locator('.mobile-nav [data-view="settings"]').click();
+ await page.locator('.mobile-nav .nav-student[data-view="settings"]').click();
  await expect(page.locator('#view-settings')).toBeVisible();
  await page.locator('#sign-out').click();
  await expect(page.locator('body')).toHaveClass(/login-required/);
