@@ -48,7 +48,7 @@ test('Preview config fails closed with helpful wording on 503 or network failure
  }
  for(const fetch of [async()=>({ok:false,status:503}),async()=>{throw Error('Failed to fetch')}]) {
   const error=await run(fetch);
-  assert.match(error,/Preview 尚未連接隔離測試資料庫/);
+  assert.match(error,/Preview 尚未設定隔離測試資料庫/);
   assert.doesNotMatch(error,/Failed to fetch/);
  }
 });
