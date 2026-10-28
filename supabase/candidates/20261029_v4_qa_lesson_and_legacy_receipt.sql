@@ -102,17 +102,17 @@ begin
     raise exception 'Only the owning teacher can classify an existing lesson';
   end if;
 
-  -- A whole simulated lesson may not silently hide genuine confirmed cash.
-  -- All confirmed allocations must be explicitly and separately QA-classified.
+  -- A whole simulated lesson may not silently hide linked real cash or pending reports.
+  -- All pending/confirmed allocations must be explicitly and separately QA-classified.
   if new.classification='simulated_lesson' and new.is_qa
      and exists (
        select 1 from public.payment_batch_items i
        join public.payment_batches b on b.id=i.batch_id
        left join public.v4_payment_batch_qa_marks m on m.batch_id=b.id
-       where i.lesson_id=new.lesson_id and b.status='confirmed'
+       where i.lesson_id=new.lesson_id and b.status in ('confirmed','pending')
          and coalesce(m.is_qa,false)=false
      ) then
-    raise exception 'Classify confirmed simulated payment batches before hiding a whole lesson';
+    raise exception 'Classify pending/confirmed simulated payment batches before hiding a whole lesson';
   end if;
 
   if new.classification='simulated_legacy_receipt' and new.is_qa then
