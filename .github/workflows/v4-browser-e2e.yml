@@ -45,8 +45,18 @@ jobs:
           start_log="$RUNNER_TEMP/v4-browser-start.log"
           reset_log="$RUNNER_TEMP/v4-browser-reset.log"
           trap 'rm -f "$start_log" "$reset_log"' EXIT
-          if ! supabase start >"$start_log" 2>&1; then
-            echo "::error::Disposable Supabase failed to start (output suppressed)"
+          if ! supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor >"$start_log" 2>&1; then
+            echo "::error::Disposable Supabase failed to start (raw output suppressed)"
+            if grep -qiE '(rate limit|too many requests|429)' "$start_log"; then
+              echo "::notice::Supabase startup category: container registry throttling"
+            elif grep -qiE '(connection refused|timed out|context deadline exceeded|TLS handshake timeout)' "$start_log"; then
+              echo "::notice::Supabase startup category: container network timeout"
+            elif grep -qiE '(unauthorized|denied|forbidden)' "$start_log"; then
+              echo "::notice::Supabase startup category: registry authorization"
+            else
+              echo "::notice::Supabase startup category: undetermined; inspect CI runner and container health"
+            fi
+            docker ps -a --filter name=tutor_v4_isolated --format 'container={{.Names}} state={{.Status}}' || true
             exit 1
           fi
           if ! supabase db reset --local --no-seed >"$reset_log" 2>&1; then
