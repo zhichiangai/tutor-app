@@ -3,10 +3,19 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta http-equiv="refresh" content="0; url=frontend/index.html">
-    <title>家教計時器</title>
+    <title>好好上課</title>
+    <script>
+      // Fallback only: Vercel normally rewrites / to /v2/index.html.
+      // If the physical root index takes precedence, do not open the legacy timer.
+      // Preserve OAuth callback and one-time invitation parameters.
+      const target = new URL('v2/index.html', window.location.href);
+      target.search = window.location.search;
+      target.hash = window.location.hash;
+      window.location.replace(target.href);
+    </script>
+    <noscript><meta http-equiv="refresh" content="0; url=v2/index.html"></noscript>
   </head>
   <body>
-    <p><a href="frontend/index.html">前往家教計時器</a></p>
+    <p><a href="v2/index.html">前往好好上課</a></p>
   </body>
 </html>
