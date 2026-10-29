@@ -253,3 +253,60 @@ test('teacher can add edit and cancel a single planned lesson in Chromium',async
  expect(db(`select type from public.lesson_records where id='${lessonId}'`)).toBe('leave');
  expect(db(`select total_amount::numeric(12,2) from public.lesson_records where id='${lessonId}'`)).toBe('0.00');
 });
+
+
+test('teacher calendar and billing remain operable at 320, 375, 390 and 430px',async ({page})=>{
+ await page.setViewportSize({width:320,height:780});
+ await login(page,'teacher');
+ for(const width of [320,375,390,430]){
+  await page.setViewportSize({width,height:780});
+  const calendar=page.locator('.mobile-nav .nav-standard[data-view="calendar"]');
+  await expect(calendar).toBeVisible();
+  await calendar.click();
+  await expect(page.locator('#view-calendar')).toBeVisible();
+  await expect(page.locator('#calendar-grid')).toBeVisible();
+  const calendarDimensions=await page.evaluate(()=>({
+   width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth
+  }));
+  expect(calendarDimensions.scroll, 'Teacher calendar overflow at '+width).toBeLessThanOrEqual(calendarDimensions.width);
+  const billing=page.locator('.mobile-nav .nav-standard[data-view="billing"]');
+  await expect(billing).toBeVisible();
+  await billing.click();
+  await expect(page.locator('#view-billing')).toBeVisible();
+  await expect(page.locator('#billing-summary')).toBeVisible();
+  const billingDimensions=await page.evaluate(()=>({
+   width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth
+  }));
+  expect(billingDimensions.scroll, 'Teacher billing overflow at '+width).toBeLessThanOrEqual(billingDimensions.width);
+ }
+});
+
+test('parent payment dialog stays accessible without horizontal overflow at mobile widths',async ({page})=>{
+ await page.setViewportSize({width:320,height:780});
+ await login(page,'parent');
+ for(const width of [320,375,390,430]){
+  await page.setViewportSize({width,height:780});
+  const billing=page.locator('.mobile-nav .nav-standard[data-view="billing"]');
+  await expect(billing).toBeVisible();
+  await billing.click();
+  await expect(page.locator('#view-billing')).toBeVisible();
+  await expect(page.locator('#batch-action')).toBeVisible();
+  await page.locator('#batch-action').click();
+  await expect(page.locator('#period-modal')).toBeVisible();
+  await expect(page.locator('#period-student')).toBeVisible();
+  await expect(page.locator('#period-paid-amount')).toBeVisible();
+  const dimensions=await page.evaluate(()=>{
+   const rect=document.querySelector('#period-modal').getBoundingClientRect();
+   return {
+    width:document.documentElement.clientWidth,
+    scroll:document.documentElement.scrollWidth,
+    left:rect.left,right:rect.right
+   };
+  });
+  expect(dimensions.scroll, 'Parent page overflow at '+width).toBeLessThanOrEqual(dimensions.width);
+  expect(dimensions.left, 'Payment dialog clipped left at '+width).toBeGreaterThanOrEqual(-1);
+  expect(dimensions.right, 'Payment dialog clipped right at '+width).toBeLessThanOrEqual(width+1);
+  await page.locator('#period-modal .modal-head .close-modal').click();
+  await expect(page.locator('#period-modal')).not.toBeVisible();
+ }
+});
