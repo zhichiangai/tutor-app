@@ -227,10 +227,11 @@ test('teacher can add edit and cancel a single planned lesson in Chromium',async
    order by created_at desc limit 1`);
  expect(lessonId).toMatch(/^[0-9a-f-]{36}$/i);
  console.log('CRUD_STAGE lesson_created');
- await page.locator('#calendar-grid .calendar-cell[data-day="'+f.day+'"]').click();
- console.log('CRUD_STAGE selected_lesson_day');
- await expect(page.locator('#agenda-list [data-action="edit"][data-id="'+lessonId+'"]')).toBeVisible();
- await page.locator('#agenda-list [data-action="edit"][data-id="'+lessonId+'"]').click();
+ await page.locator('#calendar-grid .calendar-event[data-id="'+lessonId+'"]').click();
+ console.log('CRUD_STAGE selected_lesson_event');
+ await expect(page.locator('#lesson-modal')).toBeVisible();
+ await expect(page.locator('#lesson-edit-plan')).toBeVisible();
+ await page.locator('#lesson-edit-plan').click();
  console.log('CRUD_STAGE edit_opened');
  await expect(page.locator('#record-modal')).toBeVisible();
  await page.locator('#record-subject').fill('CI 已修改數學');
@@ -240,7 +241,9 @@ test('teacher can add edit and cancel a single planned lesson in Chromium',async
  expect(db(`select subject from public.lesson_records where id='${lessonId}'`)).toBe('CI 已修改數學');
  console.log('CRUD_STAGE lesson_updated');
  expect(db(`select hourly_rate::numeric(12,2) from public.lesson_records where id='${lessonId}'`)).toBe('550.00');
- await page.locator('#agenda-list [data-action="cancel-lesson"][data-id="'+lessonId+'"]').click();
+ await page.locator('#calendar-grid .calendar-event[data-id="'+lessonId+'"]').click();
+ await expect(page.locator('#lesson-modal')).toBeVisible();
+ await page.locator('#lesson-cancel').click();
  console.log('CRUD_STAGE cancel_opened');
  await expect(page.locator('#cancel-modal')).toBeVisible();
  await page.locator('input[name="cancel-scope"][value="one"]').check();

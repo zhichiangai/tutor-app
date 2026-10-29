@@ -2109,6 +2109,7 @@ function openLessonPopup(id){
  $("#lesson-student-leave").classList.toggle("hidden",inactive||locked);
  $("#lesson-teacher-leave").classList.toggle("hidden",inactive||locked);
  $("#lesson-move").classList.toggle("hidden",inactive||locked||lesson.type==="lesson");
+ $("#lesson-edit-plan").classList.toggle("hidden",!teacher||inactive||locked||lesson.type!=="planned"||isVirtualOccurrence(lesson));
  $("#lesson-cancel").classList.toggle("hidden",!teacher||inactive||locked||(lesson.type==="lesson"&&!lesson.schedule_id));
  $("#lesson-parent-correct").classList.toggle("hidden",inactive||locked||lesson.type!=="lesson"||isVirtualOccurrence(lesson));
  $("#lesson-parent-leave").classList.toggle("hidden",inactive||locked);
@@ -2819,6 +2820,11 @@ function bindEvents(){
  $("#lesson-actual-hours").addEventListener("input",()=>{state.actualHoursManual=true});
  $("#lesson-student-leave").onclick=()=>markLessonLeave("student");
  $("#lesson-teacher-leave").onclick=()=>markLessonLeave("teacher");
+ $("#lesson-edit-plan").onclick=()=>{
+  const lesson=resolveLesson(state.activeLesson);
+  if(!lesson||state.role!=="teacher"||lesson.type!=="planned"||lessonLocked(lesson)||isVirtualOccurrence(lesson))return;
+  closeModal("lesson-modal");openRecord(lesson);
+ };
  $("#lesson-cancel").onclick=()=>openCancel(resolveLesson(state.activeLesson));
  $("#lesson-move").onclick=()=>{const lesson=resolveLesson(state.activeLesson);closeModal("lesson-modal");openChange(lesson)};
  $("#lesson-parent-correct").onclick=()=>submitParentLessonRequest("time_correction");
