@@ -198,3 +198,42 @@ test('historical QA-confirmed batch does not block genuine partial payments on t
      and coalesce(m.is_qa,false)=false`)).toBe('1000.00');
  }finally{await Promise.all([t.close(),p.close()]);}
 });
+
+test('teacher can add edit and cancel a single planned lesson in Chromium',async ({page})=>{
+ await login(page,'teacher');
+ await navigate(page,'calendar');
+ await page.locator('#agenda-add').click();
+ await expect(page.locator('#record-modal')).toBeVisible();
+ await page.locator('#record-student').selectOption(f.ids.student);
+ await page.locator('#record-subject').fill('CI 自動化數學');
+ await page.locator('#record-date').fill(f.day);
+ await page.locator('#record-rate').fill('500');
+ await page.locator('#record-start').fill('08:00');
+ await page.locator('#record-end').fill('09:00');
+ await page.locator('#record-remarks').fill('Synthetic browser CRUD verification');
+ await page.locator('#record-repeat').selectOption('none');
+ await page.locator('#save-record').click();
+ await expect(page.locator('#record-modal')).not.toBeVisible();
+ const lessonId=db(`select id from public.lesson_records
+   where owner_id='${f.actors.teacher.id}' and student_id='${f.ids.student}'
+    and lesson_date='${f.day}' and subject='CI 自動化數學'
+    and type='planned' and start_time::text like '08:00%'
+   order by created_at desc limit 1`);
+ expect(lessonId).toMatch(/^[0-9a-f-]{36}$/i);
+ await expect(page.locator('#agenda-list [data-action="edit"][data-id="'+lessonId+'"]')).toBeVisible();
+ await page.locator('#agenda-list [data-action="edit"][data-id="'+lessonId+'"]').click();
+ await expect(page.locator('#record-modal')).toBeVisible();
+ await page.locator('#record-subject').fill('CI 已修改數學');
+ await page.locator('#record-rate').fill('550');
+ await page.locator('#save-record').click();
+ await expect(page.locator('#record-modal')).not.toBeVisible();
+ expect(db(`select subject from public.lesson_records where id='${lessonId}'`)).toBe('CI 已修改數學');
+ expect(db(`select hourly_rate::numeric(12,2) from public.lesson_records where id='${lessonId}'`)).toBe('550.00');
+ await page.locator('#agenda-list [data-action="cancel-lesson"][data-id="'+lessonId+'"]').click();
+ await expect(page.locator('#cancel-modal')).toBeVisible();
+ await page.locator('input[name="cancel-scope"][value="one"]').check();
+ await page.locator('#cancel-submit').click();
+ await expect(page.locator('#cancel-modal')).not.toBeVisible();
+ expect(db(`select type from public.lesson_records where id='${lessonId}'`)).toBe('leave');
+ expect(db(`select total_amount::numeric(12,2) from public.lesson_records where id='${lessonId}'`)).toBe('0.00');
+});
