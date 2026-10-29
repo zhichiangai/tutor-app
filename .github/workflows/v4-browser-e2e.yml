@@ -112,7 +112,8 @@ jobs:
           for file in \
             supabase/candidates/20261028_v4_payment_batch_qa_classification.sql \
             supabase/candidates/20261029_v4_qa_lesson_and_legacy_receipt.sql \
-            supabase/candidates/20261029_v4_accounting_qa_snapshot_rpc.sql; do
+            supabase/candidates/20261029_v4_accounting_qa_snapshot_rpc.sql \
+            supabase/candidates/20261029_v4_qa_real_payment_rpc_reconciliation.sql; do
             docker exec -i supabase_db_tutor_v4_isolated psql \
               -v ON_ERROR_STOP=1 -U postgres -d postgres < "$file" >/dev/null
           done
@@ -124,6 +125,10 @@ jobs:
         env:
           V4_PAYMENT_TAIPEI_LOCAL_TEST: '1'
         run: node tests/local/v4-payment-date-taipei-rest.mjs
+      - name: Real local JWT parent and teacher mixed QA/genuine payment reconciliation
+        env:
+          V4_QA_REAL_PAYMENT_TEST: '1'
+        run: node tests/local/v4-qa-real-payment-rest.mjs
       - name: Install pinned Playwright and site Supabase bundle
         run: |
           npm install --no-save --no-package-lock \
