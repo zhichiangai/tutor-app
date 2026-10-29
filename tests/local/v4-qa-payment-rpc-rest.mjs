@@ -103,7 +103,9 @@ r=await rest(p,'POST','rpc/submit_range_payment',base(dayA,0.01));
 assert.notEqual(r.status,200,'Repeated payment may not exceed real available amount');checks++;
 r=await rest(t,'POST','rpc/review_range_payment',{
  p_batch_id:ids.qaB,p_confirm:true,p_received_on:dayC});
-assert.notEqual(r.status,204,'Pending simulated QA batch must never be bank-confirmed');checks++;
+eq(r.status,204,'Audited simulated QA can be reviewed but must not count as bank money');
+eq(db(`select status from public.lesson_records where id='${ids.b}'`),'未付款',
+ 'Confirming a QA batch must not settle an ordinary lesson');
 r=await rest(p,'POST','rpc/submit_range_payment',base(dayB,1000));
 eq(r.status,200,'Real full amount may ignore simulated QA pending allocation: '+JSON.stringify(r.data));
 const realB=r.data;
@@ -116,11 +118,11 @@ eq(db(`select status from public.lesson_records where id='${ids.b}'`),'老師已
 for(const batch of [ids.qaA,ids.qaB]){
  r=await rest(t,'PATCH','v4_payment_batch_qa_marks?batch_id=eq.'+batch,{
   is_qa:false,reason:'Reclassification would wrongly exceed the lesson tuition total'});
- assert.notEqual(r.status,204,'Cannot unmark simulated receipt after real balance fully allocated');checks++;
+ assert.ok(r.status>=400,'Cannot unmark simulated receipt after real balance fully allocated: '+r.status);checks++;
 }
 const direct=await rest(t,'PATCH','lesson_records?id=eq.'+ids.a,{
  status:'未付款',received_date:null});
-assert.notEqual(direct.status,204,'Teacher direct paid-status downgrade must remain blocked');checks++;
+assert.ok(direct.status>=400,'Teacher direct paid-status downgrade must remain blocked');checks++;
 const old=await rest(p,'GET','payment_batches?select=id&id=eq.'+real400);
 eq(old.status,200);eq(old.data.length,1,'linked parent sees batch');
 db(`delete from public.student_guardians where student_id='${ids.student}' and guardian_id='${p.id}'`);
