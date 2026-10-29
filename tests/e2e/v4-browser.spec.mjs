@@ -310,3 +310,53 @@ test('parent payment dialog stays accessible without horizontal overflow at mobi
   await expect(page.locator('#period-modal')).not.toBeVisible();
  }
 });
+
+
+// Release gate: an unchanged live JWT must lose historical payments immediately
+// when the active guardian relationship is removed. Disposable localhost ONLY.
+// Keep this last: it revokes the base fixture's guardian link.
+test('same live parent JWT cannot read historic batches after guardian unlink',async ({page})=>{
+ await login(page,'parent');
+ await navigate(page,'billing');
+ const historicId=db("select id from public.payment_batches where parent_id='"+f.actors.parent.id+
+   "' and status='confirmed' order by confirmed_at asc limit 1");
+ expect(historicId).toMatch(/^[0-9a-f-]{36}$/);
+
+ // Pin the existing browser token once; do NOT refresh or silently log in again.
+ await page.evaluate(async ({apiUrl,anonKey})=>{
+  const client=window.supabase.createClient(apiUrl,anonKey);
+  const {data,error}=await client.auth.getSession();
+  if(error || !data.session?.access_token)throw Error('Missing original local guardian JWT');
+  window.__v4RevokedGuardianJwt=data.session.access_token;
+ },{apiUrl:f.apiUrl,anonKey:f.anonKey});
+
+ const readWithPinnedJwt=()=>page.evaluate(async ({apiUrl,anonKey,batchId})=>{
+  const headers={apikey:anonKey,Authorization:'Bearer '+window.__v4RevokedGuardianJwt};
+  const endpoints=[
+   '/rest/v1/payment_batches?select=id&id=eq.'+batchId,
+   '/rest/v1/payment_batch_items?select=batch_id&batch_id=eq.'+batchId
+  ];
+  return Promise.all(endpoints.map(async endpoint=>{
+   const r=await fetch(apiUrl+endpoint,{headers,cache:'no-store'});
+   const body=await r.json();
+   return {status:r.status,visible:Array.isArray(body)?body.length:-1};
+  }));
+ },{apiUrl:f.apiUrl,anonKey:f.anonKey,batchId:historicId});
+
+ const before=await readWithPinnedJwt();
+ expect(before).toEqual([{status:200,visible:1},{status:200,visible:1}]);
+
+ // Simulate the teacher removing a guardian; never mutate any hosted database.
+ db("delete from public.student_guardians where teacher_id='"+f.actors.teacher.id+
+   "' and student_id='"+f.ids.student+"' and guardian_id='"+f.actors.parent.id+"'");
+ const after=await readWithPinnedJwt();
+ expect(after).toEqual([{status:200,visible:0},{status:200,visible:0}]);
+
+ // A screen reload must not resurrect the removed student's historic billing.
+ await page.reload();
+ await navigate(page,'billing');
+ await expect(page.locator('#payment-batch-history')).not.toContainText('CI Student');
+ await navigate(page,'students');
+ await expect(page.locator('#student-grid')).not.toContainText('CI Student');
+ expect(db("select count(*) from public.payment_batches where id='"+historicId+"'")).toBe('1');
+});
