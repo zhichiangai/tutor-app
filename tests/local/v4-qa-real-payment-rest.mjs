@@ -137,6 +137,29 @@ eq(db(`select count(*) from public.payment_batches b
 left join public.v4_payment_batch_qa_marks qm on qm.batch_id=b.id
 where b.parent_id='${p.id}' and b.status='confirmed'
   and coalesce(qm.is_qa,false)=false`),'4');
+// A still-valid parent JWT and previously known UUID must not bypass unlink RLS.
+db(`delete from public.student_guardians
+where guardian_id='${p.id}' and student_id='${ids.student}'`);
+async function readOldId(actor,resource){
+ const r=await fetch(s.API_URL+'/rest/v1/'+resource,{method:'GET',
+  headers:{apikey:s.ANON_KEY,Authorization:'Bearer '+actor.jwt}});
+ const raw=await r.text();let body;
+ try{body=JSON.parse(raw)}catch{body=null}
+ checks++;return{status:r.status,body};
+}
+for(const resource of [
+ 'payment_batches?id=eq.'+one+'&select=id',
+ 'payment_batch_items?batch_id=eq.'+one+'&select=batch_id',
+ 'lesson_records?id=eq.'+ids.qaOnly+'&select=id'
+]){
+ const stale=await readOldId(p,resource);
+ if(stale.status===200)eq(stale.body.length,0,
+  'Unlinked guardian retained read access to old protected ID: '+resource.split('?')[0]);
+ else{assert.ok([401,403].includes(stale.status),'Unexpected unlink RLS response '+stale.status);checks++;}
+}
+const teacherKeeps=await readOldId(t,'payment_batches?id=eq.'+one+'&select=id');
+eq(teacherKeeps.status,200,'Teacher historical accounting must remain readable');
+eq(teacherKeeps.body.length,1,'Owning teacher retains genuine payment history');
 console.log(JSON.stringify({result:'PASS',assertions:checks,realLocalJWT:4,
  genuineOnQaHistory:600,realConfirmedTotal:1000,qaExcluded:true,
  legacyReceiptControlled:true,productionWrites:0}));
