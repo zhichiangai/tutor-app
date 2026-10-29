@@ -3,6 +3,7 @@ import {test,expect} from '@playwright/test';
 import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
 
 if(process.env.V4_E2E_LOCAL!=='1')throw Error('V4_E2E_LOCAL=1 required');
 const fixturePath=process.env.V4_E2E_FIXTURE_FILE;
@@ -48,13 +49,13 @@ async function navigate(page,view){
  await page.locator('.side-nav [data-view="'+view+'"]').click();
  await expect(page.locator('#view-'+(view.startsWith('student-')?'student':view))).toBeVisible();
 }
-async function submitAmount(page,amount){
+async function submitAmount(page,amount,lessonDay=f.day){
  await navigate(page,'billing');
  await page.locator('#batch-action').click();
  await expect(page.locator('#period-modal')).toBeVisible();
  await page.locator('#period-student').selectOption(f.ids.student);
- await page.locator('#period-start').fill(f.day);
- await page.locator('#period-end').fill(f.day);
+ await page.locator('#period-start').fill(lessonDay);
+ await page.locator('#period-end').fill(lessonDay);
  await page.locator('#period-start').dispatchEvent('change');
  await page.locator('#period-paid-on').fill(f.day);
  await page.locator('#period-paid-amount').fill(String(amount));
@@ -128,4 +129,72 @@ test('unlinked other parent cannot see the synthetic child or billing',async ({p
  await expect(page.locator('#billing-summary')).not.toContainText('NT$ 1,000');
  await navigate(page,'students');
  await expect(page.locator('#student-grid')).not.toContainText('CI Student');
+});
+
+test('historical QA-confirmed batch does not block genuine partial payments on the same lesson',async ({browser})=>{
+ const lessonId=randomUUID(),qaBatchId=randomUUID();
+ const prev=new Date(f.day+'T12:00:00Z');prev.setUTCDate(prev.getUTCDate()-1);
+ const lessonDay=prev.toISOString().slice(0,10);
+ db(`begin;
+ insert into public.lesson_records
+ (id,owner_id,student_id,lesson_date,type,hours,hourly_rate,total_amount,status)
+ values ('${lessonId}','${f.actors.teacher.id}','${f.ids.student}','${lessonDay}',
+ 'lesson',2,500,1000,'老師已收到');
+ insert into public.payment_batches
+ (id,teacher_id,student_id,parent_id,period_start,period_end,paid_on,
+ paid_amount,status,received_on,confirmed_at)
+ values ('${qaBatchId}','${f.actors.teacher.id}','${f.ids.student}','${f.actors.parent.id}',
+ '${lessonDay}','${lessonDay}','${lessonDay}',1000,'confirmed','${lessonDay}',now());
+ insert into public.payment_batch_items(batch_id,lesson_id,allocated_amount)
+ values('${qaBatchId}','${lessonId}',1000);
+ commit;`);
+ const t=await browser.newPage({timezoneId:'Asia/Taipei'});
+ const p=await browser.newPage({timezoneId:'Asia/Taipei'});
+ try{
+  await login(t,'teacher');
+  await t.evaluate(async ({apiUrl,key,batchId})=>{
+   const client=window.supabase.createClient(apiUrl,key);
+   const {error}=await client.from('v4_payment_batch_qa_marks').insert({
+    batch_id:batchId,is_qa:true,classified_by:(await client.auth.getUser()).data.user.id,
+    reason:'Synthetic batch was previously confirmed without any real bank transfer'
+   });
+   if(error)throw Error('QA classification failed: '+error.message);
+  },{apiUrl:f.apiUrl,key:f.anonKey,batchId:qaBatchId});
+  await login(p,'parent');
+  await submitAmount(p,600,lessonDay);
+  const first=db(`select b.id from public.payment_batches b
+   join public.payment_batch_items i on i.batch_id=b.id
+   where i.lesson_id='${lessonId}' and b.status='pending'
+   order by b.created_at desc limit 1`);
+  expect(first).toMatch(/^[0-9a-f-]{36}$/i);
+  expect(db(`select sum(i.allocated_amount)::numeric(12,2) from public.payment_batch_items i
+   where i.batch_id='${first}'`)).toBe('600.00');
+  await t.reload();
+  await navigate(t,'billing');
+  await t.locator('[data-action="confirm-batch"][data-id="'+first+'"]').click();
+  await expect(t.locator('#receipt-modal')).toBeVisible();
+  await t.locator('#receipt-date').fill(f.day);
+  await t.locator('#receipt-form button[type="submit"]').click();
+  await expect(t.locator('#receipt-modal')).not.toBeVisible();
+  expect(db(`select status from public.lesson_records where id='${lessonId}'`)).toBe('未付款');
+  await p.reload();
+  await submitAmount(p,400,lessonDay);
+  const second=db(`select b.id from public.payment_batches b
+   join public.payment_batch_items i on i.batch_id=b.id
+   where i.lesson_id='${lessonId}' and b.status='pending'
+   order by b.created_at desc limit 1`);
+  expect(second).not.toBe(first);
+  await t.reload();
+  await navigate(t,'billing');
+  await t.locator('[data-action="confirm-batch"][data-id="'+second+'"]').click();
+  await t.locator('#receipt-date').fill(f.day);
+  await t.locator('#receipt-form button[type="submit"]').click();
+  await expect(t.locator('#receipt-modal')).not.toBeVisible();
+  expect(db(`select status from public.lesson_records where id='${lessonId}'`)).toBe('老師已收到');
+  expect(db(`select sum(i.allocated_amount)::numeric(12,2)
+   from public.payment_batch_items i join public.payment_batches b on b.id=i.batch_id
+   left join public.v4_payment_batch_qa_marks m on m.batch_id=b.id
+   where i.lesson_id='${lessonId}' and b.status='confirmed'
+     and coalesce(m.is_qa,false)=false`)).toBe('1000.00');
+ }finally{await Promise.all([t.close(),p.close()]);}
 });
