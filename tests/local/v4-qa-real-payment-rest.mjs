@@ -133,7 +133,10 @@ const attempt=await fetch(s.API_URL+'/rest/v1/lesson_records?id=eq.'+ids.qaOnly,
  'Content-Type':'application/json','Prefer':'return=representation'},
  body:JSON.stringify({status:'未付款',received_date:null})});
 assert.notEqual(attempt.status,200,'Teacher manual paid-status reversal must be denied');checks++;
-eq(db(`select count(*) from public.payment_batches where parent_id='${p.id}' and status='confirmed'`),'4');
+eq(db(`select count(*) from public.payment_batches b
+left join public.v4_payment_batch_qa_marks qm on qm.batch_id=b.id
+where b.parent_id='${p.id}' and b.status='confirmed'
+  and coalesce(qm.is_qa,false)=false`),'4');
 console.log(JSON.stringify({result:'PASS',assertions:checks,realLocalJWT:4,
  genuineOnQaHistory:600,realConfirmedTotal:1000,qaExcluded:true,
  legacyReceiptControlled:true,productionWrites:0}));
