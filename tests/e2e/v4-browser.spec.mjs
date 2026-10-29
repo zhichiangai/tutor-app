@@ -202,9 +202,10 @@ test('historical QA-confirmed batch does not block genuine partial payments on t
 test('teacher can add edit and cancel a single planned lesson in Chromium',async ({page})=>{
  test.setTimeout(42_000);
  await login(page,'teacher');
- await navigate(page,'calendar');
- console.log('CRUD_STAGE calendar');
- await page.locator('#agenda-add').click();
+ await expect(page.locator('#role-indicator-text')).toContainText('老師');
+ console.log('CRUD_STAGE teacher_role');
+ await page.locator('#top-add').click({timeout:6000});
+ console.log('CRUD_STAGE top_add_clicked');
  await expect(page.locator('#record-modal')).toBeVisible();
  console.log('CRUD_STAGE modal_open');
  await page.locator('#record-student').selectOption(f.ids.student);
@@ -218,6 +219,7 @@ test('teacher can add edit and cancel a single planned lesson in Chromium',async
  await page.locator('#save-record').click();
  await expect(page.locator('#record-modal')).not.toBeVisible();
  console.log('CRUD_STAGE form_saved');
+ await navigate(page,'calendar');
  const lessonId=db(`select id from public.lesson_records
    where owner_id='${f.actors.teacher.id}' and student_id='${f.ids.student}'
     and lesson_date='${f.day}' and subject='CI 自動化數學'
