@@ -103,7 +103,7 @@ eq(db(`select count(*) from public.schedule_exceptions where schedule_id='${biwe
 eq(db(`select cancelled_from is null from public.recurring_schedules where id='${biweekly}'`),'t');
 eq(db(`select count(*) from tutor_private.shared_course_events
  where student_id='${ids.student}' and action in (
- 'create_lesson','update_lesson','cancel_lesson','create_schedule','cancel_schedule','cancel_occurrence')`),'6');
+ 'create_lesson','update_lesson','cancel_lesson','create_schedule','cancel_schedule','cancel_occurrence')`),'7');
 db(`delete from public.student_guardians where student_id='${ids.student}'
  and guardian_id='${u.parent.id}'`);
 r=await request(u.parent,'create_lesson',ids.student,null,fields(futureDay(20),'After unlink'));
