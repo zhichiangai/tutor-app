@@ -207,6 +207,22 @@ begin
        where lm.lesson_id=l.id and lm.is_qa
          and lm.classification='simulated_lesson')
     and l.status <> '家長已付款'
+     -- A genuinely received (legacy direct) lesson has zero available balance.
+     -- A historical QA-tagged receipt is the only exception.
+     and (
+       l.status <> '老師已收到'
+       or exists(
+         select 1 from public.payment_batch_items qi
+         join public.payment_batches qb on qb.id=qi.batch_id
+         join public.v4_payment_batch_qa_marks qm on qm.batch_id=qb.id and qm.is_qa
+         where qi.lesson_id=l.id and qb.status='confirmed'
+       )
+       or exists(
+         select 1 from public.v4_lesson_qa_marks lm
+         where lm.lesson_id=l.id and lm.is_qa
+           and lm.classification='simulated_legacy_receipt'
+       )
+     )
     and not exists(select 1 from public.family_requests r where r.lesson_id=l.id and r.kind='payment' and r.status in ('pending','approved'))
   order by l.lesson_date,l.id
  loop
@@ -236,6 +252,22 @@ begin
        where lm.lesson_id=l.id and lm.is_qa
          and lm.classification='simulated_lesson')
     and l.status <> '家長已付款'
+     -- A genuinely received (legacy direct) lesson has zero available balance.
+     -- A historical QA-tagged receipt is the only exception.
+     and (
+       l.status <> '老師已收到'
+       or exists(
+         select 1 from public.payment_batch_items qi
+         join public.payment_batches qb on qb.id=qi.batch_id
+         join public.v4_payment_batch_qa_marks qm on qm.batch_id=qb.id and qm.is_qa
+         where qi.lesson_id=l.id and qb.status='confirmed'
+       )
+       or exists(
+         select 1 from public.v4_lesson_qa_marks lm
+         where lm.lesson_id=l.id and lm.is_qa
+           and lm.classification='simulated_legacy_receipt'
+       )
+     )
     and not exists(select 1 from public.family_requests r where r.lesson_id=l.id and r.kind='payment' and r.status in ('pending','approved'))
   order by l.lesson_date,l.id
  loop
