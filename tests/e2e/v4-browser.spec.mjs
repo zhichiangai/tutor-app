@@ -227,6 +227,8 @@ test('teacher can add edit and cancel a single planned lesson in Chromium',async
    order by created_at desc limit 1`);
  expect(lessonId).toMatch(/^[0-9a-f-]{36}$/i);
  console.log('CRUD_STAGE lesson_created');
+ await page.locator('#calendar-grid .calendar-cell[data-day="'+f.day+'"]').click();
+ console.log('CRUD_STAGE selected_lesson_day');
  await expect(page.locator('#agenda-list [data-action="edit"][data-id="'+lessonId+'"]')).toBeVisible();
  await page.locator('#agenda-list [data-action="edit"][data-id="'+lessonId+'"]').click();
  console.log('CRUD_STAGE edit_opened');
