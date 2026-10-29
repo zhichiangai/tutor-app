@@ -96,6 +96,10 @@ jobs:
           node tests/local/v40-qa-time-rest.mjs
           node tests/local/v40-payment-correction-rest.mjs
           node tests/local/v40-contact-tracking-rest.mjs
+      - name: Real three-role shared-course CRUD, recurring schedules and unlink permissions
+        env:
+          V4_SHARED_COURSE_LOCAL_TEST: '1'
+        run: node tests/local/v4-shared-course-rest.mjs
       - name: Reset only disposable CI database before QA suite
         run: |
           set -euo pipefail
