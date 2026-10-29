@@ -93,7 +93,7 @@ r=await rest(t,'POST','rpc/review_range_payment',{
 eq(r.status,204,'Teacher must be allowed to reconcile historical QA paid status: '+JSON.stringify(r.data));
 eq(db(`select status from public.payment_batches where id='${real400}'`),'confirmed');
 eq(db(`select status from public.lesson_records where id='${ids.a}'`),'老師已收到');
-eq(db(`select count(*) from tutor_private.v4_qa_payment_review_authorizations where lesson_id='${ids.a}' and applied`),'1');
+eq(db(`select count(*) from tutor_private.v4_qa_receipt_reconciliation_authorizations where lesson_id='${ids.a}' and applied`),'1');
 eq(db(`select coalesce(sum(i.allocated_amount),0)::numeric(12,2)
  from public.payment_batch_items i
  join public.payment_batches b on b.id=i.batch_id and b.status='confirmed'
