@@ -1,15 +1,9 @@
 name: V4 QA real local GoTrue JWT acceptance
 on:
-  pull_request:
-    paths:
-      - 'supabase/candidates/*v4*qa*.sql'
-      - 'supabase/candidates/20261029_v4_accounting_qa_snapshot_rpc.sql'
-      - 'tests/local/v4-qa-classification-rest.mjs'
-      - 'tests/local/v4-payment-date-taipei-rest.mjs'
-      - 'tests/v4-payment-date-taipei-contract.mjs'
-      - 'supabase/migrations/20261029024000_v4_payment_date_taipei.sql'
-      - '.github/workflows/v4-qa-local-gotrue.yml'
   workflow_dispatch:
+
+# The default PR suite moved into v4-browser-e2e.yml to avoid simultaneous
+# GHCR downloads. Retain this workflow for independent manual debugging.
 
 permissions:
   contents: read

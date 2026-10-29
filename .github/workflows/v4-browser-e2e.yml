@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - 'v2/**'
-      - 'tests/e2e/**'
+      - 'tests/**'
       - 'supabase/migrations/**'
       - 'supabase/candidates/**'
       - '.github/workflows/v4-browser-e2e.yml'
@@ -17,7 +17,7 @@ jobs:
   browser-e2e:
     name: disposable-supabase-chromium
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     env:
       CI: 'true'
       V4_E2E_LOCAL: '1'
@@ -45,7 +45,20 @@ jobs:
           start_log="$RUNNER_TEMP/v4-browser-start.log"
           reset_log="$RUNNER_TEMP/v4-browser-reset.log"
           trap 'rm -f "$start_log" "$reset_log"' EXIT
-          if ! supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor >"$start_log" 2>&1; then
+          start_ok=0
+          for attempt in 1 2 3; do
+            if supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor >"$start_log" 2>&1; then
+              start_ok=1
+              break
+            fi
+            if grep -qiE '(toomanyrequests|too many requests|rate limit|429)' "$start_log" && [ "$attempt" -lt 3 ]; then
+              echo "::notice::Container registry rate limit on attempt $attempt, retrying isolated startup"
+              sleep $((attempt * 30))
+            else
+              break
+            fi
+          done
+          if [ "$start_ok" -ne 1 ]; then
             echo "::error::Disposable Supabase failed to start (raw output suppressed)"
             if grep -qiE '(rate limit|too many requests|429)' "$start_log"; then
               echo "::notice::Supabase startup category: container registry throttling"
@@ -68,6 +81,31 @@ jobs:
             exit 1
           fi
           echo "Disposable local Supabase ready; no hosted project touched"
+      - name: Run original V4 GoTrue JWT and REST contract suite on disposable database
+        env:
+          V359_LOCAL_RLS_TEST: '1'
+          V359_RLS_PREAPPLIED: '1'
+          V40_LOCAL_METADATA_TEST: '1'
+          V40_LOCAL_CONTACT_TEST: '1'
+          V40_LOCAL_CORRECTION_TEST: '1'
+          V40_LOCAL_CONTACT_TRACKING_TEST: '1'
+        run: |
+          set -euo pipefail
+          node tests/local/v40-contact-rest.mjs
+          node tests/local/v359-parent-payment-rest.mjs
+          node tests/local/v40-qa-time-rest.mjs
+          node tests/local/v40-payment-correction-rest.mjs
+          node tests/local/v40-contact-tracking-rest.mjs
+      - name: Reset only disposable CI database before QA suite
+        run: |
+          set -euo pipefail
+          reset_log="$RUNNER_TEMP/ci-qa-replay.log"
+          trap 'rm -f "$reset_log"' EXIT
+          if ! supabase db reset --local --no-seed >"$reset_log" 2>&1; then
+            echo "::error::Disposable QA replay failed (output suppressed)"
+            exit 1
+          fi
+          echo "CI-only QA isolation reset complete"
       - name: Apply proposed QA classification SQL only to disposable database
         run: |
           set -euo pipefail
@@ -78,6 +116,14 @@ jobs:
             docker exec -i supabase_db_tutor_v4_isolated psql \
               -v ON_ERROR_STOP=1 -U postgres -d postgres < "$file" >/dev/null
           done
+      - name: Real GoTrue JWT and PostgREST QA classification, RLS and unlink acceptance
+        env:
+          V4_QA_LOCAL_JWT_TEST: '1'
+        run: node tests/local/v4-qa-classification-rest.mjs
+      - name: Real GoTrue JWT Taipei-date parent payment and teacher receipt E2E
+        env:
+          V4_PAYMENT_TAIPEI_LOCAL_TEST: '1'
+        run: node tests/local/v4-payment-date-taipei-rest.mjs
       - name: Install pinned Playwright and site Supabase bundle
         run: |
           npm install --no-save --no-package-lock \
