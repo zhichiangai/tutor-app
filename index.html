@@ -5,19 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>好好上課</title>
     <script>
-      // Preserve legacy V1/GitHub Pages, while recovering when Vercel serves
-      // this physical index.html instead of the / => /v2 rewrite.
-      const host = window.location.hostname;
-      const isTutorVercel = host === 'tutor.rapid4grad.com' || host.endsWith('.vercel.app');
-      const target = new URL(isTutorVercel ? 'v2/index.html' : 'frontend/index.html', window.location.href);
-      target.search = window.location.search;
-      target.hash = window.location.hash;
+      // Vercel physical-index fallback: use the only maintained app in /v2/.
+      // Retired GitHub Pages host goes to the canonical site, never the old GAS app.
+      const host = window.location.hostname.toLowerCase();
+      const retiredPages = host.endsWith('.github.io');
+      const target = retiredPages
+        ? new URL('https://tutor.rapid4grad.com/')
+        : new URL('v2/index.html', window.location.href);
+      if (!retiredPages) {
+        target.search = window.location.search;
+        target.hash = window.location.hash;
+      }
       window.location.replace(target.href);
     </script>
-    <noscript><meta http-equiv="refresh" content="0; url=frontend/index.html"></noscript>
+    <noscript><meta http-equiv="refresh" content="0; url=https://tutor.rapid4grad.com/"></noscript>
   </head>
   <body>
-    <p><a href="v2/index.html">前往好好上課</a></p>
-    <p><a href="frontend/index.html">開啟舊版家教計時器</a></p>
+    <p><a href="https://tutor.rapid4grad.com/">前往好好上課正式網站</a></p>
   </body>
 </html>

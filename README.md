@@ -1,139 +1,51 @@
-# 好好上課（tutor-app）｜家教課程與收付款管理 V3.5.9
+# 好好上課（tutor-app）｜唯一維護中的家教網站
 
 **正式網站：** https://tutor.rapid4grad.com/  
-**程式碼：** https://github.com/zhichiangai/tutor-app  
-**目標版本：** V3.5.9（修補候選，尚待 PR 驗收與正式發布），正式 Production 仍以 main 為準。，部署基準為 GitHub `main`。 
+**原始碼：** https://github.com/zhichiangai/tutor-app  
+**V4 發布候選：** [Draft PR #43](https://github.com/zhichiangai/tutor-app/pull/43)（尚未合併／發布）。
 
-> 本 README 說明**目前正式運行的 Vercel + Supabase 版**。舊 GAS、Google Sheets 和 GitHub Pages 專案仍保存在程式庫內，但**不是本網域 V3.3 使用的後端**。舊版記錄見 [歷史 README](docs/legacy-readme-20261019.md)。
+> **Codex／其他 AI 請先讀 `AGENTS.md`。** 程式庫內僅 `v2/` 是正在維護的網站前端。資料夾名稱 `v2` 是歷史命名，不代表目前要維護舊 V2。
 
-## V3.5.9 OAuth 首次載入與月曆偏好隔離（修補候選）
-
-- 修正首次載入或 Google OAuth 回跳時，原 HTML 曾預設顯示「老師模式」及「尚未登入」的矛盾狀態。現在 HTML 在任何 JS 啟動前先顯示中性身份畫面，直到 Session 及 Profile 完成確認才露出完整工作區。
-- 未完成身分驗證時，角色指示器禁用且不顯示老師、家長或學生的角色標題；不更動真正角色推斷與授權。
-- 老師/家長原本共用瀏覽器 `calendarMode` localStorage key，現改按 Google Auth User ID＋角色分開保存。未設定的帳號預設進入月份月曆；登出清空暫存模式。
-- 新增 `tests/v359-auth-bootstrap-account-calendar-regression.mjs`。無 Supabase schema、RLS、付款或課程寫入調整。
-- Codex 正式網站 V3.5.8 核心月曆與最近變更已實測 PASS，但本修補仍須在真實 Google OAuth 及手機尺寸複驗，RLS 越權/Network 尚未驗證。
-
-## V3.5.8 三方月曆與最近變更
-
-- 學生「課表」最上面增加完整月份月曆、月份切換和月曆／清單切換。點選日期後可在下方檢視該日課程與狀態，接著才是原有共同排課與後續安排。
-- 老師、家長保留原有可用月份月曆；家長共同排課區塊移到月曆及當日課程下方。
-- 老師、家長、學生課表最底部皆提供最近變更，預設收合、點擊整列展開／再次收合；切換月份不會重置展開狀態。此區塊使用現有、以 `auth.uid()` 限制的 `shared_course_history` RPC。
-- 學生月曆只從已連結學生的 `student_portal_data` 授權資料讀取課程，不顯示付款金額、費率或其他學生資料。沒有更動資料庫、權限政策、Google 登入流程或現有的變更課程 RPC。
-- `tests/v358-unified-course-calendar-regression.mjs` 涵蓋月曆順序、學生隱私、日期切換、展開收合與三方資料隔離。真實瀏覽器及授權 API 完整驗收仍需另行執行。
-
-## 正式系統架構
+## 唯一正式架構
 
 ```text
-老師／家長／學生（電腦或手機瀏覽器）
-     ↓
-https://tutor.rapid4grad.com
-     ↓
-Vercel：從 main 發布，依 vercel.json 路由至 v2/ 靜態前端
-     ├── Supabase Auth：Google OAuth 登入
-     └── Supabase PostgreSQL：學生、課程、固定課表、邀請、帳務與稽核紀錄
-                    ├── RLS：老師工作空間、家長連結等權限
-                    └── 受控 RPC：三方共同排課與學生專用資料
+老師／家長／學生
+  ↓ https://tutor.rapid4grad.com/
+Vercel (tutor-app-v2, Production ← GitHub main)
+  ↓ vercel.json: / → /v2/index.html
+v2/index.html + v2/app.js + v2/style.css + v2/其他模組
+  ├─ Supabase Auth (Google OAuth)
+  └─ Supabase PostgreSQL (課程、三角色關聯、付款、RLS、RPC)
 ```
 
-- **前端**：`v2/index.html`、`v2/app.js`、`v2/style.css`，原生 HTML／JavaScript，依 `vercel.json` 設定正式網址的檔案路由。
-- **資料庫專案**：Supabase `tutor-app`（Project Ref：`vctisuglfoxyuwlvyjee`，東京區域）；歷次 SQL 版本存放於 `supabase/migrations/`。
-- **正式部署**：Vercel `tutor-app-v2`（請以 Vercel Deployments 查詢目前生效版本）；GitHub PR 合併不表示 SQL migration 自動套用。
-- **舊版**：`frontend/`、`backend/apps-script/` 供歷史與舊資料參考。不要以這兩個路徑推斷 V3.3 正式站的行為。
+- **正式前端：** `v2/`（原生 HTML、CSS、JavaScript）。
+- **正式資料庫：** Supabase `tutor-app`（ref `vctisuglfoxyuwlvyjee`）。
+- **線上部署：** Vercel 專案 `tutor-app-v2`，從 GitHub `main` 發布。
+- **V4 Edge Function：** `supabase/functions/v4-gas-bridge/`。
+- **V4 通知整合：** `integrations/google-apps-script/v4-notifications/`。這是有效的 V4 整合，**不要當作舊後端刪除**。
+- **資料庫歷史與 V4 變更：** `supabase/migrations/`、`supabase/hotfixes/`、`supabase/candidates/` 等；歷史 SQL 即使包含 V2 名稱，也必須保留，不能依檔名刪除。
 
-## V3.5.7 登入載入顯示與版號一致性
+## 舊版已從候選程式樹退場
 
-- OAuth／帳號資料尚未完成讀取時，角色切換器使用「正在確認登入身分」中性提示，禁用切換，避免沿用上一個學生／家長／老師的角色文字。
-- 角色讀取完成後恢復帳號所選模式與正常切換；登入期間不變更角色偏好、課表、帳務、權限。
-- 網頁分頁標題與頁尾同步更新至 V3.5.7。
-- 新增 `tests/v357-neutral-auth-loading-regression.mjs`，驗證角色載入狀態、切換與版號。
-- 無資料庫 Migration；跨帳號 RLS API 越權測試、三方寫入同步、真實窄手機與跨裝置驗收仍需額外實測。
+原 GitHub Pages「家教時數帳本」的 `frontend/`、`backend/apps-script/`、兩份過時 legacy README 已移出目前候選分支，防止 AI 讀錯入口。根目錄 `index.html` 僅保留為安全轉址；舊 GitHub Pages 根網址應導向正式網域。
 
-## V3.5.6 登入角色偏好修正
+**這不代表 Git 歷史或 GitHub Pages 設定自動刪除。** Git 歷史用來追溯，GitHub Pages 發布是否停用需到 GitHub Settings → Pages 個別確認；不可把仍存在的舊部署視為可繼續操作的正式版本。
 
-- 第一次登入沒有使用者明確偏好時，依已連結的學生、家長身分選擇首頁，不再一律採老師預設。
-- 已儲存的跨裝置 `profiles.last_role` 仍優先；使用者可於設定中調整下次登入角色，切換模式也會更新偏好。
-- 若登入前的角色偏好寫入中斷，依該帳號的本機待同步標記恢復並重試，不影響其他 Google 帳號。
-- 角色偏好不授權任何學生或帳務資料；所有真實資料存取仍依原本 RLS 與 RPC 限制。
-- 本次不需資料庫 Migration，也不變更任何真實課程或付款資料。
+## 目前發布狀態與安全原則
 
-## V3.4.1 排課體驗修正
+- `main` 為 Production 的唯一來源；Draft PR #43 仍在 V4 驗收。
+- 正式 Supabase 在 2026-10-29 的基線為 29 筆 Migration；PR #43 的 37 份本機重播與候選 SQL **不可**直接 `db push` 到 Production。
+- 正式付款 RLS 有 P0 待修，正式備份及隔離還原、Google OAuth 實機驗收尚未證明完成；V4 不得僅憑 CI 綠燈視為已正式安全發布。
+- **不得**在正式 Supabase 建立假學生、假課程或測試付款；不可在未授權情況下合併 PR、套 Migration、修改真實資料。
+- 目前以 GitHub Actions 中的一次性隔離 Supabase 進行 Node/Postgres/Chromium 自動測試；Preview 只有前端 READY 並不代表具備獨立測試資料庫。
+- 詳見 `docs/qa/V4_RELEASE_EXECUTION_GATE_20261029.md`、`docs/qa/V4_PRODUCTION_MIGRATION_BASELINE_20261029.json`、`docs/qa/V4_MAC_LOCALHOST_BIND_RECOVERY.md`。
 
-- **單堂補課與固定週期不同**：雙週 12/16 的課可以補到 12/23，不會把整組課表改成每週，12/30 仍照原規則上課。資料庫驗證原定日期是否屬於固定週期、補課目標時段是否撞期。
-- **錯誤提示保留**：三方共同排課遭拒絕（時間衝突或版本過期）時，表單顯示明確、可持續閱讀的錯誤說明；不依賴短暫 Toast。
-- `v2/README.md` 已更新為正式 Vercel + Supabase 架構；原 V2 歷史部署文件歸檔在 `docs/legacy-v2-readme-20261020.md`。
+## 開發與驗收
 
-## V3.5.3 登出隱私與窄螢幕月曆修復
+1. 先讀 `AGENTS.md` 和 `vercel.json`，只修改 `v2/` 的活躍網站。
+2. 以功能分支與 PR 開發，不直接在 Production 嘗試 Migration。
+3. 在隔離 CI 跑 `node --test tests/*.mjs`、Postgres Contract、Chromium Playwright。
+4. 使用具備 Browser Use 權限的工具驗收老師、家長、學生，並區分唯讀正式站、隔離測試站、CI 自動化結果。
+5. V4 經正式備份／還原、RLS、Migration 對照與使用者授權後，才能發布至 Production。
 
-- 使用者點擊「登出」時，立即清除私人課程、學生、收款、邀請、DOM 及草稿，再等待 Supabase Auth 遠端回應，不再讓私人內容因網路延遲暫留畫面。
-- 遠端登出失敗時，仍維持本地學習資料已清空，提示使用者重新確認登入狀態；登入更新事件不應在登出進行時恢復前一帳號資料。
-- 老師月曆的每堂課按鈕允許在 320px 螢幕內收縮，課程資訊可省略過長文字，付款狀態標籤依可用寬度換行。
-- 正式頁尾版號同步更新。詳細驗證見 [V3.5.3 回歸記錄](docs/v353-logout-calendar-validation.md)。
-
-## V3.5.2 收款狀態保護
-
-- 資料庫禁止舊式已收款課程先直接降回未付款、再更動時數與金額；合法撤銷使用具權限與原因、稽核的受控流程。
-- 維持家長付款申請、部分付款批次及課後學習內容更新。
-
-## V3.5.1 設定頁權限修正
-
-- 補上三個既有 RLS 更新政策所需的最小資料表欄位權限：使用者只能更新自己的顯示名稱、已啟用模式和最後模式；老師只能修改自己的家教空間名稱及尚未接受邀請的家長 Email。
-- 這次**沒有**授予修改使用者 ID、學生關聯、老師擁有者、帳務或付款欄位的權限。
-- 已使用真正的 PostgreSQL `authenticated` 角色，以臨時帳號交易驗證本人可更新、外人無法越權，全部測試資料都已 `ROLLBACK`。
-
-## V3.5 正式產品功能
-
-- 登入僅使用 Google OAuth；顯示名稱、家教空間及角色模式由獨立「設定」頁管理，不提供正式站互動預覽入口。
-- 老師、家長、學生角色可勾選啟用，頂部僅顯示所選模式，設定跨裝置同步。啟用模式不是資料授權，仍依 Supabase RLS / 關聯檢查。
-- 老師完成上課時記錄上課內容、專注度及學生心情（各 1–5 星）、課後備註。已付款課程可由老師安全補寫非財務紀錄，保留稽核歷史。
-- 家長付款與付款期間確認前可逐堂查看課後內容、星級、時數與金額；學生學習紀錄可查看內容與評分，但不回傳任何付款資料。
-- 詳細規格：[V3.5 設定與課後紀錄](docs/v35-settings-learning-billing.md)。
-
-## 使用者角色與功能
-
-| 功能 | 老師 | 已連結家長 | 已連結學生 |
-| --- | --- | --- | --- |
-| 查看屬於自己的課程 | ✅ | ✅ | ✅ |
-| 新增單堂、每週／雙週固定課表 | ✅ | ✅ | ✅ |
-| 改期、調整與取消課程 | ✅ | ✅ | ✅ |
-| 課後回饋／評分 | 編輯 | 查看 | 查看 |
-| 設定鐘點費與確認收款 | ✅ | — | — |
-| 付款申報與對帳 | 查看／確認 | 申報／查看 | 不顯示 |
-| 修改其他沒有連結的學生資料 | 禁止 | 禁止 | 禁止 |
-
-三方管理的是**同一份課表**，但家長與學生必須先被老師邀請並建立有效連結，不能單純切換介面角色取得權限。共同排課經 `shared_course_action` RPC 驗證使用者與學生關聯；老師原有的出席和付款流程保持獨立。
-
-**實務限制與已知狀態：**
-
-- 三個不同真實 Google 帳號的跨裝置端對端（E2E）測試，尚需正式完成；自動單元回歸測試不等於真人驗收。
-- 目前改動後主要透過重新載入取得別人的最新操作，尚未宣稱具備即時推播或 Email 通知。
-- 已完成、付款中或已結算課程不得透過家庭共同排課功能直接刪改。
-- 固定課表可選多星期；改動日期時單一星期與新日期連動，多星期的人工選擇應保留。細節見 [V3.3 排課設計及驗收清單](docs/v33-shared-course-management.md)。
-- 目前**沒有**導入訂閱費、線上刷卡收款、跨老師的團隊共同管理或自動搬移舊 GAS/Sheets 歷史資料。
-
-## 開發與測試
-
-1. 建立 GitHub 分支並修改 `v2/` 程式或 `supabase/migrations/`，避免直接在正式 `main` 試驗。
-2. 本機執行 `node --test tests/*.mjs`。GitHub Actions 工作流程位於 `.github/workflows/v3-regression.yml`，每次提交 PR 或合併 main 會自動測試。
-3. 如果新增 SQL migration，**必須另外透過 Supabase 審查與套用**，避免「前端已發布但 RPC 不存在」。
-4. 通過自動測試後合併 PR，確認 Vercel 對應 commit 部署成功。
-5. 使用獨立的老師、家長、學生測試帳號及測試學生，完成新增、改期、取消、跨裝置同步、取消連結與帳務隔離驗收。不要用正式學生或已付款課程測試。
-
-## 安全規範
-
-- 瀏覽器只放公開的 Supabase publishable key，**絕不能**在前端或 GitHub 提交 `service_role` 或私密金鑰。
-- 外部資料表使用 RLS；存取權限必須按實際學生關聯驗證，而不是依介面上顯示的老師／家長／學生模式判斷。
-- 有意開放給 `authenticated` 的 `SECURITY DEFINER` RPC 仍會被 Supabase Security Advisor 標示警告；不應為了消除警告而直接停用必要功能。逐一說明見 [V3.3 安全檢查](docs/v33-security-audit.md)。
-- 停用不再使用的舊學生快照 RPC 公開執行權限。密碼洩漏防護屬 Supabase Auth 設定，應由管理員核對 Email／Password 是否啟用及方案限制。
-- 任何更動正式資料、刪除、匯入或重新結算前都應先備份、驗證且取得適當授權。
-
-## 其他技術文件
-
-- [V3.4 三方共同排課穩定性與驗收](docs/v34-shared-schedule-validation.md)
-
-- [V3.3 三方共同課程管理](docs/v33-shared-course-management.md)
-- [V3 人性化課程與收付款流程](docs/v3-human-friendly-ux.md)
-- [V3 獨立家教工作空間](docs/v3-multi-tenant-ux.md)
-- [V2.7 工作空間與 RLS](docs/v27-personal-workspaces.md)
-- [V2.6 安全維護](docs/v26-security-and-maintenance.md)
-- [舊版 GAS／Sheets 專案備份](docs/legacy-readme-20261019.md)
+現行功能說明：[`v2/README.md`](v2/README.md)。專案歷次 V3/ V4 架構說明存放於 `docs/`，屬設計與回歸記錄，不代表仍有多套正式前端。
