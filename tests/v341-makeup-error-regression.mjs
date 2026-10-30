@@ -102,11 +102,11 @@ test("a stale schedule revision gets a visible and human-readable refresh instru
  assert.match(element("#shared-course-error").textContent,/重新整理後再修改/);
 });
 
-test("V2 README is current and historical deployment guidance remains available",()=>{
- const current=read("../v2/README.md"),legacy=read("../docs/legacy-v2-readme-20261020.md");
+test("Active frontend README is current and points Codex to one maintained app",()=>{
+ const current=read("../v2/README.md"),agents=read("../AGENTS.md");
  assert.match(current,/Vercel/);
- assert.match(current,/tutor\.rapid4grad\.com/);
+ assert.ok(current.includes("tutor.rapid4grad.com"));
  assert.match(current,/補課/);
- assert.match(legacy,/GitHub Pages/);
- assert.match(legacy,/Google Sheets/);
+ assert.ok(agents.includes("ONLY maintained frontend"));
+ assert.ok(!current.includes("docs/legacy-v2-readme"));
 });

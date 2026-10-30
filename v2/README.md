@@ -15,7 +15,7 @@
 - `index.html`：單一頁面結構、老師／家長／學生模式
 - `app.js`：狀態、登入、學習紀錄、付款與排課整合
 - `style.css`：桌面／手機介面
-- `calendar-view.js`、`scheduling.js`：日曆、固定排課
+- `calendar-view.js`、`scheduling.js`：日曆、固定排課、單堂改期與補課規則
 - `lesson-actual.js`：實際上課時間與時數
 - `payment-ledger.js`、`payment-correction.js`：應收與付款／更正呈現
 - `v4-connections.js`、`v4-contacts.js`、`v4-config.js`：V4 邀請、連結和設定
