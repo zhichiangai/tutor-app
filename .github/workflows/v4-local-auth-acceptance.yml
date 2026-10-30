@@ -1,10 +1,10 @@
 name: V4 isolated Supabase Auth acceptance
 on:
-  push:
-    branches: [codex/v4-beta-integration-20261025, feat/v4-batch-corrections-foundation-20261024]
-  pull_request:
-    branches: [main, codex/v4-beta-integration-20261025, feat/v4-contact-only-links-20261024]
-    paths: ['supabase/**', 'tests/local/**', 'v2/**', '.github/workflows/v4-local-auth-acceptance.yml']
+  workflow_dispatch:
+
+# The default PR suite moved into v4-browser-e2e.yml to avoid simultaneous
+# GHCR downloads. Retain this workflow for independent manual debugging.
+
 permissions:
   contents: read
 jobs:

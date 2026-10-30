@@ -1,0 +1,185 @@
+{
+  "note": "Read-only release planning snapshot; not a migration replay plan or approval. NO db push/repair on Production.",
+  "observed_at_taipei": "2026-10-29",
+  "production_project_ref": "vctisuglfoxyuwlvyjee",
+  "production_history": [
+    {
+      "version": "20261019090405",
+      "name": "create_secure_tutor_lesson_records"
+    },
+    {
+      "version": "20261019091930",
+      "name": "v2_students_guardians_requests_access"
+    },
+    {
+      "version": "20261019093329",
+      "name": "v2_integrity_constraints"
+    },
+    {
+      "version": "20261019093428",
+      "name": "v2_atomic_review_family_request"
+    },
+    {
+      "version": "20261019152058",
+      "name": "v21_recurring_schedules_exceptions"
+    },
+    {
+      "version": "20261019152210",
+      "name": "v21_review_virtual_lessons_and_split_rules"
+    },
+    {
+      "version": "20261019162650",
+      "name": "v23_secure_date_range_payment_batches"
+    },
+    {
+      "version": "20261019163424",
+      "name": "v23_prevent_allocated_lesson_overwrites"
+    },
+    {
+      "version": "20261019163504",
+      "name": "v23_taipei_payment_dates"
+    },
+    {
+      "version": "20261019183328",
+      "name": "v26_close_cross_user_rls_and_validate_requests"
+    },
+    {
+      "version": "20261019183511",
+      "name": "v25_actual_lesson_schema_reconciliation"
+    },
+    {
+      "version": "20261019183632",
+      "name": "v26_optimize_rls_policies_and_foreign_key_indexes"
+    },
+    {
+      "version": "20261019183708",
+      "name": "v26_cache_jwt_claim_in_rls_policy"
+    },
+    {
+      "version": "20261019183944",
+      "name": "v26_restrict_dangerous_table_grants_and_request_updates"
+    },
+    {
+      "version": "20261019184235",
+      "name": "v26_protect_paid_lesson_delete"
+    },
+    {
+      "version": "20261019193426",
+      "name": "v27_personal_workspaces_and_scoped_records"
+    },
+    {
+      "version": "20261019194414",
+      "name": "v27_index_workspace_composite_foreign_keys"
+    },
+    {
+      "version": "20261019201357",
+      "name": "v3_teacher_preferences"
+    },
+    {
+      "version": "20261020101239",
+      "name": "v31_cancel_recurrence_and_invite_edit"
+    },
+    {
+      "version": "20261020104006",
+      "name": "v32_student_portal_identity"
+    },
+    {
+      "version": "20261020135424",
+      "name": "v32_student_portal"
+    },
+    {
+      "version": "20261021033215",
+      "name": "v33_shared_course_management"
+    },
+    {
+      "version": "20261021033435",
+      "name": "v33_student_invitation_compat"
+    },
+    {
+      "version": "20261021065558",
+      "name": "v33_restrict_legacy_student_snapshot"
+    },
+    {
+      "version": "20261021074320",
+      "name": "v34_shared_integrity"
+    },
+    {
+      "version": "20261021103622",
+      "name": "v35_roles_lesson_learning"
+    },
+    {
+      "version": "20261021105622",
+      "name": "v351_authenticated_settings_write_grants"
+    },
+    {
+      "version": "20261021185157",
+      "name": "v352_legacy_receipt_status_guard"
+    },
+    {
+      "version": "20261022110047",
+      "name": "v354_student_account_disconnect"
+    }
+  ],
+  "local_replay_baseline_files": [
+    "20261019090405_create_secure_tutor_lesson_records.sql",
+    "20261019091930_v2_students_guardians_requests_access.sql",
+    "20261019093329_v2_integrity_constraints.sql",
+    "20261019093428_v2_atomic_review_family_request.sql",
+    "20261019152058_v21_recurring_schedules_exceptions.sql",
+    "20261019152210_v21_review_virtual_lessons_and_split_rules.sql",
+    "20261019162650_v23_secure_date_range_payment_batches.sql",
+    "20261019163424_v23_prevent_allocated_lesson_overwrites.sql",
+    "20261019163504_v23_taipei_payment_dates.sql",
+    "20261019183328_v26_close_cross_user_rls_and_validate_requests.sql",
+    "20261020023000_v25_actual_lesson_baseline.sql",
+    "20261020023100_v26_rls_hardening_and_indexes.sql",
+    "20261020023200_v26_limit_browser_table_privileges.sql",
+    "20261020023300_v26_guard_paid_lesson_deletion.sql",
+    "20261020030000_v27_personal_workspaces.sql",
+    "20261020031000_v27_workspace_fk_indexes.sql",
+    "20261020040000_v3_teacher_preferences.sql",
+    "20261020051000_v31_cancel_recurrence_and_invite_edit.sql",
+    "20261020104006_v32_student_portal_identity.sql",
+    "20261020220000_v32_student_portal.sql",
+    "20261021030000_v33_shared_course_management.sql",
+    "20261021031000_v33_student_invitation_compat.sql",
+    "20261021153000_v33_restrict_legacy_student_snapshot.sql",
+    "20261021170000_v34_shared_integrity.sql",
+    "20261021181000_v35_roles_lesson_learning.sql",
+    "20261021190000_v351_authenticated_settings_write_grants.sql",
+    "20261022021000_v352_legacy_receipt_status_guard.sql",
+    "20261022113000_v354_student_account_disconnect.sql"
+  ],
+  "proposed_forward_files": [
+    "20261023090000_v4_bidirectional_invites_gas.sql",
+    "20261023163138_v359_parent_payment_link_rls.sql",
+    "20261023190847_v4_qa_and_time_metadata.sql",
+    "20261024033000_v4_account_contacts.sql",
+    "20261024035831_v4_contact_privacy_hardening.sql",
+    "20261024043000_v40_payment_correction_foundation.sql",
+    "20261024050000_v40_apply_payment_corrections.sql",
+    "20261024053000_v4_contact_outgoing_tracking.sql",
+    "20261029024000_v4_payment_date_taipei.sql"
+  ],
+  "direct_version_matches": 11,
+  "formal_versions_missing_from_replay": [
+    "20261019183511",
+    "20261019183632",
+    "20261019183708",
+    "20261019183944",
+    "20261019184235",
+    "20261019193426",
+    "20261019194414",
+    "20261019201357",
+    "20261020101239",
+    "20261020135424",
+    "20261021033215",
+    "20261021033435",
+    "20261021065558",
+    "20261021074320",
+    "20261021103622",
+    "20261021105622",
+    "20261021185157",
+    "20261022110047"
+  ]
+}

@@ -1,0 +1,162 @@
+name: V4 isolated Playwright browser E2E
+
+on:
+  pull_request:
+    paths:
+      - 'v2/**'
+      - 'tests/**'
+      - 'supabase/migrations/**'
+      - 'supabase/candidates/**'
+      - '.github/workflows/v4-browser-e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-e2e:
+    name: disposable-supabase-chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: 'true'
+      V4_E2E_LOCAL: '1'
+      SUPABASE_TELEMETRY_DISABLED: '1'
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io
+      V4_E2E_FIXTURE_FILE: /tmp/v4-e2e-fixture.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.107.0
+      - name: Enforce disposable localhost scope
+        run: |
+          set -euo pipefail
+          grep -q '^project_id = "tutor_v4_isolated"$' supabase/config.toml
+          test ! -f supabase/.temp/project-ref
+          test ! -f supabase/.branches/_current_branch
+          test "$V4_E2E_LOCAL" = "1"
+      - name: Start local Supabase and replay V4 migrations only
+        run: |
+          set -euo pipefail
+          start_log="$RUNNER_TEMP/v4-browser-start.log"
+          reset_log="$RUNNER_TEMP/v4-browser-reset.log"
+          trap 'rm -f "$start_log" "$reset_log"' EXIT
+          start_ok=0
+          for attempt in 1 2 3; do
+            if supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor >"$start_log" 2>&1; then
+              start_ok=1
+              break
+            fi
+            if grep -qiE '(toomanyrequests|too many requests|rate limit|429)' "$start_log" && [ "$attempt" -lt 3 ]; then
+              echo "::notice::Container registry rate limit on attempt $attempt, retrying isolated startup"
+              sleep $((attempt * 30))
+            else
+              break
+            fi
+          done
+          if [ "$start_ok" -ne 1 ]; then
+            echo "::error::Disposable Supabase failed to start (raw output suppressed)"
+            if grep -qiE '(rate limit|too many requests|429)' "$start_log"; then
+              echo "::notice::Supabase startup category: container registry throttling"
+            elif grep -qiE '(connection refused|timed out|context deadline exceeded|TLS handshake timeout)' "$start_log"; then
+              echo "::notice::Supabase startup category: container network timeout"
+            elif grep -qiE '(unauthorized|denied|forbidden)' "$start_log"; then
+              echo "::notice::Supabase startup category: registry authorization"
+            else
+              echo "::notice::Supabase startup category: undetermined; inspect CI runner and container health"
+            fi
+            echo "::notice::Sanitized Supabase error summary (first five matching lines):"
+            grep -iE '(error|failed|invalid|unknown|panic|docker|cannot|timeout)' "$start_log" |
+              sed -E 's/eyJ[A-Za-z0-9_.-]+/[JWT_REDACTED]/g; s/sb_(publishable|secret)_[A-Za-z0-9_-]+/[KEY_REDACTED]/g; s#postgres(ql)?://[^ ]+#[DB_URI_REDACTED]#g; s#https?://[^ ]+#[URL_REDACTED]#g; s/[A-Za-z0-9_+\/=-]{80,}/[LONG_TOKEN_REDACTED]/g' |
+              head -n 5 || true
+            docker ps -a --filter name=tutor_v4_isolated --format 'container={{.Names}} state={{.Status}}' || true
+            exit 1
+          fi
+          if ! supabase db reset --local --no-seed >"$reset_log" 2>&1; then
+            echo "::error::Disposable Supabase migration replay failed (output suppressed)"
+            exit 1
+          fi
+          echo "Disposable local Supabase ready; no hosted project touched"
+      - name: Run original V4 GoTrue JWT and REST contract suite on disposable database
+        env:
+          V359_LOCAL_RLS_TEST: '1'
+          V359_RLS_PREAPPLIED: '1'
+          V40_LOCAL_METADATA_TEST: '1'
+          V40_LOCAL_CONTACT_TEST: '1'
+          V40_LOCAL_CORRECTION_TEST: '1'
+          V40_LOCAL_CONTACT_TRACKING_TEST: '1'
+        run: |
+          set -euo pipefail
+          node tests/local/v40-contact-rest.mjs
+          node tests/local/v359-parent-payment-rest.mjs
+          node tests/local/v40-qa-time-rest.mjs
+          node tests/local/v40-payment-correction-rest.mjs
+          node tests/local/v40-contact-tracking-rest.mjs
+      - name: Real three-role shared-course CRUD, recurring schedules and unlink permissions
+        env:
+          V4_SHARED_COURSE_LOCAL_TEST: '1'
+        run: node tests/local/v4-shared-course-rest.mjs
+      - name: Reset only disposable CI database before QA suite
+        run: |
+          set -euo pipefail
+          reset_log="$RUNNER_TEMP/ci-qa-replay.log"
+          trap 'rm -f "$reset_log"' EXIT
+          if ! supabase db reset --local --no-seed >"$reset_log" 2>&1; then
+            echo "::error::Disposable QA replay failed (output suppressed)"
+            exit 1
+          fi
+          echo "CI-only QA isolation reset complete"
+      - name: Apply proposed QA classification SQL only to disposable database
+        run: |
+          set -euo pipefail
+          for file in \
+            supabase/candidates/20261028_v4_payment_batch_qa_classification.sql \
+            supabase/candidates/20261029_v4_qa_lesson_and_legacy_receipt.sql \
+            supabase/candidates/20261029_v4_accounting_qa_snapshot_rpc.sql \
+            supabase/candidates/20261029_v4_qa_real_payment_rpc_reconciliation.sql \
+            supabase/candidates/20261029_v4_qa_reclassification_guard.sql; do
+            docker exec -i supabase_db_tutor_v4_isolated psql \
+              -v ON_ERROR_STOP=1 -U postgres -d postgres < "$file" >/dev/null
+          done
+      - name: Real GoTrue JWT and PostgREST QA classification, RLS and unlink acceptance
+        env:
+          V4_QA_LOCAL_JWT_TEST: '1'
+        run: node tests/local/v4-qa-classification-rest.mjs
+      - name: Real GoTrue JWT Taipei-date parent payment and teacher receipt E2E
+        env:
+          V4_PAYMENT_TAIPEI_LOCAL_TEST: '1'
+        run: node tests/local/v4-payment-date-taipei-rest.mjs
+      - name: Real local JWT parent and teacher mixed QA/genuine payment reconciliation
+        env:
+          V4_QA_REAL_PAYMENT_TEST: '1'
+        run: node tests/local/v4-qa-real-payment-rest.mjs
+      - name: Real local JWT over-allocation, QA unmarking, and old-batch unlink RLS
+        env:
+          V4_QA_PAYMENT_RPC_TEST: '1'
+        run: node tests/local/v4-qa-payment-rpc-rest.mjs
+      - name: Install pinned Playwright and site Supabase bundle
+        run: |
+          npm install --no-save --no-package-lock \
+            @playwright/test@1.64.1 @supabase/supabase-js@2.76.1
+          npx playwright install --with-deps chromium
+      - name: Seed only synthetic teachers, parents, students and lessons
+        run: node tests/e2e/seed-v4-local.mjs
+      - name: Verify real Chromium teacher-parent-student flows
+        run: npx playwright test --config tests/e2e/playwright.config.mjs
+      - name: Remove ephemeral auth fixture
+        if: always()
+        run: rm -f "$V4_E2E_FIXTURE_FILE"
+      - name: Upload sanitized failure screenshots and report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v4-browser-e2e-failures
+          path: |
+            tests/e2e/test-results/v4-e2e-report/
+            tests/e2e/test-results/v4-e2e-artifacts/
+          retention-days: 7
+          if-no-files-found: ignore
