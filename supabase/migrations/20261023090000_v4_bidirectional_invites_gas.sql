@@ -451,19 +451,46 @@ for each row execute function tutor_private.v4_notify_legacy_invitation();
 create or replace function public.v4_disconnect_guardian(p_student_guardian_id uuid)
 returns void language plpgsql security definer set search_path=''
 as $$
-declare v_uid uuid:=(select auth.uid()); v_invite uuid;
+declare
+  v_uid uuid := (select auth.uid());
+  v_invite uuid;
+  v_teacher uuid;
+  v_student uuid;
+  v_parent uuid;
+  v_teacher_email text;
+  v_parent_email text;
 begin
   if v_uid is null then raise exception '請先登入'; end if;
-  -- Remove only the authorized student/guardian relationship. An invitation
-  -- can be referenced by multiple links; deleting it first cascades to all of
-  -- them, even links the caller did not intend to disconnect.
+
+  -- Revoke only this relationship; deleting the invite first cascades to
+  -- unrelated guardians if a legacy invite was shared by multiple links.
   delete from public.student_guardians g
     where g.id=p_student_guardian_id and (g.guardian_id=v_uid or g.teacher_id=v_uid)
-    returning g.invite_id into v_invite;
+    returning g.invite_id,g.teacher_id,g.student_id,g.guardian_id
+      into v_invite,v_teacher,v_student,v_parent;
   if not found then raise exception '找不到可解除的課程連結'; end if;
 
-  -- Revoke the old invite only when it is no longer used by any active link.
-  -- The historical course and payment rows are deliberately untouched.
+  -- Keep V4 application history in sync even when the invitation is shared.
+  -- The legacy invite-delete trigger cannot observe a row deleted earlier
+  -- in this transaction, so that trigger must not be the sole history writer.
+  update public.v4_connection_requests r
+    set status='disconnected',updated_at=now()
+    where r.teacher_id=v_teacher and r.student_id=v_student
+      and r.parent_id=v_parent and r.status='approved';
+
+  select u.email into v_teacher_email from auth.users u where u.id=v_teacher;
+  select u.email into v_parent_email from auth.users u where u.id=v_parent;
+  perform tutor_private.v4_enqueue(
+    'v4:rpc-unlinked-parent:'||p_student_guardian_id::text,v_parent_email,
+    '好好上課｜課程連結已解除',
+    '您好，'||chr(10)||'這筆課程連結已解除，之後將無法繼續查看該課程。過往課程和付款紀錄仍由原老師保留。');
+  perform tutor_private.v4_enqueue(
+    'v4:rpc-unlinked-teacher:'||p_student_guardian_id::text,v_teacher_email,
+    '好好上課｜家長課程連結已解除',
+    '您好，'||chr(10)||'這位家長與課程的連結已解除。原本的上課與帳務資料仍會保留。');
+
+  -- Revoke an invite only once nobody references it. This avoids cascade
+  -- deletion of a different active guardian relationship.
   if v_invite is not null then
     delete from public.guardian_invites i where i.id=v_invite
       and not exists (
