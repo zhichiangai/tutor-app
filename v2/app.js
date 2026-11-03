@@ -309,6 +309,11 @@ function setRole(role){
  if(roleChanged){
   state.recentChangesOpen=false;
   state.sharedCourseHistory={};
+  // An invitation QR/link or an outgoing contact draft belongs to the
+  // previous role, even when this Google account supports several roles.
+  // Do not show it after switching teacher/parent/student views.
+  v4ConnectionUI.clear();
+  v4ContactsUI.clear();
  }
  state.preferredLoginRole=role;
  const menu=$("#role-menu");menu.classList.add("hidden");$("#role-indicator").setAttribute("aria-expanded","false");
@@ -316,6 +321,11 @@ function setRole(role){
  const storageKey=id?ROLE_STORAGE+"_"+id:ROLE_STORAGE;
  localStorage.setItem(storageKey,role);
  setView(role==="student"?"student-today":"home");
+ if(roleChanged&&id&&(role==="teacher"||role==="parent")){
+  // Refetch only the now-current role's server-owned connection history.
+  void v4ConnectionUI.refresh();
+  void v4ContactsUI.refresh();
+ }
  if(roleChanged&&id){
   void loadSharedCourseHistory().then(()=>{
    if(activeUser?.id===id&&state.role===role)renderRecentChanges();
