@@ -24,5 +24,13 @@ test('Vercel continues to route to the maintained frontend and active V4 integra
    'supabase/functions/v4-gas-bridge/index.ts',
    'supabase/migrations/20261023090000_v4_bidirectional_invites_gas.sql'])
   assert.equal(existsSync(here(path)),true,path);
+ const redirects=config.redirects||[];
+ for(const path of ['/frontend','/frontend/index.html','/frontend/app.js','/frontend/style.css','/backend/apps-script/Code.js']){
+  const match=redirects.find(r=>r.source===path||
+    (r.source.endsWith('/:path*')&&path.startsWith(r.source.slice(0,-7)+'/')));
+  assert.ok(match,'retired public path redirects to maintained app: '+path);
+  assert.equal(match.destination,'/');
+  assert.equal(match.permanent,true);
+ }
  assert.match(read('AGENTS.md'),/ONLY maintained frontend/);
 });
