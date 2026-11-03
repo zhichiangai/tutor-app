@@ -3,10 +3,24 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta http-equiv="refresh" content="0; url=frontend/index.html">
-    <title>家教計時器</title>
+    <title>好好上課</title>
+    <script>
+      // Vercel physical-index fallback: use the only maintained app in /v2/.
+      // Retired GitHub Pages host goes to the canonical site, never the old GAS app.
+      const host = window.location.hostname.toLowerCase();
+      const retiredPages = host.endsWith('.github.io');
+      const target = retiredPages
+        ? new URL('https://tutor.rapid4grad.com/')
+        : new URL('v2/index.html', window.location.href);
+      if (!retiredPages) {
+        target.search = window.location.search;
+        target.hash = window.location.hash;
+      }
+      window.location.replace(target.href);
+    </script>
+    <noscript><meta http-equiv="refresh" content="0; url=https://tutor.rapid4grad.com/"></noscript>
   </head>
   <body>
-    <p><a href="frontend/index.html">前往家教計時器</a></p>
+    <p><a href="https://tutor.rapid4grad.com/">前往好好上課正式網站</a></p>
   </body>
 </html>

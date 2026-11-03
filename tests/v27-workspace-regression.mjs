@@ -89,11 +89,13 @@ test("Google account profile uses Auth user ID, never user-supplied role",async(
  assert.equal(Object.hasOwn(operations[0],"role"),false);
 });
 
-test("Onboarding markup exists and does not modify V1",()=>{
+test("Onboarding markup exists and retired V1 is not routed",()=>{
  const html=read("../v2/index.html");
  for(const id of ["workspace-setup","workspace-account","workspace-create","workspace-rename",
  "parent-teacher-bar","parent-teacher-select"])
  assert.ok(html.includes('id="'+id+'"'),id);
- const v1=read("../index.html");
- assert.ok(v1.includes("frontend/index.html"));
+ const root=read("../index.html");
+ assert.ok(root.includes("v2/index.html"));
+ assert.ok(!root.includes("frontend/"));
+
 });
