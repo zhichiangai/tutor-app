@@ -30,7 +30,15 @@ test('production homepage renders 好好上課 V4, not retired V1',async()=>{
  assert.equal(res.status,200);
  const html=await res.text();
  assert.match(html,/<title>好好上課/);
- assert.match(html,/V4\.0\.0/);
+ // The physical root index is a deliberate client-side forwarder to /v2/.
+ // Test the forwarder and the actual V4 page separately; fetch() cannot run JS.
+ assert.match(html,/window\.location\.replace\(target\.href\)/);
+ assert.match(html,/new URL\('v2\/index\.html', window\.location\.href\)/);
+ const maintained=await get('/v2/index.html');
+ assert.equal(maintained.status,200);
+ const v4=await maintained.text();
+ assert.match(v4,/<title>好好上課/);
+ assert.match(v4,/V4\.0\.0/);
  assert.doesNotMatch(html,/<title>家教時數帳本/);
 });
 test('retired frontend/index.html does not serve old V1',async()=>{

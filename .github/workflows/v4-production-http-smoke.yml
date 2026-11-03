@@ -3,7 +3,7 @@ name: V4 Production Public HTTP Smoke
 on:
   pull_request:
     paths:
-      - 'tests/v4-production-http-smoke.mjs'
+      - 'tests/smoke/v4-production-http-smoke.mjs'
       - '.github/workflows/v4-production-http-smoke.yml'
   workflow_dispatch:
 
@@ -20,4 +20,4 @@ jobs:
         with:
           node-version: '24'
       - name: Read-only Production HTTP, Auth provider and RLS smoke
-        run: node --test tests/v4-production-http-smoke.mjs
+        run: node --test tests/smoke/v4-production-http-smoke.mjs
