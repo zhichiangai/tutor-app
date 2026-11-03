@@ -44,5 +44,22 @@
       "source": "/v4-config.js",
       "destination": "/v2/v4-config.js"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/frontend",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/frontend/:path*",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/backend/apps-script/:path*",
+      "destination": "/",
+      "permanent": true
+    }
   ]
 }
