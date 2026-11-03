@@ -27,6 +27,11 @@ test('P0 hotfix is an explicitly guarded transaction outside migration history',
   assert.match(hotfix, /\$postflight\$;\s+commit;\s*$/i);
   assert.match(hotfix, /unexpected additional SELECT\/ALL policy/);
   assert.match(hotfix, /RLS must already be enabled/);
+  assert.match(hotfix, /guardian link table RLS must be enabled/);
+  assert.match(hotfix, /target roles must be authenticated permissive/);
+  assert.match(hotfix, /guardian link SELECT policy missing/);
+  assert.match(hotfix, /authenticated guardian-link table SELECT grant missing/);
+  assert.match(hotfix, /potential guardian policy recursion/);
   assert.doesNotMatch(hotfix, /insert into\s+(?:supabase_migrations|schema_migrations)/i);
   assert.doesNotMatch(hotfix, /alter table\s+public\.payment_batches\s+(?:add|drop)/i);
 });

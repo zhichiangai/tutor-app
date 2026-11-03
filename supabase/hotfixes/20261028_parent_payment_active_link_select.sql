@@ -30,6 +30,34 @@ begin
     and c.relrowsecurity;
   if n<>3 then raise exception 'Hotfix aborted: RLS must already be enabled on all three tables'; end if;
 
+  select count(*) into n from pg_class c join pg_namespace s on s.oid=c.relnamespace
+  where s.nspname='public' and c.relname='student_guardians' and c.relrowsecurity;
+  if n<>1 then raise exception 'Hotfix aborted: guardian link table RLS must be enabled'; end if;
+
+  select count(*) into n from pg_policies
+  where schemaname='public' and cmd='SELECT' and
+    (tablename,policyname) in (
+      ('payment_batches','batch_read_by_teacher_or_parent'),
+      ('payment_batch_items','items_read_by_batch_participant'),
+      ('family_requests','requests_teacher_or_parent_view'))
+    and 'authenticated'=any(roles) and permissive='PERMISSIVE';
+  if n<>3 then raise exception 'Hotfix aborted: target roles must be authenticated permissive'; end if;
+
+  select count(*) into n from pg_policies
+  where schemaname='public' and tablename='student_guardians'
+    and cmd='SELECT' and 'authenticated'=any(roles);
+  if n<1 then raise exception 'Hotfix aborted: guardian link SELECT policy missing'; end if;
+
+  if not has_table_privilege('authenticated','public.student_guardians','SELECT') then
+    raise exception 'Hotfix aborted: authenticated guardian-link table SELECT grant missing';
+  end if;
+
+  if exists (
+    select 1 from pg_policies where schemaname='public' and tablename='student_guardians'
+      and cmd in ('ALL','SELECT')
+      and (qual ilike '%payment_batches%' or qual ilike '%family_requests%')
+  ) then raise exception 'Hotfix aborted: potential guardian policy recursion'; end if;
+
   select count(*) into n from information_schema.columns
   where table_schema='public' and
     ((table_name='payment_batches' and column_name in ('teacher_id','parent_id','student_id','workspace_id','id')) or
