@@ -40,3 +40,14 @@ Supabase 開發分支需要使用者明確同意費率後才能建立。2026-11-
 ## 操作責任
 
 ChatGPT 負責 SQL/程式、GitHub、CI、雲端部署準備與唯讀檢查。Codex Desktop 僅在 IAB READY 後進行實際點擊、輸入、截圖的 UI QA；IAB BLOCKED 期間不能冒稱已完成 Google 登入驗收。
+
+## 前進相容性依賴清查（唯讀）
+
+執行 `supabase/diagnostics/v4_forward_dependency_readonly.sql`：
+
+- 2026-11-04 Production 實測：基礎 11 張必要表與 23 個欄位均存在；3 個財務函式存在，`student_guardians` 已啟用 RLS。
+- `schema_stage = V4_NOT_INSTALLED`：四張關鍵 V4 新表仍未建立；`active_link_guarded_payment_policies = 0`（3 條中 0 條）。
+- 如結果是 `BASELINE_MISSING_DEPENDENCIES` 或 `PARTIAL_V4_SCHEMA_STOP`，必須停止升級並追查差異。
+- 即使依賴完整且三個財務函式都 MATCH，`release_gate` 仍是 `NO_GO_UNTIL_BACKUP_RESTORE_AND_FORWARD_TEST`。
+
+此 SQL 僅查 catalog 與 information_schema，不讀取學生姓名、課程或付款資料。
