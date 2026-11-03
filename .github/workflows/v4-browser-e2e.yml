@@ -81,6 +81,109 @@ jobs:
             exit 1
           fi
           echo "Disposable local Supabase ready; no hosted project touched"
+      - name: Reproduce Production-like legacy payment SELECT only in disposable CI
+        run: |
+          set -euo pipefail
+          grep -q '^project_id = "tutor_v4_isolated"
+        env:
+          V359_LOCAL_RLS_TEST: '1'
+          V359_RLS_PREAPPLIED: '1'
+          V40_LOCAL_METADATA_TEST: '1'
+          V40_LOCAL_CONTACT_TEST: '1'
+          V40_LOCAL_CORRECTION_TEST: '1'
+          V40_LOCAL_CONTACT_TRACKING_TEST: '1'
+        run: |
+          set -euo pipefail
+          node tests/local/v40-contact-rest.mjs
+          node tests/local/v359-parent-payment-rest.mjs
+          node tests/local/v40-qa-time-rest.mjs
+          node tests/local/v40-payment-correction-rest.mjs
+          node tests/local/v40-contact-tracking-rest.mjs
+      - name: Real three-role shared-course CRUD, recurring schedules and unlink permissions
+        env:
+          V4_SHARED_COURSE_LOCAL_TEST: '1'
+        run: node tests/local/v4-shared-course-rest.mjs
+      - name: Reset only disposable CI database before QA suite
+        run: |
+          set -euo pipefail
+          reset_log="$RUNNER_TEMP/ci-qa-replay.log"
+          trap 'rm -f "$reset_log"' EXIT
+          if ! supabase db reset --local --no-seed >"$reset_log" 2>&1; then
+            echo "::error::Disposable QA replay failed (output suppressed)"
+            exit 1
+          fi
+          echo "CI-only QA isolation reset complete"
+      - name: Apply proposed QA classification SQL only to disposable database
+        run: |
+          set -euo pipefail
+          for file in \
+            supabase/candidates/20261028_v4_payment_batch_qa_classification.sql \
+            supabase/candidates/20261029_v4_qa_lesson_and_legacy_receipt.sql \
+            supabase/candidates/20261029_v4_accounting_qa_snapshot_rpc.sql \
+            supabase/candidates/20261029_v4_qa_real_payment_rpc_reconciliation.sql \
+            supabase/candidates/20261029_v4_qa_reclassification_guard.sql; do
+            docker exec -i supabase_db_tutor_v4_isolated psql \
+              -v ON_ERROR_STOP=1 -U postgres -d postgres < "$file" >/dev/null
+          done
+      - name: Real GoTrue JWT and PostgREST QA classification, RLS and unlink acceptance
+        env:
+          V4_QA_LOCAL_JWT_TEST: '1'
+        run: node tests/local/v4-qa-classification-rest.mjs
+      - name: Real GoTrue JWT Taipei-date parent payment and teacher receipt E2E
+        env:
+          V4_PAYMENT_TAIPEI_LOCAL_TEST: '1'
+        run: node tests/local/v4-payment-date-taipei-rest.mjs
+      - name: Real local JWT parent and teacher mixed QA/genuine payment reconciliation
+        env:
+          V4_QA_REAL_PAYMENT_TEST: '1'
+        run: node tests/local/v4-qa-real-payment-rest.mjs
+      - name: Real local JWT over-allocation, QA unmarking, and old-batch unlink RLS
+        env:
+          V4_QA_PAYMENT_RPC_TEST: '1'
+        run: node tests/local/v4-qa-payment-rpc-rest.mjs
+      - name: Install pinned Playwright and site Supabase bundle
+        run: |
+          npm install --no-save --no-package-lock \
+            @playwright/test@1.64.1 @supabase/supabase-js@2.76.1
+          npx playwright install --with-deps chromium
+      - name: Seed only synthetic teachers, parents, students and lessons
+        run: node tests/e2e/seed-v4-local.mjs
+      - name: Verify real Chromium teacher-parent-student flows
+        run: npx playwright test --config tests/e2e/playwright.config.mjs
+      - name: Remove ephemeral auth fixture
+        if: always()
+        run: rm -f "$V4_E2E_FIXTURE_FILE"
+      - name: Upload sanitized failure screenshots and report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v4-browser-e2e-failures
+          path: |
+            tests/e2e/test-results/v4-e2e-report/
+            tests/e2e/test-results/v4-e2e-artifacts/
+          retention-days: 7
+          if-no-files-found: ignore
+ supabase/config.toml
+          test ! -f supabase/.temp/project-ref
+          docker exec -i supabase_db_tutor_v4_isolated psql \
+            -v ON_ERROR_STOP=1 -U postgres -d postgres \
+            < tests/sql/v4_local_legacy_parent_payment_policies.sql >/dev/null
+      - name: Exercise standalone P0 hotfix with real local GoTrue JWT before and after unlink
+        env:
+          V359_LOCAL_RLS_TEST: '1'
+          V359_RLS_PREAPPLIED: '0'
+          V359_RLS_STANDALONE_HOTFIX: '1'
+        run: node tests/local/v359-parent-payment-rest.mjs
+      - name: Reset disposable database after standalone P0 hotfix proof
+        run: |
+          set -euo pipefail
+          reset_log="$RUNNER_TEMP/v4-standalone-hotfix-reset.log"
+          trap 'rm -f "$reset_log"' EXIT
+          if ! supabase db reset --local --no-seed >"$reset_log" 2>&1; then
+            echo "::error::Disposable Supabase reset after P0 hotfix test failed"
+            exit 1
+          fi
+          echo "CI-only Supabase reset complete; original V4 tests start from clean baseline"
       - name: Run original V4 GoTrue JWT and REST contract suite on disposable database
         env:
           V359_LOCAL_RLS_TEST: '1'

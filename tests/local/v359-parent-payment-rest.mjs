@@ -11,7 +11,15 @@ const status = JSON.parse(execFileSync('supabase', ['status', '-o', 'json'], { c
 assert.equal(status.API_URL, 'http://127.0.0.1:54321');
 assert.match(status.DB_URL, /^postgresql:\/\/postgres:[^@]+@127\.0\.0\.1:54322\/postgres$/);
 assert.equal(process.env.V359_LOCAL_RLS_TEST, '1', 'Explicit localhost test opt-in required');
-const migration = readFileSync(new URL('../../supabase/migrations/20261023163138_v359_parent_payment_link_rls.sql', import.meta.url), 'utf8');
+// Optional standalone P0 hotfix test, restricted by existing localhost + disposable CI checks.
+const standaloneHotfix = process.env.V359_RLS_STANDALONE_HOTFIX === '1';
+if (standaloneHotfix) {
+  assert.equal(process.env.V359_RLS_PREAPPLIED, '0', 'Standalone hotfix mode must exercise old policy first');
+}
+const rlsScriptPath = standaloneHotfix
+  ? '../../supabase/hotfixes/20261028_parent_payment_active_link_select.sql'
+  : '../../supabase/migrations/20261023163138_v359_parent_payment_link_rls.sql';
+const migration = readFileSync(new URL(rlsScriptPath, import.meta.url), 'utf8');
 const container = 'supabase_db_tutor_v4_isolated';
 function sql(query) {
   return execFileSync('docker', ['exec', container, 'psql', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres', '-d', 'postgres', '-At', '-c', query], { encoding: 'utf8' }).trim();
@@ -84,7 +92,7 @@ if (!preapplied) {
   await get('parentA', `payment_batches?select=id&id=eq.${f.batchA}`, 1);
   await get('parentA', `payment_batch_items?select=batch_id&batch_id=eq.${f.batchA}`, 1);
   await get('parentA', `family_requests?select=id&id=eq.${f.requestA}`, 1);
-  sql('begin;' + migration + 'commit;');
+  sql(standaloneHotfix ? migration : 'begin;' + migration + 'commit;');
 }
 for (const [table, column, id] of [
   ['payment_batches','id',f.batchA],['payment_batch_items','batch_id',f.batchA],['family_requests','id',f.requestA]
