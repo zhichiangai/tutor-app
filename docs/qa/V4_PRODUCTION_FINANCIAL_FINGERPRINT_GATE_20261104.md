@@ -35,7 +35,15 @@
 
 ## 隔離雲端環境與費用
 
-Supabase 開發分支需要使用者明確同意費率後才能建立。2026-11-04 查到的報價為 **US$0.01344/小時**；尚未收到此費用確認，因此沒有建立付費分支或把真實資料複製過去。
+正式 Supabase 組織目前是 **Free**。Supabase 官方說明 Free **沒有自動每日資料庫備份**；應先用 Supabase CLI 進行人工邏輯備份並確認可在隔離環境還原。資料庫備份不包含 Storage 物件本體，必須另行保存；僅核對表／函式指紋不等於完成備份。
+
+Supabase 雲端 Branching 按官方部署文件列為 **Pro 方案功能**，因此不能因 API 返回運算費率，就假設 Free 可以建立。2026-11-04 工具查詢分支運算價格為 **US$0.01344／小時**，但若須升級 Pro，另有方案費用及可能的其他使用費。**未取得對具體費用的明確同意前，不建立付費分支、不升級方案、不複製正式資料**。
+
+官方參考：
+- https://supabase.com/kb/faqs/platform/free-plan-backups
+- https://supabase.com/docs/guides/platform/backups
+- https://supabase.com/docs/guides/deployment
+- https://supabase.com/docs/guides/platform/manage-your-usage/branching
 
 ## 操作責任
 
