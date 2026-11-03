@@ -454,11 +454,22 @@ as $$
 declare v_uid uuid:=(select auth.uid()); v_invite uuid;
 begin
   if v_uid is null then raise exception '請先登入'; end if;
-  select g.invite_id into v_invite from public.student_guardians g
-  where g.id=p_student_guardian_id and (g.guardian_id=v_uid or g.teacher_id=v_uid);
-  if v_invite is null then raise exception '找不到可解除的課程連結'; end if;
-  delete from public.guardian_invites where id=v_invite;
-  if not found then raise exception '連結解除失敗'; end if;
+  -- Remove only the authorized student/guardian relationship. An invitation
+  -- can be referenced by multiple links; deleting it first cascades to all of
+  -- them, even links the caller did not intend to disconnect.
+  delete from public.student_guardians g
+    where g.id=p_student_guardian_id and (g.guardian_id=v_uid or g.teacher_id=v_uid)
+    returning g.invite_id into v_invite;
+  if not found then raise exception '找不到可解除的課程連結'; end if;
+
+  -- Revoke the old invite only when it is no longer used by any active link.
+  -- The historical course and payment rows are deliberately untouched.
+  if v_invite is not null then
+    delete from public.guardian_invites i where i.id=v_invite
+      and not exists (
+        select 1 from public.student_guardians g where g.invite_id=i.id
+      );
+  end if;
 end;
 $$;
 revoke all on function public.v4_disconnect_guardian(uuid) from public,anon;

@@ -77,6 +77,44 @@ assert.equal(sql(`select count(*) from public.student_guardians where student_id
 assert.equal((await restRows(pB,`payment_batches?select=id&id=eq.${batch}`)).length,1);count++;
 assert.equal((await restRows(pA,`payment_batches?select=id&id=eq.${batch}`)).length,0);count++;
 assert.equal((await restRows(stA,`payment_batches?select=id&id=eq.${batch}`)).length,0);count++;
+// V4 RPC unlink must remove only the selected relationship, not other guardians
+// sharing an invite. This is intentionally a synthetic edge case and does not
+// represent a production student's actual parent email.
+const secondLink=randomUUID();
+sql(`insert into public.student_guardians(teacher_id,student_id,guardian_id,invite_id)
+values ('${tA.id}','${child}','${pA.id}','${invite}');`);
+const targetLink=sql(`select id from public.student_guardians
+where student_id='${child}' and guardian_id='${pB.id}'`);
+async function unlinkRpc(who,linkId){
+ const r=await fetch(s.API_URL+'/rest/v1/rpc/v4_disconnect_guardian',{
+  method:'POST',
+  headers:{apikey:s.ANON_KEY,Authorization:'Bearer '+who.jwt,'Content-Type':'application/json'},
+  body:JSON.stringify({p_student_guardian_id:linkId})
+ });
+ count++;
+ return {status:r.status,body:await r.text()};
+}
+let unlinkResult=await unlinkRpc(stA,targetLink);
+assert.ok(![200,204].includes(unlinkResult.status),'student cannot revoke guardian link');count++;
+unlinkResult=await unlinkRpc(pB,targetLink);
+assert.ok([200,204].includes(unlinkResult.status),'guardian unlink: '+unlinkResult.body);count++;
+assert.equal(sql(`select count(*) from public.student_guardians where student_id='${child}'
+and guardian_id='${pB.id}'`),'0');count++;
+assert.equal(sql(`select count(*) from public.student_guardians where student_id='${child}'
+and guardian_id='${pA.id}'`),'1','unrelated guardian link must survive');count++;
+assert.equal(sql(`select count(*) from public.guardian_invites where id='${invite}'`),'1',
+ 'shared invite must remain while referenced');count++;
+assert.equal((await restRows(pB,`payment_batches?select=id&id=eq.${batch}`)).length,0);count++;
+assert.equal((await restRows(tA,`payment_batches?select=id&id=eq.${batch}`)).length,1);count++;
+const secondLinkId=sql(`select id from public.student_guardians
+where student_id='${child}' and guardian_id='${pA.id}'`);
+unlinkResult=await unlinkRpc(pA,secondLinkId);
+assert.ok([200,204].includes(unlinkResult.status),'last guardian unlink: '+unlinkResult.body);count++;
+assert.equal(sql(`select count(*) from public.guardian_invites where id='${invite}'`),'0',
+ 'unused old invitation must be revoked');count++;
+assert.equal(sql(`select count(*) from public.lesson_records where id='${lesson}'`),'1');count++;
+assert.equal(sql(`select count(*) from public.payment_batches where id='${batch}'`),'1');count++;
+
 // Row locking serializes competing approvals: exactly one may succeed.
 await request(tB,pB,'teacher');const concurrent=(await inbox(pB,2)).find(r=>r.status==='pending').id;
 const racing=await Promise.all([call(pB,'v4_contact_action',{p_id:concurrent,p_action:'approve'}),call(pB,'v4_contact_action',{p_id:concurrent,p_action:'approve'})]);
