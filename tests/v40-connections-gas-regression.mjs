@@ -20,6 +20,18 @@ test("V4 invitation UI is isolated to existing teacher/parent student page",()=>
  assert.doesNotMatch(html,/data-view="v4"/);
 });
 
+test("switching roles clears V4 invitation and contact state before fresh reads",()=>{
+ const start=app.indexOf("function setRole(");
+ const end=app.indexOf("async function changeDefaultLoginRole()",start);
+ assert.ok(start>=0&&end>start,"setRole must be present");
+ const fn=app.slice(start,end);
+ assert.match(fn,/if\(roleChanged\)\{[\s\S]*?v4ConnectionUI\.clear\(\)/);
+ assert.match(fn,/if\(roleChanged\)\{[\s\S]*?v4ContactsUI\.clear\(\)/);
+ assert.match(fn,/role==="teacher"\|\|role==="parent"/);
+ assert.match(fn,/void v4ConnectionUI\.refresh\(\)/);
+ assert.match(fn,/void v4ContactsUI\.refresh\(\)/);
+});
+
 test("V4 requests use authenticated RPC; QR codes store only opaque token links",()=>{
  for(const fn of ["v4_request_teacher","v4_create_connection_link","v4_claim_connection_link",
    "v4_decide_connection_request","v4_cancel_connection_request","v4_connection_inbox",

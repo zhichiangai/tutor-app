@@ -11,7 +11,15 @@ const status = JSON.parse(execFileSync('supabase', ['status', '-o', 'json'], { c
 assert.equal(status.API_URL, 'http://127.0.0.1:54321');
 assert.match(status.DB_URL, /^postgresql:\/\/postgres:[^@]+@127\.0\.0\.1:54322\/postgres$/);
 assert.equal(process.env.V359_LOCAL_RLS_TEST, '1', 'Explicit localhost test opt-in required');
-const migration = readFileSync(new URL('../../supabase/migrations/20261023163138_v359_parent_payment_link_rls.sql', import.meta.url), 'utf8');
+// Optional standalone P0 hotfix test, restricted by existing localhost + disposable CI checks.
+const standaloneHotfix = process.env.V359_RLS_STANDALONE_HOTFIX === '1';
+if (standaloneHotfix) {
+  assert.equal(process.env.V359_RLS_PREAPPLIED, '0', 'Standalone hotfix mode must exercise old policy first');
+}
+const rlsScriptPath = standaloneHotfix
+  ? '../../supabase/hotfixes/20261028_parent_payment_active_link_select.sql'
+  : '../../supabase/migrations/20261023163138_v359_parent_payment_link_rls.sql';
+const migration = readFileSync(new URL(rlsScriptPath, import.meta.url), 'utf8');
 const container = 'supabase_db_tutor_v4_isolated';
 function sql(query) {
   return execFileSync('docker', ['exec', container, 'psql', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres', '-d', 'postgres', '-At', '-c', query], { encoding: 'utf8' }).trim();
@@ -69,6 +77,26 @@ async function get(who, path, expected) {
   assert.equal(rows.length, expected, `${who} GET ${path}`);
   assertions += 2;
 }
+// The anonymous gateway token must not expose financial rows. A missing SELECT
+// grant (401/403) and an RLS-filtered empty response (200) are both deny.
+async function getAnon(path) {
+  const res = await fetch(status.API_URL + '/rest/v1/' + path, {
+    headers: {apikey: status.ANON_KEY}
+  });
+  assert.ok([200, 401, 403].includes(res.status), 'Anonymous read: unexpected status ' + res.status);
+  if (res.status === 200) {
+    const rows = await res.json();
+    assert.ok(Array.isArray(rows), 'Anonymous read returned non-list payload');
+    assert.equal(rows.length, 0, 'Anonymous access must return no financial data');
+    assertions += 2;
+  }
+  assertions += 1;
+}
+
+await getAnon(`payment_batches?select=id&id=eq.${f.batchA}`);
+await getAnon(`payment_batch_items?select=batch_id&batch_id=eq.${f.batchA}`);
+await getAnon(`family_requests?select=id&id=eq.${f.requestA}`);
+
 if (!preapplied) {
   await get('parentA', `payment_batches?select=id&id=eq.${f.batchA}`, 1);
   await get('parentA', `payment_batch_items?select=batch_id&batch_id=eq.${f.batchA}`, 1);
@@ -84,13 +112,19 @@ if (!preapplied) {
   await get('parentA', `payment_batches?select=id&id=eq.${f.batchA}`, 1);
   await get('parentA', `payment_batch_items?select=batch_id&batch_id=eq.${f.batchA}`, 1);
   await get('parentA', `family_requests?select=id&id=eq.${f.requestA}`, 1);
-  sql('begin;' + migration + 'commit;');
+  sql(standaloneHotfix ? migration : 'begin;' + migration + 'commit;');
 }
 for (const [table, column, id] of [
   ['payment_batches','id',f.batchA],['payment_batch_items','batch_id',f.batchA],['family_requests','id',f.requestA]
 ]) await get('parentA', `${table}?select=${column}&${column}=eq.${id}`, 0);
 await get('parentA', `payment_batches?select=id&id=eq.${f.batchB}`, 1);
 await get('parentA', `payment_batch_items?select=batch_id&batch_id=eq.${f.batchB}`, 1);
+await get('parentA', `family_requests?select=id&id=eq.${f.requestB}`, 1);
+await get('parentB', `family_requests?select=id&id=eq.${f.requestA}`, 0);
+await get('studentA', `family_requests?select=id&id=eq.${f.requestA}`, 0);
+await get('teacherA', `payment_batches?select=id&id=eq.${f.batchA}`, 1);
+await get('teacherA', `payment_batch_items?select=batch_id&batch_id=eq.${f.batchA}`, 1);
+await get('teacherA', `family_requests?select=id&id=eq.${f.requestA}`, 1);
 await get('parentB', `payment_batches?select=id&id=eq.${f.batchC}`, 1);
 await get('teacherA', 'payment_batches?select=id', 2);
 await get('teacherB', 'payment_batches?select=id', 1);
@@ -100,6 +134,21 @@ for (const who of ['parentB','teacherB','studentA','studentB','studentC']) {
   await get(who, `payment_batches?select=id&id=eq.${f.batchA}`, 0);
   await get(who, `payment_batch_items?select=batch_id&batch_id=eq.${f.batchA}`, 0);
 }
+// Assert that existing signed JWTs honor the current link, not a stale session
+// claim or a previously cached payment grant. Keep all writes in local CI only.
+sql(`insert into public.student_guardians(teacher_id,student_id,guardian_id,invite_id)
+values ('${a.teacherA.id}','${f.studentA}','${a.parentA.id}','${f.inviteA}');`);
+await get('parentA', `payment_batches?select=id&id=eq.${f.batchA}`, 1);
+await get('parentA', `payment_batch_items?select=batch_id&batch_id=eq.${f.batchA}`, 1);
+await get('parentA', `family_requests?select=id&id=eq.${f.requestA}`, 1);
+sql(`delete from public.student_guardians
+where teacher_id='${a.teacherA.id}'
+and student_id='${f.studentA}' and guardian_id='${a.parentA.id}';`);
+await get('parentA', `payment_batches?select=id&id=eq.${f.batchA}`, 0);
+await get('parentA', `payment_batch_items?select=batch_id&batch_id=eq.${f.batchA}`, 0);
+await get('parentA', `family_requests?select=id&id=eq.${f.requestA}`, 0);
+await getAnon(`payment_batches?select=id&id=eq.${f.batchA}`);
+
 for (const [who, rpc, args, fragment] of [
   ['parentA','submit_range_payment',{p_teacher_id:a.teacherA.id,p_student_id:f.studentA,p_period_start:'2026-09-01',p_period_end:'2026-09-01',p_paid_on:'2026-09-03',p_paid_amount:100,p_note:'local'},'Not authorized'],
   ['parentB','submit_range_payment',{p_teacher_id:a.teacherA.id,p_student_id:f.studentA,p_period_start:'2026-09-01',p_period_end:'2026-09-01',p_paid_on:'2026-09-03',p_paid_amount:100,p_note:'local'},'Not authorized'],

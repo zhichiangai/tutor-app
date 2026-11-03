@@ -38,7 +38,7 @@ v2/index.html + v2/app.js + v2/style.css + v2/其他模組
 - 正式付款 RLS 有 P0 待修，正式備份及隔離還原、Google OAuth 實機驗收尚未證明完成；V4 不得僅憑 CI 綠燈視為已正式安全發布。
 - **不得**在正式 Supabase 建立假學生、假課程或測試付款；不可在未授權情況下合併 PR、套 Migration、修改真實資料。
 - 目前以 GitHub Actions 中的一次性隔離 Supabase 進行 Node/Postgres/Chromium 自動測試；Preview 只有前端 READY 並不代表具備獨立測試資料庫。
-- 詳見 [docs/qa/V4_RELEASE_EXECUTION_GATE_20261029.md](https://github.com/zhichiangai/tutor-app/blob/chat/v4-release-integration-20261029/docs/qa/V4_RELEASE_EXECUTION_GATE_20261029.md)、[docs/qa/V4_PRODUCTION_MIGRATION_BASELINE_20261029.json](https://github.com/zhichiangai/tutor-app/blob/chat/v4-release-integration-20261029/docs/qa/V4_PRODUCTION_MIGRATION_BASELINE_20261029.json)、[docs/qa/V4_MAC_LOCALHOST_BIND_RECOVERY.md](https://github.com/zhichiangai/tutor-app/blob/chat/v4-release-integration-20261029/docs/qa/V4_MAC_LOCALHOST_BIND_RECOVERY.md)。
+- 詳見 `docs/qa/V4_RELEASE_EXECUTION_GATE_20261029.md`、`docs/qa/V4_PRODUCTION_MIGRATION_BASELINE_20261029.json`、`docs/qa/V4_MAC_LOCALHOST_BIND_RECOVERY.md`。
 
 ## 開發與驗收
 

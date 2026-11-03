@@ -25,7 +25,7 @@
 
 - V4 is being developed in Draft PR #43: https://github.com/zhichiangai/tutor-app/pull/43 . Verify its HEAD before editing.
 - **DO NOT** merge to `main`, deploy Production, execute Production SQL/migrations, loosen RLS, or alter real student/payment records without explicit authorization.
-- Production migration history is 29 as of the read-only 2026-10-29 snapshot. Repository replay baseline and V4 candidates differ: read [docs/qa/V4_PRODUCTION_MIGRATION_BASELINE_20261029.json](https://github.com/zhichiangai/tutor-app/blob/chat/v4-release-integration-20261029/docs/qa/V4_PRODUCTION_MIGRATION_BASELINE_20261029.json) and [docs/qa/V4_RELEASE_EXECUTION_GATE_20261029.md](https://github.com/zhichiangai/tutor-app/blob/chat/v4-release-integration-20261029/docs/qa/V4_RELEASE_EXECUTION_GATE_20261029.md). **NEVER** blindly run `supabase db push` or `supabase migration repair` on Production.
+- Production migration history is 29 as of the read-only 2026-10-29 snapshot. Repository replay baseline and V4 candidates differ: read `docs/qa/V4_PRODUCTION_MIGRATION_BASELINE_20261029.json` and `docs/qa/V4_RELEASE_EXECUTION_GATE_20261029.md`. **NEVER** blindly run `supabase db push` or `supabase migration repair` on Production.
 - Run Node tests: `node --test tests/*.mjs`; verify isolated Postgres + real Chromium GitHub Actions separately.
 - Preview READY does not mean an isolated test database exists. Only perform fake lessons/payments in a verified isolated staging backend.
 - GUI validation requires actual Browser Use or Computer Use tools; don't label API/Playwright automation as live manual browser testing.
@@ -42,5 +42,5 @@
 
 - `README.md`: single source of truth for site architecture and release state.
 - `v2/README.md`: active frontend file map.
-- [docs/qa/V4_RELEASE_EXECUTION_GATE_20261029.md](https://github.com/zhichiangai/tutor-app/blob/chat/v4-release-integration-20261029/docs/qa/V4_RELEASE_EXECUTION_GATE_20261029.md): production NO-GO and migration release gates.
+- `docs/qa/V4_RELEASE_EXECUTION_GATE_20261029.md`: production NO-GO and migration release gates.
 - Old `docs/v*.md` files describe historical changes or security rules, not an alternate active frontend.

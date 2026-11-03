@@ -1,0 +1,65 @@
+name: V4 QA real local GoTrue JWT acceptance
+on:
+  workflow_dispatch:
+
+# The default PR suite moved into v4-browser-e2e.yml to avoid simultaneous
+# GHCR downloads. Retain this workflow for independent manual debugging.
+
+permissions:
+  contents: read
+
+jobs:
+  qa-real-jwt:
+    name: local-supabase-qa-auth-rest
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_TELEMETRY_DISABLED: '1'
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io
+      V4_QA_LOCAL_JWT_TEST: '1'
+      V4_PAYMENT_TAIPEI_LOCAL_TEST: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.107.0
+      - name: Verify localhost only and reject remote project writes
+        run: |
+          set -euo pipefail
+          grep -q '^project_id = "tutor_v4_isolated"$' supabase/config.toml
+          test ! -f supabase/.branches/_current_branch
+          test ! -f supabase/.temp/project-ref
+      - name: Start isolated local Supabase and replay migrations (suppress keys)
+        run: |
+          set -euo pipefail
+          start_log="${RUNNER_TEMP}/qa-supabase-start.log"
+          reset_log="${RUNNER_TEMP}/qa-supabase-reset.log"
+          trap 'rm -f "$start_log" "$reset_log"' EXIT
+          if ! supabase start >"$start_log" 2>&1; then
+            echo "::error::Local Supabase startup failed; logs suppressed for safety"
+            exit 1
+          fi
+          if ! supabase db reset --local --no-seed >"$reset_log" 2>&1; then
+            echo "::error::Local migration replay failed; logs suppressed for safety"
+            exit 1
+          fi
+          echo "Local migration replay finished on disposable Supabase"
+      - name: Apply QA SQL candidates to local database only
+        run: |
+          set -euo pipefail
+          for file in \
+            supabase/candidates/20261028_v4_payment_batch_qa_classification.sql \
+            supabase/candidates/20261029_v4_qa_lesson_and_legacy_receipt.sql \
+            supabase/candidates/20261029_v4_accounting_qa_snapshot_rpc.sql; do
+            docker exec -i supabase_db_tutor_v4_isolated psql \
+              -v ON_ERROR_STOP=1 -U postgres -d postgres < "$file" \
+              > /dev/null
+          done
+          echo "Three QA SQL candidates applied only to localhost"
+      - name: Real GoTrue JWT and PostgREST QA classification, RLS and unlink acceptance
+        run: node tests/local/v4-qa-classification-rest.mjs
+      - name: Real GoTrue JWT Taipei-date parent payment and teacher receipt E2E
+        run: node tests/local/v4-payment-date-taipei-rest.mjs

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; font-src 'none'; base-uri 'none'; form-action 'none'">
+<title>好好上課 · QA 帳務合成資料驗收（非正式帳務）</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;color:#364139;background:#f8f7f3}
+*{box-sizing:border-box}body{margin:0}main{max-width:1100px;margin:auto;padding:24px}
+header{background:#f2e7dc;border-bottom:1px solid #d6c8ba;padding:12px 24px}
+header strong{font-size:19px}header span{margin-left:12px;font-size:13px}
+h1{font-size:28px;margin:10px 0 8px}h2{font-size:19px;margin:0 0 14px}
+p{line-height:1.6}.notice{border:2px solid #9b5d38;background:#fff5ec;border-radius:12px;padding:12px 16px;font-weight:600}
+.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin:20px 0}
+button{padding:10px 16px;border-radius:10px;border:1px solid #b0b9b1;background:#fff;color:#243b30;font:inherit;font-weight:600;cursor:pointer}
+button:hover,button:focus-visible{outline:2px solid #638875}button:disabled{opacity:.45;cursor:not-allowed}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.card{background:#fff;border:1px solid #e4e0d8;border-radius:14px;padding:18px;margin-bottom:16px}
+.card .k{font-size:13px;color:#65746d}.number{font-size:26px;font-weight:750;margin:8px 0}
+table{border-collapse:collapse;width:100%}th,td{padding:12px 10px;border-bottom:1px solid #eee8df;text-align:left;vertical-align:top}
+th{background:#f6f5f0;font-size:12px;color:#596d61}td:last-child,th:last-child{text-align:right}
+small,.subtle{color:#66766c}.tag{font-size:12px;background:#e3efe7;border-radius:10px;padding:4px 7px;display:inline-block}
+.tag.qa{background:#fff0da;color:#815522}
+.scroll{overflow-x:auto}fieldset{border:0;padding:0}label{cursor:pointer}label input{margin-right:6px}
+@media(max-width:650px){main{padding:12px}h1{font-size:22px}.grid{grid-template-columns:1fr}th,td{font-size:12px;padding:9px 6px}.number{font-size:22px}header span{display:block;margin:2px 0 0}.controls{justify-content:flex-start}}
+</style>
+</head>
+<body>
+<header><strong>✳ 好好上課</strong><span>QA 帳務視覺驗收專頁 · 僅合成資料</span></header>
+<main>
+<h1>收付款整理 · 模擬驗收</h1>
+<p class="notice" role="status">非正式帳務資料。此頁不登入、不讀取 Supabase、不提供付款／課程寫入，僅用於檢查帳務分類、金額與月份顯示。</p>
+<div class="controls">
+<div><button id="previous" type="button">上個月</button> <strong id="month-label" aria-live="polite"></strong> <button id="next" type="button">下個月</button></div>
+<label><input id="show-qa" type="checkbox">顯示 QA 測試明細（不影響正式統計）</label>
+</div>
+<div class="grid" id="summary" aria-live="polite"></div>
+<section class="card"><h2>課程與學生收款明細</h2><div class="scroll"><table><thead><tr><th>課程</th><th>學生與科目</th><th>分類</th><th>本月應收</th><th>已確認</th><th>仍需付款</th></tr></thead><tbody id="lesson-rows"></tbody></table></div></section>
+<section class="card"><h2>期間付款／部分分配</h2><p id="history-scope" class="subtle"></p>
+<div class="scroll"><table><thead><tr><th>付款批次</th><th>課程期間</th><th>付款分配</th><th>分類</th><th>是否計入銀行收款</th></tr></thead><tbody id="batch-rows"></tbody></table></div></section>
+<p class="subtle">內含：同堂兩筆部分付款（一筆 QA、一筆真正付款）、整堂 QA 模擬課程、舊式單堂模擬收款、跨月期間付款。每個案例的金額和日期都是合成測試資料。</p>
+</main>
+<script type="module" src="./qa-ledger-synthetic.js"></script>
+</body>
+</html>

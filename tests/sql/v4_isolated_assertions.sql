@@ -55,6 +55,7 @@ select public.v4_disconnect_guardian(:'link1');
 reset role;
 select public.qa_assert(not exists(select 1 from public.student_guardians where id=:'link1'),'disconnect removes targeted permission row');
 select public.qa_assert((select status='disconnected' from public.v4_connection_requests where id=:'req1'),'request history reflects disconnected permission');
+select public.qa_assert((select status='approved' from public.v4_connection_requests where id=:'req2'),'unrelated guardian request stays approved after one unlink');
 select public.qa_assert((select count(*)=1 and bool_and(hours=1.5 and amount=999 and paid) from public.qa_course_snapshot),'synthetic paid course snapshot unchanged');
 select public.qa_assert((select count(*)=3 from public.students),'no students deleted');
 -- Cancellation and decline cannot later be accepted.

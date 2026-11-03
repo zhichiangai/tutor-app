@@ -34,4 +34,4 @@
 - 不得在正式站使用假課程或付款做測試。
 - 不要重啟或清除未經授權的 Mac Docker Volume。
 - V4 通知的 GAS 程式位於 `integrations/google-apps-script/v4-notifications/`，仍屬有效整合。
-- 詳細發布條件參閱 [docs/qa/V4_RELEASE_EXECUTION_GATE_20261029.md](https://github.com/zhichiangai/tutor-app/blob/chat/v4-release-integration-20261029/docs/qa/V4_RELEASE_EXECUTION_GATE_20261029.md)。
+- 詳細發布條件參閱 `docs/qa/V4_RELEASE_EXECUTION_GATE_20261029.md`。
