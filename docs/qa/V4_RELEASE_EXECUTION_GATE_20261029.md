@@ -38,8 +38,8 @@ Repository 的 37 份檔案含本機為空白環境重播的歷史重建版本�
 
 ## Codex 與 ChatGPT 分工
 
-- **ChatGPT：** 維護 PR #43、SQL/RLS、CI、版本對照、隔離資料庫合成測試及發布 Gate。停止擴大 V5 的實作，直到 V4 安全發布。
-- **Codex：** 操作 Mac Docker Desktop、Terminal、實際瀏覽器滑鼠／觸控及截圖。既有 Mac `tutor_v4_isolated` 有 21 個合成 Auth 帳號；先按 `docs/qa/V4_MAC_LOCALHOST_BIND_RECOVERY.md` 驗證 LAN isolation、Volume／備份，不能 reset 或覆寫。
+- **ChatGPT：** 維護 PR #43、SQL/RLS、CI、版本對照、Docker／隔離資料庫合成測試、發布 Gate 及所有工程修改。停止擴大 V5 的實作，直到 V4 安全發布。
+- **Codex：** 僅負責 Codex Desktop 內建瀏覽器（IAB）的實際 UI 讀取、點擊、鍵盤、截圖與測試回報。IAB BLOCKED 時不改網站或環境；不執行 Terminal、Docker、SQL、GitHub 或部署。
 - **使用者：** 核准正式資料與 Production 相關高風險操作；未授權保持 Draft / NO-GO。
 
 ### 本階段不能宣稱已完成
@@ -49,3 +49,4 @@ Repository 的 37 份檔案含本機為空白環境重播的歷史重建版本�
 - 無正式 Google OAuth／跨裝置實機全驗收。
 - 正式付款 SELECT RLS 仍未修補；正式 V4 資料結構未升級。
 - Supabase Advisor 的 5 個 `SECURITY DEFINER` 警告需逐項審查執行權限與實際 RLS／函式內部身分授權，不能因警告就擅自撤銷必要的 RPC。
+- Codex Desktop IAB 目前 BLOCKED；自動化 Chromium PASS 不等於實機或 Codex 互動驗收。

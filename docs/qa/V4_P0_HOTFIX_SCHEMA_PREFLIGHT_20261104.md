@@ -49,8 +49,9 @@
 本次新增的隔離 CI 步驟只在 GitHub Actions 一次性 `tutor_v4_isolated` 容器運作：
 
 1. 從現有 V4 本機合成資料庫，暫時還原三條與正式 Production 相同邏輯的**舊版不安全 SELECT 政策**；該 SQL 檔案明文禁止在 hosted Supabase 執行。
+   - Hotfix 額外拒絕：非 authenticated/permissive 目標政策、guardian link 未開 RLS、guardian SELECT 權限不足，以及可能的 guardian policy recursion。
 2. 透過 `tests/local/v359-parent-payment-rest.mjs` 的 `V359_RLS_STANDALONE_HOTFIX=1` 模式，建立 7 個一次性 GoTrue 帳號，測試舊政策下家長解除連結仍可讀取，再執行**獨立 Hotfix SQL**，確認同一 JWT 已不能讀取原付款批次／分配／請求。
-3. 測試有效家長仍可讀取另一位老師的已授權資料、老師仍可讀取、其他老師與學生不得讀取。
+3. 測試有效家長仍可讀取另一位老師的已授權資料、老師仍可讀取、其他老師與學生不得讀取；另檢驗匿名拒絕、跨家長請求隔離，以及解除→重新關聯→再次解除後，原 JWT 的付款可讀性立即跟隨有效關聯改變。
 4. 將一次性資料庫重新 reset，再跑原本的 V4 PostgreSQL／Chromium 合約及三角色測試。
 
 **重要限制：** 這驗證的是「完整 V4 合成 schema 上獨立 Hotfix 的行為」，**不是**對 Production 29 筆 Migration 原樣還原資料庫的獨立證明，也不取代真正 Production 備份還原與正式套用授權。
