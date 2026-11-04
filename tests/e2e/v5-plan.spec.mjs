@@ -42,7 +42,7 @@ test('Free cumulative student quota, manual Pro/Team grants and teacher cap',asy
  const teacherId=f.actors.teacher.id;
  const ws=db("select id from public.workspaces where owner_id='"+teacherId+"'");
  assert.match(ws,/^[a-f0-9-]{36}$/i);
- const getPlan=async jwt=teacher=>rest(jwt,'POST','rpc/v5_my_plan',{})
+ const getPlan=async (jwt=teacher)=>rest(jwt,'POST','rpc/v5_my_plan',{});
  let plan=await getPlan();
  assert.equal(plan.status,200);
  assert.equal(plan.data.plan,'free');
