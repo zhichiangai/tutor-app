@@ -150,4 +150,10 @@ test('teacher settings shows Free/Pro/Team without checkout or hidden quotas',as
  await expect(page.locator('#v5-plan-content')).toContainText('NT$399／月');
  await expect(page.locator('#v5-plan-content')).toContainText('不會釋放已使用名額');
  await expect(page.locator('#v5-plan-card')).not.toContainText('立即訂閱');
+ // The first test intentionally downgraded this owner to Free with four
+ // historical seats; the friendly UI must lead back to the plan wall.
+ await page.locator('.side-nav .nav-standard[data-view="students"]').click();
+ await page.locator('#add-student').click();
+ await expect(page.locator('#view-settings')).toBeVisible();
+ await expect(page.locator('#student-modal')).not.toBeVisible();
 });
