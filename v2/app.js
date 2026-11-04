@@ -489,6 +489,10 @@ function enterPreviewReadOnly(){
  $("#preview-readonly-banner").hidden=false;
  applyPreviewReadOnlyControls();
 }
+function canDismissAccountModal(){
+ return (authPhase==="ready"&&!!activeUser)||
+  (previewBackendUnavailable()&&document.body.classList.contains("preview-readonly"));
+}
 function renderAuthUI(){
  const waiting=authPhase==="checking";
  const failed=authPhase==="error";
@@ -553,6 +557,9 @@ function render(){
  $("#profile-display-form").classList.toggle("hidden",!activeUser);
  renderRoleSettings();
  $("#settings-role-card").classList.toggle("hidden",!activeUser);
+ // The login gate is not a dashboard mode. Never rebuild payment summaries,
+ // student records or lesson content when there is no verified active account.
+ if(!identified)return;
  // Role preference checkboxes are on the separate settings page.
  if(student){
   if(state.view==="settings"){
@@ -2506,6 +2513,9 @@ const SESSION_PRIVATE_DOM_IDS=[
  "agenda-list","calendar-grid","day-modal-lessons","invite-content","mini-calendar",
  "month-lesson-list","month-lesson-preview","next-lesson","period-overview",
  "period-student","receipt-details","recent-lessons","requests-list",
+ "home-focus","metrics","money-reminder","student-calendar-grid",
+ "student-calendar-list-view","student-day-lessons","student-calendar-overview",
+ "student-recent-changes","calendar-recent-changes",
  "schedule-rules-list","student-grid","student-invite-teacher-content",
  "teacher-student-summary","teacher-student-list","managed-student-accounts","managed-guardian-accounts",
  "lesson-content","lesson-feedback","lesson-focus-stars","lesson-mood-stars",
@@ -2889,7 +2899,13 @@ function bindEvents(){
    ev.preventDefault();openDay(el.dataset.day);
   }
  });
- $("#account-modal").addEventListener("cancel",ev=>{if(previewBackendUnavailable()){enterPreviewReadOnly();return}if(!activeUser)ev.preventDefault()});
+ $("#account-modal").addEventListener("cancel",ev=>{
+  if(!canDismissAccountModal())ev.preventDefault();
+ });
+ // Defensive recovery if an unexpected close() bypasses backdrop/cancel guards.
+ $("#account-modal").addEventListener("close",()=>{
+  if(!canDismissAccountModal())showModal("account-modal");
+ });
  $("#lesson-form").addEventListener("submit",saveLessonOutcome);
  $("#correction-form").addEventListener("submit",submitCorrection);
  $("#correction-form").addEventListener("input",()=>{
@@ -2989,7 +3005,12 @@ function bindEvents(){
  $("#mode-settings-form").addEventListener("submit",saveEnabledRoles);
  $("#default-login-role").addEventListener("change",changeDefaultLoginRole);
   $("#profile-display-form").addEventListener("submit",saveDisplayName);
- $$(".modal").forEach(d=>d.addEventListener("click",e=>{if(e.target===d)d.close()}));
+ $(".modal").forEach(d=>d.addEventListener("click",e=>{
+  if(e.target!==d)return;
+  // A signed-out login gate must never be dismissible by clicking its backdrop.
+  if(d.id==="account-modal"&&!canDismissAccountModal())return;
+  d.close();
+ }));
 }
 function moveMonth(offset){state.month=new Date(state.month.getFullYear(),state.month.getMonth()+offset,1);render();applyPreviewReadOnlyControls()}
 function main(){
