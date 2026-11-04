@@ -372,6 +372,11 @@ test('synthetic teacher calendar shows complete day and month details at 320-430
   await expect(cell).toBeVisible();
   await expect(cell.locator('.mobile-lesson-count')).toBeVisible();
   await expect(cell.locator('.calendar-event.lesson-event-click:visible')).toHaveCount(0);
+  // Exercise the actual date tap, not merely the initially selected day.
+  await cell.click();
+  await expect(page.locator('#calendar-grid .calendar-cell.selected[data-day="'+f.day+'"]')).toBeVisible();
+  await expect(page.locator('#day-modal')).not.toBeVisible();
+  await expect(page.locator('#lesson-modal')).not.toBeVisible();
   await expect(page.locator('#view-calendar>.agenda-card')).toBeVisible();
   const dayAgenda=page.locator('#agenda-list');
   await expect(dayAgenda).toContainText('CI Student');
