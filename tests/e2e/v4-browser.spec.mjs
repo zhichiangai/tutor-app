@@ -422,3 +422,42 @@ test('parent signout clears account data before switching to student in same bro
  await expect(page.locator('#student-calendar-panel')).not.toContainText('NT$');
  await expect(page.locator('#role-indicator-text')).toContainText('同學');
 });
+
+test('logout gate cannot be dismissed or reveal cached account data for parent and student',async ({page})=>{
+ async function assertLockedGate(){
+  await expect(page.locator('body')).toHaveClass(/login-required/);
+  await expect(page.locator('#account-modal')).toBeVisible();
+  await expect(page.locator('.main-content')).toHaveCSS('visibility','hidden');
+  await expect(page.locator('.sidebar')).toHaveCSS('visibility','hidden');
+  await expect(page.locator('#metrics')).toBeEmpty();
+  await expect(page.locator('#billing-summary')).toBeEmpty();
+  await expect(page.locator('#home-focus')).toBeEmpty();
+  await expect(page.locator('#money-reminder')).toBeEmpty();
+  await page.mouse.click(3,3);
+  await expect(page.locator('#account-modal')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#account-modal')).toBeVisible();
+  await expect(page.locator('.main-content')).toHaveCSS('visibility','hidden');
+ }
+ await login(page,'parent');
+ await navigate(page,'billing');
+ await expect(page.locator('#billing-summary')).toContainText('NT$');
+ await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await expect(page.locator('#view-settings')).toBeVisible();
+ await page.locator('#sign-out').click();
+ await expect(page.locator('#toast')).toContainText('已登出 Google 帳號');
+ await assertLockedGate();
+ await page.reload();
+ await assertLockedGate();
+ await page.setViewportSize({width:390,height:780});
+ await login(page,'student');
+ await expect(page.locator('#student-today-panel')).toBeVisible();
+ await expect(page.locator('#student-today-content')).not.toBeEmpty();
+ await page.locator('.mobile-nav .nav-student[data-view="settings"]').click();
+ await page.locator('#sign-out').click();
+ await expect(page.locator('#toast')).toContainText('已登出 Google 帳號');
+ await assertLockedGate();
+ await expect(page.locator('#student-today-content')).toBeEmpty();
+ await page.reload();
+ await assertLockedGate();
+});
