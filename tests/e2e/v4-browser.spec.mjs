@@ -401,12 +401,14 @@ test('parent signout clears account data before switching to student in same bro
  await login(page,'parent');
  await navigate(page,'billing');
  await expect(page.locator('#billing-summary')).toBeVisible();
+ await navigate(page,'settings');
  await page.locator('#sign-out').click();
  await expect(page.locator('body')).toHaveClass(/login-required/);
  await expect(page.locator('#account-current')).toContainText('尚未使用 Google 登入');
  await expect(page.locator('#student-grid')).not.toContainText('CI Student');
  await expect(page.locator('#v4-connection-content')).toBeEmpty();
  await expect(page.locator('#billing-summary')).not.toContainText('NT$ 1,000');
+ await page.setViewportSize({width:390,height:780});
  await login(page,'student');
  await page.locator('.mobile-nav [data-view="student-calendar"]').click();
  await expect(page.locator('#student-calendar-panel')).toBeVisible();
