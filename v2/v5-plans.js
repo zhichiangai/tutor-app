@@ -57,7 +57,7 @@ export function createV5PlanUI({getClient,getUser,getRole,isReady}){
   const note=document.createElement('p');
   note.className='section-sub';
   note.textContent=used>=limit?
-   '學生名額已滿，歷史課程仍可查看；新增學生需調整方案或名額。':
+   '學生名額已滿，歷史課程仍可查看；刪除學生也不會釋放已使用名額，新增學生需調整方案或名額。':
    '歷史學生也計入名額。刪除學生不會釋放已使用名額。';
   summary.append(strong,student,teachers,note);
   root.append(summary);
