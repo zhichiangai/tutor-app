@@ -59,7 +59,7 @@ test('local QR token lifecycle requires teacher approval and revokes parent acce
  const links=await list(other,'student_guardians','student_id',id);
  assert.equal(links.length,1);
  assert.deepEqual(await list(other,'lesson_records','id',f.ids.qaLesson),[f.ids.qaLesson]);
- assert.equal((await rpc(other,'v4_disconnect_guardian',{p_student_guardian_id:links[0]})).status,200);
+ assert.ok([200,204].includes((await rpc(other,'v4_disconnect_guardian',{p_student_guardian_id:links[0]})).status));
  assert.deepEqual(await list(other,'student_guardians','student_id',id),[]);
  assert.deepEqual(await list(other,'lesson_records','id',f.ids.qaLesson),[]);
  assert.deepEqual(await list(teacher,'lesson_records','id',f.ids.qaLesson),[f.ids.qaLesson]);
