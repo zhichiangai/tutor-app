@@ -10,6 +10,7 @@ import { createV4Connections } from "./v4-connections.js";
 import { runSiteConfirmation } from "./site-confirm.js";
 import { createV4AccountContacts } from "./v4-contacts.js";
 import { exactCents, prepareCorrection } from "./payment-correction.js";
+import { createV5PlanUI } from "./v5-plans.js";
 // Backend settings are resolved before the first Auth request. Production is
 // delivered only by the hostname- and Vercel-environment-guarded config API.
 const V4_PRODUCTION_HOST="tutor.rapid4grad.com";
@@ -103,6 +104,11 @@ const v4ConnectionUI=typeof createV4Connections==="function"?createV4Connections
 const v4ContactsUI=typeof createV4AccountContacts==="function"?createV4AccountContacts({
  getClient:()=>client,getUser:()=>activeUser,getRole:()=>state.role,notify:message=>toast(message)
 }):{render(){},refresh(){},clear(){},handleClick(){return false},handleSubmit(){return false}};
+// Older Node harnesses strip imports when evaluating app.js; keep optional.
+const v5PlanUI=typeof createV5PlanUI==="function"?createV5PlanUI({
+ getClient:()=>client,getUser:()=>activeUser,getRole:()=>state.role,
+ isReady:()=>authPhase==="ready"&&state.mode==="live"
+}):{render(){},refresh(){},clear(){}};
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
  const demoStudents=[
@@ -249,6 +255,10 @@ function setView(view){
  state.view=normalizeView(view);
  render();
  applyPreviewReadOnlyControls();
+ // Plan usage is queried only on the owner's settings view. This avoids
+ // repeated RPCs for each calendar render and never blocks V4 functionality.
+ if(state.view==="settings"&&state.role==="teacher"&&activeUser)
+  void v5PlanUI.refresh();
 }
 const VALID_ROLES=["teacher","parent","student"];
 const ROLE_SUFFIX={teacher:"老師",parent:"家長",student:"同學"};
@@ -557,6 +567,7 @@ function render(){
  $("#profile-display-form").classList.toggle("hidden",!activeUser);
  renderRoleSettings();
  $("#settings-role-card").classList.toggle("hidden",!activeUser);
+ v5PlanUI.render();
  // The login gate is not a dashboard mode. Never rebuild payment summaries,
  // student records or lesson content when there is no verified active account.
  if(!identified)return;
@@ -2526,6 +2537,7 @@ function clearUserSessionState(){
  correctionBatchId=null;correctionRequest=null;closeModal("correction-modal");
  v4ConnectionUI.clear();
  v4ContactsUI.clear();
+ v5PlanUI.clear();
  for(const field of LIVE_FIELDS)state[field]=[];
  state.qaTags={qaBatchIds:[],qaLessonIds:[],qaLegacyReceiptLessonIds:[]};
  state.qaClassificationReady=false;
