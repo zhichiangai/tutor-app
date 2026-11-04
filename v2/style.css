@@ -771,3 +771,55 @@ body.preview-readonly .app-shell textarea:disabled{opacity:.45;cursor:not-allowe
 body.preview-readonly .app-shell [aria-disabled="true"]{cursor:not-allowed}
 .preview-readonly-banner{position:sticky;top:0;z-index:999;display:block;background:#f2eee7;color:#49443b;padding:12px 20px;text-align:center;font-size:13px;font-weight:600;line-height:1.6}
 .preview-readonly-banner[hidden]{display:none}
+
+
+/* V4 mobile month calendar: keep seven date columns compact, reveal readable
+   student/subject/time/status in the selected day's agenda and month lists. */
+@media (max-width:650px){
+  /* This must override the later desktop .calendar-event.lesson-event-click
+     display:block rule, otherwise 320px dates show unusable 1-character chips. */
+  #view-calendar .calendar-cell .calendar-event.lesson-event-click{display:none}
+  #view-calendar .calendar-cell .mobile-lesson-count{display:block;font-size:10px;line-height:1.35;white-space:normal;overflow-wrap:anywhere}
+  #view-calendar .calendar-cell .more-count{display:none}
+  #view-calendar .calendar-cell{min-width:0;padding:8px 1px;text-align:center}
+  #view-calendar .calendar-cell .day-number{margin-left:auto;margin-right:auto}
+
+  /* Date selection also exposes the complete daily agenda on phones; desktop
+     keeps the historical compact detail-popup behavior. */
+  #view-calendar>.agenda-card{display:block;padding:15px 12px;margin-top:12px}
+  #view-calendar>.agenda-card .section-row{align-items:flex-start;gap:8px;flex-wrap:wrap}
+  #view-calendar>.agenda-card .section-row h2{line-height:1.5;overflow-wrap:anywhere}
+  #view-calendar #agenda-list .lesson-row{flex-wrap:wrap;align-items:flex-start;gap:8px}
+  #view-calendar #agenda-list .lesson-main{flex:1 1 calc(100% - 28px);min-width:0}
+  #view-calendar #agenda-list .day-lesson-open,
+  #view-calendar #agenda-list .lesson-main small{
+    white-space:normal;overflow-wrap:anywhere;text-align:left;line-height:1.5
+  }
+  #view-calendar #agenda-list .lesson-main small{display:block}
+  #view-calendar #agenda-list .row-actions{
+    flex:1 1 100%;min-width:0;padding-left:18px;
+    justify-content:flex-start;flex-wrap:wrap;gap:7px
+  }
+
+  /* The previous strong/small nowrap + ellipsis, and status occupying 43%
+     of the row, caused names like "兆…" and "V…" at 320-430px. */
+  #view-calendar .month-agenda-row.lesson-quick-trigger{
+    display:grid;grid-template-columns:5px minmax(0,1fr);
+    grid-template-areas:"mark info" ". status";
+    align-items:start;column-gap:10px;row-gap:7px;
+    min-width:0;width:100%;max-width:100%;padding:12px 0
+  }
+  #view-calendar .month-agenda-row .month-agenda-dot{grid-area:mark;align-self:center}
+  #view-calendar .month-agenda-row .month-agenda-info{
+    grid-area:info;min-width:0;max-width:100%;overflow:visible
+  }
+  #view-calendar .month-agenda-row .month-agenda-info strong,
+  #view-calendar .month-agenda-row .month-agenda-info small{
+    display:block;min-width:0;max-width:100%;overflow:visible;
+    white-space:normal;text-overflow:clip;overflow-wrap:anywhere;line-height:1.55
+  }
+  #view-calendar .month-agenda-row .pill{
+    grid-area:status;justify-self:start;max-width:100%;
+    white-space:normal;overflow-wrap:anywhere;text-align:left
+  }
+}

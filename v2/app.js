@@ -2238,6 +2238,12 @@ function refreshDaySheet(){
 function openDay(day){
  state.selected=day;state.month=new Date(parseDate(day).getFullYear(),parseDate(day).getMonth(),1);
  render();
+ // On phones the complete, wrapping daily agenda is the detail view.
+ // Do not cover it with the desktop single-lesson or day modal.
+ if(window.matchMedia("(max-width:650px)").matches){
+  $("#view-calendar>.agenda-card")?.scrollIntoView({behavior:"smooth",block:"nearest"});
+  return;
+ }
  const options=visibleLessons().filter(l=>l.lesson_date===day&&l.type!=="moved");
  if(options.length===1){openLessonPopup(options[0].id);return}
  refreshDaySheet();showModal("day-modal");refreshDaySheet();
