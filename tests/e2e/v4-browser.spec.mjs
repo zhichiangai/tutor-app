@@ -401,7 +401,8 @@ test('parent signout clears account data before switching to student in same bro
  await login(page,'parent');
  await navigate(page,'billing');
  await expect(page.locator('#billing-summary')).toBeVisible();
- await navigate(page,'settings');
+ await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await expect(page.locator('#view-settings')).toBeVisible();
  await page.locator('#sign-out').click();
  await expect(page.locator('body')).toHaveClass(/login-required/);
  await expect(page.locator('#account-current')).toContainText('尚未使用 Google 登入');
