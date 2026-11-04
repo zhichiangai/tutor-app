@@ -67,6 +67,8 @@ test('Free cumulative student quota, manual Pro/Team grants and teacher cap',asy
  result=await rest(teacher,'DELETE','students?id=eq.'+third.id);
  assert.equal(result.status,200);
  assert.equal((await getPlan()).data.student_used,3);
+ result=await rest(teacher,'POST','students?select=id',third);
+ assert.notEqual(result.status,201,'reusing a deleted student UUID must be rejected');
  result=await rest(teacher,'POST','students?select=id',newStudent(teacherId));
  assert.notEqual(result.status,201,'hard delete must not regain lifetime seat');
 
