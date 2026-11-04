@@ -448,6 +448,7 @@ test('logout gate cannot be dismissed or reveal cached account data for parent a
  await assertLockedGate();
  await page.reload();
  await assertLockedGate();
+ await page.setViewportSize({width:390,height:780});
  await login(page,'student');
  await expect(page.locator('#student-today-panel')).toBeVisible();
  await expect(page.locator('#student-today-content')).not.toBeEmpty();
