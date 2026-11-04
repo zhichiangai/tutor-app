@@ -38,6 +38,41 @@ async function initializeV4BackendConfig(){
  V4_CONFIG_INITIALIZED=true;
  return true;
 }
+// Keep OAuth callbacks on the maintained app without copying stale error or
+// arbitrary query parameters into a new Google sign-in. The one explicitly
+// supported deep link is the 64-character V4 invitation token.
+function oauthRedirectUrl(){
+ const target=new URL("/v2/index.html",window.location.origin);
+ const invite=new URLSearchParams(window.location.search||"").get("v4invite");
+ if(/^[a-f0-9]{64}$/.test(invite||""))target.searchParams.set("v4invite",invite);
+ return target.href;
+}
+let oauthCallbackIssue="";
+function captureOAuthCallbackError(){
+ const current=window.location;
+ if(!current)return "";
+ const query=new URLSearchParams(current.search||"");
+ const fragment=String(current.hash||"").replace(/^#/,"");
+ const fromFragment=/^(?:error|error_code|error_description)=/.test(fragment)
+  ?new URLSearchParams(fragment):null;
+ const params=query.has("error")||query.has("error_code")?query:fromFragment;
+ if(!params||(!params.has("error")&&!params.has("error_code")))return "";
+ const code=params.get("error_code")||"";
+ const detail=params.get("error_description")||"";
+ const expired=code==="bad_oauth_state"||/oauth state.*expir/i.test(detail);
+ const issue=expired?
+  "這次 Google 登入已逾時。請重新點選 Google 登入，並在帳號選擇畫面完成驗證。":
+  "Google 登入沒有完成，請重新點選 Google 登入。";
+ // A successful callback may contain a code/fragment required by supabase-js.
+ // Never delete those fields; only scrub a known error callback.
+ for(const key of ["error","error_code","error_description"])query.delete(key);
+ const remaining=query.toString();
+ const safePath=(current.pathname||"/v2/index.html")+(remaining?"?"+remaining:"")+
+  (fromFragment?"":current.hash||"");
+ window.history?.replaceState?.(null,"",safePath);
+ return issue;
+}
+
 const STORAGE = "tutor_v2_preview_data_20261019";
 const ROLE_STORAGE = "tutor_v2_role";
 const ROLE_PENDING_STORAGE = "tutor_v2_role_pending";
@@ -458,13 +493,16 @@ function renderAuthUI(){
  const waiting=authPhase==="checking";
  const failed=authPhase==="error";
  const previewUnavailable=previewBackendUnavailable();
+ const oauthFailed=!waiting&&!failed&&!!oauthCallbackIssue;
  const identified=authPhase==="ready"&&!!activeUser;
  $("#login-heading").textContent=waiting?"正在為你準備好好上課":previewUnavailable?
-  "預覽環境尚未開放登入":failed?"剛剛沒有成功開啟課程":"歡迎來到好好上課";
+  "預覽環境尚未開放登入":failed?"剛剛沒有成功開啟課程":
+  oauthFailed?"Google 登入尚未完成":"歡迎來到好好上課";
  $("#login-description").textContent=waiting?
   "稍等一下，我們正在整理你的課程和學習紀錄。":
   previewUnavailable?"此預覽尚未連接獨立測試資料庫，不能登入或修改課程與帳務。":
   failed?"你的課程暫時無法顯示，請再試一次。":
+  oauthFailed?oauthCallbackIssue:
   "老師安排課程、家長了解孩子的學習、學生回顧每次進步。從這裡開始就好。";
  $("#login-progress").hidden=!waiting;
  $("#google-login").hidden=waiting||failed;
@@ -2589,7 +2627,10 @@ async function ensureClient(){
 }
 async function initializeLive(){
  if(signOutRequested)return;
+ const callbackIssue=captureOAuthCallbackError();
+ if(callbackIssue)oauthCallbackIssue=callbackIssue;
  const bootGeneration=authDataGeneration;
+ let verifiedSessionUserId=null;
  authPhase="checking";
  // Close the first-paint race: show a neutral gate even before getSession resolves.
  document.body?.classList?.toggle("auth-pending",true);
@@ -2602,6 +2643,7 @@ async function initializeLive(){
   if(error)throw error;
   activeUser=data.session?.user||null;
   if(activeUser){
+   verifiedSessionUserId=activeUser.id;
    const initializingUserId=activeUser.id,initializingGeneration=authDataGeneration;
    await ensureMyProfile();
    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
@@ -2647,6 +2689,7 @@ async function initializeLive(){
    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    await loadTeacherPreferences();
    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
+   oauthCallbackIssue="";
    authPhase="ready";
    closeModal("account-modal");
    toast("歡迎回來，課程都準備好了");
@@ -2660,25 +2703,37 @@ async function initializeLive(){
  }catch(err){
   if(bootGeneration!==authDataGeneration)return;
   console.error(err);
-  activeUser=null;
+  // A verified Google session is not the same as a successful data refresh.
+  // Keep the identity for a safe retry, but erase all partially loaded private
+  // UI state. Never ask for a second OAuth login just because an RPC failed.
+  const verifiedUser=verifiedSessionUserId&&activeUser?.id===verifiedSessionUserId?
+   activeUser:null;
   clearUserSessionState();
+  activeUser=verifiedUser;
   authPhase="error";
   render();
   const configError=window.V4_CONFIG_ERROR||"";
   const description=$("#login-description");
-  if(configError&&description)description.textContent=configError;
-  toast(configError||"剛剛沒能開啟課程，請按「再試一次」。");
+  if(description){
+   if(configError)description.textContent=configError;
+   else if(verifiedUser)description.textContent=
+    "Google 登入已完成，但課程資料暫時無法載入。請按「再試一次」，不需要重新選擇帳號。";
+  }
+  toast(configError||(verifiedUser?
+   "Google 登入成功，課程載入未完成；請按「再試一次」。":
+   "剛剛沒能開啟課程，請按「再試一次」。"));
   showModal("account-modal");
  }
 }
 async function googleLogin(){
  try{
   signOutRequested=false;
+  oauthCallbackIssue="";
   authPhase="checking";
   document.body?.classList?.toggle("auth-pending",true);
   renderAuthUI();
   const db=await ensureClient();state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
-  const {error}=await db.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname+location.search}});
+  const {error}=await db.auth.signInWithOAuth({provider:"google",options:{redirectTo:oauthRedirectUrl()}});
   if(error)throw error;
  }catch(err){
   console.error(err);
@@ -2690,6 +2745,7 @@ async function googleLogin(){
 }
 async function signOut(){
  // Immediately erase private data before awaiting the remote Auth response.
+ oauthCallbackIssue="";
  signOutRequested=true;
  authPhase="signedOut";
  const db=client;
