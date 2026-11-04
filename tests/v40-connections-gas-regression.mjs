@@ -73,7 +73,9 @@ test("GAS notifications have protected access and no stored secret in repository
 });
 
 test("Existing Google OAuth flow preserves shared invitation links",()=>{
- assert.match(app,/redirectTo:location\.origin\+location\.pathname\+location\.search/);
+ assert.match(app,/redirectTo:oauthRedirectUrl\(\)/);
+ assert.match(app,/new URL\("\/v2\/index\.html",window\.location\.origin\)/);
+ assert.match(app,/searchParams\.set\("v4invite",invite\)/);
  assert.match(app,/v4ConnectionUI\.clear\(\)/);
  assert.match(app,/void v4ConnectionUI\.refresh\(\)/);
 });
