@@ -2710,9 +2710,19 @@ async function initializeLive(){
    activeUser:null;
   clearUserSessionState();
   activeUser=verifiedUser;
+  const configError=window.V4_CONFIG_ERROR||"";
+  // Supabase can report an OAuth callback error through getSession. A known
+  // expired/cancelled OAuth attempt must leave the Google button available,
+  // not strand the person on a generic RPC retry screen.
+  if(!verifiedUser&&oauthCallbackIssue&&!configError){
+   authPhase="signedOut";
+   render();
+   toast(oauthCallbackIssue);
+   showModal("account-modal");
+   return;
+  }
   authPhase="error";
   render();
-  const configError=window.V4_CONFIG_ERROR||"";
   const description=$("#login-description");
   if(description){
    if(configError)description.textContent=configError;

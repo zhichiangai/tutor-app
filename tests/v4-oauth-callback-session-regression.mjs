@@ -119,6 +119,19 @@ test("data refresh failure retains verified Google identity and permits session-
  assert.equal(googleAuthorizations,0,"Data retry must not trigger another OAuth login");
  assert.equal(sessionReads,2);
 });
+test("an expired callback remains restartable even when Supabase reports a getSession error",async()=>{
+ const h=harness("https://tutor.rapid4grad.com/v2/index.html?error=invalid_request&error_code=bad_oauth_state");
+ h.api.setClient({auth:{getSession:async()=>({
+  data:{session:null},error:new Error("OAuth state has expired")
+ })}});
+ await h.api.initializeLive();
+ assert.equal(h.api.phase(),"signedOut");
+ assert.equal(h.api.user(),null);
+ assert.match(h.node("#login-description").textContent,/登入已逾時/);
+ assert.equal(h.node("#google-login").hidden,false);
+ assert.equal(h.replaced[0],"/v2/index.html");
+});
+
 test("missing or invalid session still blocks access and offers non-OAuth retry",async()=>{
  const h=harness();
  h.api.setClient({auth:{getSession:async()=>({data:{session:null},error:new Error("Synthetic token failure")})}});
