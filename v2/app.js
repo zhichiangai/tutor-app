@@ -2902,7 +2902,9 @@ function bindEvents(){
  $("#account-modal").addEventListener("cancel",ev=>{
   // Preserve the existing, explicitly locked Preview no-data fallback.
   if(previewBackendUnavailable()){enterPreviewReadOnly();return}
-  if(!canDismissAccountModal())ev.preventDefault();
+  // Keep legacy signed-out protection and additionally guard loading/error phases.
+  if(!activeUser)ev.preventDefault();
+  else if(!canDismissAccountModal())ev.preventDefault();
  });
  // Defensive recovery if an unexpected close() bypasses backdrop/cancel guards.
  $("#account-modal").addEventListener("close",()=>{
