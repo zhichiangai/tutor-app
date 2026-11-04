@@ -1,5 +1,5 @@
 // V5.1 contract against disposable localhost Supabase and synthetic users ONLY.
-import {test} from '@playwright/test';
+import {test,expect} from '@playwright/test';
 import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
@@ -119,4 +119,35 @@ test('Free cumulative student quota, manual Pro/Team grants and teacher cap',asy
  const audit=db("select count(*) from tutor_private.v5_entitlement_grant_audit "+
    "where workspace_id='"+ws+"'");
  assert.equal(Number(audit),3);
+});
+
+
+test('teacher settings shows Free/Pro/Team without checkout or hidden quotas',async ({page})=>{
+ const actor=f.actors.teacher;
+ await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
+  route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
+   contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+ await page.addInitScript(({url,key})=>{
+  window.V4_LOCAL_BACKEND={
+   environment:'local',isolated:true,projectRef:'local',url,publishableKey:key
+  };
+ },{url:f.apiUrl,key:f.anonKey});
+ await page.goto('/v2/index.html');
+ await page.waitForFunction(()=>!!window.supabase?.createClient,{timeout:20_000});
+ await page.evaluate(async ({url,key,email,password})=>{
+  const client=window.supabase.createClient(url,key,{auth:{persistSession:true,
+   autoRefreshToken:true,detectSessionInUrl:true}});
+  const {error}=await client.auth.signInWithPassword({email,password});
+  if(error)throw Error('Synthetic login failed: '+error.message);
+  client.auth.stopAutoRefresh?.();
+ },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
+ await page.reload();
+ await expect(page.locator('body')).not.toHaveClass(/login-required/);
+ await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await expect(page.locator('#v5-plan-card')).toBeVisible();
+ await expect(page.locator('#v5-plan-content')).toContainText('Free');
+ await expect(page.locator('#v5-plan-content')).toContainText('NT$99／月');
+ await expect(page.locator('#v5-plan-content')).toContainText('NT$399／月');
+ await expect(page.locator('#v5-plan-content')).toContainText('不會釋放已使用名額');
+ await expect(page.locator('#v5-plan-card')).not.toContainText('立即訂閱');
 });
