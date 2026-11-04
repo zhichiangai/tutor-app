@@ -827,3 +827,17 @@ body.preview-readonly .app-shell [aria-disabled="true"]{cursor:not-allowed}
     white-space:normal;overflow-wrap:anywhere;text-align:left
   }
 }
+
+
+/* V5.1 owner-only plan overview. All quota decisions are enforced in DB. */
+.v5-plan-card{grid-column:1/-1}
+.v5-plan-summary{padding:14px 16px;border:1px solid var(--line,#e5e7eb);border-radius:14px;margin:12px 0}
+.v5-plan-summary>strong{display:block;font-size:1.05rem;margin-bottom:10px}
+.v5-plan-summary p{margin:5px 0}
+.v5-plan-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:14px 0}
+.v5-plan-option{display:grid;gap:7px;align-content:start;border:1px solid var(--line,#e5e7eb);border-radius:14px;padding:14px;min-width:0}
+.v5-plan-option.current{border:2px solid currentColor}
+.v5-plan-option strong{font-size:1.05rem}
+.v5-plan-option span{font-weight:600}
+.v5-plan-option small{line-height:1.5;color:var(--text-muted,#64748b)}
+@media(max-width:720px){.v5-plan-options{grid-template-columns:1fr}}
