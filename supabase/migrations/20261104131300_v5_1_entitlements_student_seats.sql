@@ -80,9 +80,10 @@ returns trigger language plpgsql security definer set search_path='' as $$
 declare v_plan text; v_bonus integer; v_limit integer; v_used integer;
 begin
   if tg_op='UPDATE' then
-    if new.id=old.id and new.workspace_id is not distinct from old.workspace_id then
-      return new;
+    if new.id<>old.id then
+      raise exception '學生識別碼不可變更，以避免繞過累計名額' using errcode='23514';
     end if;
+    if new.workspace_id is not distinct from old.workspace_id then return new; end if;
   end if;
   if new.workspace_id is null then
     raise exception 'V5: student workspace is required' using errcode='23514';
@@ -90,7 +91,12 @@ begin
   perform 1 from public.workspaces w where w.id=new.workspace_id for update;
   if not found then raise exception 'V5: workspace not found' using errcode='23503'; end if;
   if exists(select 1 from tutor_private.v5_student_seat_ledger
-    where workspace_id=new.workspace_id and student_id=new.id) then return new; end if;
+    where workspace_id=new.workspace_id and student_id=new.id) then
+    if tg_op='INSERT' then
+      raise exception '已刪除的學生識別碼不得重新使用' using errcode='23505';
+    end if;
+    return new;
+  end if;
   select plan_code,extra_student_seats into v_plan,v_bonus
     from public.v5_workspace_entitlements where workspace_id=new.workspace_id;
   if not found then raise exception 'V5: workspace entitlement missing' using errcode='23514'; end if;
