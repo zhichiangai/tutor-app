@@ -49,7 +49,7 @@ function oauthRedirectUrl(){
 }
 let oauthCallbackIssue="";
 function captureOAuthCallbackError(){
- const current=window.location;
+ const current=typeof window==="undefined"?null:window.location;
  if(!current)return "";
  const query=new URLSearchParams(current.search||"");
  const fragment=String(current.hash||"").replace(/^#/,"");
