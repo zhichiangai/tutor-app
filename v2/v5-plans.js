@@ -109,5 +109,12 @@ export function createV5PlanUI({getClient,getUser,getRole,isReady}){
   }
   render();
  }
- return {render,refresh,clear};
+ function canAddStudent(){
+  if(!isReady()||!getUser()?.id||getRole()!=='teacher')return true;
+  // Unknown/loading backend state never acts as a client-side permission grant:
+  // the PostgreSQL trigger independently enforces the actual quota.
+  if(status!=='ready'||!data||owner!==getUser().id)return true;
+  return safeNumber(data.student_used)<safeNumber(data.student_limit);
+ }
+ return {render,refresh,clear,canAddStudent};
 }
