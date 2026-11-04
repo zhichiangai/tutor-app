@@ -442,7 +442,8 @@ test('logout gate cannot be dismissed or reveal cached account data for parent a
  await login(page,'parent');
  await navigate(page,'billing');
  await expect(page.locator('#billing-summary')).toContainText('NT$');
- await navigate(page,'settings');
+ await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await expect(page.locator('#view-settings')).toBeVisible();
  await page.locator('#sign-out').click();
  await expect(page.locator('#toast')).toContainText('已登出 Google 帳號');
  await assertLockedGate();
