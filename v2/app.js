@@ -108,7 +108,7 @@ const v4ContactsUI=typeof createV4AccountContacts==="function"?createV4AccountCo
 const v5PlanUI=typeof createV5PlanUI==="function"?createV5PlanUI({
  getClient:()=>client,getUser:()=>activeUser,getRole:()=>state.role,
  isReady:()=>authPhase==="ready"&&state.mode==="live"
-}):{render(){},refresh(){},clear(){}};
+}):{render(){},refresh(){},clear(){},canAddStudent(){return true}};
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
  const demoStudents=[
@@ -1801,9 +1801,13 @@ async function saveRecord(ev){
 }
 async function saveStudent(ev){
  ev.preventDefault();if(state.role!=="teacher"||!requireTeacherWorkspace())return;
+ if(!v5PlanUI.canAddStudent()){
+  toast("累計學生名額已滿，請到設定查看方案並聯絡管理員");
+  setView("settings");return;
+ }
  const form=new FormData(ev.target),name=asText(form.get("name")).trim(),subject=asText(form.get("subject")).trim(),rate=num(form.get("hourly_rate"));
  if(!name)return;const data={name,subject,hourly_rate:rate,teacher_id:activeUser?.id||"demo-teacher"};
- const ok=await persist(async()=>{if(state.mode==="demo")state.students.push({id:uid(),...data});else assertResult(await client.from("students").insert(data))});if(ok){await rememberTeacherForm({subject,rate});closeModal("student-modal");ev.target.reset();toast("已新增學生")}
+ const ok=await persist(async()=>{if(state.mode==="demo")state.students.push({id:uid(),...data});else assertResult(await client.from("students").insert(data))});if(ok){await rememberTeacherForm({subject,rate});closeModal("student-modal");ev.target.reset();toast("已新增學生");void v5PlanUI.refresh()}
 }
 async function saveInvite(ev){
  ev.preventDefault();if(state.role!=="teacher"||!requireTeacherWorkspace())return;
@@ -2726,7 +2730,10 @@ async function initializeLive(){
    authPhase="signedOut";
   }
   render();
-  if(activeUser){void v4ConnectionUI.refresh();void v4ContactsUI.refresh();}
+  if(activeUser){
+   void v4ConnectionUI.refresh();void v4ContactsUI.refresh();
+   if(state.role==="teacher")void v5PlanUI.refresh();
+  }
   if(!activeUser)showModal("account-modal");
  }catch(err){
   if(bootGeneration!==authDataGeneration)return;
@@ -2957,6 +2964,10 @@ function bindEvents(){
  $("#schedule-student").onchange=()=>{if(!state.editingSchedule)selectStudentDefaults("schedule",$("#schedule-student").value)};
  $("#add-student").onclick=()=>{
   if(!requireTeacherWorkspace())return;
+  if(!v5PlanUI.canAddStudent()){
+   toast("累計學生名額已滿，請到設定查看會員方案與名額");
+   setView("settings");return;
+  }
   refreshFormOptions(teacherPreferences.lastStudentId||"");
   const form=$("#student-form");
   const subject=form.querySelector('[name="subject"]'),rate=form.querySelector('[name="hourly_rate"]');
