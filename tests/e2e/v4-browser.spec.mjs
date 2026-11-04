@@ -360,3 +360,56 @@ test('same live parent JWT cannot read historic batches after guardian unlink',a
  await expect(page.locator('#student-grid')).not.toContainText('CI Student');
  expect(db("select count(*) from public.payment_batches where id='"+historicId+"'")).toBe('1');
 });
+
+
+test('synthetic teacher calendar shows complete day and month details at 320-430px',async ({page})=>{
+ await login(page,'teacher');
+ for(const width of [430,390,375,320]){
+  await page.setViewportSize({width,height:780});
+  await page.locator('.mobile-nav [data-view="calendar"]').click();
+  await expect(page.locator('#view-calendar')).toBeVisible();
+  const cell=page.locator('#calendar-grid .calendar-cell[data-day="'+f.day+'"]');
+  await expect(cell).toBeVisible();
+  await expect(cell.locator('.mobile-lesson-count')).toBeVisible();
+  await expect(cell.locator('.calendar-event.lesson-event-click')).toBeHidden();
+  await expect(page.locator('#view-calendar>.agenda-card')).toBeVisible();
+  const dayAgenda=page.locator('#agenda-list');
+  await expect(dayAgenda).toContainText('CI Student');
+  await expect(dayAgenda).toContainText('17:00');
+  await expect(dayAgenda).toContainText('19:00');
+  const row=page.locator('#month-lesson-preview .month-agenda-row')
+   .filter({hasText:'CI Student'}).first();
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('數學');
+  await expect(row).toContainText('17:00');
+  await expect(row).toContainText('19:00');
+  const layout=await row.evaluate(element=>{
+   const title=element.querySelector('.month-agenda-info strong');
+   const style=getComputedStyle(title);
+   return {whiteSpace:style.whiteSpace,textOverflow:style.textOverflow,
+    viewport:document.documentElement.clientWidth,
+    scroll:document.documentElement.scrollWidth};
+  });
+  expect(layout.whiteSpace,'month-list name must wrap at '+width).not.toBe('nowrap');
+  expect(layout.textOverflow,'month-list name must not ellipsize at '+width).not.toBe('ellipsis');
+  expect(layout.scroll,'calendar causes horizontal overflow at '+width)
+   .toBeLessThanOrEqual(layout.viewport);
+ }
+});
+
+test('parent signout clears account data before switching to student in same browser',async ({page})=>{
+ await login(page,'parent');
+ await navigate(page,'billing');
+ await expect(page.locator('#billing-summary')).toBeVisible();
+ await page.locator('#sign-out').click();
+ await expect(page.locator('body')).toHaveClass(/login-required/);
+ await expect(page.locator('#account-current')).toContainText('尚未使用 Google 登入');
+ await expect(page.locator('#student-grid')).not.toContainText('CI Student');
+ await expect(page.locator('#v4-connection-content')).toBeEmpty();
+ await expect(page.locator('#billing-summary')).not.toContainText('NT$ 1,000');
+ await login(page,'student');
+ await page.locator('.mobile-nav [data-view="student-calendar"]').click();
+ await expect(page.locator('#student-calendar-panel')).toBeVisible();
+ await expect(page.locator('#student-calendar-panel')).not.toContainText('NT$');
+ await expect(page.locator('#role-indicator-text')).toContainText('同學');
+});
