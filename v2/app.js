@@ -2900,6 +2900,8 @@ function bindEvents(){
   }
  });
  $("#account-modal").addEventListener("cancel",ev=>{
+  // Preserve the existing, explicitly locked Preview no-data fallback.
+  if(previewBackendUnavailable()){enterPreviewReadOnly();return}
   if(!canDismissAccountModal())ev.preventDefault();
  });
  // Defensive recovery if an unexpected close() bypasses backdrop/cancel guards.
