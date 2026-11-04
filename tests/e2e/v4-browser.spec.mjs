@@ -453,7 +453,7 @@ test('logout gate cannot be dismissed or reveal cached account data for parent a
  await login(page,'student');
  await expect(page.locator('#student-today-panel')).toBeVisible();
  await expect(page.locator('#student-today-content')).not.toBeEmpty();
- await page.locator('.mobile-nav [data-view="settings"]').click();
+ await page.locator('.mobile-nav .nav-student[data-view="settings"]').click();
  await page.locator('#sign-out').click();
  await expect(page.locator('#toast')).toContainText('已登出 Google 帳號');
  await assertLockedGate();
