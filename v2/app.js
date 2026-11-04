@@ -3009,7 +3009,7 @@ function bindEvents(){
  $("#mode-settings-form").addEventListener("submit",saveEnabledRoles);
  $("#default-login-role").addEventListener("change",changeDefaultLoginRole);
   $("#profile-display-form").addEventListener("submit",saveDisplayName);
- $(".modal").forEach(d=>d.addEventListener("click",e=>{
+ $$(".modal").forEach(d=>d.addEventListener("click",e=>{
   if(e.target!==d)return;
   // A signed-out login gate must never be dismissible by clicking its backdrop.
   if(d.id==="account-modal"&&!canDismissAccountModal())return;
