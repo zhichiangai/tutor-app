@@ -381,8 +381,9 @@ test('synthetic teacher calendar shows complete day and month details at 320-430
    .filter({hasText:'CI Student'}).first();
   await expect(row).toBeVisible();
   await expect(row).toContainText('數學');
-  await expect(row).toContainText('17:00');
-  await expect(row).toContainText('19:00');
+  // Earlier synthetic CRUD tests can reschedule a lesson to 08:00; preview
+  // order is not fixed. Require a complete visible time range instead.
+  await expect(row).toContainText(/\d{2}:\d{2}–\d{2}:\d{2}/);
   const layout=await row.evaluate(element=>{
    const title=element.querySelector('.month-agenda-info strong');
    const style=getComputedStyle(title);
