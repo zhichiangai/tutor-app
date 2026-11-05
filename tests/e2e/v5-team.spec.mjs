@@ -416,3 +416,51 @@ test('manager transfer requires acceptance; personal V4 owner stays unchanged',a
   "where workspace_id='"+ws+"' and actor_id='"+ownerId+"' "+
   "and event='teacher_left'"),'1');
 });
+
+
+test('successor sees transferred Team in the settings UI without V4 data',async({page})=>{
+ const actor=f.actors.parent;
+ const original=f.actors.teacher;
+ const ownedTeam=db("select id from public.workspaces where owner_id='"+original.id+"'");
+ const personalTeam=db("select id from public.workspaces where owner_id='"+actor.id+"'");
+ // Disposable synthetic profile only: this account was originally a parent in
+ // V4 tests. It now explicitly opts in to teacher mode for Team management UI.
+ db("update public.profiles set last_role='teacher',"+
+  "enabled_roles=array['parent','teacher']::text[],roles_configured=true "+
+  "where id='"+actor.id+"'");
+ await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
+  route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
+   contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+ await page.addInitScript(({url,key})=>{
+  window.V4_LOCAL_BACKEND={
+   environment:'local',isolated:true,projectRef:'local',url,publishableKey:key
+  };
+ },{url:f.apiUrl,key:f.anonKey});
+ await page.goto('/v2/index.html');
+ await page.waitForFunction(()=>!!window.supabase?.createClient,{timeout:20_000});
+ await page.evaluate(async({url,key,email,password})=>{
+  const client=window.supabase.createClient(url,key,{
+   auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+  });
+  const {error}=await client.auth.signInWithPassword({email,password});
+  if(error)throw Error('Synthetic new manager login failed');
+  client.auth.stopAutoRefresh?.();
+ },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
+ await page.reload();
+ await expect(page.locator('body')).not.toHaveClass(/login-required/);
+ await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await expect(page.locator('#v5-team-card')).toBeVisible();
+ await expect(page.locator('#v5-team-owner-controls')).toBeVisible();
+ const teams=await page.locator('#v5-team-manage-select option').evaluateAll(
+  els=>els.map(x=>x.value));
+ assert.ok(teams.includes(ownedTeam),'Transferred team is manageable');
+ assert.ok(teams.includes(personalTeam),'Personal Team management remains');
+ await page.locator('#v5-team-manage-select').selectOption(ownedTeam);
+ await expect(page.locator('#v5-team-project-list')).toContainText(
+  'Project Alpha Renamed by Successor');
+ await expect(page.locator('#v5-team-transfer-list')).toContainText(
+  '目前沒有待確認的管理權轉讓');
+ await page.locator('#sign-out').click();
+ await expect(page.locator('body')).toHaveClass(/login-required/);
+ await expect(page.locator('#v5-team-card')).toBeHidden();
+});
