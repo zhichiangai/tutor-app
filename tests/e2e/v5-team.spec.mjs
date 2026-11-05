@@ -406,7 +406,7 @@ test('manager transfer requires acceptance; personal V4 owner stays unchanged',a
   ws+"' and user_id='"+ownerId+"'"),'0');
  const ownerTeamView=await rows(owner,'v5_team_projects');
  assert.equal(ownerTeamView.data.some(p=>p.workspace_id===ws),false);
- assert.equal(Number(db("select count(*) from public.lesson_records where teacher_id='"+
+ assert.equal(Number(db("select count(*) from public.lesson_records where owner_id='"+
   ownerId+"'")),beforeLessonCount,'V4 personal lesson history must remain');
  assert.equal(Number(db("select count(*) from public.v5_team_projects where workspace_id='"+
   ws+"'")),beforeProjectCount+1,'Team projects survive transfer and exit');
