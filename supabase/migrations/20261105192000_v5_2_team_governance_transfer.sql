@@ -512,3 +512,72 @@ returns jsonb language sql stable security invoker set search_path='' as $$
 $$;
 revoke all on function public.v5_my_managed_teams() from public,anon,authenticated;
 grant execute on function public.v5_my_managed_teams() to authenticated;
+
+
+-- Keep the V5.1 plan and internal operator counts aligned with active
+-- Team roster, not legacy V4 personal membership rows.
+create or replace function public.v5_my_plan()
+returns jsonb language plpgsql security definer set search_path='' stable as $$
+declare v_uid uuid:=(select auth.uid()); v_workspace uuid;
+ v_plan text; v_bonus integer; v_students integer; v_teachers integer;
+ v_student_limit integer; v_teacher_limit integer;
+begin
+ if v_uid is null then raise exception '請先登入'; end if;
+ select w.id,e.plan_code,e.extra_student_seats into v_workspace,v_plan,v_bonus
+ from public.workspaces w
+ join public.v5_workspace_entitlements e on e.workspace_id=w.id
+ where w.owner_id=v_uid;
+ if not found then return null; end if;
+ v_student_limit:=(case v_plan when 'free' then 3 when 'pro' then 30
+  when 'team' then 100 else 0 end)+v_bonus;
+ v_teacher_limit:=case v_plan when 'team' then 10 else 1 end;
+ select count(*)::int into v_students
+  from tutor_private.v5_student_seat_ledger l
+  where l.workspace_id=v_workspace;
+ if v_plan='team' then
+  select count(*)::int into v_teachers from public.v5_team_roster r
+   where r.workspace_id=v_workspace;
+ else
+  select count(*)::int into v_teachers from public.workspace_members m
+   where m.workspace_id=v_workspace and m.role in('owner','admin','teacher');
+ end if;
+ return jsonb_build_object(
+  'plan',v_plan,'student_used',v_students,'student_limit',v_student_limit,
+  'teacher_used',v_teachers,'teacher_limit',v_teacher_limit,
+  'student_can_add',v_students<v_student_limit,
+  'teacher_can_add',v_teachers<v_teacher_limit,
+  'monthly_price_twd',case v_plan when 'pro' then 99 when 'team' then 399 else 0 end,
+  'billing_enabled',false
+ );
+end;$$;
+revoke all on function public.v5_my_plan() from public,anon,authenticated;
+grant execute on function public.v5_my_plan() to authenticated;
+
+create or replace function tutor_private.v5_admin_snapshot_private()
+returns jsonb language plpgsql stable security definer set search_path='' as $$
+begin
+ return coalesce((
+ select jsonb_agg(jsonb_build_object(
+  'workspace_id',w.id,'workspace_name',w.name,
+  'plan',e.plan_code,'extra_student_seats',e.extra_student_seats,
+  'student_used',(select count(*)::int from tutor_private.v5_student_seat_ledger l
+   where l.workspace_id=w.id),
+  'qa_deleted_eligible',(select count(*)::int from tutor_private.v5_student_seat_ledger l
+   where l.workspace_id=w.id and l.is_qa_at_first_seen
+    and not exists(select 1 from public.students s
+     where s.id=l.student_id and s.workspace_id=l.workspace_id)),
+  'teacher_used',(case when e.plan_code='team'
+   then(select count(*)::int from public.v5_team_roster r where r.workspace_id=w.id)
+   else(select count(*)::int from public.workspace_members m
+    where m.workspace_id=w.id and m.role in('owner','admin','teacher')) end),
+  'student_limit',(case e.plan_code when 'free' then 3 when 'pro' then 30
+   else 100 end)+e.extra_student_seats,
+  'teacher_limit',case e.plan_code when 'team' then 10 else 1 end
+ ) order by w.created_at,w.id)
+ from public.workspaces w
+ join public.v5_workspace_entitlements e on e.workspace_id=w.id
+ ),'[]'::jsonb);
+end;$$;
+revoke all on function tutor_private.v5_admin_snapshot_private()
+ from public,anon,authenticated;
+grant execute on function tutor_private.v5_admin_snapshot_private() to service_role;
