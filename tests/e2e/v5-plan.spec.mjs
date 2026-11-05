@@ -103,6 +103,9 @@ test('Free cumulative student quota, manual Pro/Team grants and teacher cap',asy
  assert.equal(plan.data.student_limit,100);
  db("insert into public.workspace_members(workspace_id,user_id,role) "+
   "values('"+ws+"','"+extraMember+"','teacher')");
+ // V5.2 Team quota is independent from V4 workspace owner memberships.
+ db("insert into public.v5_team_roster(workspace_id,user_id) "+
+  "values('"+ws+"','"+extraMember+"')");
  assert.equal((await getPlan()).data.teacher_used,2);
 
  db("select tutor_private.v5_admin_grant_entitlement('"+ws+"','free',0,"+

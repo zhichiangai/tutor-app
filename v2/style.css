@@ -841,3 +841,19 @@ body.preview-readonly .app-shell [aria-disabled="true"]{cursor:not-allowed}
 .v5-plan-option span{font-weight:600}
 .v5-plan-option small{line-height:1.5;color:var(--text-muted,#64748b)}
 @media(max-width:720px){.v5-plan-options{grid-template-columns:1fr}}
+
+
+/* V5.2 Team settings. Dynamic strings are created through textContent. */
+#v5-team-card .v5-team-panel{border-top:1px solid var(--line,#e2e8f0);padding-top:14px;margin-top:14px}
+#v5-team-card .v5-team-panel h4{font-size:.96rem;margin:5px 0 12px}
+#v5-team-card .v5-team-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;
+ border:1px solid var(--line,#e2e8f0);border-radius:10px;padding:10px 12px;margin:8px 0}
+#v5-team-card .v5-team-row strong,#v5-team-card .v5-team-row span{overflow-wrap:anywhere}
+#v5-team-card .v5-team-row button{min-height:36px}
+#v5-team-owner-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:20px}
+#v5-team-owner-controls>.v5-team-panel:last-child{grid-column:1/-1}
+#v5-team-owner-controls form{display:grid;gap:8px}
+#v5-team-owner-controls label{display:grid;gap:6px}
+#v5-team-owner-controls select,#v5-team-owner-controls input{max-width:100%}
+@media(max-width:640px){#v5-team-owner-controls{grid-template-columns:1fr}
+#v5-team-owner-controls>.v5-team-panel:last-child{grid-column:auto}}
