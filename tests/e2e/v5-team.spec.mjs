@@ -1514,6 +1514,88 @@ test('V5.4 isolated advance credit is split, suggested, applied and never double
   owner+"'"),beforeV4Lessons,'V4 lessons must remain unchanged');
 });
 
+test('V5.4 month boundaries count October cash once and September advance settlement only',async()=>{
+ const actor=f.actors.parent,manager=await signIn('parent');
+ const ws=db("select id from public.workspaces where owner_id='"+actor.id+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ const project=db("select id from public.v5_team_projects where workspace_id='"+
+  ws+"' and name='Private Team B Project'");
+ let r=await rest(manager,'POST','v5_team_students?select=id',{
+  team_id:team,display_name:'Cross Month Advance Isolation Student',
+  created_by:actor.id
+ });
+ assert.equal(r.status,201);
+ const student=r.data[0].id;
+ r=await rest(manager,'POST','v5_team_enrollments?select=student_id',{
+  team_id:team,project_id:project,student_id:student
+ });
+ assert.equal(r.status,201);
+ const create=async(date,subject,hourly)=>{
+  let resp=await rest(manager,'POST','v5_team_lessons?select=id',{
+   team_id:team,project_id:project,student_id:student,
+   teacher_user_id:actor.id,subject,status:'completed',
+   lesson_start:date+'T13:00:00+08:00',
+   lesson_end:date+'T14:00:00+08:00'
+  });
+  assert.equal(resp.status,201);
+  const id=resp.data[0].id;
+  resp=await rest(manager,'POST','rpc/v5_confirm_team_lesson_fee',{
+   p_lesson_id:id,p_hourly_rate_cents:hourly
+  });
+  assert.equal(resp.status,200);
+  return id;
+ };
+ const september=await create('2026-09-18','Cross Month Math',50000);
+ const october=await create('2026-10-19','Cross Month English',100000);
+ const monthly=m=>rest(manager,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:m
+ });
+ const beforeSept=await monthly('2026-09-01');
+ const beforeOct=await monthly('2026-10-01');
+ assert.equal(beforeSept.status,200);
+ assert.equal(beforeOct.status,200);
+ const entry=await rest(manager,'POST','rpc/v5_report_team_payment_with_advance',{
+  p_team_id:team,p_student_id:student,
+  p_amount_cents:60000,p_expected_credit_cents:20000,
+  p_received_on:'2026-10-20',p_method:'cash',
+  p_reference:'CROSS-MONTH-ADVANCE-ISOLATED'
+ });
+ assert.equal(entry.status,200);
+ r=await rest(manager,'POST','rpc/v5_confirm_team_advance_payment',{
+  p_payment_id:entry.data.payment_id,
+  p_allocations:[{lesson_id:october,amount_cents:40000}]
+ });
+ assert.equal(r.status,200);
+ const credit=r.data.credit_id;
+ let sep=await monthly('2026-09-01'),oct=await monthly('2026-10-01');
+ assert.equal(sep.data.confirmed_payments_cents,
+  beforeSept.data.confirmed_payments_cents,'October cash is not a September receipt');
+ assert.equal(oct.data.confirmed_payments_cents,
+  beforeOct.data.confirmed_payments_cents+60000);
+ assert.equal(oct.data.advance_created_cents,beforeOct.data.advance_created_cents+20000);
+ assert.equal(oct.data.receivables.find(x=>x.lesson_id===october).outstanding_cents,
+  60000);
+ r=await rest(manager,'POST','rpc/v5_apply_team_advance_credit',{
+  p_credit_id:credit,p_idempotency_key:'CROSS-MONTH-APPLY-SEPTEMBER',
+  p_allocations:[{lesson_id:september,amount_cents:20000}]
+ });
+ assert.equal(r.status,200);
+ sep=await monthly('2026-09-01');oct=await monthly('2026-10-01');
+ assert.equal(sep.data.confirmed_payments_cents,
+  beforeSept.data.confirmed_payments_cents,
+  'September offset must not create a second cash receipt');
+ assert.equal(sep.data.advance_applied_cents,beforeSept.data.advance_applied_cents+20000);
+ assert.equal(sep.data.outstanding_cents,beforeSept.data.outstanding_cents-20000);
+ assert.equal(sep.data.receivables.find(x=>x.lesson_id===september).outstanding_cents,
+  30000);
+ assert.equal(oct.data.confirmed_payments_cents,
+  beforeOct.data.confirmed_payments_cents+60000,
+  'October received cash must not increase a second time');
+ assert.equal(oct.data.receivables.find(x=>x.lesson_id===october).outstanding_cents,
+  60000);
+ assert.equal(oct.data.advance_available_cents,beforeOct.data.advance_available_cents);
+});
+
 test('V5.4 manager GUI confirms an advance and applies a separate offset with no V4 writes',async({page})=>{
  test.setTimeout(120_000);
  const actor=f.actors.parent,manager=await signIn('parent');
