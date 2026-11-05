@@ -27,8 +27,10 @@ export function createV5LearningUI({getClient,getUser,getRole,isReady,notify}){
   projectEnrollments(id).some(en=>en.student_id===s.id));
  const currentLessonDate=(date)=>{
   const d=new Date(date);
-  return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',
-   month:'2-digit',day:'2-digit'}).format(d);
+  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',
+   year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d);
+  const field=k=>parts.find(x=>x.type===k)?.value||'00';
+  return [field('year'),field('month'),field('day')].join('-');
  };
  function clear(){
   generation++;teams=[];managed=[];projects=[];students=[];enrollments=[];
@@ -153,6 +155,7 @@ export function createV5LearningUI({getClient,getUser,getRole,isReady,notify}){
   if(!visible.length)target.append(el('p','這個月沒有已建立的 Team 課程。','section-sub'));
   for(const l of visible){
    const row=el('div',undefined,'v5-learning-lesson-row');
+   row.dataset.v5LessonId=l.id;
    const student=students.find(s=>s.id===l.student_id)?.display_name||'學生';
    const start=new Date(l.lesson_start).toLocaleString('zh-TW',{
     timeZone:'Asia/Taipei',month:'numeric',day:'numeric',
@@ -189,6 +192,13 @@ export function createV5LearningUI({getClient,getUser,getRole,isReady,notify}){
   $('v5-learning-project-select').addEventListener('change',e=>{
    projectId=e.target.value;render();
   });
+  const now=new Date();
+  const local=new Date(now.getTime()-now.getTimezoneOffset()*60000)
+    .toISOString().slice(0,16);
+  const finish=new Date(now.getTime()+60*60000-now.getTimezoneOffset()*60000)
+    .toISOString().slice(0,16);
+  $('v5-learning-lesson-start').value=local;
+  $('v5-learning-lesson-end').value=finish;
   $('v5-learning-prev-month').addEventListener('click',()=>shiftMonth(-1));
   $('v5-learning-next-month').addEventListener('click',()=>shiftMonth(1));
  }
@@ -242,7 +252,8 @@ export function createV5LearningUI({getClient,getUser,getRole,isReady,notify}){
   busy=true;render();
   try{
    const result=await fn();
-   if(result.error)throw result.error;
+   if(result.error||Array.isArray(result.data)&&result.data.length===0)
+    throw result.error||new Error('No rows were changed');
    notify(message);await refresh();return true;
   }catch(err){
    notify('操作未完成，請確認名額、專案指派與權限。');
