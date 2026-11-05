@@ -10,6 +10,7 @@ import { createV4Connections } from "./v4-connections.js";
 import { runSiteConfirmation } from "./site-confirm.js";
 import { createV4AccountContacts } from "./v4-contacts.js";
 import { exactCents, prepareCorrection } from "./payment-correction.js";
+import { createV5PlanUI } from "./v5-plans.js";
 // Backend settings are resolved before the first Auth request. Production is
 // delivered only by the hostname- and Vercel-environment-guarded config API.
 const V4_PRODUCTION_HOST="tutor.rapid4grad.com";
@@ -103,6 +104,11 @@ const v4ConnectionUI=typeof createV4Connections==="function"?createV4Connections
 const v4ContactsUI=typeof createV4AccountContacts==="function"?createV4AccountContacts({
  getClient:()=>client,getUser:()=>activeUser,getRole:()=>state.role,notify:message=>toast(message)
 }):{render(){},refresh(){},clear(){},handleClick(){return false},handleSubmit(){return false}};
+// Older Node harnesses strip imports when evaluating app.js; keep optional.
+const v5PlanUI=typeof createV5PlanUI==="function"?createV5PlanUI({
+ getClient:()=>client,getUser:()=>activeUser,getRole:()=>state.role,
+ isReady:()=>authPhase==="ready"&&state.mode==="live"
+}):{render(){},refresh(){},clear(){},canAddStudent(){return true}};
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
  const demoStudents=[
@@ -249,6 +255,10 @@ function setView(view){
  state.view=normalizeView(view);
  render();
  applyPreviewReadOnlyControls();
+ // Plan usage is queried only on the owner's settings view. This avoids
+ // repeated RPCs for each calendar render and never blocks V4 functionality.
+ if(state.view==="settings"&&state.role==="teacher"&&activeUser)
+  void v5PlanUI.refresh();
 }
 const VALID_ROLES=["teacher","parent","student"];
 const ROLE_SUFFIX={teacher:"老師",parent:"家長",student:"同學"};
@@ -557,6 +567,7 @@ function render(){
  $("#profile-display-form").classList.toggle("hidden",!activeUser);
  renderRoleSettings();
  $("#settings-role-card").classList.toggle("hidden",!activeUser);
+ v5PlanUI.render();
  // The login gate is not a dashboard mode. Never rebuild payment summaries,
  // student records or lesson content when there is no verified active account.
  if(!identified)return;
@@ -1790,9 +1801,13 @@ async function saveRecord(ev){
 }
 async function saveStudent(ev){
  ev.preventDefault();if(state.role!=="teacher"||!requireTeacherWorkspace())return;
+ if(!v5PlanUI.canAddStudent()){
+  toast("累計學生名額已滿，請到設定查看方案並聯絡管理員");
+  setView("settings");return;
+ }
  const form=new FormData(ev.target),name=asText(form.get("name")).trim(),subject=asText(form.get("subject")).trim(),rate=num(form.get("hourly_rate"));
  if(!name)return;const data={name,subject,hourly_rate:rate,teacher_id:activeUser?.id||"demo-teacher"};
- const ok=await persist(async()=>{if(state.mode==="demo")state.students.push({id:uid(),...data});else assertResult(await client.from("students").insert(data))});if(ok){await rememberTeacherForm({subject,rate});closeModal("student-modal");ev.target.reset();toast("已新增學生")}
+ const ok=await persist(async()=>{if(state.mode==="demo")state.students.push({id:uid(),...data});else assertResult(await client.from("students").insert(data))});if(ok){await rememberTeacherForm({subject,rate});closeModal("student-modal");ev.target.reset();toast("已新增學生");void v5PlanUI.refresh()}
 }
 async function saveInvite(ev){
  ev.preventDefault();if(state.role!=="teacher"||!requireTeacherWorkspace())return;
@@ -2526,6 +2541,7 @@ function clearUserSessionState(){
  correctionBatchId=null;correctionRequest=null;closeModal("correction-modal");
  v4ConnectionUI.clear();
  v4ContactsUI.clear();
+ v5PlanUI.clear();
  for(const field of LIVE_FIELDS)state[field]=[];
  state.qaTags={qaBatchIds:[],qaLessonIds:[],qaLegacyReceiptLessonIds:[]};
  state.qaClassificationReady=false;
@@ -2714,7 +2730,10 @@ async function initializeLive(){
    authPhase="signedOut";
   }
   render();
-  if(activeUser){void v4ConnectionUI.refresh();void v4ContactsUI.refresh();}
+  if(activeUser){
+   void v4ConnectionUI.refresh();void v4ContactsUI.refresh();
+   if(state.role==="teacher")void v5PlanUI.refresh();
+  }
   if(!activeUser)showModal("account-modal");
  }catch(err){
   if(bootGeneration!==authDataGeneration)return;
@@ -2945,6 +2964,10 @@ function bindEvents(){
  $("#schedule-student").onchange=()=>{if(!state.editingSchedule)selectStudentDefaults("schedule",$("#schedule-student").value)};
  $("#add-student").onclick=()=>{
   if(!requireTeacherWorkspace())return;
+  if(!v5PlanUI.canAddStudent()){
+   toast("累計學生名額已滿，請到設定查看會員方案與名額");
+   setView("settings");return;
+  }
   refreshFormOptions(teacherPreferences.lastStudentId||"");
   const form=$("#student-form");
   const subject=form.querySelector('[name="subject"]'),rate=form.querySelector('[name="hourly_rate"]');
