@@ -12,6 +12,7 @@ import { createV4AccountContacts } from "./v4-contacts.js";
 import { exactCents, prepareCorrection } from "./payment-correction.js";
 import { createV5PlanUI } from "./v5-plans.js";
 import { createV5TeamUI } from "./v5-team.js";
+import { createV5LearningUI } from "./v5-learning.js";
 // Backend settings are resolved before the first Auth request. Production is
 // delivered only by the hostname- and Vercel-environment-guarded config API.
 const V4_PRODUCTION_HOST="tutor.rapid4grad.com";
@@ -114,6 +115,11 @@ const v5TeamUI=typeof createV5TeamUI==="function"?createV5TeamUI({
  getClient:()=>client,getUser:()=>activeUser,getRole:()=>state.role,
  isReady:()=>authPhase==="ready"&&state.mode==="live",
  getOwnWorkspace:()=>myWorkspace(),notify:message=>toast(message)
+}):{render(){},refresh(){},clear(){},handleSubmit(){return false},handleClick(){return false}};
+const v5LearningUI=typeof createV5LearningUI==="function"?createV5LearningUI({
+ getClient:()=>client,getUser:()=>activeUser,getRole:()=>state.role,
+ isReady:()=>authPhase==="ready"&&state.mode==="live",
+ notify:message=>toast(message)
 }):{render(){},refresh(){},clear(){},handleSubmit(){return false},handleClick(){return false}};
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
@@ -266,6 +272,7 @@ function setView(view){
  if(state.view==="settings"&&state.role==="teacher"&&activeUser){
   void v5PlanUI.refresh();
   void v5TeamUI.refresh();
+  void v5LearningUI.refresh();
  }
 }
 const VALID_ROLES=["teacher","parent","student"];
@@ -367,7 +374,7 @@ function setRole(role){
   // Do not show it after switching teacher/parent/student views.
   v4ConnectionUI.clear();
   v4ContactsUI.clear();
-  v5TeamUI.clear();
+  v5TeamUI.clear();v5LearningUI.clear();
  }
  state.preferredLoginRole=role;
  const menu=$("#role-menu");menu.classList.add("hidden");$("#role-indicator").setAttribute("aria-expanded","false");
@@ -578,6 +585,7 @@ function render(){
  $("#settings-role-card").classList.toggle("hidden",!activeUser);
  v5PlanUI.render();
  v5TeamUI.render();
+ v5LearningUI.render();
  // The login gate is not a dashboard mode. Never rebuild payment summaries,
  // student records or lesson content when there is no verified active account.
  if(!identified)return;
@@ -2552,7 +2560,7 @@ function clearUserSessionState(){
  v4ConnectionUI.clear();
  v4ContactsUI.clear();
  v5PlanUI.clear();
- v5TeamUI.clear();
+ v5TeamUI.clear();v5LearningUI.clear();
  for(const field of LIVE_FIELDS)state[field]=[];
  state.qaTags={qaBatchIds:[],qaLessonIds:[],qaLegacyReceiptLessonIds:[]};
  state.qaClassificationReady=false;
@@ -2848,6 +2856,7 @@ function bindEvents(){
  document.addEventListener("click",async ev=>{
   if(ev.target.closest("[data-v4-action]")){await v4ConnectionUI.handleClick(ev.target);return}
   if(ev.target.closest("[data-v5-team-action]")){await v5TeamUI.handleClick(ev.target);return}
+  if(ev.target.closest("[data-v5-learning-action]")){await v5LearningUI.handleClick(ev.target);return}
   if(ev.target.closest("[data-contact-action]")){await v4ContactsUI.handleClick(ev.target);return}
   const correctionPreview=ev.target.closest('[data-action="preview-correction"]');
   if(correctionPreview){await previewConfirmedBatchCorrection(correctionPreview.dataset.id);return}
@@ -3029,7 +3038,7 @@ function bindEvents(){
   ["shared-course-weekdays","shared-weekday-hint","shared-course-date"]
  ])$("#"+group).addEventListener("change",()=>syncRecurringWeekdays(date,group,hint));
  $("#request-form").addEventListener("submit",submitRequest);
- document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e);if(e.target.id==="student-invite-form")saveStudentInvite(e);if(e.target.id==="v4-parent-request-form")void v4ConnectionUI.handleSubmit(e);if(e.target.id==="v4-account-contact-form")void v4ContactsUI.handleSubmit(e);if(["v5-team-project-form","v5-team-invite-form","v5-team-assign-form"].includes(e.target.id))void v5TeamUI.handleSubmit(e)});
+ document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e);if(e.target.id==="student-invite-form")saveStudentInvite(e);if(e.target.id==="v4-parent-request-form")void v4ConnectionUI.handleSubmit(e);if(e.target.id==="v4-account-contact-form")void v4ContactsUI.handleSubmit(e);if(["v5-team-project-form","v5-team-invite-form","v5-team-assign-form","v5-team-transfer-form"].includes(e.target.id))void v5TeamUI.handleSubmit(e);if(["v5-learning-student-form","v5-learning-enroll-form","v5-learning-lesson-form"].includes(e.target.id))void v5LearningUI.handleSubmit(e)});
  $("#invite-edit-form").addEventListener("submit",submitInviteEdit);
  $("#workspace-start").onclick=()=>setView("settings");
  $("#workspace-create").onclick=()=>saveMyWorkspace(false);
