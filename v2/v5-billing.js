@@ -42,6 +42,12 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
     'v5-advance-available','v5-advance-credit-rows']){
    $(id)?.replaceChildren();
   }
+  for(const id of ['v5-billing-team-select','v5-payment-student-select',
+   'v5-advance-student-select'])$(id)?.replaceChildren();
+  for(const id of ['v5-payment-amount','v5-payment-note',
+   'v5-advance-amount','v5-advance-credit','v5-advance-note']){
+   const input=$(id);if(input)input.value='';
+  }
  }
  function options(element,items){
   element.replaceChildren();
@@ -407,6 +413,9 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   const stamp=++generation,userId=getUser().id;
   loading=true;error='';overview=null;paymentOverview=null;advanceOverview=null;
   $('v5-advance-panel')?.classList.add('hidden');
+  for(const id of ['v5-advance-message','v5-advance-pending-payments',
+   'v5-advance-available','v5-advance-credit-rows'])
+   $(id)?.replaceChildren();
   render();
   const client=getClient();
   try{
