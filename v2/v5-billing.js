@@ -61,7 +61,16 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   pending.replaceChildren();confirmed.replaceChildren();
   $('v5-billing-total').textContent=overview?
    money(overview.confirmed_total_cents):'尚無可用資料';
-  if(!overview)return;
+  if(!overview){
+   for(const id of ['v5-payment-pending-reports','v5-payment-confirmed-reports']){
+    $(id).replaceChildren();
+   }
+   $('v5-payment-confirmed-total').textContent='';
+   $('v5-payment-outstanding-total').textContent='';
+   $('v5-payment-student-select').replaceChildren();
+   $('v5-payment-report-submit').disabled=true;
+   return;
+  }
   const waiting=Array.isArray(overview.pending_rows)?overview.pending_rows:[];
   if(!waiting.length)pending.append(item('p','本月份沒有待確認費用的已完成課程。','section-sub'));
   for(const row of waiting){
