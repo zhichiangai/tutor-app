@@ -1210,6 +1210,78 @@ test('V5.3 manual partial payments distribute across subjects without over-alloc
  assert.notEqual((await rows(teacher,'v5_team_payment_reports')).status,200);
 });
 
+
+test('V5.3 manager GUI reports and partially allocates a payment without V4 effects',async({page})=>{
+ const actor=f.actors.parent;
+ const ws=db("select id from public.workspaces where owner_id='"+actor.id+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ const student=db("select id from public.v5_team_students where team_id='"+
+  team+"' and display_name='GUI Synthetic Student 532'");
+ const lesson=db("select lesson_id from tutor_private.v5_team_lesson_fees "+
+  "where team_id='"+team+"' and subject='Finance UI Synthetic'");
+ const beforeV4=db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'");
+ assert.match(student,/^[a-f0-9-]{36}$/i);
+ assert.match(lesson,/^[a-f0-9-]{36}$/i);
+ await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
+  route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
+   contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+ await page.addInitScript(({url,key})=>{
+  window.V4_LOCAL_BACKEND={
+   environment:'local',isolated:true,projectRef:'local',url,publishableKey:key
+  };
+ },{url:f.apiUrl,key:f.anonKey});
+ await page.goto('/v2/index.html');
+ await page.waitForFunction(()=>!!window.supabase?.createClient,{timeout:20_000});
+ await page.evaluate(async({url,key,email,password})=>{
+  const supa=window.supabase.createClient(url,key,{
+   auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+  });
+  const {error}=await supa.auth.signInWithPassword({email,password});
+  if(error)throw Error('Synthetic manager payment GUI login failed');
+  supa.auth.stopAutoRefresh?.();
+ },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
+ await page.reload();
+ await expect(page.locator('body')).not.toHaveClass(/login-required/);
+ await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await expect(page.locator('#v5-billing-card')).toBeVisible();
+ await page.locator('#v5-billing-team-select').selectOption(team);
+ await page.locator('#v5-billing-prev').click();
+ await expect(page.locator('#v5-payment-student-select')).toHaveValue(student);
+ await page.locator('#v5-payment-amount').fill('500');
+ await page.locator('#v5-payment-received-date').fill('2026-10-25');
+ await page.locator('#v5-payment-method').selectOption('bank_transfer');
+ await page.locator('#v5-payment-note').fill('Synthetic manual payment, no external bank');
+ page.on('dialog',dialog=>dialog.accept());
+ await page.locator('#v5-payment-report-submit').click();
+ await expect(page.locator('#v5-payment-pending-reports')).toContainText('GUI Synthetic Student 532');
+ const pid=db("select id from tutor_private.v5_team_payment_reports "+
+  "where student_id='"+student+"' and reference like 'manual-%' "+
+  "order by reported_at desc limit 1");
+ assert.match(pid,/^[a-f0-9-]{36}$/i);
+ assert.equal(db("select status from tutor_private.v5_team_payment_reports "+
+  "where id='"+pid+"'"),'pending');
+ const field=page.locator('[data-v5-payment-id="'+pid+'"]'+
+  '[data-v5-payment-lesson="'+lesson+'"]');
+ await expect(field).toBeVisible();
+ await field.fill('500');
+ await page.locator('[data-v5-billing-action="allocate-payment"]'+
+  '[data-id="'+pid+'"]').click();
+ await expect(page.locator('#v5-payment-confirmed-reports')).toContainText('GUI Synthetic Student 532');
+ await expect(page.locator('#v5-payment-confirmed-total')).toContainText('2,341.67');
+ assert.equal(db("select status from tutor_private.v5_team_payment_reports "+
+  "where id='"+pid+"'"),'confirmed');
+ assert.equal(db("select amount_cents from tutor_private.v5_team_payment_allocations "+
+  "where payment_id='"+pid+"' and lesson_id='"+lesson+"'"),'50000');
+ assert.equal(db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'"),beforeV4,'Manager report/allocate GUI never changes V4 receipts');
+ await page.locator('#sign-out').click();
+ await expect(page.locator('body')).toHaveClass(/login-required/);
+ await expect(page.locator('#v5-billing-card')).toBeHidden();
+ await expect(page.locator('#v5-payment-confirmed-reports')).toBeEmpty();
+ await expect(page.locator('#v5-payment-pending-reports')).toBeEmpty();
+});
+
 test('V5.3 billing management follows accepted Team governance transfer, not V4 owner',async()=>{
  const former=await signIn('parent'),newManager=await signIn('teacher');
  const fromId=f.actors.parent.id,toId=f.actors.teacher.id;
