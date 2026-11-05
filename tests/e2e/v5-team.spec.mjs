@@ -624,3 +624,94 @@ test('V5.3 Team student lifetime seats and archived status do not erase history'
  assert.deepEqual((await rows(oldOwner,'v5_team_students','&id=eq.'+student)).data,[],
   'Departed V4 owner remains unable to see archived Team students');
 });
+
+
+test('V5.3 manager uses Team student and shared lesson calendar UI without V4 writes',async({page})=>{
+ const actor=f.actors.parent;
+ const manager=await signIn('parent');
+ const workspace=db("select id from public.workspaces where owner_id='"+actor.id+"'");
+ const teamId=db("select id from public.v5_teams where anchor_workspace_id='"+workspace+"'");
+ const project=db("select id from public.v5_team_projects where workspace_id='"+
+  workspace+"' and name='Private Team B Project'");
+ assert.match(teamId,/^[a-f0-9-]{36}$/i);
+ assert.match(project,/^[a-f0-9-]{36}$/i);
+
+ const assigned=await rest(manager,'POST','v5_team_project_members?select=project_id',{
+  project_id:project,workspace_id:workspace,user_id:actor.id
+ });
+ assert.equal(assigned.status,201,'Synthetic manager assigned to own Team B project');
+ const beforeV4=db("select count(*) from public.lesson_records where owner_id='"+
+  actor.id+"'");
+ const beforeTeamSeats=Number(db("select count(*) from tutor_private.v5_team_student_seat_ledger "+
+  "where team_id='"+teamId+"'"));
+
+ await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
+  route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
+   contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+ await page.addInitScript(({url,key})=>{
+  window.V4_LOCAL_BACKEND={
+   environment:'local',isolated:true,projectRef:'local',url,publishableKey:key
+  };
+ },{url:f.apiUrl,key:f.anonKey});
+ await page.goto('/v2/index.html');
+ await page.waitForFunction(()=>!!window.supabase?.createClient,{timeout:20_000});
+ await page.evaluate(async({url,key,email,password})=>{
+  const supa=window.supabase.createClient(url,key,{
+   auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+  });
+  const {error}=await supa.auth.signInWithPassword({email,password});
+  if(error)throw Error('Synthetic V5.3 manager login failed');
+  supa.auth.stopAutoRefresh?.();
+ },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
+ await page.reload();
+ await expect(page.locator('body')).not.toHaveClass(/login-required/);
+ await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await expect(page.locator('#v5-learning-card')).toBeVisible();
+ await expect(page.locator('#v5-learning-manager-controls')).toBeVisible();
+ await page.locator('#v5-learning-team-select').selectOption(teamId);
+ await expect(page.locator('#v5-learning-project-select')).toHaveValue(project);
+
+ await page.locator('#v5-learning-student-name').fill('GUI Synthetic Student 532');
+ await page.locator('#v5-learning-student-form button[type="submit"]').click();
+ await expect(page.locator('#v5-learning-enroll-student')).toContainText(
+  'GUI Synthetic Student 532');
+ const student=db("select id from public.v5_team_students "+
+  "where team_id='"+teamId+"' and display_name='GUI Synthetic Student 532'");
+ assert.match(student,/^[a-f0-9-]{36}$/i);
+ await page.locator('#v5-learning-enroll-student').selectOption(student);
+ await page.locator('#v5-learning-enroll-submit').click();
+ await expect(page.locator('#v5-learning-students')).toContainText('GUI Synthetic Student 532');
+
+ const current=await page.evaluate(()=>{
+  const d=new Date();
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0');
+  return y+'-'+m;
+ });
+ await page.locator('#v5-learning-lesson-student').selectOption(student);
+ await page.locator('#v5-learning-lesson-teacher').selectOption(actor.id);
+ await page.locator('#v5-learning-lesson-subject').fill('Math Team GUI QA');
+ await page.locator('#v5-learning-lesson-start').fill(current+'-15T10:00');
+ await page.locator('#v5-learning-lesson-end').fill(current+'-15T11:00');
+ await page.locator('#v5-learning-lesson-notes').fill('Synthetic cross-teacher schedule entry');
+ await page.locator('#v5-learning-lesson-submit').click();
+ await expect(page.locator('#v5-learning-lessons')).toContainText('Math Team GUI QA');
+ await expect(page.locator('#v5-learning-calendar')).toContainText('Math Team GUI QA');
+ const lesson=db("select id from public.v5_team_lessons "+
+  "where student_id='"+student+"' and subject='Math Team GUI QA'");
+ assert.match(lesson,/^[a-f0-9-]{36}$/i);
+ page.on('dialog',dialog=>dialog.accept());
+ await page.locator('[data-v5-learning-action="update-lesson"][data-id="'+lesson+'"]'+
+  '[data-status="completed"]').click();
+ await expect(page.locator('#v5-learning-lessons')).toContainText('已完成');
+ assert.equal(db("select status from public.v5_team_lessons where id='"+lesson+"'"),'completed');
+ assert.equal(db("select count(*) from public.lesson_records where owner_id='"+
+  actor.id+"'"),beforeV4,'UI must never mutate V4 lessons');
+ assert.equal(Number(db("select count(*) from tutor_private.v5_team_student_seat_ledger "+
+  "where team_id='"+teamId+"'")),beforeTeamSeats+1);
+
+ await page.locator('#sign-out').click();
+ await expect(page.locator('body')).toHaveClass(/login-required/);
+ await expect(page.locator('#v5-learning-card')).toBeHidden();
+ await expect(page.locator('#v5-learning-students')).toBeEmpty();
+ await expect(page.locator('#v5-learning-lessons')).toBeEmpty();
+});
