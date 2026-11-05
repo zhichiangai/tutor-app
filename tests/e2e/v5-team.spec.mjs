@@ -852,7 +852,7 @@ test('V5.3 manager safely renames Team student, edits lesson, archives without l
  await page.locator('#v5-learning-team-select').selectOption(teamId);
  await expect(page.locator('[data-v5-learning-edit-student="'+student+'"]')).toBeAttached();
  const studentForm=page.locator('[data-v5-learning-edit-student="'+student+'"]');
- await studentForm.locator('xpath=..').locator('summary').click();
+ await page.locator('#v5-learning-students details.v5-learning-edit > summary').click();
  await studentForm.locator('input[name="display_name"]').fill('Renamed Team Student GUI');
  await studentForm.locator('button[type="submit"]').click();
  await expect(page.locator('#v5-learning-students')).toContainText('Renamed Team Student GUI');
@@ -861,7 +861,7 @@ test('V5.3 manager safely renames Team student, edits lesson, archives without l
 
  const form=page.locator('[data-v5-learning-edit-lesson="'+lesson+'"]');
  await expect(form).toBeAttached();
- await form.locator('xpath=..').locator('summary').click();
+ await page.locator('[data-v5-lesson-id="'+lesson+'"] details.v5-learning-edit > summary').click();
  const month=await page.evaluate(()=>{
   const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
  });
@@ -893,4 +893,214 @@ test('V5.3 manager safely renames Team student, edits lesson, archives without l
  await page.locator('#sign-out').click();
  await expect(page.locator('body')).toHaveClass(/login-required/);
  await expect(page.locator('#v5-learning-card')).toBeHidden();
+});
+
+
+test('V5.3 Team fee confirmations are manager-only, immutable and independent of V4',async()=>{
+ const manager=await signIn('parent'),teacher=await signIn('teacher'),outsider=await signIn('stranger');
+ const m=f.actors.parent.id,t=f.actors.teacher.id;
+ const ws=db("select id from public.workspaces where owner_id='"+m+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ const project=db("select id from public.v5_team_projects where workspace_id='"+
+  ws+"' and name='Private Team B Project'");
+ const v4before=db("select count(*) from public.lesson_records where owner_id='"+m+"'");
+ assert.equal(db("select manager_user_id from public.v5_team_governance "+
+  "where workspace_id='"+ws+"'"),m);
+ assert.equal(db("select count(*) from public.v5_team_project_members "+
+  "where workspace_id='"+ws+"' and project_id='"+project+"' and user_id='"+t+"'"),'1');
+ let r=await rest(manager,'POST','v5_team_students?select=id',{
+  team_id:team,display_name:'Private Billing Student 01',created_by:m
+ });
+ assert.equal(r.status,201);
+ const student=r.data[0].id;
+ r=await rest(manager,'POST','v5_team_enrollments?select=student_id',{
+  team_id:team,project_id:project,student_id:student
+ });
+ assert.equal(r.status,201);
+ const makeLesson=async(user,subject,start,end,status='completed')=>{
+  const x=await rest(manager,'POST','v5_team_lessons?select=id',{
+   team_id:team,project_id:project,student_id:student,teacher_user_id:user,
+   subject,lesson_start:start,lesson_end:end,status
+  });
+  assert.equal(x.status,201,'Synthetic billing lesson setup');
+  return x.data[0].id;
+ };
+ const a=await makeLesson(m,'數學','2026-10-15T10:00:00+08:00',
+  '2026-10-15T11:30:00+08:00');
+ const b=await makeLesson(t,'英文','2026-10-16T14:00:00+08:00',
+  '2026-10-16T15:20:00+08:00');
+ const scheduled=await makeLesson(t,'尚未完成課程','2026-10-17T14:00:00+08:00',
+  '2026-10-17T15:00:00+08:00','scheduled');
+
+ const summary=()=>rest(manager,'POST','rpc/v5_team_billing_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ r=await summary();
+ assert.equal(r.status,200);
+ assert.equal(r.data.confirmed_count,0);
+ assert.equal(r.data.pending_rows.length,2);
+ assert.equal(r.data.confirmed_total_cents,0);
+ assert.equal((await rest(teacher,'POST','rpc/v5_team_billing_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ })).status,403,'Assigned teacher must not read billing');
+ assert.equal((await rest(outsider,'POST','rpc/v5_team_billing_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ })).status,403);
+ assert.notEqual((await rest(teacher,'POST','rpc/v5_confirm_team_lesson_fee',{
+  p_lesson_id:a,p_hourly_rate_cents:65000
+ })).status,200,'Assigned teacher cannot confirm finance');
+ assert.notEqual((await rest(outsider,'POST','rpc/v5_confirm_team_lesson_fee',{
+  p_lesson_id:a,p_hourly_rate_cents:65000
+ })).status,200);
+ assert.notEqual((await rest(manager,'POST','rpc/v5_confirm_team_lesson_fee',{
+  p_lesson_id:scheduled,p_hourly_rate_cents:65000
+ })).status,200,'Incomplete lesson must never become confirmed receivable');
+ assert.notEqual((await rest(manager,'POST','rpc/v5_confirm_team_lesson_fee',{
+  p_lesson_id:a,p_hourly_rate_cents:-1
+ })).status,200,'Negative hourly fee is forbidden');
+
+ r=await rest(manager,'POST','rpc/v5_confirm_team_lesson_fee',{
+  p_lesson_id:a,p_hourly_rate_cents:65000
+ });
+ assert.equal(r.status,200);
+ assert.equal(r.data.amount_cents,97500,'90-minute math: NT$650/hour → NT$975');
+ assert.equal(r.data.duration_minutes,90);
+ r=await rest(manager,'POST','rpc/v5_confirm_team_lesson_fee',{
+  p_lesson_id:b,p_hourly_rate_cents:65000
+ });
+ assert.equal(r.status,200);
+ assert.equal(r.data.amount_cents,86667,'80-minute English must round TWD cents');
+ assert.notEqual((await rest(manager,'POST','rpc/v5_confirm_team_lesson_fee',{
+  p_lesson_id:a,p_hourly_rate_cents:65000
+ })).status,200,'Confirmed lesson is at most once');
+ r=await summary();
+ assert.equal(r.status,200);
+ assert.equal(r.data.confirmed_count,2);
+ assert.equal(r.data.confirmed_rows.length,2);
+ assert.equal(r.data.confirmed_total_cents,184167);
+ assert.equal(r.data.pending_rows.length,0);
+ assert.deepEqual(new Set(r.data.confirmed_rows.map(x=>x.subject)),
+  new Set(['數學','英文']));
+ assert.equal(new Set(r.data.confirmed_rows.map(x=>x.teacher_user_id)).size,2);
+ assert.deepEqual((await rows(teacher,'v5_team_lessons','&id=eq.'+a)).data
+  .map(x=>Object.keys(x).filter(y=>/amount|rate|cents/i.test(y))),[[]],
+  'Teacher-readable lesson metadata must never include fee amounts');
+ const privateApi=await rows(teacher,'v5_team_lesson_fees');
+ assert.notEqual(privateApi.status,200,'Private fee table is not exposed');
+
+ for(const payload of [{lesson_start:'2026-10-15T09:00:00+08:00'},
+  {status:'cancelled'},{subject:'操縱已計價科目'}]){
+  const x=await rest(manager,'PATCH','v5_team_lessons?id=eq.'+a,payload);
+  assert.notEqual(x.status,200,'Billed lesson must be immutable');
+ }
+ assert.equal(db("select count(*) from tutor_private.v5_team_billing_audit "+
+  "where team_id='"+team+"' and event='fee_confirmed'"),'2');
+ assert.equal(db("select count(*) from tutor_private.v5_team_lesson_fees "+
+  "where team_id='"+team+"'"),'2');
+ assert.equal(db("select count(*) from public.lesson_records where owner_id='"+
+  m+"'"),v4before,'No V4 lesson write');
+});
+
+
+test('V5.3 Team manager GUI confirms a lesson receivable; regular teachers cannot see fees',async({page})=>{
+ const managerJwt=await signIn('parent');
+ const m=f.actors.parent,t=f.actors.teacher;
+ const ws=db("select id from public.workspaces where owner_id='"+m.id+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ const project=db("select id from public.v5_team_projects where workspace_id='"+
+  ws+"' and name='Private Team B Project'");
+ const student=db("select id from public.v5_team_students where team_id='"+
+  team+"' and display_name='Private Billing Student 01'");
+ let r=await rest(managerJwt,'POST','v5_team_lessons?select=id',{
+  team_id:team,project_id:project,student_id:student,teacher_user_id:t.id,
+  subject:'Finance UI Synthetic',
+  lesson_start:'2026-10-18T13:00:00+08:00',
+  lesson_end:'2026-10-18T15:00:00+08:00',status:'completed'
+ });
+ assert.equal(r.status,201);
+ const lesson=r.data[0].id;
+ const beforeV4=db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'");
+
+ await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
+  route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
+   contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+ await page.addInitScript(({url,key})=>{
+  window.V4_LOCAL_BACKEND={
+   environment:'local',isolated:true,projectRef:'local',url,publishableKey:key
+  };
+ },{url:f.apiUrl,key:f.anonKey});
+ const login=async(role)=>{
+  const actor=f.actors[role];
+  await page.goto('/v2/index.html');
+  await page.waitForFunction(()=>!!window.supabase?.createClient,{timeout:20_000});
+  await page.evaluate(async({url,key,email,password})=>{
+   const s=window.supabase.createClient(url,key,{
+    auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+   });
+   const {error}=await s.auth.signInWithPassword({email,password});
+   if(error)throw Error('Synthetic fee UI login failed');
+   s.auth.stopAutoRefresh?.();
+  },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
+  await page.reload();
+  await expect(page.locator('body')).not.toHaveClass(/login-required/);
+  await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ };
+ await login('parent');
+ await expect(page.locator('#v5-billing-card')).toBeVisible();
+ await page.locator('#v5-billing-team-select').selectOption(team);
+ await page.locator('#v5-billing-prev').click();
+ await expect(page.locator('#v5-billing-pending')).toContainText('Finance UI Synthetic');
+ const rate=page.locator('[data-v5-billing-rate-for="'+lesson+'"]');
+ await rate.fill('500');
+ page.on('dialog',dialog=>dialog.accept());
+ await page.locator('[data-v5-billing-action="confirm"][data-id="'+lesson+'"]').click();
+ await expect(page.locator('#v5-billing-confirmed')).toContainText('Finance UI Synthetic');
+ await expect(page.locator('#v5-billing-total')).toContainText('2,841.67');
+ assert.equal(db("select amount_cents from tutor_private.v5_team_lesson_fees "+
+  "where lesson_id='"+lesson+"'"),'100000');
+ assert.equal(db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'"),beforeV4,'Confirming Team receivable does not receive money or write V4 payments');
+ await page.locator('#sign-out').click();
+ await expect(page.locator('body')).toHaveClass(/login-required/);
+ await expect(page.locator('#v5-billing-card')).toBeHidden();
+ await expect(page.locator('#v5-billing-confirmed')).toBeEmpty();
+ await login('teacher');
+ await expect(page.locator('#v5-learning-card')).toBeVisible();
+ await expect(page.locator('#v5-billing-card')).toBeHidden();
+ await page.locator('#sign-out').click();
+ await expect(page.locator('#v5-billing-total')).toBeEmpty();
+});
+
+test('V5.3 billing management follows accepted Team governance transfer, not V4 owner',async()=>{
+ const former=await signIn('parent'),newManager=await signIn('teacher');
+ const fromId=f.actors.parent.id,toId=f.actors.teacher.id;
+ const ws=db("select id from public.workspaces where owner_id='"+fromId+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ const nominate=await rest(former,'POST','rpc/v5_propose_team_manager',{
+  p_workspace_id:ws,p_target_user_id:toId
+ });
+ assert.equal(nominate.status,200);
+ let r=await rest(newManager,'POST','rpc/v5_respond_team_manager',{
+  p_transfer_id:nominate.data,p_accept:true
+ });
+ assert.equal(r.status,200);
+ assert.equal(r.data.status,'accepted');
+ assert.equal(db("select owner_id from public.workspaces where id='"+ws+"'"),fromId,
+  'V4 owner remains the original user');
+ r=await rest(newManager,'POST','rpc/v5_team_billing_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal(r.status,200);
+ assert.equal(r.data.confirmed_total_cents,284167);
+ r=await rest(former,'POST','rpc/v5_team_billing_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal(r.status,403,'Former manager immediately loses finance with old JWT');
+ assert.notEqual((await rest(former,'POST','rpc/v5_confirm_team_lesson_fee',{
+  p_lesson_id:r.data?.lesson_id||'00000000-0000-0000-0000-000000000001',
+  p_hourly_rate_cents:50000
+ })).status,200,'Former manager cannot post finance after transfer');
+ assert.equal(db("select count(*) from tutor_private.v5_team_billing_audit "+
+  "where team_id='"+team+"'"),'3','Transfer does not modify audit or fees');
 });

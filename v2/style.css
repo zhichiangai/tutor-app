@@ -914,3 +914,27 @@ body.preview-readonly .app-shell [aria-disabled="true"]{cursor:not-allowed}
 .v5-learning-edit form button[type=submit]{justify-self:start}
 @media(max-width:600px){.v5-learning-edit form{grid-template-columns:1fr}
  .v5-learning-edit form label:has(textarea){grid-column:auto}}
+
+
+/* V5.3 Team receivables are isolated from all V4 payment panels. */
+#v5-billing-card{grid-column:1/-1;min-width:0}
+#v5-billing-card .v5-team-panel{border-top:1px solid var(--line,#e2e8f0);
+ padding-top:15px;margin-top:17px}
+#v5-billing-card h4{margin:0 0 11px;font-size:1rem}
+.v5-billing-controls{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:end}
+.v5-billing-controls label{display:grid;gap:6px;font-weight:600}
+.v5-billing-controls select{width:100%;min-width:0;max-width:100%}
+.v5-billing-month{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.v5-billing-total{font-weight:700;font-size:1.55rem;font-variant-numeric:tabular-nums;
+ padding:8px 0 13px}
+.v5-billing-row{display:grid;gap:6px;border:1px solid var(--line,#e2e8f0);
+ border-radius:12px;padding:12px;margin:8px 0;overflow-wrap:anywhere}
+.v5-billing-row label{display:grid;gap:6px;font-size:.91rem}
+.v5-billing-row input[type=number]{min-width:0;width:100%;max-width:280px;
+ box-sizing:border-box}
+.v5-billing-row button{justify-self:start}
+@media(max-width:670px){
+ .v5-billing-controls{grid-template-columns:1fr}
+ .v5-billing-month{justify-content:space-between}
+ .v5-billing-row button{width:100%}
+}

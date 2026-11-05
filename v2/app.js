@@ -13,6 +13,7 @@ import { exactCents, prepareCorrection } from "./payment-correction.js";
 import { createV5PlanUI } from "./v5-plans.js";
 import { createV5TeamUI } from "./v5-team.js";
 import { createV5LearningUI } from "./v5-learning.js";
+import { createV5BillingUI } from "./v5-billing.js";
 // Backend settings are resolved before the first Auth request. Production is
 // delivered only by the hostname- and Vercel-environment-guarded config API.
 const V4_PRODUCTION_HOST="tutor.rapid4grad.com";
@@ -121,6 +122,11 @@ const v5LearningUI=typeof createV5LearningUI==="function"?createV5LearningUI({
  isReady:()=>authPhase==="ready"&&state.mode==="live",
  notify:message=>toast(message)
 }):{render(){},refresh(){},clear(){},handleSubmit(){return false},handleClick(){return false}};
+const v5BillingUI=typeof createV5BillingUI==="function"?createV5BillingUI({
+ getClient:()=>client,getUser:()=>activeUser,getRole:()=>state.role,
+ isReady:()=>authPhase==="ready"&&state.mode==="live",
+ notify:message=>toast(message)
+}):{render(){},refresh(){},clear(){},handleClick(){return false}};
 function seed(){
  const today=tick(), base=new Date(today.getFullYear(),today.getMonth(),1);
  const demoStudents=[
@@ -273,6 +279,7 @@ function setView(view){
   void v5PlanUI.refresh();
   void v5TeamUI.refresh();
   void v5LearningUI.refresh();
+  void v5BillingUI.refresh();
  }
 }
 const VALID_ROLES=["teacher","parent","student"];
@@ -374,7 +381,7 @@ function setRole(role){
   // Do not show it after switching teacher/parent/student views.
   v4ConnectionUI.clear();
   v4ContactsUI.clear();
-  v5TeamUI.clear();v5LearningUI.clear();
+  v5TeamUI.clear();v5LearningUI.clear();v5BillingUI.clear();
  }
  state.preferredLoginRole=role;
  const menu=$("#role-menu");menu.classList.add("hidden");$("#role-indicator").setAttribute("aria-expanded","false");
@@ -586,6 +593,7 @@ function render(){
  v5PlanUI.render();
  v5TeamUI.render();
  v5LearningUI.render();
+ v5BillingUI.render();
  // The login gate is not a dashboard mode. Never rebuild payment summaries,
  // student records or lesson content when there is no verified active account.
  if(!identified)return;
@@ -2560,7 +2568,7 @@ function clearUserSessionState(){
  v4ConnectionUI.clear();
  v4ContactsUI.clear();
  v5PlanUI.clear();
- v5TeamUI.clear();v5LearningUI.clear();
+ v5TeamUI.clear();v5LearningUI.clear();v5BillingUI.clear();
  for(const field of LIVE_FIELDS)state[field]=[];
  state.qaTags={qaBatchIds:[],qaLessonIds:[],qaLegacyReceiptLessonIds:[]};
  state.qaClassificationReady=false;
@@ -2857,6 +2865,7 @@ function bindEvents(){
   if(ev.target.closest("[data-v4-action]")){await v4ConnectionUI.handleClick(ev.target);return}
   if(ev.target.closest("[data-v5-team-action]")){await v5TeamUI.handleClick(ev.target);return}
   if(ev.target.closest("[data-v5-learning-action]")){await v5LearningUI.handleClick(ev.target);return}
+  if(ev.target.closest("[data-v5-billing-action]")){await v5BillingUI.handleClick(ev.target);return}
   if(ev.target.closest("[data-contact-action]")){await v4ContactsUI.handleClick(ev.target);return}
   const correctionPreview=ev.target.closest('[data-action="preview-correction"]');
   if(correctionPreview){await previewConfirmedBatchCorrection(correctionPreview.dataset.id);return}

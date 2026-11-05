@@ -302,6 +302,31 @@
                 </form>
               </div>
             </article>
+            <article class="card settings-card v5-plan-card hidden" id="v5-billing-card" aria-labelledby="v5-billing-title">
+              <h3 id="v5-billing-title">Team 應收費用（管理者）</h3>
+              <p class="section-sub">這裡是確認已完成課程的費用，不代表家長已付款。一般老師與學生不能查看金額。</p>
+              <p id="v5-billing-message" class="section-sub" role="status" aria-live="polite"></p>
+              <div class="v5-billing-controls">
+                <label>Team
+                  <select id="v5-billing-team-select" aria-label="選擇查看應收費用的 Team"></select>
+                </label>
+                <div class="v5-billing-month">
+                  <button type="button" id="v5-billing-prev" class="secondary-button" aria-label="上個月 Team 應收">上月</button>
+                  <strong id="v5-billing-month-label"></strong>
+                  <button type="button" id="v5-billing-next" class="secondary-button" aria-label="下個月 Team 應收">下月</button>
+                </div>
+              </div>
+              <div class="v5-team-panel">
+                <h4>本月份已確認應收</h4>
+                <div id="v5-billing-total" class="v5-billing-total" aria-live="polite"></div>
+                <div id="v5-billing-confirmed"></div>
+              </div>
+              <div class="v5-team-panel">
+                <h4>待確認費用的已完成課程</h4>
+                <p class="helper-note">請填每小時的新臺幣整數金額，系統會依實際課程分鐘數計算；確認後不得直接改寫，後續更正須有稽核紀錄。</p>
+                <div id="v5-billing-pending"></div>
+              </div>
+            </article>
             <article class="card settings-card"><h3>登入與安全</h3><p class="section-sub">使用 Google 管理登入，不會在網站儲存你的 Google 密碼。</p>
               <button class="secondary-button wide" id="sign-out" type="button">登出 Google 帳號</button>
             </article>
