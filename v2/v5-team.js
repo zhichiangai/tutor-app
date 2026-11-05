@@ -76,6 +76,19 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
    }
    invites.append(wrap);
   }
+  // A teacher can leave without an owner action. This does not touch their
+  // personal workspace or delete any Team project/history.
+  if(!isOwner){
+   for(const membership of current.members.filter(m=>
+    m.user_id===getUser()?.id&&m.role==='teacher'&&m.workspace_id!==ws?.id)){
+    const row=node('div','v5-team-row');
+    row.append(node('span','','已加入 Team（末碼 '+membership.workspace_id.slice(-6)+'）'));
+    const leave=node('button','secondary-button','退出 Team');
+    leave.type='button';leave.dataset.v5TeamAction='leave-team';
+    leave.dataset.id=membership.workspace_id;
+    row.append(leave);invites.append(row);
+   }
+  }
   const members=$('v5-team-members-list');members.replaceChildren();
   const ownMembers=current.members.filter(m=>m.workspace_id===ws?.id&&
     m.user_id!==getUser()?.id);
@@ -220,8 +233,14 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
       .eq('id',id).eq('workspace_id',ws.id),'專案已封存');break;
    case 'remove-teacher':
     if(ws&&window.confirm('確定移除此老師的 Team 存取權？所有專案指派會一併取消。'))
-     await perform(()=>client.from('workspace_members').delete()
-      .eq('workspace_id',ws.id).eq('user_id',id),'已移除老師');break;
+     await perform(()=>client.rpc('v5_remove_team_teacher',{
+      p_workspace_id:ws.id,p_user_id:id
+     }),'已移除老師並記錄操作');break;
+   case 'leave-team':
+    if(window.confirm('確定退出 Team？你的專案權限會立即失效，個人家教空間不受影響。'))
+     await perform(()=>client.rpc('v5_leave_team',{
+      p_workspace_id:id
+     }),'已退出 Team，個人資料不受影響');break;
    case 'unassign':
     if(ws&&window.confirm('確定取消此專案的老師指派？'))
      await perform(()=>client.from('v5_team_project_members').delete()
