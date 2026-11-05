@@ -282,7 +282,7 @@ test('manager transfer requires acceptance; personal V4 owner stays unchanged',a
  const beforeProjectCount=Number(db("select count(*) from public.v5_team_projects "+
   "where workspace_id='"+ws+"'"));
  const beforeLessonCount=Number(db("select count(*) from public.lesson_records "+
-  "where teacher_id='"+ownerId+"'"));
+  "where owner_id='"+ownerId+"'"));
  assert.match(project,/^[a-f0-9-]{36}$/i);
  assert.notEqual(personal,ws);
 
