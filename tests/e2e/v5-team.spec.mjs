@@ -1514,6 +1514,89 @@ test('V5.4 isolated advance credit is split, suggested, applied and never double
   owner+"'"),beforeV4Lessons,'V4 lessons must remain unchanged');
 });
 
+test('V5.4 concurrent advance offsets cannot spend the same credit twice',async()=>{
+ const manager=await signIn('parent');
+ const m=f.actors.parent.id;
+ const ws=db("select id from public.workspaces where owner_id='"+m+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ const project=db("select id from public.v5_team_projects where workspace_id='"+
+  ws+"' and name='Private Team B Project'");
+ const makeStudentWithFee=async(name,subject,day)=>{
+  let response=await rest(manager,'POST','v5_team_students?select=id',{
+   team_id:team,display_name:name,created_by:m
+  });
+  assert.equal(response.status,201);
+  const student=response.data[0].id;
+  response=await rest(manager,'POST','v5_team_enrollments?select=student_id',{
+   team_id:team,project_id:project,student_id:student
+  });
+  assert.equal(response.status,201);
+  response=await rest(manager,'POST','v5_team_lessons?select=id',{
+   team_id:team,project_id:project,student_id:student,teacher_user_id:m,
+   subject,status:'completed',
+   lesson_start:'2026-10-'+day+'T11:00:00+08:00',
+   lesson_end:'2026-10-'+day+'T12:00:00+08:00'
+  });
+  assert.equal(response.status,201);
+  const lesson=response.data[0].id;
+  response=await rest(manager,'POST','rpc/v5_confirm_team_lesson_fee',{
+   p_lesson_id:lesson,p_hourly_rate_cents:10000
+  });
+  assert.equal(response.status,200);
+  return {student,lesson};
+ };
+ const current=await makeStudentWithFee(
+  'Concurrency Advance Student 01','Concurrency Math','29');
+ const other=await makeStudentWithFee(
+  'Concurrency Advance Student 02','Concurrency English','30');
+ const beforeV4=db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'");
+ let result=await rest(manager,'POST','rpc/v5_report_team_payment_with_advance',{
+  p_team_id:team,p_student_id:current.student,p_amount_cents:6000,
+  p_expected_credit_cents:6000,p_received_on:'2026-10-30',
+  p_method:'cash',p_reference:'CONCURRENT-ADVANCE-ISOLATION-001'
+ });
+ assert.equal(result.status,200);
+ result=await rest(manager,'POST','rpc/v5_confirm_team_advance_payment',{
+  p_payment_id:result.data.payment_id,p_allocations:[]
+ });
+ assert.equal(result.status,200);
+ const credit=result.data.credit_id;
+ // This fails for the student's identity, even while the credit is available.
+ const cross=await rest(manager,'POST','rpc/v5_apply_team_advance_credit',{
+  p_credit_id:credit,p_idempotency_key:'CONCURRENT-WRONG-STUDENT',
+  p_allocations:[{lesson_id:other.lesson,amount_cents:1000}]
+ });
+ assert.equal(cross.status,403,'A credit cannot pay another student in the same Team');
+ const attempt=key=>rest(manager,'POST','rpc/v5_apply_team_advance_credit',{
+  p_credit_id:credit,p_idempotency_key:key,
+  p_allocations:[{lesson_id:current.lesson,amount_cents:6000}]
+ });
+ const both=await Promise.all([
+  attempt('CONCURRENT-ADVANCE-WRITER-A'),
+  attempt('CONCURRENT-ADVANCE-WRITER-B')
+ ]);
+ assert.equal(both.filter(x=>x.status===200).length,1,
+  'Two simultaneous writers must not both spend the same advance');
+ assert.equal(both.filter(x=>x.status!==200).length,1);
+ const balance=await rest(manager,'POST','rpc/v5_team_advance_overview',{
+  p_team_id:team,p_student_id:current.student
+ });
+ assert.equal(balance.status,200);
+ assert.equal(balance.data.available_cents,0);
+ assert.equal(balance.data.outstanding_cents,4000);
+ assert.equal(db("select count(*) from tutor_private.v5_team_advance_operations "+
+  "where credit_id='"+credit+"'"),'1','Only one operation is committed');
+ assert.equal(db("select coalesce(sum(amount_cents),0) "+
+  "from tutor_private.v5_team_advance_applications "+
+  "where credit_id='"+credit+"'"),'6000','Exactly one credit consumption');
+ assert.equal(db("select count(*) from tutor_private.v5_team_advance_audit "+
+  "where credit_id='"+credit+"' and event='credit_applied'"),'1',
+  'Only one append-only application audit');
+ assert.equal(db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'"),beforeV4,'No V4 receipt changes during concurrent credit application');
+});
+
 test('V5.4 month boundaries count October cash once and September advance settlement only',async()=>{
  const actor=f.actors.parent,manager=await signIn('parent');
  const ws=db("select id from public.workspaces where owner_id='"+actor.id+"'");
