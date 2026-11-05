@@ -58,6 +58,10 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
    opt.value=team.workspace_id;managedSelect.append(opt);
   }
   if(ws)managedSelect.value=ws.id;
+  managedSelect.onchange=()=>{
+   selectedManagedWorkspace=managedSelect.value;
+   render();
+  };
   const ownProjects=current.projects.filter(p=>p.workspace_id===ws?.id);
   const visibleProjects=isOwner?ownProjects:assigned;
   const projectList=$('v5-team-project-list');
