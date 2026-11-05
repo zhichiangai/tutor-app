@@ -28,7 +28,9 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   for(const id of ['v5-billing-message','v5-billing-pending',
     'v5-billing-confirmed','v5-billing-total',
     'v5-payment-pending-reports','v5-payment-confirmed-reports',
-    'v5-payment-confirmed-total','v5-payment-outstanding-total']){
+    'v5-payment-confirmed-total','v5-payment-outstanding-total',
+    'v5-payment-advance-created-total','v5-payment-advance-applied-total',
+    'v5-payment-advance-available-total']){
    $(id)?.replaceChildren();
   }
  }
@@ -67,6 +69,9 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    }
    $('v5-payment-confirmed-total').textContent='';
    $('v5-payment-outstanding-total').textContent='';
+   $('v5-payment-advance-created-total').textContent='';
+   $('v5-payment-advance-applied-total').textContent='';
+   $('v5-payment-advance-available-total').textContent='';
    $('v5-payment-student-select').replaceChildren();
    $('v5-payment-report-submit').disabled=true;
    return;
@@ -120,6 +125,12 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    money(report.confirmed_payments_cents):'—';
   $('v5-payment-outstanding-total').textContent=report?
    money(report.outstanding_cents):'—';
+  $('v5-payment-advance-created-total').textContent=report?
+   money(report.advance_created_cents??0):'—';
+  $('v5-payment-advance-applied-total').textContent=report?
+   money(report.advance_applied_cents??0):'—';
+  $('v5-payment-advance-available-total').textContent=report?
+   money(report.advance_available_cents??0):'—';
   const fees=Array.isArray(report?.receivables)?report.receivables:[];
   const studentNames=new Map(fees.filter(x=>x.outstanding_cents>0)
    .map(x=>[x.student_id,x.student_name]));
@@ -137,6 +148,12 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
     cash:'現金',bank_transfer:'銀行轉帳',other:'其他'
    }[p.method]||'其他')+' · '+p.status,'section-sub'));
    if(p.status==='pending'){
+    if(p.intended_advance_cents>0){
+     row.append(item('span','預計認列預收 '+money(p.intended_advance_cents)+
+      '，須使用管理者預收款確認流程，不可當作一般付款分配。','section-sub'));
+     pending.append(row);
+     continue;
+    }
     const available=fees.filter(x=>x.student_id===p.student_id&&x.outstanding_cents>0);
     for(const f of available){
      const field=item('label',f.subject+' · 尚欠 '+money(f.outstanding_cents));
@@ -153,6 +170,10 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
     button.dataset.id=p.payment_id;row.append(button);
     pending.append(row);
    }else{
+    if(p.advance_credit_cents>0){
+     row.append(item('span','其中預收款 '+money(p.advance_credit_cents)+
+      '（已包含在上述已確認付款，不重複計入收款）','section-sub'));
+    }
     const allocations=Array.isArray(p.allocations)?p.allocations:[];
     for(const a of allocations){
      row.append(item('span',a.subject+'：'+money(a.amount_cents),'section-sub'));
