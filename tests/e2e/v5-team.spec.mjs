@@ -811,6 +811,8 @@ test('V5.3 shared calendar shows two teachers; assigned teacher has no manager c
 
 
 test('V5.3 manager safely renames Team student, edits lesson, archives without losing history',async({page})=>{
+ // Several authenticated GUI edits and refreshes can exceed the 60-second suite default on CI.
+ test.setTimeout(120_000);
  const actor=f.actors.parent;
  const workspace=db("select id from public.workspaces where owner_id='"+actor.id+"'");
  const teamId=db("select id from public.v5_teams where anchor_workspace_id='"+workspace+"'");
@@ -1072,11 +1074,299 @@ test('V5.3 Team manager GUI confirms a lesson receivable; regular teachers canno
  await expect(page.locator('#v5-billing-total')).toBeEmpty();
 });
 
+
+test('V5.3 manual partial payments distribute across subjects without over-allocating',async()=>{
+ const manager=await signIn('parent'),teacher=await signIn('teacher');
+ const stranger=await signIn('stranger');
+ const managerId=f.actors.parent.id;
+ const ws=db("select id from public.workspaces where owner_id='"+managerId+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ const student=db("select id from public.v5_team_students where team_id='"+
+  team+"' and display_name='Private Billing Student 01'");
+ const math=db("select lesson_id from tutor_private.v5_team_lesson_fees "+
+  "where team_id='"+team+"' and subject='數學'");
+ const english=db("select lesson_id from tutor_private.v5_team_lesson_fees "+
+  "where team_id='"+team+"' and subject='英文'");
+ const gui=db("select lesson_id from tutor_private.v5_team_lesson_fees "+
+  "where team_id='"+team+"' and subject='Finance UI Synthetic'");
+ assert.match(math,/^[a-f0-9-]{36}$/i);
+ assert.match(english,/^[a-f0-9-]{36}$/i);
+ assert.match(gui,/^[a-f0-9-]{36}$/i);
+ const beforeV4=db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'");
+ const report=({reference,studentId=student,amount=60000})=>
+  rest(manager,'POST','rpc/v5_report_team_payment',{
+   p_team_id:team,p_student_id:studentId,p_amount_cents:amount,
+   p_received_on:'2026-10-22',p_method:'bank_transfer',
+   p_reference:reference,p_note:'Synthetic no real transfer'
+  });
+ const allocate=(jwt,paymentId,allocations)=>
+  rest(jwt,'POST','rpc/v5_confirm_team_payment_allocation',{
+   p_payment_id:paymentId,p_allocations:allocations
+  });
+ const view=jwt=>rest(jwt,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal((await view(manager)).status,200);
+ assert.equal((await view(teacher)).status,403);
+ assert.equal((await view(stranger)).status,403);
+ assert.notEqual((await rest(teacher,'POST','rpc/v5_report_team_payment',{
+  p_team_id:team,p_student_id:student,p_amount_cents:60000,
+  p_received_on:'2026-10-22',p_method:'cash',
+  p_reference:'NOT-MANAGER-TRY'
+ })).status,200);
+ assert.notEqual((await report({reference:'WRONG-STUDENT-1',
+  studentId:db("select id from public.v5_team_students where team_id<>'"+
+   team+"' limit 1")})).status,200,'Cannot report another Team student');
+ assert.notEqual((await report({reference:'NEGATIVE-REJECT',amount:-5})).status,200);
+ // A separate billing test must not require the previous GUI rename/archive test.
+ const unbilled=await rest(manager,'POST','v5_team_students?select=id',{
+  team_id:team,display_name:'Unbilled Payment Isolation Student',
+  created_by:managerId
+ });
+ assert.equal(unbilled.status,201,'Create an independent student with no billed courses');
+ const unrelatedStudent=unbilled.data[0].id;
+ assert.match(unrelatedStudent,/^[a-f0-9-]{36}$/i);
+ assert.notEqual((await report({reference:'NO-RECEIVABLE-TEST',
+  studentId:unrelatedStudent,amount:100})).status,200,
+  'No payment without a confirmed receivable for the same student');
+ const first=await report({reference:'PARTIAL-SYNTH-001'});
+ assert.equal(first.status,200);
+ const paymentId=first.data.payment_id;
+ assert.equal(first.data.status,'pending');
+ assert.equal((await report({reference:'PARTIAL-SYNTH-001'})).status!==200,true,
+  'Reference idempotency must reject duplicate manual report');
+ assert.equal((await allocate(teacher,paymentId,[{
+  lesson_id:math,amount_cents:60000
+ }])).status!==200,true,'Assigned teacher may not confirm payment');
+ assert.equal((await allocate(stranger,paymentId,[{
+  lesson_id:math,amount_cents:60000
+ }])).status!==200,true);
+ assert.notEqual((await allocate(manager,paymentId,[{
+  lesson_id:math,amount_cents:50000
+ }])).status,200,'Must allocate full payment or stay pending');
+ assert.notEqual((await allocate(manager,paymentId,[{
+  lesson_id:math,amount_cents:60000
+ },{lesson_id:math,amount_cents:1}])).status,200,'Duplicate lesson must be rejected');
+ assert.notEqual((await allocate(manager,paymentId,[{
+  lesson_id:math,amount_cents:60001
+ }])).status,200,'Cannot allocate beyond the payment total');
+ // Math, English and the existing UI lesson all belong to Student 01.
+ // Cross-student and cross-Team restrictions are independently enforced in SQL.
+ assert.equal(db("select count(*) from tutor_private.v5_team_payment_allocations "+
+  "where payment_id='"+paymentId+"'"),'0','Failed allocation must roll back completely');
+
+ let r=await allocate(manager,paymentId,[
+  {lesson_id:math,amount_cents:30000},{lesson_id:english,amount_cents:30000}
+ ]);
+ assert.equal(r.status,200);
+ assert.equal(r.data.status,'confirmed');
+ assert.equal(r.data.allocated_cents,60000);
+ assert.deepEqual(new Set(r.data.allocations.map(x=>x.subject)),new Set(['數學','英文']));
+ assert.notEqual((await allocate(manager,paymentId,[{
+  lesson_id:math,amount_cents:60000
+ }])).status,200,'Payment must be confirmed at most once');
+ r=await view(manager);
+ assert.equal(r.status,200);
+ assert.equal(r.data.confirmed_payments_cents,60000);
+ const remaining=Object.fromEntries(r.data.receivables.map(x=>[
+  x.lesson_id,x.outstanding_cents
+ ]));
+ assert.equal(remaining[math],67500);
+ assert.equal(remaining[english],56667);
+ assert.equal(remaining[gui],100000);
+ assert.equal(r.data.payments.find(x=>x.payment_id===paymentId).allocations.length,2);
+
+ const second=await report({reference:'PARTIAL-SYNTH-002',amount:67500});
+ assert.equal(second.status,200);
+ assert.equal((await allocate(manager,second.data.payment_id,[{
+  lesson_id:math,amount_cents:67501
+ }])).status!==200,true,'Overpayment must never be hidden as prepayment');
+ r=await allocate(manager,second.data.payment_id,[{
+  lesson_id:math,amount_cents:67500
+ }]);
+ assert.equal(r.status,200);
+ const third=await report({reference:'PARTIAL-SYNTH-003',amount:56667});
+ assert.equal(third.status,200);
+ assert.equal((await allocate(manager,third.data.payment_id,[{
+  lesson_id:english,amount_cents:56667
+ }])).status,200);
+ r=await view(manager);
+ assert.equal(r.status,200);
+ assert.equal(r.data.confirmed_payments_cents,184167);
+ assert.equal(r.data.receivables.find(x=>x.lesson_id===math).outstanding_cents,0);
+ assert.equal(r.data.receivables.find(x=>x.lesson_id===english).outstanding_cents,0);
+ assert.equal(r.data.receivables.find(x=>x.lesson_id===gui).outstanding_cents,100000);
+ assert.equal(r.data.outstanding_cents,100000);
+
+ const p4=await report({reference:'PENDING-TRANSFER-4',amount:100});
+ assert.equal(p4.status,200);
+ const p5=await report({reference:'PENDING-CONCURRENT-5',amount:100});
+ assert.equal(p5.status,200);
+ const contested=await Promise.all([
+  allocate(manager,p4.data.payment_id,[{lesson_id:math,amount_cents:100}]),
+  allocate(manager,p5.data.payment_id,[{lesson_id:math,amount_cents:100}])
+ ]);
+ assert.ok(contested.every(x=>x.status!==200),
+  'Concurrent payments cannot over-allocate an already settled receivable');
+ assert.equal(db("select count(*) from tutor_private.v5_team_payment_allocations "+
+  "where lesson_id='"+math+"'"),'2',
+  'Exactly two legitimate partial allocation entries remain');
+ assert.equal(db("select count(*) from tutor_private.v5_team_payment_audit "+
+  "where team_id='"+team+"' and event='confirmed'"),'3');
+ assert.equal(db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'"),beforeV4,'V5 manual payments never write V4 payment history');
+ assert.notEqual((await rows(teacher,'v5_team_payment_reports')).status,200);
+});
+
+
+test('V5.3 manager GUI reports and partially allocates a payment without V4 effects',async({page})=>{
+ const actor=f.actors.parent;
+ const ws=db("select id from public.workspaces where owner_id='"+actor.id+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ const student=db("select id from public.v5_team_students where team_id='"+
+  team+"' and display_name='Private Billing Student 01'");
+ const lesson=db("select lesson_id from tutor_private.v5_team_lesson_fees "+
+  "where team_id='"+team+"' and subject='Finance UI Synthetic'");
+ const beforeV4=db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'");
+ const beforeConfirmed=Number(db(
+  "select coalesce(sum(amount_cents),0) from tutor_private.v5_team_payment_reports "+
+  "where team_id='"+team+"' and received_on>='2026-10-01' "+
+  "and received_on<'2026-11-01' and status='confirmed'"));
+ assert.ok(Number.isSafeInteger(beforeConfirmed));
+ assert.match(student,/^[a-f0-9-]{36}$/i);
+ assert.match(lesson,/^[a-f0-9-]{36}$/i);
+ await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
+  route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
+   contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+ await page.addInitScript(({url,key})=>{
+  window.V4_LOCAL_BACKEND={
+   environment:'local',isolated:true,projectRef:'local',url,publishableKey:key
+  };
+ },{url:f.apiUrl,key:f.anonKey});
+ await page.goto('/v2/index.html');
+ await page.waitForFunction(()=>!!window.supabase?.createClient,{timeout:20_000});
+ await page.evaluate(async({url,key,email,password})=>{
+  const supa=window.supabase.createClient(url,key,{
+   auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+  });
+  const {error}=await supa.auth.signInWithPassword({email,password});
+  if(error)throw Error('Synthetic manager payment GUI login failed');
+  supa.auth.stopAutoRefresh?.();
+ },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
+ await page.reload();
+ await expect(page.locator('body')).not.toHaveClass(/login-required/);
+ await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await expect(page.locator('#v5-billing-card')).toBeVisible();
+ await page.locator('#v5-billing-team-select').selectOption(team);
+ await page.locator('#v5-billing-prev').click();
+ await expect(page.locator('#v5-payment-student-select')).toHaveValue(student);
+ await page.locator('#v5-payment-amount').fill('500');
+ await page.locator('#v5-payment-received-date').fill('2026-10-25');
+ await page.locator('#v5-payment-method').selectOption('bank_transfer');
+ await page.locator('#v5-payment-note').fill('Synthetic manual payment, no external bank');
+ page.on('dialog',dialog=>dialog.accept());
+ await page.locator('#v5-payment-report-submit').click();
+ // The list already contains pending payments for this student from earlier tests.
+ // Wait for this newly submitted row, not merely a repeated student name.
+ const lookupManualPayment=()=>db("select id from tutor_private.v5_team_payment_reports "+
+  "where student_id='"+student+"' and reference like 'manual-%' "+
+  "order by reported_at desc limit 1");
+ await expect.poll(lookupManualPayment,{timeout:15_000}).toMatch(/^[a-f0-9-]{36}$/i);
+ const pid=lookupManualPayment();
+ assert.equal(db("select status from tutor_private.v5_team_payment_reports "+
+  "where id='"+pid+"'"),'pending');
+ const field=page.locator('[data-v5-payment-id="'+pid+'"]'+
+  '[data-v5-payment-lesson="'+lesson+'"]');
+ await expect(field).toBeVisible();
+ await field.fill('500');
+ await page.locator('[data-v5-billing-action="allocate-payment"]'+
+  '[data-id="'+pid+'"]').click();
+ // Likewise, previously confirmed payments are already visible. Assert this
+ // particular payment completed before checking the refreshed monthly UI.
+ await expect.poll(()=>db("select status from tutor_private.v5_team_payment_reports "+
+  "where id='"+pid+"'"),{timeout:15_000}).toBe('confirmed');
+ await expect(page.locator('#v5-payment-confirmed-reports')).toContainText('Private Billing Student 01');
+ const expectedConfirmed=new Intl.NumberFormat('zh-TW',{
+  style:'currency',currency:'TWD',minimumFractionDigits:0,maximumFractionDigits:2
+ }).format((beforeConfirmed+50000)/100);
+ await expect(page.locator('#v5-payment-confirmed-total')).toHaveText(expectedConfirmed);
+ assert.equal(Number(db("select coalesce(sum(amount_cents),0) "+
+  "from tutor_private.v5_team_payment_reports "+
+  "where team_id='"+team+"' and status='confirmed' "+
+  "and received_on>='2026-10-01' and received_on<'2026-11-01'")),
+  beforeConfirmed+50000,'Confirmed monthly ledger increases by exactly NT$500');
+ assert.equal(db("select status from tutor_private.v5_team_payment_reports "+
+  "where id='"+pid+"'"),'confirmed');
+ assert.equal(db("select amount_cents from tutor_private.v5_team_payment_allocations "+
+  "where payment_id='"+pid+"' and lesson_id='"+lesson+"'"),'50000');
+ assert.equal(db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'"),beforeV4,'Manager report/allocate GUI never changes V4 receipts');
+ await page.locator('#sign-out').click();
+ await expect(page.locator('body')).toHaveClass(/login-required/);
+ await expect(page.locator('#v5-billing-card')).toBeHidden();
+ await expect(page.locator('#v5-payment-confirmed-reports')).toBeEmpty();
+ await expect(page.locator('#v5-payment-pending-reports')).toBeEmpty();
+});
+
 test('V5.3 billing management follows accepted Team governance transfer, not V4 owner',async()=>{
  const former=await signIn('parent'),newManager=await signIn('teacher');
  const fromId=f.actors.parent.id,toId=f.actors.teacher.id;
  const ws=db("select id from public.workspaces where owner_id='"+fromId+"'");
  const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ // Prepare transfer-specific funds and a pending payment. No dependency on a
+ // preceding GUI payment or partial-allocation test succeeding.
+ const project=db("select id from public.v5_team_projects where workspace_id='"+
+  ws+"' and name='Private Team B Project'");
+ assert.match(project,/^[a-f0-9-]{36}$/i);
+ let setup=await rest(former,'POST','v5_team_students?select=id',{
+  team_id:team,display_name:'Transfer Payment Isolation Student',created_by:fromId
+ });
+ assert.equal(setup.status,201);
+ const freshStudent=setup.data[0].id;
+ setup=await rest(former,'POST','v5_team_enrollments?select=student_id',{
+  team_id:team,project_id:project,student_id:freshStudent
+ });
+ assert.equal(setup.status,201);
+ setup=await rest(former,'POST','v5_team_lessons?select=id',{
+  team_id:team,project_id:project,student_id:freshStudent,teacher_user_id:fromId,
+  subject:'Transfer Payment Isolation',lesson_start:'2026-10-20T14:00:00+08:00',
+  lesson_end:'2026-10-20T15:00:00+08:00',status:'completed'
+ });
+ assert.equal(setup.status,201);
+ const freshLesson=setup.data[0].id;
+ setup=await rest(former,'POST','rpc/v5_confirm_team_lesson_fee',{
+  p_lesson_id:freshLesson,p_hourly_rate_cents:65000
+ });
+ assert.equal(setup.status,200);
+ const reportForTransfer=(ref,amount)=>rest(former,'POST','rpc/v5_report_team_payment',{
+  p_team_id:team,p_student_id:freshStudent,p_amount_cents:amount,
+  p_received_on:'2026-10-26',p_method:'cash',p_reference:ref
+ });
+ setup=await reportForTransfer('TRANSFER-CONFIRMED-ISOLATED',20000);
+ assert.equal(setup.status,200);
+ const transferPaid=setup.data.payment_id;
+ setup=await rest(former,'POST','rpc/v5_confirm_team_payment_allocation',{
+  p_payment_id:transferPaid,
+  p_allocations:[{lesson_id:freshLesson,amount_cents:20000}]
+ });
+ assert.equal(setup.status,200);
+ setup=await reportForTransfer('PENDING-TRANSFER-ISOLATED',100);
+ assert.equal(setup.status,200);
+ const pending=setup.data.payment_id;
+ const auditBefore=db("select count(*) from tutor_private.v5_team_billing_audit "+
+  "where team_id='"+team+"'");
+ const feesBefore=await rest(former,'POST','rpc/v5_team_billing_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal(feesBefore.status,200);
+ const beforeTransfer=await rest(former,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal(beforeTransfer.status,200);
+ assert.ok(beforeTransfer.data.confirmed_payments_cents>0,
+  'A previous confirmed payment must exist before authority transfer');
  const nominate=await rest(former,'POST','rpc/v5_propose_team_manager',{
   p_workspace_id:ws,p_target_user_id:toId
  });
@@ -1088,11 +1378,35 @@ test('V5.3 billing management follows accepted Team governance transfer, not V4 
  assert.equal(r.data.status,'accepted');
  assert.equal(db("select owner_id from public.workspaces where id='"+ws+"'"),fromId,
   'V4 owner remains the original user');
+ const newView=await rest(newManager,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal(newView.status,200,'New Team manager inherits payment read authority');
+ assert.equal(newView.data.confirmed_payments_cents,
+  beforeTransfer.data.confirmed_payments_cents,
+  'Team governance transfer must preserve all confirmed payment totals');
+ assert.deepEqual(newView.data.payments,beforeTransfer.data.payments,
+  'Existing payment history must survive manager transfer unchanged');
+ const oldView=await rest(former,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal(oldView.status,403,'Previous manager immediately loses payment records');
+ assert.notEqual((await rest(former,'POST','rpc/v5_report_team_payment',{
+  p_team_id:team,p_student_id:newView.data.receivables[0].student_id,
+  p_amount_cents:100,p_received_on:'2026-10-26',
+  p_method:'cash',p_reference:'OLD-MANAGER-FORBIDDEN'
+ })).status,200,'Former manager cannot report a new payment');
+ assert.match(pending,/^[a-f0-9-]{36}$/i);
+ assert.notEqual((await rest(former,'POST','rpc/v5_confirm_team_payment_allocation',{
+  p_payment_id:pending,
+  p_allocations:[{lesson_id:freshLesson,amount_cents:100}]
+ })).status,200,'Former manager cannot confirm allocations after transfer');
  r=await rest(newManager,'POST','rpc/v5_team_billing_overview',{
   p_team_id:team,p_month:'2026-10-01'
  });
  assert.equal(r.status,200);
- assert.equal(r.data.confirmed_total_cents,284167);
+ assert.equal(r.data.confirmed_total_cents,feesBefore.data.confirmed_total_cents,
+  'Transfer cannot change confirmed lesson fees');
  r=await rest(former,'POST','rpc/v5_team_billing_overview',{
   p_team_id:team,p_month:'2026-10-01'
  });
@@ -1102,5 +1416,5 @@ test('V5.3 billing management follows accepted Team governance transfer, not V4 
   p_hourly_rate_cents:50000
  })).status,200,'Former manager cannot post finance after transfer');
  assert.equal(db("select count(*) from tutor_private.v5_team_billing_audit "+
-  "where team_id='"+team+"'"),'3','Transfer does not modify audit or fees');
+  "where team_id='"+team+"'"),auditBefore,'Transfer does not modify audit or fees');
 });

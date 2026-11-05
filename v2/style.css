@@ -938,3 +938,22 @@ body.preview-readonly .app-shell [aria-disabled="true"]{cursor:not-allowed}
  .v5-billing-month{justify-content:space-between}
  .v5-billing-row button{width:100%}
 }
+
+
+/* V5.3 manual payment allocation (no gateway, manager-only). */
+#v5-payment-panel{min-width:0}
+.v5-payment-report-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.v5-payment-report-form label{min-width:0;display:grid;gap:6px;font-weight:600}
+.v5-payment-report-form label input,.v5-payment-report-form label select{
+ min-width:0;width:100%;max-width:100%;box-sizing:border-box}
+.v5-payment-note{grid-column:1/-1}
+.v5-payment-report-form button[type=submit]{justify-self:start}
+.v5-payment-totals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;
+ margin:15px 0;border-top:1px solid var(--line,#e2e8f0);padding-top:14px}
+.v5-payment-totals span{display:grid;gap:5px}
+.v5-payment-totals strong{font-size:1.13rem;font-variant-numeric:tabular-nums}
+@media(max-width:670px){
+ .v5-payment-report-form,.v5-payment-totals{grid-template-columns:1fr}
+ .v5-payment-note{grid-column:auto}
+ .v5-payment-report-form button[type=submit]{width:100%}
+}
