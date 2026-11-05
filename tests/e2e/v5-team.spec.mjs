@@ -1001,6 +1001,77 @@ test('V5.3 Team fee confirmations are manager-only, immutable and independent of
   m+"'"),v4before,'No V4 lesson write');
 });
 
+
+test('V5.3 Team manager GUI confirms a lesson receivable; regular teachers cannot see fees',async({page})=>{
+ const managerJwt=await signIn('parent');
+ const m=f.actors.parent,t=f.actors.teacher;
+ const ws=db("select id from public.workspaces where owner_id='"+m.id+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ const project=db("select id from public.v5_team_projects where workspace_id='"+
+  ws+"' and name='Private Team B Project'");
+ const student=db("select id from public.v5_team_students where team_id='"+
+  team+"' and display_name='Private Billing Student 01'");
+ let r=await rest(managerJwt,'POST','v5_team_lessons?select=id',{
+  team_id:team,project_id:project,student_id:student,teacher_user_id:t.id,
+  subject:'Finance UI Synthetic',
+  lesson_start:'2026-10-18T13:00:00+08:00',
+  lesson_end:'2026-10-18T15:00:00+08:00',status:'completed'
+ });
+ assert.equal(r.status,201);
+ const lesson=r.data[0].id;
+ const beforeV4=db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'");
+
+ await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
+  route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
+   contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+ await page.addInitScript(({url,key})=>{
+  window.V4_LOCAL_BACKEND={
+   environment:'local',isolated:true,projectRef:'local',url,publishableKey:key
+  };
+ },{url:f.apiUrl,key:f.anonKey});
+ const login=async(role)=>{
+  const actor=f.actors[role];
+  await page.goto('/v2/index.html');
+  await page.waitForFunction(()=>!!window.supabase?.createClient,{timeout:20_000});
+  await page.evaluate(async({url,key,email,password})=>{
+   const s=window.supabase.createClient(url,key,{
+    auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+   });
+   const {error}=await s.auth.signInWithPassword({email,password});
+   if(error)throw Error('Synthetic fee UI login failed');
+   s.auth.stopAutoRefresh?.();
+  },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
+  await page.reload();
+  await expect(page.locator('body')).not.toHaveClass(/login-required/);
+  await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ };
+ await login('parent');
+ await expect(page.locator('#v5-billing-card')).toBeVisible();
+ await page.locator('#v5-billing-team-select').selectOption(team);
+ await page.locator('#v5-billing-prev').click();
+ await expect(page.locator('#v5-billing-pending')).toContainText('Finance UI Synthetic');
+ const rate=page.locator('[data-v5-billing-rate-for="'+lesson+'"]');
+ await rate.fill('500');
+ page.on('dialog',dialog=>dialog.accept());
+ await page.locator('[data-v5-billing-action="confirm"][data-id="'+lesson+'"]').click();
+ await expect(page.locator('#v5-billing-confirmed')).toContainText('Finance UI Synthetic');
+ await expect(page.locator('#v5-billing-total')).toContainText('2,841.67');
+ assert.equal(db("select amount_cents from tutor_private.v5_team_lesson_fees "+
+  "where lesson_id='"+lesson+"'"),'100000');
+ assert.equal(db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'"),beforeV4,'Confirming Team receivable does not receive money or write V4 payments');
+ await page.locator('#sign-out').click();
+ await expect(page.locator('body')).toHaveClass(/login-required/);
+ await expect(page.locator('#v5-billing-card')).toBeHidden();
+ await expect(page.locator('#v5-billing-confirmed')).toBeEmpty();
+ await login('teacher');
+ await expect(page.locator('#v5-learning-card')).toBeVisible();
+ await expect(page.locator('#v5-billing-card')).toBeHidden();
+ await page.locator('#sign-out').click();
+ await expect(page.locator('#v5-billing-total')).toBeEmpty();
+});
+
 test('V5.3 billing management follows accepted Team governance transfer, not V4 owner',async()=>{
  const former=await signIn('parent'),newManager=await signIn('teacher');
  const fromId=f.actors.parent.id,toId=f.actors.teacher.id;
@@ -1021,7 +1092,7 @@ test('V5.3 billing management follows accepted Team governance transfer, not V4 
   p_team_id:team,p_month:'2026-10-01'
  });
  assert.equal(r.status,200);
- assert.equal(r.data.confirmed_total_cents,184167);
+ assert.equal(r.data.confirmed_total_cents,284167);
  r=await rest(former,'POST','rpc/v5_team_billing_overview',{
   p_team_id:team,p_month:'2026-10-01'
  });
@@ -1031,5 +1102,5 @@ test('V5.3 billing management follows accepted Team governance transfer, not V4 
   p_hourly_rate_cents:50000
  })).status,200,'Former manager cannot post finance after transfer');
  assert.equal(db("select count(*) from tutor_private.v5_team_billing_audit "+
-  "where team_id='"+team+"'"),'2','Transfer does not modify audit or fees');
+  "where team_id='"+team+"'"),'3','Transfer does not modify audit or fees');
 });
