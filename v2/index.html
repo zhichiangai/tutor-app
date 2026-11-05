@@ -179,6 +179,42 @@
               <p class="section-sub">Free 開放使用；Pro 與 Team 目前僅提供方案介紹，不收取訂閱費用。</p>
               <div id="v5-plan-content" aria-live="polite"></div>
             </article>
+            <article class="card settings-card v5-plan-card hidden" id="v5-team-card" aria-labelledby="v5-team-heading">
+              <h3 id="v5-team-heading">Team 團隊與專案</h3>
+              <p class="section-sub">每位老師只會看到被指派的專案；加入 Team 不會自動開放其他老師的學費、學生與課程。</p>
+              <p id="v5-team-message" class="section-sub" role="status" aria-live="polite"></p>
+              <div class="v5-team-panel">
+                <h4>我的專案</h4><div id="v5-team-project-list"></div>
+                <h4>Team 邀請</h4><div id="v5-team-invite-list"></div>
+              </div>
+              <div id="v5-team-owner-controls" class="hidden">
+                <div class="v5-team-panel">
+                  <h4>建立專案</h4>
+                  <form id="v5-team-project-form">
+                    <label>專案名稱<input id="v5-team-project-name" type="text" required maxlength="80" placeholder="例如：數學教學專案"></label>
+                    <button class="secondary-button" type="submit">建立專案</button>
+                  </form>
+                </div>
+                <div class="v5-team-panel">
+                  <h4>邀請老師</h4>
+                  <form id="v5-team-invite-form">
+                    <label>老師的電子郵件<input id="v5-team-invite-email" type="email" required maxlength="254" placeholder="老師的登入 Email" autocomplete="off"></label>
+                    <button class="secondary-button" type="submit">送出 Team 邀請</button>
+                  </form>
+                  <p class="helper-note">對方需要登入並主動接受邀請，才會佔用老師席次。</p>
+                  <h4>現有老師</h4><div id="v5-team-members-list"></div>
+                </div>
+                <div class="v5-team-panel">
+                  <h4>指定專案老師</h4>
+                  <form id="v5-team-assign-form">
+                    <label>專案<select id="v5-team-project-select" required></select></label>
+                    <label>老師<select id="v5-team-teacher-select" required></select></label>
+                    <button class="secondary-button" id="v5-team-assign-submit" type="submit">指派老師</button>
+                  </form>
+                  <div id="v5-team-assignments"></div>
+                </div>
+              </div>
+            </article>
             <article class="card settings-card"><h3>登入與安全</h3><p class="section-sub">使用 Google 管理登入，不會在網站儲存你的 Google 密碼。</p>
               <button class="secondary-button wide" id="sign-out" type="button">登出 Google 帳號</button>
             </article>
