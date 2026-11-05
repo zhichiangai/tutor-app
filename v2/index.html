@@ -344,9 +344,13 @@
                   <button class="secondary-button" type="submit" id="v5-payment-report-submit">登錄待分配付款</button>
                 </form>
                 <div class="v5-payment-totals">
-                  <span>本月已確認付款 <strong id="v5-payment-confirmed-total"></strong></span>
-                  <span>本月課程尚未結清 <strong id="v5-payment-outstanding-total"></strong></span>
+                  <span>本月已確認人工付款 <strong id="v5-payment-confirmed-total"></strong></span>
+                  <span>本月課程未結清（已扣預收） <strong id="v5-payment-outstanding-total"></strong></span>
+                  <span>本月確認付款內含預收 <strong id="v5-payment-advance-created-total"></strong></span>
+                  <span>本月課程已使用預收抵扣 <strong id="v5-payment-advance-applied-total"></strong></span>
+                  <span>Team 目前可用預收款（跨月） <strong id="v5-payment-advance-available-total"></strong></span>
                 </div>
+                <p class="helper-note">預收款是已確認付款中的未分配部分；抵扣只減少尚未結清金額，不代表再收到一次款項。這些數字由資料庫依現任管理者權限計算。</p>
                 <h4>待分配的款項</h4>
                 <div id="v5-payment-pending-reports" aria-live="polite"></div>
                 <h4>已確認的分配紀錄</h4>
