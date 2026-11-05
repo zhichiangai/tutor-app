@@ -405,7 +405,8 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   if(!valid()){reset();return}
   attach();
   const stamp=++generation,userId=getUser().id;
-  loading=true;error='';overview=null;paymentOverview=null;
+  loading=true;error='';overview=null;paymentOverview=null;advanceOverview=null;
+  $('v5-advance-panel')?.classList.add('hidden');
   render();
   const client=getClient();
   try{
