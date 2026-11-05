@@ -1,5 +1,5 @@
 // V5.2 isolated Team RLS: real local Auth/JWT and PostgREST, no Production.
-import {test} from '@playwright/test';
+import {test,expect} from '@playwright/test';
 import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import assert from 'node:assert/strict';
@@ -123,4 +123,41 @@ test('Team projects stay isolated until teacher accepts email invitation and is 
  assert.equal(remaining.data.length,2,'Revocation must retain project history');
  assert.equal(Number(db("select count(*) from public.v5_team_project_members "+
   "where project_id='"+alpha+"' and user_id='"+guestId+"'")),0);
+});
+
+
+test('Team settings shows authorized projects and hides private Team UI on logout',async({page})=>{
+ const actor=f.actors.teacher;
+ await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
+  route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
+   contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+ await page.addInitScript(({url,key})=>{
+  window.V4_LOCAL_BACKEND={
+   environment:'local',isolated:true,projectRef:'local',url,publishableKey:key
+  };
+ },{url:f.apiUrl,key:f.anonKey});
+ await page.goto('/v2/index.html');
+ await page.waitForFunction(()=>!!window.supabase?.createClient,{timeout:20_000});
+ await page.evaluate(async({url,key,email,password})=>{
+  const client=window.supabase.createClient(url,key,{
+   auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+  });
+  const {error}=await client.auth.signInWithPassword({email,password});
+  if(error)throw Error('Synthetic login error');
+  client.auth.stopAutoRefresh?.();
+ },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
+ await page.reload();
+ await expect(page.locator('body')).not.toHaveClass(/login-required/);
+ await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await expect(page.locator('#v5-team-card')).toBeVisible();
+ await expect(page.locator('#v5-team-owner-controls')).toBeVisible();
+ await expect(page.locator('#v5-team-project-list')).toContainText('Project Alpha');
+ await expect(page.locator('#v5-team-project-list')).toContainText('Project Beta');
+ await page.locator('#v5-team-project-name').fill('Project Gamma via GUI');
+ await page.locator('#v5-team-project-form button[type="submit"]').click();
+ await expect(page.locator('#v5-team-project-list')).toContainText('Project Gamma via GUI');
+ await page.locator('#sign-out').click();
+ await expect(page.locator('body')).toHaveClass(/login-required/);
+ await expect(page.locator('#v5-team-card')).toBeHidden();
+ await expect(page.locator('#v5-team-project-list')).toBeEmpty();
 });
