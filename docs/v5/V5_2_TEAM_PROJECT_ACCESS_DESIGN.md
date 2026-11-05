@@ -39,3 +39,20 @@ Team 名額沿用 PR #51：100 名累計學生、10 名現行老師（含擁有�
 ## 發布管理
 
 本項變更為 Draft PR #52，Base 是 PR #51 的開發分支，不直接合併 Main。先讓隔離 PostgreSQL、JWT、Chromium 及 V3 regression 通過，再完善 Team 使用者介面。V5.1 的真正隔離 Vercel Preview 管理後台仍需要獨立 Supabase 與環境變數設定，READY 並不是 GUI 驗收。
+
+## V5.2 第二階段：教師退出及成員移除稽核
+
+老師已接受邀請並成為 Team 成員後，得使用 `v5_leave_team(p_workspace_id)` 主動退出：
+- 後端再次確認是有效 Team、本人為 teacher 成員，且不是 Team owner。
+- 刪除 Team membership，透過外鍵連動取消全部專案指派；原 Team 專案及歷史紀錄保留。
+- 使用原 JWT 立即失去原 Team 專案讀取權；個人工作空間與原有資料不變。
+- 留下私有 `v5_team_membership_audit` 的 `teacher_left` 紀錄。
+
+管理者移除老師改用 `v5_remove_team_teacher(p_workspace_id,p_user_id)`：
+- 僅 Team owner 可執行，不允許移除本人；記錄 `teacher_removed`。
+- 禁止使用一般 REST `DELETE workspace_members` 繞過稽核。
+- 刪除成員後名額釋放；歷史專案 metadata 不刪除。
+
+**管理者不得直接退出 Team。** 已確認的產品規則 A 是：管理權必須先轉讓給目前仍在 Team 的老師、對方接受，後端單一交易完成權限交接，原管理者轉為普通老師後才能退出；Team 所有資料及 ID 均保留。V5.2 現階段**沒有**實作管理權轉讓。因 V4 的 `workspaces.owner_id` 同時涉及老師個人空間和舊資料 RLS，不能直接修改它達到 Team 轉讓，必須先將 Team 治理與 V4 個人老師所有權分離，再實作轉讓交易和權限驗收。
+
+另外，既有規則 A 要求 Team 帳務只有管理者可查看；V5.2 不變更 V4 財務資料授權。跨老師課表與財務、歷史授課者歸屬及權限轉移列入 V5.3。
