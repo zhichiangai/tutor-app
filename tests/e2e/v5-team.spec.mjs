@@ -1579,6 +1579,8 @@ test('V5.4 manager GUI confirms an advance and applies a separate offset with no
  await expect(page.locator('#v5-advance-panel')).toBeVisible();
  await expect(page.locator('#v5-advance-student-select option[value="'+student+'"]')).toBeAttached();
  await page.locator('#v5-advance-student-select').selectOption(student);
+ await expect(page.locator('#v5-advance-panel')).toBeVisible();
+ await expect(page.locator('#v5-advance-student-select')).toHaveValue(student);
  await expect(page.locator('#v5-advance-message')).toContainText('管理者資料已核對');
  await page.locator('#v5-advance-amount').fill('1000');
  await page.locator('#v5-advance-credit').fill('300');
