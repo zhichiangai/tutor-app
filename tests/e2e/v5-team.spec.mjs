@@ -1679,6 +1679,20 @@ test('V5.3 billing management follows accepted Team governance transfer, not V4 
  setup=await reportForTransfer('PENDING-TRANSFER-ISOLATED',100);
  assert.equal(setup.status,200);
  const pending=setup.data.payment_id;
+ // The same governance transfer must revoke V5.4 credit read/write with the
+ // old JWT, while preserving an already confirmed credit for the new manager.
+ let transferAdvance=await rest(former,'POST',
+  'rpc/v5_report_team_payment_with_advance',{
+   p_team_id:team,p_student_id:freshStudent,p_amount_cents:100,
+   p_expected_credit_cents:100,p_received_on:'2026-10-26',
+   p_method:'cash',p_reference:'TRANSFER-ADVANCE-ISOLATION'
+  });
+ assert.equal(transferAdvance.status,200);
+ transferAdvance=await rest(former,'POST','rpc/v5_confirm_team_advance_payment',{
+  p_payment_id:transferAdvance.data.payment_id,p_allocations:[]
+ });
+ assert.equal(transferAdvance.status,200);
+ const transferCredit=transferAdvance.data.credit_id;
  const auditBefore=db("select count(*) from tutor_private.v5_team_billing_audit "+
   "where team_id='"+team+"'");
  const feesBefore=await rest(former,'POST','rpc/v5_team_billing_overview',{
@@ -1715,6 +1729,24 @@ test('V5.3 billing management follows accepted Team governance transfer, not V4 
   p_team_id:team,p_month:'2026-10-01'
  });
  assert.equal(oldView.status,403,'Previous manager immediately loses payment records');
+ const inheritedCredit=await rest(newManager,'POST','rpc/v5_team_advance_overview',{
+  p_team_id:team,p_student_id:freshStudent
+ });
+ assert.equal(inheritedCredit.status,200);
+ assert.ok(inheritedCredit.data.credits.some(c=>c.credit_id===transferCredit));
+ assert.equal((await rest(former,'POST','rpc/v5_team_advance_overview',{
+  p_team_id:team,p_student_id:freshStudent
+ })).status,403,'Previous manager loses advance credit read authority');
+ assert.notEqual((await rest(former,'POST','rpc/v5_apply_team_advance_credit',{
+  p_credit_id:transferCredit,
+  p_allocations:[{lesson_id:freshLesson,amount_cents:100}],
+  p_idempotency_key:'TRANSFER-OLD-MANAGER-BLOCKED'
+ })).status,200,'Previous manager cannot offset any credit with an old JWT');
+ assert.notEqual((await rest(former,'POST','rpc/v5_report_team_payment_with_advance',{
+  p_team_id:team,p_student_id:freshStudent,p_amount_cents:100,
+  p_expected_credit_cents:100,p_received_on:'2026-10-26',
+  p_method:'cash',p_reference:'TRANSFER-FORMER-BLOCKED'
+ })).status,200,'Previous manager cannot create advance credit');
  assert.notEqual((await rest(former,'POST','rpc/v5_report_team_payment',{
   p_team_id:team,p_student_id:newView.data.receivables[0].student_id,
   p_amount_cents:100,p_received_on:'2026-10-26',
