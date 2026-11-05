@@ -1117,6 +1117,12 @@ test('V5.3 manual partial payments distribute across subjects without over-alloc
   studentId:db("select id from public.v5_team_students where team_id<>'"+
    team+"' limit 1")})).status,200,'Cannot report another Team student');
  assert.notEqual((await report({reference:'NEGATIVE-REJECT',amount:-5})).status,200);
+ const unrelatedStudent=db("select id from public.v5_team_students "+
+  "where team_id='"+team+"' and display_name='Renamed Team Student GUI'");
+ assert.match(unrelatedStudent,/^[a-f0-9-]{36}$/i);
+ assert.notEqual((await report({reference:'NO-RECEIVABLE-TEST',
+  studentId:unrelatedStudent,amount:100})).status,200,
+  'No payment without a confirmed receivable for the same student');
  const first=await report({reference:'PARTIAL-SYNTH-001'});
  assert.equal(first.status,200);
  const paymentId=first.data.payment_id;
