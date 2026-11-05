@@ -44,7 +44,7 @@ create policy v5_owner_read_team_members on public.workspace_members
  using (exists (
    select 1 from public.workspaces w
    join public.v5_workspace_entitlements e on e.workspace_id=w.id
-   where w.id=workspace_id and w.owner_id=(select auth.uid())
+   where w.id=public.workspace_members.workspace_id and w.owner_id=(select auth.uid())
      and e.plan_code='team'
  ));
 create policy v5_owner_remove_team_teacher on public.workspace_members
@@ -53,7 +53,7 @@ create policy v5_owner_remove_team_teacher on public.workspace_members
   and exists (
    select 1 from public.workspaces w
    join public.v5_workspace_entitlements e on e.workspace_id=w.id
-   where w.id=workspace_id and w.owner_id=(select auth.uid())
+   where w.id=public.workspace_members.workspace_id and w.owner_id=(select auth.uid())
      and e.plan_code='team'
  ));
 
@@ -62,30 +62,30 @@ create policy v5_project_owner_or_assigned_read on public.v5_team_projects
  for select to authenticated using (
    exists(select 1 from public.workspaces w
     join public.v5_workspace_entitlements e on e.workspace_id=w.id
-    where w.id=workspace_id and e.plan_code='team'
+    where w.id=public.v5_team_projects.workspace_id and e.plan_code='team'
       and w.owner_id=(select auth.uid()))
    or exists(select 1 from public.v5_team_project_members pm
-     where pm.project_id=id and pm.user_id=(select auth.uid()))
+     where pm.project_id=public.v5_team_projects.id and pm.user_id=(select auth.uid()))
  );
 create policy v5_project_owner_create on public.v5_team_projects
  for insert to authenticated with check (
    created_by=(select auth.uid()) and
    exists(select 1 from public.workspaces w
     join public.v5_workspace_entitlements e on e.workspace_id=w.id
-    where w.id=workspace_id and w.owner_id=(select auth.uid())
+    where w.id=public.v5_team_projects.workspace_id and w.owner_id=(select auth.uid())
       and e.plan_code='team')
  );
 create policy v5_project_owner_update on public.v5_team_projects
  for update to authenticated using (
    exists(select 1 from public.workspaces w
     join public.v5_workspace_entitlements e on e.workspace_id=w.id
-    where w.id=workspace_id and w.owner_id=(select auth.uid())
+    where w.id=public.v5_team_projects.workspace_id and w.owner_id=(select auth.uid())
       and e.plan_code='team')
  ) with check (
    created_by=(select auth.uid()) and
    exists(select 1 from public.workspaces w
     join public.v5_workspace_entitlements e on e.workspace_id=w.id
-    where w.id=workspace_id and w.owner_id=(select auth.uid())
+    where w.id=public.v5_team_projects.workspace_id and w.owner_id=(select auth.uid())
       and e.plan_code='team')
  );
 
@@ -93,21 +93,21 @@ create policy v5_project_member_self_or_owner_read on public.v5_team_project_mem
  for select to authenticated using (
    user_id=(select auth.uid())
    or exists(select 1 from public.workspaces w
-     where w.id=workspace_id and w.owner_id=(select auth.uid()))
+     where w.id=public.v5_team_project_members.workspace_id and w.owner_id=(select auth.uid()))
  );
 create policy v5_project_member_owner_assign on public.v5_team_project_members
  for insert to authenticated with check (
    exists(select 1 from public.workspaces w
     join public.v5_workspace_entitlements e on e.workspace_id=w.id
-    where w.id=workspace_id and w.owner_id=(select auth.uid())
+    where w.id=public.v5_team_project_members.workspace_id and w.owner_id=(select auth.uid())
       and e.plan_code='team')
    and exists(select 1 from public.v5_team_projects p
-    where p.id=project_id and p.workspace_id=workspace_id and p.status='active')
+    where p.id=public.v5_team_project_members.project_id and p.workspace_id=public.v5_team_project_members.workspace_id and p.status='active')
  );
 create policy v5_project_member_owner_unassign on public.v5_team_project_members
  for delete to authenticated using (
    exists(select 1 from public.workspaces w
-    where w.id=workspace_id and w.owner_id=(select auth.uid()))
+    where w.id=public.v5_team_project_members.workspace_id and w.owner_id=(select auth.uid()))
  );
 
 -- Teacher invitation is email-addressed; simply knowing a UUID does not
@@ -136,7 +136,7 @@ grant select,insert on public.v5_team_invitations to authenticated;
 create policy v5_team_invite_owner_or_recipient_read on public.v5_team_invitations
  for select to authenticated using (
    exists(select 1 from public.workspaces w
-    where w.id=workspace_id and w.owner_id=(select auth.uid()))
+    where w.id=public.v5_team_invitations.workspace_id and w.owner_id=(select auth.uid()))
    or recipient_email=lower(coalesce((select auth.jwt())->>'email',''))
  );
 create policy v5_team_invite_owner_create on public.v5_team_invitations
@@ -146,7 +146,7 @@ create policy v5_team_invite_owner_create on public.v5_team_invitations
    and expires_at>now() and expires_at<=now()+interval '8 days'
    and exists(select 1 from public.workspaces w
      join public.v5_workspace_entitlements e on e.workspace_id=w.id
-     where w.id=workspace_id and w.owner_id=(select auth.uid())
+     where w.id=public.v5_team_invitations.workspace_id and w.owner_id=(select auth.uid())
        and e.plan_code='team')
  );
 
