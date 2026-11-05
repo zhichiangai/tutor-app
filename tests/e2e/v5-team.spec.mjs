@@ -53,6 +53,40 @@ test('Team projects stay isolated until teacher accepts email invitation and is 
 
  db("select tutor_private.v5_admin_grant_entitlement('"+ws+"','team',0,"+
   "'V5.2 CI operator','Synthetic Team test entitlement');");
+
+ // Tenant-isolation regression: the parent owns a separate synthetic Team.
+ // Teacher A must never read Team B projects, members or invitations.
+ const otherId=f.actors.parent.id;
+ let otherWs=db("select id from public.workspaces where owner_id='"+otherId+"'");
+ if(!otherWs){
+  const created=await rest(other,'POST','workspaces?select=id',{
+   owner_id:otherId,kind:'individual',name:'Synthetic other tenant'
+  });
+  assert.equal(created.status,201);
+  otherWs=created.data[0].id;
+ }
+ assert.notEqual(ws,otherWs);
+ db("select tutor_private.v5_admin_grant_entitlement('"+otherWs+"','team',0,"+
+  "'V5.2 CI operator','Synthetic separate-tenant entitlement');");
+ const foreignProject=await rest(other,'POST','v5_team_projects?select=id',{
+  workspace_id:otherWs,name:'Private Team B Project',created_by:otherId
+ });
+ assert.equal(foreignProject.status,201);
+ assert.equal((await rows(owner,'v5_team_projects')).data.some(
+  p=>p.id===foreignProject.data[0].id),false,
+  'Team A owner must not see Team B projects');
+ assert.deepEqual((await rows(owner,'workspace_members',
+   '&workspace_id=eq.'+otherWs)).data,[],
+  'Team A owner cannot enumerate Team B members');
+ const foreignInvite=await rest(other,'POST','v5_team_invitations?select=id',{
+  workspace_id:otherWs,recipient_email:f.actors.stranger.email.toLowerCase(),
+  invited_by:otherId
+ });
+ assert.equal(foreignInvite.status,201);
+ assert.deepEqual((await rows(owner,'v5_team_invitations',
+   '&id=eq.'+foreignInvite.data[0].id)).data,[],
+  'Team A owner must not read Team B invitations');
+
  r=await rest(owner,'POST','v5_team_projects?select=id,name',{
   workspace_id:ws,name:'Project Alpha',created_by:ownerId
  });
