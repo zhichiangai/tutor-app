@@ -464,3 +464,433 @@ test('successor sees transferred Team in the settings UI without V4 data',async(
  await expect(page.locator('body')).toHaveClass(/login-required/);
  await expect(page.locator('#v5-team-card')).toBeHidden();
 });
+
+
+test('V5.3 Team students and lessons stay independent of V4 personal data and manager transfer',async()=>{
+ const oldOwner=await signIn('teacher');
+ const manager=await signIn('parent');
+ const outsider=await signIn('stranger');
+ const oldId=f.actors.teacher.id,managerId=f.actors.parent.id;
+ const anchor=db("select id from public.workspaces where owner_id='"+oldId+"'");
+ const personal=db("select id from public.workspaces where owner_id='"+managerId+"'");
+ const teamId=db("select id from public.v5_teams where anchor_workspace_id='"+anchor+"'");
+ const otherTeam=db("select id from public.v5_teams where anchor_workspace_id='"+personal+"'");
+ assert.match(teamId,/^[a-f0-9-]{36}$/i);
+ assert.notEqual(teamId,otherTeam,'Two Team identities must be independent');
+ const alpha=db("select id from public.v5_team_projects where workspace_id='"+
+  anchor+"' and name='Project Alpha Renamed by Successor'");
+ const foreignProject=db("select id from public.v5_team_projects where workspace_id='"+
+  personal+"' and name='Private Team B Project'");
+ assert.equal(db("select team_id from public.v5_team_projects where id='"+alpha+"'"),teamId);
+ const oldStudents=Number(db("select count(*) from public.students where workspace_id='"+
+  anchor+"'"));
+ const oldLessons=Number(db("select count(*) from public.lesson_records where owner_id='"+
+  oldId+"'"));
+ const oldV4Seats=Number(db("select count(*) from tutor_private.v5_student_seat_ledger "+
+  "where workspace_id='"+anchor+"'"));
+ assert.equal(db("select manager_user_id from public.v5_team_governance "+
+  "where workspace_id='"+anchor+"'"),managerId,
+  'Team management already transferred in preceding local isolated test');
+ assert.deepEqual((await rows(oldOwner,'v5_teams','&id=eq.'+teamId)).data,[],
+  'The original V4 owner is not entitled to view departed Team data');
+ assert.deepEqual((await rows(outsider,'v5_teams','&id=eq.'+teamId)).data,[]);
+
+ let result=await rest(oldOwner,'POST','v5_team_students?select=id',{
+  team_id:teamId,display_name:'Unauthorized V4 owner',created_by:oldId
+ });
+ assert.notEqual(result.status,201,'V4 workspace owner cannot create Team student after exit');
+ result=await rest(outsider,'POST','v5_team_students?select=id',{
+  team_id:teamId,display_name:'Cross tenant',created_by:f.actors.stranger.id
+ });
+ assert.notEqual(result.status,201,'Unrelated teacher cannot create Team student');
+ result=await rest(manager,'POST','v5_team_students?select=id,team_id',{
+  team_id:teamId,display_name:'Team scoped synthetic learner',created_by:managerId
+ });
+ assert.equal(result.status,201);
+ const student=result.data[0].id;
+ assert.equal(result.data[0].team_id,teamId);
+ assert.deepEqual((await rows(oldOwner,'v5_team_students','&id=eq.'+student)).data,[],
+  'Former manager must not see new Team students');
+
+ // Project belongs to a different Team: both composite foreign keys must
+ // reject cross-Team enrollment even for a user managing both Teams.
+ result=await rest(manager,'POST','v5_team_enrollments?select=student_id',{
+  team_id:teamId,student_id:student,project_id:foreignProject
+ });
+ assert.notEqual(result.status,201,'A student cannot be enrolled into another Team project');
+ result=await rest(manager,'POST','v5_team_enrollments?select=student_id',{
+  team_id:teamId,student_id:student,project_id:alpha
+ });
+ assert.equal(result.status,201);
+ assert.deepEqual((await rows(oldOwner,'v5_team_enrollments',
+  '&student_id=eq.'+student)).data,[]);
+
+ // Rejoin only via a fresh invitation; V4 owner membership alone has no
+ // Team access. Assigning a project is a further separate permission.
+ const invite=await rest(manager,'POST','v5_team_invitations?select=id',{
+  workspace_id:anchor,recipient_email:f.actors.teacher.email.toLowerCase(),
+  invited_by:managerId
+ });
+ assert.equal(invite.status,201);
+ assert.equal((await rest(oldOwner,'POST','rpc/v5_accept_team_invitation',{
+  p_invitation_id:invite.data[0].id
+ })).status,200);
+ assert.deepEqual((await rows(oldOwner,'v5_team_students',
+  '&id=eq.'+student)).data,[],
+  'Roster membership must not reveal all Team students');
+
+ const assignment=await rest(manager,'POST','v5_team_project_members?select=project_id',{
+  project_id:alpha,workspace_id:anchor,user_id:oldId
+ });
+ assert.equal(assignment.status,201);
+ assert.equal((await rows(oldOwner,'v5_team_students','&id=eq.'+student)).data.length,1);
+ assert.equal((await rows(oldOwner,'v5_team_enrollments',
+  '&student_id=eq.'+student)).data.length,1);
+
+ const start='2030-04-05T10:00:00.000Z',end='2030-04-05T11:30:00.000Z';
+ const bad=await rest(outsider,'POST','v5_team_lessons?select=id',{
+  team_id:teamId,project_id:alpha,student_id:student,
+  teacher_user_id:f.actors.stranger.id,subject:'Cross tenant',
+  lesson_start:start,lesson_end:end
+ });
+ assert.notEqual(bad.status,201);
+ result=await rest(oldOwner,'POST','v5_team_lessons?select=id,teacher_user_id',{
+  team_id:teamId,project_id:alpha,student_id:student,teacher_user_id:oldId,
+  subject:'V5 Team isolated math',lesson_start:start,lesson_end:end
+ });
+ assert.equal(result.status,201);
+ const lesson=result.data[0].id;
+ assert.equal(result.data[0].teacher_user_id,oldId);
+ assert.equal((await rows(oldOwner,'v5_team_lessons','&id=eq.'+lesson)).data.length,1);
+ assert.equal((await rows(manager,'v5_team_lessons','&id=eq.'+lesson)).data.length,1);
+ assert.deepEqual((await rows(outsider,'v5_team_lessons','&id=eq.'+lesson)).data,[]);
+ assert.deepEqual((await rows(outsider,'v5_team_students','&id=eq.'+student)).data,[]);
+
+ result=await rest(oldOwner,'PATCH','v5_team_lessons?id=eq.'+lesson,{
+  status:'completed',notes:'Synthetic course completed'
+ });
+ assert.equal(result.status,200);
+ assert.equal(result.data[0].status,'completed');
+ assert.notEqual((await rest(oldOwner,'PATCH','v5_team_lessons?id=eq.'+lesson,{
+  teacher_user_id:f.actors.stranger.id
+ })).status,200,'Teacher attribution cannot be reassigned through the API');
+
+ // After a teacher leaves, the same JWT must be unable to see Team student
+ // and lesson data. Historic lesson attribution is retained for the manager.
+ assert.equal((await rest(oldOwner,'POST','rpc/v5_leave_team',{
+  p_workspace_id:anchor
+ })).status,200);
+ assert.deepEqual((await rows(oldOwner,'v5_team_students','&id=eq.'+student)).data,[]);
+ assert.deepEqual((await rows(oldOwner,'v5_team_lessons','&id=eq.'+lesson)).data,[]);
+ assert.equal((await rows(manager,'v5_team_lessons','&id=eq.'+lesson)).data[0].teacher_user_id,oldId);
+ assert.equal(Number(db("select count(*) from public.students where workspace_id='"+
+  anchor+"'")),oldStudents,'No V4 students migrated or altered');
+ assert.equal(Number(db("select count(*) from public.lesson_records where owner_id='"+
+  oldId+"'")),oldLessons,'No V4 lesson records changed');
+ assert.equal(Number(db("select count(*) from tutor_private.v5_student_seat_ledger "+
+  "where workspace_id='"+anchor+"'")),oldV4Seats,'V4 personal quota ledger unchanged');
+ assert.equal(db("select count(*) from tutor_private.v5_team_student_seat_ledger "+
+  "where team_id='"+teamId+"'"),'1',
+  'Team student is counted exclusively in the Team lifetime ledger');
+ assert.equal(db("select owner_id from public.workspaces where id='"+anchor+"'"),oldId);
+});
+
+test('V5.3 Team student lifetime seats and archived status do not erase history',async()=>{
+ const manager=await signIn('parent');
+ const oldOwner=await signIn('teacher');
+ const oldId=f.actors.teacher.id,managerId=f.actors.parent.id;
+ const anchor=db("select id from public.workspaces where owner_id='"+oldId+"'");
+ const teamId=db("select id from public.v5_teams where anchor_workspace_id='"+anchor+"'");
+ const student=db("select id from public.v5_team_students where team_id='"+
+  teamId+"' and display_name='Team scoped synthetic learner'");
+ const lesson=db("select id from public.v5_team_lessons where team_id='"+
+  teamId+"' and subject='V5 Team isolated math'");
+ assert.match(student,/^[a-f0-9-]{36}$/i);
+ const ledgerCount=db("select count(*) from tutor_private.v5_team_student_seat_ledger "+
+  "where team_id='"+teamId+"'");
+ let r=await rest(manager,'PATCH','v5_team_students?id=eq.'+student,
+  {is_archived:true});
+ assert.equal(r.status,200);
+ assert.notEqual((await rest(manager,'DELETE','v5_team_students?id=eq.'+student)).status,200,
+  'Team student hard-delete is not available through the browser');
+ assert.notEqual((await rest(manager,'POST','v5_team_students?select=id',{
+  id:student,team_id:teamId,display_name:'Recycled identifier',
+  created_by:managerId
+ })).status,201,'Lifetime student UUID cannot be recycled');
+ assert.equal(db("select count(*) from tutor_private.v5_team_student_seat_ledger "+
+  "where team_id='"+teamId+"'"),ledgerCount);
+ assert.equal(db("select count(*) from public.v5_team_lessons where id='"+
+  lesson+"'"),'1','Archiving Team student must not erase historic lessons');
+ assert.deepEqual((await rows(oldOwner,'v5_team_students','&id=eq.'+student)).data,[],
+  'Departed V4 owner remains unable to see archived Team students');
+});
+
+
+test('V5.3 manager uses Team student and shared lesson calendar UI without V4 writes',async({page})=>{
+ const actor=f.actors.parent;
+ const manager=await signIn('parent');
+ const workspace=db("select id from public.workspaces where owner_id='"+actor.id+"'");
+ const teamId=db("select id from public.v5_teams where anchor_workspace_id='"+workspace+"'");
+ const project=db("select id from public.v5_team_projects where workspace_id='"+
+  workspace+"' and name='Private Team B Project'");
+ assert.match(teamId,/^[a-f0-9-]{36}$/i);
+ assert.match(project,/^[a-f0-9-]{36}$/i);
+
+ const assigned=await rest(manager,'POST','v5_team_project_members?select=project_id',{
+  project_id:project,workspace_id:workspace,user_id:actor.id
+ });
+ assert.equal(assigned.status,201,'Synthetic manager assigned to own Team B project');
+ const beforeV4=db("select count(*) from public.lesson_records where owner_id='"+
+  actor.id+"'");
+ const beforeTeamSeats=Number(db("select count(*) from tutor_private.v5_team_student_seat_ledger "+
+  "where team_id='"+teamId+"'"));
+
+ await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
+  route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
+   contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+ await page.addInitScript(({url,key})=>{
+  window.V4_LOCAL_BACKEND={
+   environment:'local',isolated:true,projectRef:'local',url,publishableKey:key
+  };
+ },{url:f.apiUrl,key:f.anonKey});
+ await page.goto('/v2/index.html');
+ await page.waitForFunction(()=>!!window.supabase?.createClient,{timeout:20_000});
+ await page.evaluate(async({url,key,email,password})=>{
+  const supa=window.supabase.createClient(url,key,{
+   auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+  });
+  const {error}=await supa.auth.signInWithPassword({email,password});
+  if(error)throw Error('Synthetic V5.3 manager login failed');
+  supa.auth.stopAutoRefresh?.();
+ },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
+ await page.reload();
+ await expect(page.locator('body')).not.toHaveClass(/login-required/);
+ await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await expect(page.locator('#v5-learning-card')).toBeVisible();
+ await expect(page.locator('#v5-learning-manager-controls')).toBeVisible();
+ await page.locator('#v5-learning-team-select').selectOption(teamId);
+ await expect(page.locator('#v5-learning-project-select')).toHaveValue(project);
+
+ await page.locator('#v5-learning-student-name').fill('GUI Synthetic Student 532');
+ await page.locator('#v5-learning-student-form button[type="submit"]').click();
+ await expect(page.locator('#v5-learning-enroll-student')).toContainText(
+  'GUI Synthetic Student 532');
+ const student=db("select id from public.v5_team_students "+
+  "where team_id='"+teamId+"' and display_name='GUI Synthetic Student 532'");
+ assert.match(student,/^[a-f0-9-]{36}$/i);
+ await page.locator('#v5-learning-enroll-student').selectOption(student);
+ await page.locator('#v5-learning-enroll-submit').click();
+ await expect(page.locator('#v5-learning-students')).toContainText('GUI Synthetic Student 532');
+
+ const current=await page.evaluate(()=>{
+  const d=new Date();
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0');
+  return y+'-'+m;
+ });
+ await page.locator('#v5-learning-lesson-student').selectOption(student);
+ await page.locator('#v5-learning-lesson-teacher').selectOption(actor.id);
+ await page.locator('#v5-learning-lesson-subject').fill('Math Team GUI QA');
+ await page.locator('#v5-learning-lesson-start').fill(current+'-15T10:00');
+ await page.locator('#v5-learning-lesson-end').fill(current+'-15T11:00');
+ await page.locator('#v5-learning-lesson-notes').fill('Synthetic cross-teacher schedule entry');
+ await page.locator('#v5-learning-lesson-submit').click();
+ await expect(page.locator('#v5-learning-lessons')).toContainText('Math Team GUI QA');
+ await expect(page.locator('#v5-learning-calendar')).toContainText('Math Team GUI QA');
+ const lesson=db("select id from public.v5_team_lessons "+
+  "where student_id='"+student+"' and subject='Math Team GUI QA'");
+ assert.match(lesson,/^[a-f0-9-]{36}$/i);
+ page.on('dialog',dialog=>dialog.accept());
+ await page.locator('[data-v5-learning-action="update-lesson"][data-id="'+lesson+'"]'+
+  '[data-status="completed"]').click();
+ await expect(page.locator('#v5-learning-lessons')).toContainText('已完成');
+ assert.equal(db("select status from public.v5_team_lessons where id='"+lesson+"'"),'completed');
+ assert.equal(db("select count(*) from public.lesson_records where owner_id='"+
+  actor.id+"'"),beforeV4,'UI must never mutate V4 lessons');
+ assert.equal(Number(db("select count(*) from tutor_private.v5_team_student_seat_ledger "+
+  "where team_id='"+teamId+"'")),beforeTeamSeats+1);
+
+ await page.locator('#sign-out').click();
+ await expect(page.locator('body')).toHaveClass(/login-required/);
+ await expect(page.locator('#v5-learning-card')).toBeHidden();
+ await expect(page.locator('#v5-learning-students')).toBeEmpty();
+ await expect(page.locator('#v5-learning-lessons')).toBeEmpty();
+});
+
+
+test('V5.3 shared calendar shows two teachers; assigned teacher has no manager controls',async({page})=>{
+ const managerJwt=await signIn('parent'),teacherJwt=await signIn('teacher');
+ const managerActor=f.actors.parent,teacherActor=f.actors.teacher;
+ const workspace=db("select id from public.workspaces where owner_id='"+managerActor.id+"'");
+ const originalWorkspace=db("select id from public.workspaces where owner_id='"+teacherActor.id+"'");
+ const teamId=db("select id from public.v5_teams where anchor_workspace_id='"+workspace+"'");
+ const oldTeam=db("select id from public.v5_teams where anchor_workspace_id='"+
+  originalWorkspace+"'");
+ const project=db("select id from public.v5_team_projects where workspace_id='"+
+  workspace+"' and name='Private Team B Project'");
+ const student=db("select id from public.v5_team_students where team_id='"+
+  teamId+"' and display_name='GUI Synthetic Student 532'");
+ assert.match(student,/^[a-f0-9-]{36}$/i);
+
+ let r=await rest(managerJwt,'POST','v5_team_invitations?select=id',{
+  workspace_id:workspace,recipient_email:teacherActor.email.toLowerCase(),
+  invited_by:managerActor.id
+ });
+ assert.equal(r.status,201);
+ assert.equal((await rest(teacherJwt,'POST','rpc/v5_accept_team_invitation',{
+  p_invitation_id:r.data[0].id
+ })).status,200);
+ r=await rest(managerJwt,'POST','v5_team_project_members?select=project_id',{
+  workspace_id:workspace,project_id:project,user_id:teacherActor.id
+ });
+ assert.equal(r.status,201,'Team manager assigns a second real synthetic teacher');
+
+ await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
+  route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
+   contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+ await page.addInitScript(({url,key})=>{
+  window.V4_LOCAL_BACKEND={environment:'local',isolated:true,projectRef:'local',
+   url,publishableKey:key};
+ },{url:f.apiUrl,key:f.anonKey});
+ async function enter(role){
+  const actor=f.actors[role];
+  await page.goto('/v2/index.html');
+  await page.waitForFunction(()=>!!window.supabase?.createClient,{timeout:20_000});
+  await page.evaluate(async({url,key,email,password})=>{
+   const supa=window.supabase.createClient(url,key,{
+    auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+   });
+   const {error}=await supa.auth.signInWithPassword({email,password});
+   if(error)throw Error('Synthetic Team GUI login failed');
+   supa.auth.stopAutoRefresh?.();
+  },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
+  await page.reload();
+  await expect(page.locator('body')).not.toHaveClass(/login-required/);
+  await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+  await expect(page.locator('#v5-learning-card')).toBeVisible();
+  await page.locator('#v5-learning-team-select').selectOption(teamId);
+  await expect(page.locator('#v5-learning-project-select')).toHaveValue(project);
+ }
+ await enter('parent');
+ await expect(page.locator('#v5-learning-manager-controls')).toBeVisible();
+ const opts=await page.locator('#v5-learning-lesson-teacher option').evaluateAll(
+  els=>els.map(x=>x.value));
+ assert.ok(opts.includes(managerActor.id));
+ assert.ok(opts.includes(teacherActor.id));
+ const month=await page.evaluate(()=>{
+  const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+ });
+ await page.locator('#v5-learning-lesson-student').selectOption(student);
+ await page.locator('#v5-learning-lesson-teacher').selectOption(teacherActor.id);
+ await page.locator('#v5-learning-lesson-subject').fill('Cross Teacher English GUI');
+ await page.locator('#v5-learning-lesson-start').fill(month+'-16T14:00');
+ await page.locator('#v5-learning-lesson-end').fill(month+'-16T15:30');
+ await page.locator('#v5-learning-lesson-submit').click();
+ await expect(page.locator('#v5-learning-lessons')).toContainText('Cross Teacher English GUI');
+ await expect(page.locator('#v5-learning-lessons')).toContainText('Math Team GUI QA');
+ await expect(page.locator('#v5-learning-lessons')).toContainText(
+  '老師 · '+teacherActor.id.slice(-6));
+ await expect(page.locator('#v5-learning-calendar')).toContainText('Cross Teacher English GUI');
+
+ await page.locator('#sign-out').click();
+ await expect(page.locator('#v5-learning-students')).toBeEmpty();
+ await enter('teacher');
+ await expect(page.locator('#v5-learning-manager-controls')).toBeHidden();
+ const teamChoices=await page.locator('#v5-learning-team-select option')
+  .evaluateAll(els=>els.map(x=>x.value));
+ assert.ok(teamChoices.includes(teamId),'Assigned teacher can open their Team project');
+ assert.ok(!teamChoices.includes(oldTeam),'Departed original Team stays inaccessible');
+ await expect(page.locator('#v5-learning-lessons')).toContainText('Cross Teacher English GUI');
+ await expect(page.locator('#v5-learning-lessons')).toContainText('Math Team GUI QA');
+ assert.deepEqual((await rows(teacherJwt,'v5_team_students',
+  '&team_id=eq.'+oldTeam)).data,[],
+  'Assigned Teacher B may not read their former Team A students');
+ await page.locator('#sign-out').click();
+ await expect(page.locator('#v5-learning-card')).toBeHidden();
+ await expect(page.locator('#v5-learning-calendar')).toBeEmpty();
+});
+
+
+test('V5.3 manager safely renames Team student, edits lesson, archives without losing history',async({page})=>{
+ const actor=f.actors.parent;
+ const workspace=db("select id from public.workspaces where owner_id='"+actor.id+"'");
+ const teamId=db("select id from public.v5_teams where anchor_workspace_id='"+workspace+"'");
+ const student=db("select id from public.v5_team_students where team_id='"+
+  teamId+"' and display_name='GUI Synthetic Student 532'");
+ const lesson=db("select id from public.v5_team_lessons where student_id='"+
+  student+"' and subject='Cross Teacher English GUI'");
+ const teacherId=db("select teacher_user_id from public.v5_team_lessons where id='"+
+  lesson+"'");
+ assert.match(student,/^[a-f0-9-]{36}$/i);
+ assert.match(lesson,/^[a-f0-9-]{36}$/i);
+ assert.equal(teacherId,f.actors.teacher.id);
+ const beforeV4=db("select count(*) from public.lesson_records where owner_id='"+
+  actor.id+"'");
+ const beforeSeats=db("select count(*) from tutor_private.v5_team_student_seat_ledger "+
+  "where team_id='"+teamId+"'");
+
+ await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
+  route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
+   contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+ await page.addInitScript(({url,key})=>{
+  window.V4_LOCAL_BACKEND={environment:'local',isolated:true,projectRef:'local',
+   url,publishableKey:key};
+ },{url:f.apiUrl,key:f.anonKey});
+ await page.goto('/v2/index.html');
+ await page.waitForFunction(()=>!!window.supabase?.createClient,{timeout:20_000});
+ await page.evaluate(async({url,key,email,password})=>{
+  const supa=window.supabase.createClient(url,key,{
+   auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+  });
+  const {error}=await supa.auth.signInWithPassword({email,password});
+  if(error)throw Error('Synthetic manager editor login failed');
+  supa.auth.stopAutoRefresh?.();
+ },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
+ await page.reload();
+ await expect(page.locator('body')).not.toHaveClass(/login-required/);
+ await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await expect(page.locator('#v5-learning-card')).toBeVisible();
+ await page.locator('#v5-learning-team-select').selectOption(teamId);
+ await expect(page.locator('[data-v5-learning-edit-student="'+student+'"]')).toBeAttached();
+ const studentForm=page.locator('[data-v5-learning-edit-student="'+student+'"]');
+ await studentForm.locator('xpath=..').locator('summary').click();
+ await studentForm.locator('input[name="display_name"]').fill('Renamed Team Student GUI');
+ await studentForm.locator('button[type="submit"]').click();
+ await expect(page.locator('#v5-learning-students')).toContainText('Renamed Team Student GUI');
+ assert.equal(db("select display_name from public.v5_team_students where id='"+
+  student+"'"),'Renamed Team Student GUI');
+
+ const form=page.locator('[data-v5-learning-edit-lesson="'+lesson+'"]');
+ await expect(form).toBeAttached();
+ await form.locator('xpath=..').locator('summary').click();
+ const month=await page.evaluate(()=>{
+  const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+ });
+ await form.locator('input[name="subject"]').fill('Edited Cross Teacher English');
+ await form.locator('input[name="lesson_start"]').fill(month+'-16T14:30');
+ await form.locator('input[name="lesson_end"]').fill(month+'-16T15:30');
+ await form.locator('textarea[name="notes"]').fill('Authorized schedule edit, teacher unchanged');
+ await form.locator('button[type="submit"]').click();
+ await expect(page.locator('#v5-learning-lessons')).toContainText('Edited Cross Teacher English');
+ assert.equal(db("select subject from public.v5_team_lessons where id='"+
+  lesson+"'"),'Edited Cross Teacher English');
+ assert.equal(db("select teacher_user_id from public.v5_team_lessons where id='"+
+  lesson+"'"),teacherId,
+  'Editing time, notes and subject must not reassign lesson teacher');
+
+ page.on('dialog',dialog=>dialog.accept());
+ await page.locator('[data-v5-learning-action="archive-student"][data-id="'+student+'"]').click();
+ await expect(page.locator('#v5-learning-students')).toContainText('已封存');
+ assert.equal(db("select is_archived from public.v5_team_students where id='"+
+  student+"'"),'t');
+ assert.equal(db("select count(*) from public.v5_team_lessons where student_id='"+
+  student+"'"),'2','Archived student must retain both cross-teacher lessons');
+ assert.equal(db("select count(*) from tutor_private.v5_team_student_seat_ledger "+
+  "where team_id='"+teamId+"'"),beforeSeats,
+  'Archiving does not free lifetime student seat');
+ assert.equal(db("select count(*) from public.lesson_records where owner_id='"+
+  actor.id+"'"),beforeV4,'No V4 personal lessons changed');
+
+ await page.locator('#sign-out').click();
+ await expect(page.locator('body')).toHaveClass(/login-required/);
+ await expect(page.locator('#v5-learning-card')).toBeHidden();
+});

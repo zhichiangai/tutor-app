@@ -232,6 +232,76 @@
                 </div>
               </div>
             </article>
+            <article class="card settings-card v5-plan-card hidden" id="v5-learning-card" aria-labelledby="v5-learning-heading">
+              <div class="section-row">
+                <div>
+                  <h3 id="v5-learning-heading">Team 學生與跨老師課表</h3>
+                  <p class="section-sub">團隊專案的課程與學生獨立於個人家教空間。只有被指派的老師能看見相應內容。</p>
+                </div>
+              </div>
+              <p id="v5-learning-message" role="status" aria-live="polite" class="section-sub"></p>
+              <div class="v5-learning-controls">
+                <label>Team
+                  <select id="v5-learning-team-select" aria-label="選擇 Team"></select>
+                </label>
+                <label>專案
+                  <select id="v5-learning-project-select" aria-label="選擇 Team 專案"></select>
+                </label>
+              </div>
+              <p id="v5-learning-no-project" class="helper-note hidden">此 Team 尚未建立可用專案，請先到 Team 團隊與專案建立。</p>
+              <div class="v5-team-panel">
+                <h4>專案學生</h4>
+                <div id="v5-learning-students"></div>
+              </div>
+              <div class="v5-learning-management hidden" id="v5-learning-manager-controls">
+                <div class="v5-team-panel">
+                  <h4>新增 Team 學生</h4>
+                  <p class="helper-note">每位學生只計一次 Team 累計名額；加入多個專案不會重複計算。</p>
+                  <form id="v5-learning-student-form">
+                    <label>學生名稱
+                      <input id="v5-learning-student-name" maxlength="100" placeholder="例如：王同學" required>
+                    </label>
+                    <button class="secondary-button" type="submit">新增 Team 學生</button>
+                  </form>
+                </div>
+                <div class="v5-team-panel">
+                  <h4>學生加入此專案</h4>
+                  <form id="v5-learning-enroll-form">
+                    <label>未加入此專案的 Team 學生
+                      <select id="v5-learning-enroll-student" required></select>
+                    </label>
+                    <button id="v5-learning-enroll-submit" class="secondary-button" type="submit">加入專案</button>
+                  </form>
+                </div>
+              </div>
+              <div class="v5-team-panel">
+                <div class="v5-learning-calendar-head">
+                  <h4>跨老師課表</h4>
+                  <div class="v5-learning-month-controls">
+                    <button id="v5-learning-prev-month" type="button" class="secondary-button" aria-label="Team 上個月">上一月</button>
+                    <strong id="v5-learning-month-label"></strong>
+                    <button id="v5-learning-next-month" type="button" class="secondary-button" aria-label="Team 下個月">下一月</button>
+                  </div>
+                </div>
+                <p class="helper-note">僅顯示這個專案的課程。管理者可查看團隊老師排課，老師只能查看獲指派專案的課程；不顯示學費金額。</p>
+                <div id="v5-learning-calendar" class="v5-learning-calendar" aria-label="Team 月課表"></div>
+                <div id="v5-learning-lessons" class="v5-learning-lessons" aria-live="polite"></div>
+              </div>
+              <div class="v5-team-panel">
+                <h4>新增 Team 課程</h4>
+                <form id="v5-learning-lesson-form" class="v5-learning-lesson-form">
+                  <label>學生<select id="v5-learning-lesson-student" required></select></label>
+                  <label>授課老師<select id="v5-learning-lesson-teacher" required></select></label>
+                  <label>科目<input id="v5-learning-lesson-subject" maxlength="100" placeholder="例如：數學" required></label>
+                  <label>開始時間<input id="v5-learning-lesson-start" type="datetime-local" required></label>
+                  <label>結束時間<input id="v5-learning-lesson-end" type="datetime-local" required></label>
+                  <label class="v5-learning-notes-field">備註
+                    <textarea id="v5-learning-lesson-notes" maxlength="1000" rows="2" placeholder="本堂課需要注意的事（不含付款資訊）"></textarea>
+                  </label>
+                  <button id="v5-learning-lesson-submit" type="submit" class="secondary-button">建立 Team 課程</button>
+                </form>
+              </div>
+            </article>
             <article class="card settings-card"><h3>登入與安全</h3><p class="section-sub">使用 Google 管理登入，不會在網站儲存你的 Google 密碼。</p>
               <button class="secondary-button wide" id="sign-out" type="button">登出 Google 帳號</button>
             </article>

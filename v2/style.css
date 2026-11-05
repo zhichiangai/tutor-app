@@ -857,3 +857,60 @@ body.preview-readonly .app-shell [aria-disabled="true"]{cursor:not-allowed}
 #v5-team-owner-controls select,#v5-team-owner-controls input{max-width:100%}
 @media(max-width:640px){#v5-team-owner-controls{grid-template-columns:1fr}
 #v5-team-owner-controls>.v5-team-panel:last-child{grid-column:auto}}
+
+
+/* V5.3 Team student and cross-teacher month overview. */
+#v5-learning-card{grid-column:1/-1;min-width:0}
+#v5-learning-card .v5-team-panel{border-top:1px solid var(--line,#e2e8f0);padding-top:16px;margin-top:18px}
+#v5-learning-card h4{margin:3px 0 10px;font-size:1rem}
+#v5-learning-card form label{display:grid;gap:6px;margin:0}
+#v5-learning-card form input,
+#v5-learning-card form select,
+#v5-learning-card form textarea,
+#v5-learning-card select{max-width:100%;min-width:0;width:100%;box-sizing:border-box}
+.v5-learning-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.v5-learning-controls label{display:grid;gap:6px;font-weight:600}
+.v5-learning-management{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:22px}
+.v5-learning-management form{display:grid;gap:10px}
+.v5-learning-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:9px;
+ border:1px solid var(--line,#e2e8f0);padding:10px 12px;border-radius:12px;margin:7px 0}
+.v5-learning-calendar-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.v5-learning-month-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.v5-learning-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));
+ border:1px solid var(--line,#e2e8f0);border-radius:12px;overflow:hidden;margin:12px 0}
+.v5-learning-weekday{text-align:center;font-weight:600;font-size:.85rem;padding:8px 2px;
+ background:var(--surface-soft,#f6f8fa)}
+.v5-learning-day{min-width:0;min-height:95px;padding:7px 5px;border-top:1px solid var(--line,#e2e8f0);
+ border-right:1px solid var(--line,#e2e8f0)}
+.v5-learning-day.outside{background:var(--surface-soft,#f6f8fa)}
+.v5-learning-day strong{display:block;font-size:.85rem;margin-bottom:6px}
+.v5-learning-event{display:block;border:0;border-radius:5px;width:100%;text-align:left;font-size:.72rem;
+ padding:3px 5px;margin:3px 0;background:var(--surface-soft,#eaf0f5);color:inherit;
+ cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.v5-learning-event:focus-visible{outline:2px solid currentColor}
+.v5-learning-lesson-row{display:grid;gap:5px;padding:12px 8px;border-bottom:1px solid var(--line,#e2e8f0)}
+.v5-learning-lesson-row strong{overflow-wrap:anywhere}
+.v5-learning-lesson-actions{display:flex;gap:8px;flex-wrap:wrap}
+.v5-learning-notes{white-space:pre-wrap;overflow-wrap:anywhere;margin:0;font-size:.88rem}
+.v5-learning-lesson-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.v5-learning-notes-field{grid-column:1/-1}
+@media(max-width:700px){
+ .v5-learning-controls,.v5-learning-management,.v5-learning-lesson-form{grid-template-columns:1fr}
+ .v5-learning-calendar{overflow:hidden}
+ .v5-learning-day{min-height:74px;padding:5px 2px}
+ .v5-learning-weekday{font-size:.75rem}
+ .v5-learning-event{font-size:.67rem;padding:3px}
+ .v5-learning-month-controls{width:100%;justify-content:space-between}
+}
+
+/* V5.3 per-row edit forms; backend RLS remains authoritative. */
+.v5-learning-edit{width:100%;max-width:100%;padding:5px 0}
+.v5-learning-edit>summary{cursor:pointer;font-weight:600;font-size:.86rem}
+.v5-learning-edit form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;
+ padding:12px;margin-top:8px;border:1px solid var(--line,#e2e8f0);border-radius:10px}
+.v5-learning-edit form label{display:grid;gap:4px;min-width:0}
+.v5-learning-edit form label:has(textarea){grid-column:1/-1}
+.v5-learning-edit form input,.v5-learning-edit form textarea{width:100%;min-width:0;box-sizing:border-box}
+.v5-learning-edit form button[type=submit]{justify-self:start}
+@media(max-width:600px){.v5-learning-edit form{grid-template-columns:1fr}
+ .v5-learning-edit form label:has(textarea){grid-column:auto}}
