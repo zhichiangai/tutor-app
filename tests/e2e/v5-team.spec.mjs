@@ -148,6 +148,12 @@ test('Team projects stay isolated until teacher accepts email invitation and is 
  assert.notEqual((await rest(guest,'POST','v5_team_project_members?select=project_id',{
   project_id:beta,workspace_id:ws,user_id:guestId
  })).status,201,'Non-owner cannot self-assign');
+ const archived=await rest(owner,'PATCH','v5_team_projects?id=eq.'+beta,
+  {status:'archived'});
+ assert.equal(archived.status,200);
+ assert.notEqual((await rest(owner,'POST','v5_team_project_members?select=project_id',{
+  project_id:beta,workspace_id:ws,user_id:guestId
+ })).status,201,'Archived project cannot receive new teacher assignment');
  assert.notEqual((await rest(guest,'POST','v5_team_invitations?select=id',{
   workspace_id:ws,recipient_email:f.actors.parent.email,invited_by:guestId
  })).status,201,'Teacher cannot invite other teachers');
