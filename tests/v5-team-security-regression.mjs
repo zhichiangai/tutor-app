@@ -20,13 +20,16 @@ test('all workspace policy predicates are explicitly outer-qualified',()=>{
   /public\.v5_team_projects\.workspace_id/);
 });
 test('legacy membership RLS does not query V5 entitlements recursively',()=>{
- for(const name of ['v5_owner_read_team_members','v5_owner_remove_team_teacher']){
-  const p=policies.get(name);
-  assert.ok(p);
-  assert.doesNotMatch(p,/v5_workspace_entitlements/,
-   'Membership->entitlements->membership cycle blocks V4 login');
-  assert.match(p,/w\.owner_id\s*=\s*\(select auth\.uid\(\)\)/);
- }
+ const p=policies.get('v5_owner_read_team_members');
+ assert.ok(p);
+ assert.doesNotMatch(p,/v5_workspace_entitlements/,
+  'Membership->entitlements->membership cycle blocks V4 login');
+ assert.match(p,/w\.owner_id\s*=\s*\(select auth\.uid\(\)\)/);
+ assert.equal(policies.has('v5_owner_remove_team_teacher'),false,
+  'Owner deletion must be routed through audited RPC instead of direct RLS');
+ assert.doesNotMatch(sql,/grant\s+delete\s+on\s+public\.workspace_members\s+to\s+authenticated\s*;/i);
+ assert.match(sql,/function public\.v5_remove_team_teacher\(p_workspace_id uuid,p_user_id uuid\)/);
+ assert.match(sql,/function public\.v5_leave_team\(p_workspace_id uuid\)/);
 });
 test('project assignment policy uses FK and privileged guard without recursive project read',()=>{
  const p=policies.get('v5_project_member_owner_assign')||'';
