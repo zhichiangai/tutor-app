@@ -31,7 +31,7 @@ test('legacy membership RLS does not query V5 entitlements recursively',()=>{
 test('V4 students, lessons and payment RLS are not altered by Team migration',()=>{
  assert.doesNotMatch(sql,/alter\s+policy[\s\S]*?(students|lesson_records|payment_batches)/i);
  for(const table of ['students','lesson_records','payment_batches']){
-  assert.doesNotMatch(sql,new RegExp('create policy\\\\s+\\\\w+\\\\s+on\\\\s+public\\\\.'+table+'\\\\b','i'));
+  assert.doesNotMatch(sql,new RegExp('create policy\\s+\\w+\\s+on\\s+public\\.'+table+'\\b','i'));
  }
 });
 test('invites require verified Auth identity and project assignments enforce composite FKs',()=>{
