@@ -85,6 +85,17 @@ export function createV5LearningUI({getClient,getUser,getRole,isReady,notify}){
    const row=el('div',undefined,'v5-learning-row');
    row.append(el('span',s.display_name+(s.is_archived?' · 已封存':'')));
    if(manager&&!s.is_archived){
+    const details=el('details',undefined,'v5-learning-edit');
+    details.append(el('summary','編輯名稱'));
+    const form=el('form');
+    form.dataset.v5LearningEditStudent=s.id;
+    const label=el('label','學生名稱');
+    const input=el('input');
+    input.name='display_name';input.value=s.display_name;input.maxLength=100;input.required=true;
+    label.append(input);
+    const save=el('button','儲存名稱','secondary-button');
+    save.type='submit';form.append(label,save);details.append(form);
+    row.append(details);
     const btn=el('button','封存','secondary-button');
     btn.type='button';btn.dataset.v5LearningAction='archive-student';
     btn.dataset.id=s.id;row.append(btn);
@@ -115,6 +126,14 @@ export function createV5LearningUI({getClient,getUser,getRole,isReady,notify}){
   $('v5-learning-month-label').textContent=availableMonth;
   renderCalendar();
   renderLessonList();
+ }
+ function toDateTimeLocal(iso){
+  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',
+   year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',
+   hourCycle:'h23'}).formatToParts(new Date(iso));
+  const value=k=>parts.find(x=>x.type===k)?.value||'00';
+  return [value('year'),value('month'),value('day')].join('-')+'T'+
+    [value('hour'),value('minute')].join(':');
  }
  function renderCalendar(){
   const target=$('v5-learning-calendar');target.replaceChildren();
@@ -173,6 +192,25 @@ export function createV5LearningUI({getClient,getUser,getRole,isReady,notify}){
    const able=isManager()||l.teacher_user_id===getUser()?.id&&
     projectAssignments(l.project_id).some(a=>a.user_id===getUser()?.id);
    if(able&&l.status==='scheduled'){
+    const details=el('details',undefined,'v5-learning-edit');
+    details.append(el('summary','編輯課程'));
+    const form=el('form',undefined,'v5-learning-edit-form');
+    form.dataset.v5LearningEditLesson=l.id;
+    const field=(label,name,value,type,max)=>{
+     const wrapper=el('label',label),input=el('input');
+     input.name=name;input.type=type;input.value=value;input.required=true;
+     if(max)input.maxLength=max;
+     wrapper.append(input);form.append(wrapper);
+    };
+    field('科目','subject',l.subject,'text',100);
+    field('開始','lesson_start',toDateTimeLocal(l.lesson_start),'datetime-local');
+    field('結束','lesson_end',toDateTimeLocal(l.lesson_end),'datetime-local');
+    const noteLabel=el('label','備註'),note=el('textarea');
+    note.name='notes';note.rows=2;note.maxLength=1000;note.value=l.notes||'';
+    noteLabel.append(note);form.append(noteLabel);
+    const save=el('button','儲存課程','secondary-button');
+    save.type='submit';form.append(save);
+    details.append(form);row.append(details);
     const actions=el('div',undefined,'v5-learning-lesson-actions');
     for(const [value,label] of [['completed','標記完成'],['cancelled','取消課程']]){
      const btn=el('button',label,'secondary-button');
@@ -261,12 +299,40 @@ export function createV5LearningUI({getClient,getUser,getRole,isReady,notify}){
   }finally{busy=false;render()}
  }
  async function handleSubmit(e){
-  const id=e.target?.id;
+  const id=e.target?.id,editStudent=e.target?.dataset?.v5LearningEditStudent,
+   editLesson=e.target?.dataset?.v5LearningEditLesson;
   if(!['v5-learning-student-form','v5-learning-enroll-form',
-    'v5-learning-lesson-form'].includes(id))return false;
+    'v5-learning-lesson-form'].includes(id)&&!editStudent&&!editLesson)return false;
   e.preventDefault();
   const client=getClient(),manager=isManager();
   if(!valid()||!ready||!client||!teamId)return true;
+  if(editStudent){
+   if(!manager)return true;
+   const name=e.target.elements.namedItem('display_name')?.value?.trim();
+   if(!name||name.length>100||
+    !students.some(s=>s.id===editStudent&&s.team_id===teamId&&!s.is_archived))return true;
+   await mutation(()=>client.from('v5_team_students').update({display_name:name})
+    .eq('id',editStudent).eq('team_id',teamId).select('id'),'已更新學生名稱');
+   return true;
+  }
+  if(editLesson){
+   const l=lessons.find(x=>x.id===editLesson&&x.project_id===projectId);
+   const canEdit=l?.status==='scheduled'&&(manager||l.teacher_user_id===getUser()?.id&&
+    projectAssignments(l.project_id).some(a=>a.user_id===getUser()?.id));
+   if(!canEdit)return true;
+   const subject=e.target.elements.namedItem('subject')?.value?.trim();
+   const startDate=new Date(e.target.elements.namedItem('lesson_start')?.value||'');
+   const endDate=new Date(e.target.elements.namedItem('lesson_end')?.value||'');
+   const notes=e.target.elements.namedItem('notes')?.value?.trim()||'';
+   if(!subject||subject.length>100||notes.length>1000||
+    !Number.isFinite(+startDate)||!Number.isFinite(+endDate)||
+    endDate<=startDate)return true;
+   await mutation(()=>client.from('v5_team_lessons').update({
+    subject,lesson_start:startDate.toISOString(),lesson_end:endDate.toISOString(),notes
+   }).eq('id',editLesson).eq('project_id',projectId).select('id'),
+   '已更新 Team 課程');
+   return true;
+  }
   if(id==='v5-learning-student-form'){
    if(!manager)return true;
    const name=$('v5-learning-student-name').value.trim();
