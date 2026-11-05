@@ -1514,6 +1514,126 @@ test('V5.4 isolated advance credit is split, suggested, applied and never double
   owner+"'"),beforeV4Lessons,'V4 lessons must remain unchanged');
 });
 
+test('V5.4 manager GUI confirms an advance and applies a separate offset with no V4 writes',async({page})=>{
+ test.setTimeout(120_000);
+ const actor=f.actors.parent,manager=await signIn('parent');
+ const ws=db("select id from public.workspaces where owner_id='"+actor.id+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ const project=db("select id from public.v5_team_projects where workspace_id='"+
+  ws+"' and name='Private Team B Project'");
+ const beforeV4=db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'");
+ let r=await rest(manager,'POST','v5_team_students?select=id',{
+  team_id:team,display_name:'GUI Advance Isolated Student',created_by:actor.id
+ });
+ assert.equal(r.status,201);
+ const student=r.data[0].id;
+ r=await rest(manager,'POST','v5_team_enrollments?select=student_id',{
+  team_id:team,project_id:project,student_id:student
+ });
+ assert.equal(r.status,201);
+ const fee=async(subject,date,hourly)=>{
+  let t=await rest(manager,'POST','v5_team_lessons?select=id',{
+   team_id:team,project_id:project,student_id:student,teacher_user_id:actor.id,
+   subject,lesson_start:date+'T14:00:00+08:00',
+   lesson_end:date+'T15:00:00+08:00',status:'completed'
+  });
+  assert.equal(t.status,201);
+  const id=t.data[0].id;
+  t=await rest(manager,'POST','rpc/v5_confirm_team_lesson_fee',{
+   p_lesson_id:id,p_hourly_rate_cents:hourly
+  });
+  assert.equal(t.status,200);
+  return id;
+ };
+ const math=await fee('Advance GUI Math','2026-10-27',100000);
+ const english=await fee('Advance GUI English','2026-10-28',50000);
+ const moneyBefore=await rest(manager,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal(moneyBefore.status,200);
+ const baseReceived=moneyBefore.data.confirmed_payments_cents;
+ await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
+  route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
+   contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+ await page.addInitScript(({url,key})=>{
+  window.V4_LOCAL_BACKEND={environment:'local',isolated:true,projectRef:'local',
+   url,publishableKey:key};
+ },{url:f.apiUrl,key:f.anonKey});
+ await page.goto('/v2/index.html');
+ await page.waitForFunction(()=>!!window.supabase?.createClient,{timeout:20_000});
+ await page.evaluate(async({url,key,email,password})=>{
+  const client=window.supabase.createClient(url,key,{
+   auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+  });
+  const {error}=await client.auth.signInWithPassword({email,password});
+  if(error)throw Error('Synthetic advance GUI login failed');
+  client.auth.stopAutoRefresh?.();
+ },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
+ await page.reload();
+ await expect(page.locator('body')).not.toHaveClass(/login-required/);
+ await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await expect(page.locator('#v5-billing-card')).toBeVisible();
+ await page.locator('#v5-billing-team-select').selectOption(team);
+ await page.locator('#v5-billing-prev').click();
+ await expect(page.locator('#v5-advance-panel')).toBeVisible();
+ await expect(page.locator('#v5-advance-student-select option[value="'+student+'"]')).toBeAttached();
+ await page.locator('#v5-advance-student-select').selectOption(student);
+ await expect(page.locator('#v5-advance-message')).toContainText('管理者資料已核對');
+ await page.locator('#v5-advance-amount').fill('1000');
+ await page.locator('#v5-advance-credit').fill('300');
+ await page.locator('#v5-advance-received-date').fill('2026-10-29');
+ await page.locator('#v5-advance-note').fill('Synthetic GUI advance, no bank verification');
+ page.on('dialog',dialog=>dialog.accept());
+ await page.locator('#v5-advance-report-submit').click();
+ const manualId=()=>db("select id from tutor_private.v5_team_payment_reports "+
+  "where student_id='"+student+"' and reference like 'manual-advance-%' "+
+  "order by reported_at desc limit 1");
+ await expect.poll(manualId,{timeout:20_000}).toMatch(/^[a-f0-9-]{36}$/i);
+ const payment=manualId();
+ const field=page.locator('[data-v5-advance-payment="'+payment+'"]'+
+  '[data-v5-advance-lesson="'+math+'"]');
+ await expect(field).toBeVisible();
+ await field.fill('700');
+ await page.locator('[data-v5-billing-action="confirm-advance-payment"]'+
+  '[data-id="'+payment+'"]').click();
+ await expect.poll(()=>db("select status from tutor_private.v5_team_payment_reports "+
+  "where id='"+payment+"'"),{timeout:20_000}).toBe('confirmed');
+ const credit=db("select id from tutor_private.v5_team_advance_credits "+
+  "where payment_id='"+payment+"'");
+ assert.match(credit,/^[a-f0-9-]{36}$/i);
+ assert.equal(db("select amount_cents from tutor_private.v5_team_advance_credits "+
+  "where id='"+credit+"'"),'30000');
+ assert.equal(db("select amount_cents from tutor_private.v5_team_payment_allocations "+
+  "where payment_id='"+payment+"' and lesson_id='"+math+"'"),'70000');
+ await expect(page.locator('#v5-advance-available')).toContainText('300');
+ const apply=page.locator('[data-v5-billing-action="apply-advance-credit"]'+
+  '[data-id="'+credit+'"]');
+ await expect(apply).toBeVisible();
+ const suggested=page.locator('[data-v5-advance-credit="'+credit+'"]'+
+  '[data-v5-advance-lesson="'+math+'"]');
+ await expect(suggested).toHaveValue('300.00');
+ await apply.click();
+ await expect.poll(()=>db("select coalesce(sum(amount_cents),0) "+
+  "from tutor_private.v5_team_advance_applications "+
+  "where credit_id='"+credit+"'"),{timeout:20_000}).toBe('30000');
+ await expect(page.locator('#v5-advance-available')).toContainText('$0');
+ const final=await rest(manager,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal(final.status,200);
+ assert.equal(final.data.confirmed_payments_cents,baseReceived+100000,
+  'Advance GUI must count cash exactly once even after offset');
+ assert.equal(final.data.receivables.find(x=>x.lesson_id===math).outstanding_cents,0);
+ assert.equal(final.data.receivables.find(x=>x.lesson_id===english).outstanding_cents,50000);
+ assert.equal(db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'"),beforeV4,'GUI advance never writes V4 receipts');
+ await page.locator('#sign-out').click();
+ await expect(page.locator('body')).toHaveClass(/login-required/);
+ await expect(page.locator('#v5-advance-panel')).toBeHidden();
+ await expect(page.locator('#v5-advance-available')).toBeEmpty();
+});
+
 test('V5.3 billing management follows accepted Team governance transfer, not V4 owner',async()=>{
  const former=await signIn('parent'),newManager=await signIn('teacher');
  const fromId=f.actors.parent.id,toId=f.actors.teacher.id;
