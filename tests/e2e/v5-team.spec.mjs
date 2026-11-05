@@ -1256,11 +1256,13 @@ test('V5.3 manager GUI reports and partially allocates a payment without V4 effe
  await page.locator('#v5-payment-note').fill('Synthetic manual payment, no external bank');
  page.on('dialog',dialog=>dialog.accept());
  await page.locator('#v5-payment-report-submit').click();
- await expect(page.locator('#v5-payment-pending-reports')).toContainText('Private Billing Student 01');
- const pid=db("select id from tutor_private.v5_team_payment_reports "+
+ // The list already contains pending payments for this student from earlier tests.
+ // Wait for this newly submitted row, not merely a repeated student name.
+ const lookupManualPayment=()=>db("select id from tutor_private.v5_team_payment_reports "+
   "where student_id='"+student+"' and reference like 'manual-%' "+
   "order by reported_at desc limit 1");
- assert.match(pid,/^[a-f0-9-]{36}$/i);
+ await expect.poll(lookupManualPayment,{timeout:15_000}).toMatch(/^[a-f0-9-]{36}$/i);
+ const pid=lookupManualPayment();
  assert.equal(db("select status from tutor_private.v5_team_payment_reports "+
   "where id='"+pid+"'"),'pending');
  const field=page.locator('[data-v5-payment-id="'+pid+'"]'+
@@ -1269,6 +1271,10 @@ test('V5.3 manager GUI reports and partially allocates a payment without V4 effe
  await field.fill('500');
  await page.locator('[data-v5-billing-action="allocate-payment"]'+
   '[data-id="'+pid+'"]').click();
+ // Likewise, previously confirmed payments are already visible. Assert this
+ // particular payment completed before checking the refreshed monthly UI.
+ await expect.poll(()=>db("select status from tutor_private.v5_team_payment_reports "+
+  "where id='"+pid+"'"),{timeout:15_000}).toBe('confirmed');
  await expect(page.locator('#v5-payment-confirmed-reports')).toContainText('Private Billing Student 01');
  await expect(page.locator('#v5-payment-confirmed-total')).toContainText('2,341.67');
  assert.equal(db("select status from tutor_private.v5_team_payment_reports "+
@@ -1289,6 +1295,12 @@ test('V5.3 billing management follows accepted Team governance transfer, not V4 
  const fromId=f.actors.parent.id,toId=f.actors.teacher.id;
  const ws=db("select id from public.workspaces where owner_id='"+fromId+"'");
  const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ const beforeTransfer=await rest(former,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal(beforeTransfer.status,200);
+ assert.ok(beforeTransfer.data.confirmed_payments_cents>0,
+  'A previous confirmed payment must exist before authority transfer');
  const nominate=await rest(former,'POST','rpc/v5_propose_team_manager',{
   p_workspace_id:ws,p_target_user_id:toId
  });
@@ -1304,7 +1316,11 @@ test('V5.3 billing management follows accepted Team governance transfer, not V4 
   p_team_id:team,p_month:'2026-10-01'
  });
  assert.equal(newView.status,200,'New Team manager inherits payment read authority');
- assert.equal(newView.data.confirmed_payments_cents,234167);
+ assert.equal(newView.data.confirmed_payments_cents,
+  beforeTransfer.data.confirmed_payments_cents,
+  'Team governance transfer must preserve all confirmed payment totals');
+ assert.deepEqual(newView.data.payments,beforeTransfer.data.payments,
+  'Existing payment history must survive manager transfer unchanged');
  const oldView=await rest(former,'POST','rpc/v5_team_payment_overview',{
   p_team_id:team,p_month:'2026-10-01'
  });
