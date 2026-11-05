@@ -1072,6 +1072,144 @@ test('V5.3 Team manager GUI confirms a lesson receivable; regular teachers canno
  await expect(page.locator('#v5-billing-total')).toBeEmpty();
 });
 
+
+test('V5.3 manual partial payments distribute across subjects without over-allocating',async()=>{
+ const manager=await signIn('parent'),teacher=await signIn('teacher');
+ const stranger=await signIn('stranger');
+ const managerId=f.actors.parent.id;
+ const ws=db("select id from public.workspaces where owner_id='"+managerId+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ const student=db("select id from public.v5_team_students where team_id='"+
+  team+"' and display_name='Private Billing Student 01'");
+ const wrongStudent=db("select id from public.v5_team_students where team_id='"+
+  team+"' and display_name='GUI Synthetic Student 532'");
+ const math=db("select lesson_id from tutor_private.v5_team_lesson_fees "+
+  "where team_id='"+team+"' and subject='數學'");
+ const english=db("select lesson_id from tutor_private.v5_team_lesson_fees "+
+  "where team_id='"+team+"' and subject='英文'");
+ const gui=db("select lesson_id from tutor_private.v5_team_lesson_fees "+
+  "where team_id='"+team+"' and subject='Finance UI Synthetic'");
+ assert.match(math,/^[a-f0-9-]{36}$/i);
+ assert.match(english,/^[a-f0-9-]{36}$/i);
+ assert.match(gui,/^[a-f0-9-]{36}$/i);
+ const beforeV4=db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'");
+ const report=({reference,studentId=student,amount=60000})=>
+  rest(manager,'POST','rpc/v5_report_team_payment',{
+   p_team_id:team,p_student_id:studentId,p_amount_cents:amount,
+   p_received_on:'2026-10-22',p_method:'bank_transfer',
+   p_reference:reference,p_note:'Synthetic no real transfer'
+  });
+ const allocate=(jwt,paymentId,allocations)=>
+  rest(jwt,'POST','rpc/v5_confirm_team_payment_allocation',{
+   p_payment_id:paymentId,p_allocations:allocations
+  });
+ const view=jwt=>rest(jwt,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal((await view(manager)).status,200);
+ assert.equal((await view(teacher)).status,403);
+ assert.equal((await view(stranger)).status,403);
+ assert.notEqual((await rest(teacher,'POST','rpc/v5_report_team_payment',{
+  p_team_id:team,p_student_id:student,p_amount_cents:60000,
+  p_received_on:'2026-10-22',p_method:'cash',
+  p_reference:'NOT-MANAGER-TRY'
+ })).status,200);
+ assert.notEqual((await report({reference:'WRONG-STUDENT-1',
+  studentId:db("select id from public.v5_team_students where team_id<>'"+
+   team+"' limit 1")})).status,200,'Cannot report another Team student');
+ assert.notEqual((await report({reference:'NEGATIVE-REJECT',amount:-5})).status,200);
+ const first=await report({reference:'PARTIAL-SYNTH-001'});
+ assert.equal(first.status,200);
+ const paymentId=first.data.payment_id;
+ assert.equal(first.data.status,'pending');
+ assert.equal((await report({reference:'PARTIAL-SYNTH-001'})).status!==200,true,
+  'Reference idempotency must reject duplicate manual report');
+ assert.equal((await allocate(teacher,paymentId,[{
+  lesson_id:math,amount_cents:60000
+ }])).status!==200,true,'Assigned teacher may not confirm payment');
+ assert.equal((await allocate(stranger,paymentId,[{
+  lesson_id:math,amount_cents:60000
+ }])).status!==200,true);
+ assert.notEqual((await allocate(manager,paymentId,[{
+  lesson_id:math,amount_cents:50000
+ }])).status,200,'Must allocate full payment or stay pending');
+ assert.notEqual((await allocate(manager,paymentId,[{
+  lesson_id:math,amount_cents:60000
+ },{lesson_id:math,amount_cents:1}])).status,200,'Duplicate lesson must be rejected');
+ assert.notEqual((await allocate(manager,paymentId,[{
+  lesson_id:math,amount_cents:60001
+ }])).status,200,'Cannot allocate beyond the payment total');
+ assert.notEqual((await allocate(manager,paymentId,[{
+  lesson_id:math,amount_cents:30000
+ },{lesson_id:gui,amount_cents:30000}])).status,200,
+ 'Cannot allocate payment for Student A to Student B');
+ assert.equal(db("select count(*) from tutor_private.v5_team_payment_allocations "+
+  "where payment_id='"+paymentId+"'"),'0','Failed allocation must roll back completely');
+
+ let r=await allocate(manager,paymentId,[
+  {lesson_id:math,amount_cents:30000},{lesson_id:english,amount_cents:30000}
+ ]);
+ assert.equal(r.status,200);
+ assert.equal(r.data.status,'confirmed');
+ assert.equal(r.data.allocated_cents,60000);
+ assert.deepEqual(new Set(r.data.allocations.map(x=>x.subject)),new Set(['數學','英文']));
+ assert.notEqual((await allocate(manager,paymentId,[{
+  lesson_id:math,amount_cents:60000
+ }])).status,200,'Payment must be confirmed at most once');
+ r=await view(manager);
+ assert.equal(r.status,200);
+ assert.equal(r.data.confirmed_payments_cents,60000);
+ const remaining=Object.fromEntries(r.data.receivables.map(x=>[
+  x.lesson_id,x.outstanding_cents
+ ]));
+ assert.equal(remaining[math],67500);
+ assert.equal(remaining[english],56667);
+ assert.equal(remaining[gui],100000);
+ assert.equal(r.data.payments.find(x=>x.payment_id===paymentId).allocations.length,2);
+
+ const second=await report({reference:'PARTIAL-SYNTH-002',amount:67500});
+ assert.equal(second.status,200);
+ assert.equal((await allocate(manager,second.data.payment_id,[{
+  lesson_id:math,amount_cents:67501
+ }])).status!==200,true,'Overpayment must never be hidden as prepayment');
+ r=await allocate(manager,second.data.payment_id,[{
+  lesson_id:math,amount_cents:67500
+ }]);
+ assert.equal(r.status,200);
+ const third=await report({reference:'PARTIAL-SYNTH-003',amount:56667});
+ assert.equal(third.status,200);
+ assert.equal((await allocate(manager,third.data.payment_id,[{
+  lesson_id:english,amount_cents:56667
+ }])).status,200);
+ r=await view(manager);
+ assert.equal(r.status,200);
+ assert.equal(r.data.confirmed_payments_cents,184167);
+ assert.equal(r.data.receivables.find(x=>x.lesson_id===math).outstanding_cents,0);
+ assert.equal(r.data.receivables.find(x=>x.lesson_id===english).outstanding_cents,0);
+ assert.equal(r.data.receivables.find(x=>x.lesson_id===gui).outstanding_cents,100000);
+ assert.equal(r.data.outstanding_cents,100000);
+
+ const p4=await report({reference:'PENDING-TRANSFER-4',amount:100});
+ assert.equal(p4.status,200);
+ const p5=await report({reference:'PENDING-CONCURRENT-5',amount:100});
+ assert.equal(p5.status,200);
+ const contested=await Promise.all([
+  allocate(manager,p4.data.payment_id,[{lesson_id:math,amount_cents:100}]),
+  allocate(manager,p5.data.payment_id,[{lesson_id:math,amount_cents:100}])
+ ]);
+ assert.ok(contested.every(x=>x.status!==200),
+  'Concurrent payments cannot over-allocate an already settled receivable');
+ assert.equal(db("select count(*) from tutor_private.v5_team_payment_allocations "+
+  "where lesson_id='"+math+"'"),'2',
+  'Exactly two legitimate partial allocation entries remain');
+ assert.equal(db("select count(*) from tutor_private.v5_team_payment_audit "+
+  "where team_id='"+team+"' and event='confirmed'"),'3');
+ assert.equal(db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'"),beforeV4,'V5 manual payments never write V4 payment history');
+ assert.notEqual((await rows(teacher,'v5_team_payment_reports')).status,200);
+});
+
 test('V5.3 billing management follows accepted Team governance transfer, not V4 owner',async()=>{
  const former=await signIn('parent'),newManager=await signIn('teacher');
  const fromId=f.actors.parent.id,toId=f.actors.teacher.id;
