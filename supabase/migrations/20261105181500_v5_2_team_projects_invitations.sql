@@ -100,9 +100,31 @@ create policy v5_project_member_owner_assign on public.v5_team_project_members
     join public.v5_workspace_entitlements e on e.workspace_id=w.id
     where w.id=public.v5_team_project_members.workspace_id and w.owner_id=(select auth.uid())
       and e.plan_code='team')
-   and exists(select 1 from public.v5_team_projects p
-    where p.id=public.v5_team_project_members.project_id and p.workspace_id=public.v5_team_project_members.workspace_id and p.status='active')
  );
+-- Avoid checking a project through its own RLS from a project-member policy:
+-- project SELECT includes project membership, so such checks recurse (42P17).
+-- A privileged BEFORE trigger validates archived status; the composite FK
+-- separately enforces matching project/workspace and accepted Team membership.
+create function tutor_private.v5_project_assignment_guard()
+returns trigger language plpgsql security definer set search_path='' as $
+declare v_status text;
+begin
+ select p.status into v_status from public.v5_team_projects p
+  where p.id=new.project_id and p.workspace_id=new.workspace_id;
+ if v_status is null then
+  raise exception '專案不存在或不屬於這個 Team' using errcode='23503';
+ end if;
+ if v_status<>'active' then
+  raise exception '已封存專案不能新增老師' using errcode='23514';
+ end if;
+ return new;
+end;$;
+revoke all on function tutor_private.v5_project_assignment_guard()
+ from public,anon,authenticated;
+create trigger v5_project_assignment_guard
+before insert or update on public.v5_team_project_members for each row
+execute function tutor_private.v5_project_assignment_guard();
+
 create policy v5_project_member_owner_unassign on public.v5_team_project_members
  for delete to authenticated using (
    exists(select 1 from public.workspaces w
