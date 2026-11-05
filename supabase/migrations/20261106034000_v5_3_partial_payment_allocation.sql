@@ -72,6 +72,8 @@ declare
  v_actor uuid:=(select auth.uid());
  v_anchor uuid;
  v_payment uuid;
+ v_outstanding bigint;
+ v_pending bigint;
 begin
  if v_actor is null or p_team_id is null or p_student_id is null
    or p_amount_cents is null or p_amount_cents<1
@@ -100,6 +102,25 @@ begin
  if not exists(select 1 from public.v5_team_students s
   where s.team_id=p_team_id and s.id=p_student_id) then
   raise exception '學生不屬於此 Team' using errcode='42501';
+ end if;
+ -- No orphan pending payment or silent prepayment before V5.4.
+ -- The workspace row lock serializes all reports/confirmations for this Team.
+ select coalesce(sum(f.amount_cents-coalesce(a.allocated_cents,0)),0)::bigint
+ into v_outstanding
+ from tutor_private.v5_team_lesson_fees f
+ left join lateral(
+  select sum(x.amount_cents)::bigint allocated_cents
+  from tutor_private.v5_team_payment_allocations x
+  where x.lesson_id=f.lesson_id
+ ) a on true
+ where f.team_id=p_team_id and f.student_id=p_student_id;
+ select coalesce(sum(p.amount_cents),0)::bigint into v_pending
+ from tutor_private.v5_team_payment_reports p
+ where p.team_id=p_team_id and p.student_id=p_student_id
+   and p.status='pending';
+ if v_outstanding-v_pending<p_amount_cents then
+  raise exception '金額超過該學生未結清應收，超額預收須待 V5.4'
+   using errcode='23514';
  end if;
  insert into tutor_private.v5_team_payment_reports(
   team_id,student_id,amount_cents,received_on,method,reference,note,
