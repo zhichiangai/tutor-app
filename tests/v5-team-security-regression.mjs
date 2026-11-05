@@ -28,6 +28,13 @@ test('legacy membership RLS does not query V5 entitlements recursively',()=>{
   assert.match(p,/w\.owner_id\s*=\s*\(select auth\.uid\(\)\)/);
  }
 });
+test('project assignment policy uses FK and privileged guard without recursive project read',()=>{
+ const p=policies.get('v5_project_member_owner_assign')||'';
+ assert.doesNotMatch(p,/from public\.v5_team_projects/,
+  'Project SELECT references project members and must not recurse into INSERT RLS');
+ assert.match(sql,/function tutor_private\.v5_project_assignment_guard\(\)/);
+ assert.match(sql,/before insert or update on public\.v5_team_project_members/);
+});
 test('V4 students, lessons and payment RLS are not altered by Team migration',()=>{
  assert.doesNotMatch(sql,/alter\s+policy[\s\S]*?(students|lesson_records|payment_batches)/i);
  for(const table of ['students','lesson_records','payment_batches']){
