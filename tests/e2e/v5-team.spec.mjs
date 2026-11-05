@@ -715,3 +715,96 @@ test('V5.3 manager uses Team student and shared lesson calendar UI without V4 wr
  await expect(page.locator('#v5-learning-students')).toBeEmpty();
  await expect(page.locator('#v5-learning-lessons')).toBeEmpty();
 });
+
+
+test('V5.3 shared calendar shows two teachers; assigned teacher has no manager controls',async({page})=>{
+ const managerJwt=await signIn('parent'),teacherJwt=await signIn('teacher');
+ const managerActor=f.actors.parent,teacherActor=f.actors.teacher;
+ const workspace=db("select id from public.workspaces where owner_id='"+managerActor.id+"'");
+ const originalWorkspace=db("select id from public.workspaces where owner_id='"+teacherActor.id+"'");
+ const teamId=db("select id from public.v5_teams where anchor_workspace_id='"+workspace+"'");
+ const oldTeam=db("select id from public.v5_teams where anchor_workspace_id='"+
+  originalWorkspace+"'");
+ const project=db("select id from public.v5_team_projects where workspace_id='"+
+  workspace+"' and name='Private Team B Project'");
+ const student=db("select id from public.v5_team_students where team_id='"+
+  teamId+"' and display_name='GUI Synthetic Student 532'");
+ assert.match(student,/^[a-f0-9-]{36}$/i);
+
+ let r=await rest(managerJwt,'POST','v5_team_invitations?select=id',{
+  workspace_id:workspace,recipient_email:teacherActor.email.toLowerCase(),
+  invited_by:managerActor.id
+ });
+ assert.equal(r.status,201);
+ assert.equal((await rest(teacherJwt,'POST','rpc/v5_accept_team_invitation',{
+  p_invitation_id:r.data[0].id
+ })).status,200);
+ r=await rest(managerJwt,'POST','v5_team_project_members?select=project_id',{
+  workspace_id:workspace,project_id:project,user_id:teacherActor.id
+ });
+ assert.equal(r.status,201,'Team manager assigns a second real synthetic teacher');
+
+ await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
+  route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
+   contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+ await page.addInitScript(({url,key})=>{
+  window.V4_LOCAL_BACKEND={environment:'local',isolated:true,projectRef:'local',
+   url,publishableKey:key};
+ },{url:f.apiUrl,key:f.anonKey});
+ async function enter(role){
+  const actor=f.actors[role];
+  await page.goto('/v2/index.html');
+  await page.waitForFunction(()=>!!window.supabase?.createClient,{timeout:20_000});
+  await page.evaluate(async({url,key,email,password})=>{
+   const supa=window.supabase.createClient(url,key,{
+    auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+   });
+   const {error}=await supa.auth.signInWithPassword({email,password});
+   if(error)throw Error('Synthetic Team GUI login failed');
+   supa.auth.stopAutoRefresh?.();
+  },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
+  await page.reload();
+  await expect(page.locator('body')).not.toHaveClass(/login-required/);
+  await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+  await expect(page.locator('#v5-learning-card')).toBeVisible();
+  await page.locator('#v5-learning-team-select').selectOption(teamId);
+  await expect(page.locator('#v5-learning-project-select')).toHaveValue(project);
+ }
+ await enter('parent');
+ await expect(page.locator('#v5-learning-manager-controls')).toBeVisible();
+ const opts=await page.locator('#v5-learning-lesson-teacher option').evaluateAll(
+  els=>els.map(x=>x.value));
+ assert.ok(opts.includes(managerActor.id));
+ assert.ok(opts.includes(teacherActor.id));
+ const month=await page.evaluate(()=>{
+  const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+ });
+ await page.locator('#v5-learning-lesson-student').selectOption(student);
+ await page.locator('#v5-learning-lesson-teacher').selectOption(teacherActor.id);
+ await page.locator('#v5-learning-lesson-subject').fill('Cross Teacher English GUI');
+ await page.locator('#v5-learning-lesson-start').fill(month+'-16T14:00');
+ await page.locator('#v5-learning-lesson-end').fill(month+'-16T15:30');
+ await page.locator('#v5-learning-lesson-submit').click();
+ await expect(page.locator('#v5-learning-lessons')).toContainText('Cross Teacher English GUI');
+ await expect(page.locator('#v5-learning-lessons')).toContainText('Math Team GUI QA');
+ await expect(page.locator('#v5-learning-lessons')).toContainText(
+  '老師 · '+teacherActor.id.slice(-6));
+ await expect(page.locator('#v5-learning-calendar')).toContainText('Cross Teacher English GUI');
+
+ await page.locator('#sign-out').click();
+ await expect(page.locator('#v5-learning-students')).toBeEmpty();
+ await enter('teacher');
+ await expect(page.locator('#v5-learning-manager-controls')).toBeHidden();
+ const teamChoices=await page.locator('#v5-learning-team-select option')
+  .evaluateAll(els=>els.map(x=>x.value));
+ assert.ok(teamChoices.includes(teamId),'Assigned teacher can open their Team project');
+ assert.ok(!teamChoices.includes(oldTeam),'Departed original Team stays inaccessible');
+ await expect(page.locator('#v5-learning-lessons')).toContainText('Cross Teacher English GUI');
+ await expect(page.locator('#v5-learning-lessons')).toContainText('Math Team GUI QA');
+ assert.deepEqual((await rows(teacherJwt,'v5_team_students',
+  '&team_id=eq.'+oldTeam)).data,[],
+  'Assigned Teacher B may not read their former Team A students');
+ await page.locator('#sign-out').click();
+ await expect(page.locator('#v5-learning-card')).toBeHidden();
+ await expect(page.locator('#v5-learning-calendar')).toBeEmpty();
+});
