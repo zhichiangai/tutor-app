@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+ <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+ <meta name="robots" content="noindex,nofollow,noarchive">
+ <title>V5.1 內部管理｜好好上課</title>
+ <style>
+ :root{color-scheme:light;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif;color:#172b35;background:#f5f7fa}
+ *{box-sizing:border-box}body{margin:0;line-height:1.55}
+ .wrap{max-width:1080px;margin:0 auto;padding:26px 18px 70px}
+ header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:26px}
+ a{color:#21587c;text-decoration:none}h1{font-size:1.75rem;line-height:1.25;margin:4px 0}
+ .eyebrow{font-size:.78rem;font-weight:700;letter-spacing:.12em;color:#577384}
+ .muted{color:#5f7380}p{margin:8px 0}
+ .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+ .panel{border:1px solid #dde6ea;background:white;border-radius:18px;padding:22px;min-width:0;box-shadow:0 5px 24px #1c374308}
+ .panel h2{font-size:1.1rem;margin:0 0 8px}
+ label{display:grid;gap:6px;font-weight:600;font-size:.92rem;margin:12px 0}
+ input,select,textarea,button{font:inherit}
+ input,select,textarea{width:100%;border:1px solid #bacbd3;background:white;border-radius:9px;padding:10px;color:#172b35}
+ textarea{min-height:94px;resize:vertical}
+ button{border-radius:9px;border:1px solid #25465c;background:#25465c;color:white;padding:10px 15px;cursor:pointer;font-weight:600}
+ button:disabled{opacity:.45;cursor:not-allowed}
+ button.secondary{background:#fff;color:#25465c}
+ .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+ .summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+ .metric{padding:12px;background:#f2f6f8;border-radius:10px}
+ .metric b{display:block;font-size:1.3rem}
+ .confirm{font-family:ui-monospace,SFMono-Regular,monospace;background:#f2f4f6;padding:10px 12px;border-radius:9px;word-break:break-word}
+ #status{padding:11px 13px;border-radius:10px;background:#e9eef1;margin:0 0 20px}
+ .alert{color:#9a3e2e}
+ .hidden{display:none!important}
+ @media(max-width:700px){.grid{grid-template-columns:1fr}.summary{grid-template-columns:1fr}h1{font-size:1.45rem}}
+ </style>
+</head>
+<body>
+ <main class="wrap">
+  <header><div><div class="eyebrow">好好上課 / V5.1 INTERNAL</div><h1>方案與測試名額管理</h1>
+   <p class="muted">僅限授權管理者的隔離 Preview。此處不提供正式資料清除功能。</p></div>
+   <div class="toolbar"><a href="./index.html">返回好好上課</a><button id="reload" class="secondary" type="button">重新整理</button></div>
+  </header>
+  <p id="status" role="status" aria-live="polite">正在核對安全環境及登入狀態…</p>
+  <div id="console" class="grid hidden">
+   <section class="panel">
+    <h2>工作空間與使用量</h2>
+    <p class="muted">所有數字均由伺服器提供。刪除一般學生不會釋放累計名額。</p>
+    <label>選擇工作空間
+     <select id="workspace"><option value="">尚未載入</option></select>
+    </label>
+    <div id="current-plan" class="summary" aria-live="polite"></div>
+   </section>
+   <section class="panel">
+    <h2>方案授權</h2>
+    <p class="muted">不會產生訂閱扣款。每次修改都留下操作紀錄。</p>
+    <form id="grant-form">
+     <label>會員方案
+      <select id="plan" required>
+       <option value="free">Free｜3 位累計學生、1 位老師</option>
+       <option value="pro">Pro｜30 位累計學生、1 位老師</option>
+       <option value="team">Team｜100 位累計學生、10 位老師</option>
+      </select>
+     </label>
+     <label>額外學生名額<input id="extra" type="number" min="0" max="100000" step="1" value="0" required></label>
+     <label>授權理由（至少 10 字）<textarea id="grant-reason" maxlength="500" required placeholder="例：內部 V5.1 測試授權，不產生付款"></textarea></label>
+     <p class="muted">輸入以下完整確認文字，才能套用：</p>
+     <div id="grant-phrase" class="confirm"></div>
+     <label>確認文字<input id="grant-confirm" autocomplete="off" spellcheck="false" required></label>
+     <button type="submit">套用方案與記錄稽核</button>
+    </form>
+   </section>
+   <section class="panel">
+    <h2>釋放已刪除 QA 名額</h2>
+    <p class="muted">只釋放「建立時已標記 QA」且「學生紀錄已不存在」的名額。絕不刪除有效學生、課程、付款或 Auth。</p>
+    <form id="qa-form">
+     <label>本次預期可釋放數量<input id="qa-count" type="number" min="1" readonly required></label>
+     <label>清理理由（至少 10 字）<textarea id="qa-reason" maxlength="500" required placeholder="例：隔離測試完成後釋放已刪除 QA 學生名額"></textarea></label>
+     <p class="muted">請輸入以下完整確認文字：</p>
+     <div id="qa-phrase" class="confirm"></div>
+     <label>確認文字<input id="qa-confirm" autocomplete="off" spellcheck="false" required></label>
+     <button id="qa-submit" type="submit" disabled>釋放 QA 名額並記錄稽核</button>
+    </form>
+   </section>
+   <section class="panel">
+    <h2>權限與發布保護</h2>
+    <p>只有授權管理者可以使用此頁的伺服器操作。正式 Production 預設關閉管理 API。</p>
+    <p>管理者身分由 Supabase Auth 驗證，另需通過伺服器設定的 UID 白名單。</p>
+    <p>所有更改都由伺服器使用受控權限完成，網頁不持有 service_role 密鑰。</p>
+   </section>
+  </div>
+ </main>
+ <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js" crossorigin="anonymous"></script>
+ <script src="./v4-config.js"></script>
+ <script type="module" src="./v5-admin-ui.js"></script>
+</body>
+</html>
