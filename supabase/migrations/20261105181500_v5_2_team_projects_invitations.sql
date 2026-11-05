@@ -19,7 +19,10 @@ create unique index v5_project_name_unique_per_workspace
  on public.v5_team_projects(workspace_id,lower(btrim(name)));
 alter table public.v5_team_projects enable row level security;
 revoke all on public.v5_team_projects from public,anon,authenticated;
-grant select,insert,update on public.v5_team_projects to authenticated;
+grant select,insert on public.v5_team_projects to authenticated;
+-- A project ID, workspace owner and creator never change through the browser.
+-- Only these two presentation fields can be edited after creation.
+grant update(name,status) on public.v5_team_projects to authenticated;
 
 create table public.v5_team_project_members (
  project_id uuid not null,
