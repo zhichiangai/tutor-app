@@ -157,3 +157,49 @@ test('teacher settings shows Free/Pro/Team without checkout or hidden quotas',as
  await expect(page.locator('#view-settings')).toBeVisible();
  await expect(page.locator('#student-modal')).not.toBeVisible();
 });
+
+
+test('QA seat reset is operator-only, exact-count audited and never deletes live rows',async()=>{
+ const teacher=await login('teacher');
+ const wid=db("select id from public.workspaces where owner_id='"+f.actors.teacher.id+"'");
+ const getCount=()=>Number(db("select count(*) from tutor_private.v5_student_seat_ledger "+
+  "where workspace_id='"+wid+"'"));
+ // Previous V5 tests downgraded this workspace; manual grant is needed.
+ db("select tutor_private.v5_admin_grant_entitlement('"+wid+"','pro',0,"+
+  "'CI operator','Allow synthetic QA seat release test');");
+ const baseCount=getCount();
+ const qa={...newStudent(f.actors.teacher.id),is_qa:true};
+ let result=await rest(teacher,'POST','students?select=id',qa);
+ assert.equal(result.status,201);
+ assert.equal(getCount(),baseCount+1);
+ assert.equal(db("select is_qa_at_first_seen from tutor_private.v5_student_seat_ledger "+
+  "where workspace_id='"+wid+"' and student_id='"+qa.id+"'"),'t');
+ result=await rest(teacher,'DELETE','students?id=eq.'+qa.id);
+ assert.equal(result.status,200);
+ assert.equal(getCount(),baseCount+1,'ordinary deletion does not release cumulative QA seat');
+ const eligible=Number(db("select count(*) from tutor_private.v5_student_seat_ledger l "+
+  "where l.workspace_id='"+wid+"' and l.is_qa_at_first_seen and "+
+  "not exists(select 1 from public.students s where s.id=l.student_id)"));
+ assert.equal(eligible,1);
+ assert.notEqual((await rest(teacher,'POST','rpc/v5_admin_snapshot',{})).status,200,
+  'Browser user cannot invoke service-role-only snapshot');
+ assert.notEqual((await rest(teacher,'POST','rpc/v5_admin_release_qa_seats',{
+  p_workspace_id:wid,p_expected_count:1,p_operator_user_id:f.actors.teacher.id,
+  p_reason:'Attempt client-sided QA cleanup'})).status,200,
+  'Browser user cannot invoke service-role-only QA release');
+ assert.throws(()=>db("select public.v5_admin_release_qa_seats('"+wid+"',2,"+
+  "'"+f.actors.teacher.id+"','Synthetic mismatch should abort');"),
+  /count changed|expected|actual/i);
+ assert.equal(getCount(),baseCount+1,'mismatch must not partially delete');
+ const released=db("select public.v5_admin_release_qa_seats('"+wid+"',1,"+
+  "'"+f.actors.teacher.id+"','Synthetic isolated QA seat cleanup');");
+ assert.equal(released,'1');
+ assert.equal(getCount(),baseCount,'only deleted QA seat released');
+ assert.equal(Number(db("select count(*) from tutor_private.v5_qa_seat_release_audit "+
+   "where workspace_id='"+wid+"'")),1);
+ assert.equal(Number(db("select count(*) from public.students where id='"+qa.id+"'")),0);
+ assert.ok(getCount()>=4,'previously deleted non-QA students still consume seats');
+ const audit=db("select released_count from tutor_private.v5_qa_seat_release_audit "+
+  "where workspace_id='"+wid+"'");
+ assert.equal(audit,'1');
+});
