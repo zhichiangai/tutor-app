@@ -1298,6 +1298,28 @@ test('V5.3 billing management follows accepted Team governance transfer, not V4 
  assert.equal(r.data.status,'accepted');
  assert.equal(db("select owner_id from public.workspaces where id='"+ws+"'"),fromId,
   'V4 owner remains the original user');
+ const newView=await rest(newManager,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal(newView.status,200,'New Team manager inherits payment read authority');
+ assert.equal(newView.data.confirmed_payments_cents,234167);
+ const oldView=await rest(former,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal(oldView.status,403,'Previous manager immediately loses payment records');
+ assert.notEqual((await rest(former,'POST','rpc/v5_report_team_payment',{
+  p_team_id:team,p_student_id:newView.data.receivables[0].student_id,
+  p_amount_cents:100,p_received_on:'2026-10-26',
+  p_method:'cash',p_reference:'OLD-MANAGER-FORBIDDEN'
+ })).status,200,'Former manager cannot report a new payment');
+ const pending=db("select id from tutor_private.v5_team_payment_reports "+
+  "where team_id='"+team+"' and reference='PENDING-TRANSFER-4'");
+ assert.match(pending,/^[a-f0-9-]{36}$/i);
+ assert.notEqual((await rest(former,'POST','rpc/v5_confirm_team_payment_allocation',{
+  p_payment_id:pending,
+  p_allocations:[{lesson_id:newView.data.receivables.find(x=>
+   x.subject==='Finance UI Synthetic').lesson_id,amount_cents:100}]
+ })).status,200,'Former manager cannot confirm allocations after transfer');
  r=await rest(newManager,'POST','rpc/v5_team_billing_overview',{
   p_team_id:team,p_month:'2026-10-01'
  });
