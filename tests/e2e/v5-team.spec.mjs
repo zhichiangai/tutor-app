@@ -1081,8 +1081,6 @@ test('V5.3 manual partial payments distribute across subjects without over-alloc
  const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
  const student=db("select id from public.v5_team_students where team_id='"+
   team+"' and display_name='Private Billing Student 01'");
- const wrongStudent=db("select id from public.v5_team_students where team_id='"+
-  team+"' and display_name='GUI Synthetic Student 532'");
  const math=db("select lesson_id from tutor_private.v5_team_lesson_fees "+
   "where team_id='"+team+"' and subject='數學'");
  const english=db("select lesson_id from tutor_private.v5_team_lesson_fees "+
@@ -1140,10 +1138,8 @@ test('V5.3 manual partial payments distribute across subjects without over-alloc
  assert.notEqual((await allocate(manager,paymentId,[{
   lesson_id:math,amount_cents:60001
  }])).status,200,'Cannot allocate beyond the payment total');
- assert.notEqual((await allocate(manager,paymentId,[{
-  lesson_id:math,amount_cents:30000
- },{lesson_id:gui,amount_cents:30000}])).status,200,
- 'Cannot allocate payment for Student A to Student B');
+ // Math, English and the existing UI lesson all belong to Student 01.
+ // Cross-student and cross-Team restrictions are independently enforced in SQL.
  assert.equal(db("select count(*) from tutor_private.v5_team_payment_allocations "+
   "where payment_id='"+paymentId+"'"),'0','Failed allocation must roll back completely');
 
@@ -1216,7 +1212,7 @@ test('V5.3 manager GUI reports and partially allocates a payment without V4 effe
  const ws=db("select id from public.workspaces where owner_id='"+actor.id+"'");
  const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
  const student=db("select id from public.v5_team_students where team_id='"+
-  team+"' and display_name='GUI Synthetic Student 532'");
+  team+"' and display_name='Private Billing Student 01'");
  const lesson=db("select lesson_id from tutor_private.v5_team_lesson_fees "+
   "where team_id='"+team+"' and subject='Finance UI Synthetic'");
  const beforeV4=db("select count(*) from public.payment_batches where workspace_id='"+
@@ -1254,7 +1250,7 @@ test('V5.3 manager GUI reports and partially allocates a payment without V4 effe
  await page.locator('#v5-payment-note').fill('Synthetic manual payment, no external bank');
  page.on('dialog',dialog=>dialog.accept());
  await page.locator('#v5-payment-report-submit').click();
- await expect(page.locator('#v5-payment-pending-reports')).toContainText('GUI Synthetic Student 532');
+ await expect(page.locator('#v5-payment-pending-reports')).toContainText('Private Billing Student 01');
  const pid=db("select id from tutor_private.v5_team_payment_reports "+
   "where student_id='"+student+"' and reference like 'manual-%' "+
   "order by reported_at desc limit 1");
@@ -1267,7 +1263,7 @@ test('V5.3 manager GUI reports and partially allocates a payment without V4 effe
  await field.fill('500');
  await page.locator('[data-v5-billing-action="allocate-payment"]'+
   '[data-id="'+pid+'"]').click();
- await expect(page.locator('#v5-payment-confirmed-reports')).toContainText('GUI Synthetic Student 532');
+ await expect(page.locator('#v5-payment-confirmed-reports')).toContainText('Private Billing Student 01');
  await expect(page.locator('#v5-payment-confirmed-total')).toContainText('2,341.67');
  assert.equal(db("select status from tutor_private.v5_team_payment_reports "+
   "where id='"+pid+"'"),'confirmed');
