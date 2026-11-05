@@ -1,0 +1,41 @@
+# V5.2｜Team 團隊與多專案：第一階段
+
+## 延用 V4 的設計
+
+一個老師仍只擁有一個 V4 workspace；升級 Team 時是把原 workspace 的 V5 方案標記為 Team，不另外建立第二個 workspace，以避免撞上 V4 owner_id 唯一限制及既有 myWorkspace() 使用方式。
+
+Team 名額沿用 PR #51：100 名累計學生、10 名現行老師（含擁有人）；V5.1 觸發器是最終強制來源。
+
+## 表格與角色
+
+| 表格 | 用途 | 存取限制 |
+|---|---|---|
+| public.v5_team_projects | 專案名稱、狀態、工作空間 | Team 擁有人可建立、管理；被指派的成員才可讀取 |
+| public.v5_team_project_members | 專案與已加入 Team 的老師對應 | Team 擁有人可指派與解除；老師只能看自己的分配 |
+| public.v5_team_invitations | 電子郵件邀請及 pending/accepted/declined/cancelled | Team 擁有人與收件者可讀；只有管理者建立，只有本人驗證後接受 |
+| public.workspace_members (既有) | 已確認的 Team 現行老師成員 | Owner 可看與撤銷老師；老師只能查看自身成員關係 |
+
+## 邀請生命週期
+
+1. 擁有人在 Team 方案建立待處理邀請，填入受邀者電子郵件；尚未取得任何 Team 權限。
+2. 受邀者登入 Google，且 email 必須已由 Auth 驗證；RPC 將目前 auth.users.email 與邀請比對，不能由前端偽造身分。
+3. 接受後，RPC 才插入 workspace_members 教師成員；V5.1 的老師 10 人上限仍是最後資料庫 Gate。
+4. 老師還需被 owner 指派特定專案，才能讀取其 Team 專案名稱／狀態。
+5. Owner 移除 workspace_members 的教師列，專案成員 FK 連動刪除；使用相同未過期 JWT 也不再具有專案讀取權。
+
+## V4 與 V5.3 界線
+
+本階段**不修改** V4 students、lesson_records、payment_batches、學生與家長關係的 RLS 或寫入 API。V5.2 的專案中目前只保存專案 metadata 與老師指派，不包含學生與收款明細。日後跨老師課表、帳務、家長檢視及預收款將由 V5.3 專門加上授權資料模型與測試。不可因加入 Team 就讓所有老師讀取其他老師的全部學生資料。
+
+## 隔離驗收
+
+- 只能在已確認的 localhost 合成 Supabase 測試；Production 不進行 Team 增刪操作。
+- Free 方案建立專案必須被拒絕，升級 Team 才可建立。
+- 非擁有人不能建立 Team 專案、邀請別人或自行分配專案。
+- 只有受邀且郵件身分吻合的使用者可以接受邀請；一筆邀請不可重複使用。
+- 僅接受邀請不能直接看到專案；受指派後只能看到被指派的專案。
+- 撤銷老師成員後，同一 JWT 必須立即失去專案存取權；專案本身及歷史資料保留。
+
+## 發布管理
+
+本項變更為 Draft PR #52，Base 是 PR #51 的開發分支，不直接合併 Main。先讓隔離 PostgreSQL、JWT、Chromium 及 V3 regression 通過，再完善 Team 使用者介面。V5.1 的真正隔離 Vercel Preview 管理後台仍需要獨立 Supabase 與環境變數設定，READY 並不是 GUI 驗收。
