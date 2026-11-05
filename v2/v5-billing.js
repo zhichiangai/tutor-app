@@ -16,6 +16,9 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
  };
  let generation=0,attached=false,ready=false,loading=false,writing=false,error='';
  let availableTeams=[],teamId='',overview=null,paymentOverview=null;
+ let advanceStudents=[],advanceStudentId='',advanceOverview=null;
+ let advanceReference='manual-advance-'+crypto.randomUUID();
+ const retryAdvanceOperations=new Map();
  let paymentReference='manual-'+crypto.randomUUID();
  const today=new Date();
  let month=new Date(today.getFullYear(),today.getMonth(),1);
@@ -23,6 +26,10 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
  function reset(){
   generation++;ready=false;loading=false;writing=false;error='';
   availableTeams=[];teamId='';overview=null;paymentOverview=null;
+  advanceStudents=[];advanceStudentId='';advanceOverview=null;
+  advanceReference='manual-advance-'+crypto.randomUUID();
+  retryAdvanceOperations.clear();
+  $('v5-advance-panel')?.classList.add('hidden');
   paymentReference='manual-'+crypto.randomUUID();
   $('v5-billing-card')?.classList.add('hidden');
   for(const id of ['v5-billing-message','v5-billing-pending',
@@ -30,7 +37,9 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
     'v5-payment-pending-reports','v5-payment-confirmed-reports',
     'v5-payment-confirmed-total','v5-payment-outstanding-total',
     'v5-payment-advance-created-total','v5-payment-advance-applied-total',
-    'v5-payment-advance-available-total']){
+    'v5-payment-advance-available-total',
+    'v5-advance-message','v5-advance-pending-payments',
+    'v5-advance-available','v5-advance-credit-rows']){
    $(id)?.replaceChildren();
   }
  }
@@ -110,6 +119,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    confirmed.append(wrap);
   }
   renderPayments();
+  renderAdvance();
  }
  function taipeiDate(){
   const fields=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',
@@ -233,8 +243,12 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   if(attached)return;attached=true;
   $('v5-payment-received-date').value=taipeiDate();
   $('v5-billing-team-select').addEventListener('change',ev=>{
-   teamId=ev.target.value;void refresh();
+   teamId=ev.target.value;advanceStudentId='';void refresh();
   });
+  $('v5-advance-student-select').addEventListener('change',ev=>{
+   advanceStudentId=ev.target.value;void refresh();
+  });
+  $('v5-advance-received-date').value=taipeiDate();
   $('v5-billing-prev').addEventListener('click',()=>{
    month=new Date(month.getFullYear(),month.getMonth()-1,1);void refresh();
   });
@@ -261,22 +275,41 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    if(!availableTeams.some(t=>t.id===teamId))teamId=availableTeams[0]?.id||'';
    if(teamId){
     const first=[month.getFullYear(),String(month.getMonth()+1).padStart(2,'0'),'01'].join('-');
-    const [result,payments]=await Promise.all([
+    const [result,payments,students]=await Promise.all([
      client.rpc('v5_team_billing_overview',{
       p_team_id:teamId,p_month:first
      }),
      client.rpc('v5_team_payment_overview',{
       p_team_id:teamId,p_month:first
-     })
+     }),
+     client.from('v5_team_students').select('id,team_id,display_name')
+      .eq('team_id',teamId)
     ]);
     if(stamp!==generation||!valid()||getUser()?.id!==userId)return;
-    if(result.error||payments.error)throw result.error||payments.error;
+    if(result.error||payments.error||students.error)
+     throw result.error||payments.error||students.error;
     overview=result.data;paymentOverview=payments.data;
-   }else overview=null;
+    advanceStudents=students.data||[];
+    if(!advanceStudents.some(s=>s.id===advanceStudentId))
+     advanceStudentId=advanceStudents[0]?.id||'';
+    advanceOverview=null;
+    if(advanceStudentId){
+     const credit=await client.rpc('v5_team_advance_overview',{
+      p_team_id:teamId,p_student_id:advanceStudentId
+     });
+     if(stamp!==generation||!valid()||getUser()?.id!==userId)return;
+     if(credit.error)throw credit.error;
+     advanceOverview=credit.data;
+    }
+   }else{
+    overview=null;paymentOverview=null;
+    advanceStudents=[];advanceStudentId='';advanceOverview=null;
+   }
    ready=true;
   }catch{
    if(stamp!==generation||!valid()||getUser()?.id!==userId)return;
-   overview=null;paymentOverview=null;
+   overview=null;paymentOverview=null;advanceOverview=null;
+   advanceStudents=[];advanceStudentId='';
    error='Team 帳務暫時無法讀取，請重新進入設定頁。';
   }finally{
    if(stamp===generation&&valid()&&getUser()?.id===userId){
