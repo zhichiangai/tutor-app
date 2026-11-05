@@ -298,7 +298,56 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   const n=Math.round(Number(raw)*100);
   return Number.isSafeInteger(n)?n:null;
  }
+ async function submitAdvanceReport(){
+  if(!ready||!valid()||writing||!teamId||!advanceStudentId||!advanceOverview)
+   return true;
+  const amount=cents($('v5-advance-amount').value);
+  const credit=cents($('v5-advance-credit').value);
+  const date=$('v5-advance-received-date').value;
+  const method=$('v5-advance-method').value;
+  const note=$('v5-advance-note').value.trim();
+  if(amount===null||credit===null||amount<=0||credit<=0||
+   credit>amount||amount>1000000000||note.length>250||
+   !/^\d{4}-\d{2}-\d{2}$/.test(date)||date>taipeiDate()){
+   notify('請確認付款總額、預收金額及日期。預收須大於零且不能超過本次付款。');
+   return true;
+  }
+  const direct=amount-credit;
+  const total=(advanceOverview.receivables||[])
+   .reduce((sum,f)=>sum+f.outstanding_cents,0);
+  if(direct>total){
+   notify('直接分配金額超過此學生跨月份尚未結清的課程費用。');
+   return true;
+  }
+  if(!window.confirm('人工登錄付款 '+money(amount)+'：其中預收 '+
+   money(credit)+'、待分配到課程 '+money(direct)+
+   '。此操作不驗證銀行交易，須再由管理者確認後才正式入帳。'))
+   return true;
+  writing=true;
+  try{
+   const {data,error:failure}=await getClient().rpc(
+    'v5_report_team_payment_with_advance',{
+     p_team_id:teamId,p_student_id:advanceStudentId,
+     p_amount_cents:amount,p_expected_credit_cents:credit,
+     p_received_on:date,p_method:method,
+     p_reference:advanceReference,p_note:note
+    });
+   if(failure||data?.status!=='pending')throw failure||new Error('Unreported advance');
+   advanceReference='manual-advance-'+crypto.randomUUID();
+   $('v5-advance-amount').value='';$('v5-advance-credit').value='';
+   $('v5-advance-note').value='';
+   month=new Date(Number(date.slice(0,4)),Number(date.slice(5,7))-1,1);
+   notify('已建立待確認付款。請在下方確認直接分配與預收差額後入帳。');
+   await refresh();
+  }catch{
+   notify('預收款登錄未完成；請查詢是否已有同 reference 的待確認付款，避免重複登錄。');
+  }finally{writing=false;render()}
+  return true;
+ }
  async function handleSubmit(e){
+  if(e.target?.id==='v5-advance-report-form'){
+   e.preventDefault();return submitAdvanceReport();
+  }
   if(e.target?.id!=='v5-payment-report-form')return false;
   e.preventDefault();
   if(!ready||!valid()||writing||!teamId||!paymentOverview)return true;
