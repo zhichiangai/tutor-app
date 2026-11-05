@@ -902,3 +902,15 @@ body.preview-readonly .app-shell [aria-disabled="true"]{cursor:not-allowed}
  .v5-learning-event{font-size:.67rem;padding:3px}
  .v5-learning-month-controls{width:100%;justify-content:space-between}
 }
+
+/* V5.3 per-row edit forms; backend RLS remains authoritative. */
+.v5-learning-edit{width:100%;max-width:100%;padding:5px 0}
+.v5-learning-edit>summary{cursor:pointer;font-weight:600;font-size:.86rem}
+.v5-learning-edit form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;
+ padding:12px;margin-top:8px;border:1px solid var(--line,#e2e8f0);border-radius:10px}
+.v5-learning-edit form label{display:grid;gap:4px;min-width:0}
+.v5-learning-edit form label:has(textarea){grid-column:1/-1}
+.v5-learning-edit form input,.v5-learning-edit form textarea{width:100%;min-width:0;box-sizing:border-box}
+.v5-learning-edit form button[type=submit]{justify-self:start}
+@media(max-width:600px){.v5-learning-edit form{grid-template-columns:1fr}
+ .v5-learning-edit form label:has(textarea){grid-column:auto}}
