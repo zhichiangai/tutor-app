@@ -22,7 +22,8 @@ test('release blocks blindly replaying incompatible historical migrations',()=>{
   '20261105171000_v5_1_admin_qa_release.sql',
   '20261105181500_v5_2_team_projects_invitations.sql',
   '20261105192000_v5_2_team_governance_transfer.sql',
-  '20261105201500_v5_3_team_data_boundaries.sql'
+  '20261105201500_v5_3_team_data_boundaries.sql',
+  '20261106031000_v5_3_team_billing_foundation.sql'
  ],'Review the separate V5 release map before accepting new V5 migrations');
  const v4Files=files.filter(p=>!v5Files.includes(p));
  assert.deepEqual(v4Files,[...replay,...pending].sort(),
