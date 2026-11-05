@@ -56,3 +56,21 @@ Team 名額沿用 PR #51：100 名累計學生、10 名現行老師（含擁有�
 **管理者不得直接退出 Team。** 已確認的產品規則 A 是：管理權必須先轉讓給目前仍在 Team 的老師、對方接受，後端單一交易完成權限交接，原管理者轉為普通老師後才能退出；Team 所有資料及 ID 均保留。V5.2 現階段**沒有**實作管理權轉讓。因 V4 的 `workspaces.owner_id` 同時涉及老師個人空間和舊資料 RLS，不能直接修改它達到 Team 轉讓，必須先將 Team 治理與 V4 個人老師所有權分離，再實作轉讓交易和權限驗收。
 
 另外，既有規則 A 要求 Team 帳務只有管理者可查看；V5.2 不變更 V4 財務資料授權。跨老師課表與財務、歷史授課者歸屬及權限轉移列入 V5.3。
+
+## V5.2 第三階段：Team 管理權轉讓（雙向確認）
+
+**個人與 Team 分離：** V4 `public.workspaces.owner_id` 永遠維持原家教老師，不因轉讓 Team 管理權而更新。V5 引入：
+- `v5_team_governance`：每個 Team 的現任管理者和世代版本。
+- `v5_team_roster`：Team 活躍老師名單，與 V4 `workspace_members` 不同。Team 老師 10 人限制以 roster 計算；V4 個人 owner 留存不佔已退出 Team 名額。
+- `v5_team_manager_transfers`：不可由使用者直接編輯的待確認、接受、婉拒及取消紀錄。
+- `tutor_private.v5_team_governance_audit`：每次提出和處理結果的安全稽核。
+
+**流程：** 現任管理者以 `v5_propose_team_manager(workspace,target)` 指定已加入 Team 且電子郵件已確認的老師。此時新舊權限不變；接任者必須登入本人帳號，以 `v5_respond_team_manager(transfer_id,true)` 才正式接任。拒絕或原管理者取消均維持原狀。交易中鎖定 Team 與轉讓紀錄，禁止重複接受和非本人確認；每次只允許一件待確認轉讓。
+
+**轉讓完成：** 新管理者接手 Team 專案、老師指派及邀請管理；舊管理者仍在 roster，已不具有管理權，可用 `v5_leave_team` 自行退出。舊管理者的 V4 個人 owner membership、lesson_records、帳務及其他個人資料維持不變；已建立的 Team 專案與存續歷史不刪除。
+
+**權限界線：** Team 管理者僅取得 V5 Team metadata 管理權，絕不自動取得 V4 原老師課程、帳務或學生的讀取權。跨老師課表和帳務仍屬 V5.3，需另外設計資料歸屬與 RLS。
+
+**後台顯示：** Team 設定卡獨立呼叫 `v5_my_managed_teams`，不能用 `getOwnWorkspace()` 或 `v5_my_plan()` 判定誰是 Team 管理者。普通老師能接受或拒絕管理權轉讓；已退出 Team 的原管理者在 UI 不應再看見原 Team 資料。
+
+**隔離驗收必須確認：** 未被邀請老師不可接任、錯帳號不能接受、被拒與被取消不能生效、管理者在接任人接受前不能退出、接受後原管理者失去管理權、同一 JWT 即時撤權、舊個人 workspace 的 owner_id 完全不變、Team 專案歷史保留、審計完整。
