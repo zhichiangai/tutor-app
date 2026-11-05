@@ -106,7 +106,7 @@ create policy v5_project_member_owner_assign on public.v5_team_project_members
 -- A privileged BEFORE trigger validates archived status; the composite FK
 -- separately enforces matching project/workspace and accepted Team membership.
 create function tutor_private.v5_project_assignment_guard()
-returns trigger language plpgsql security definer set search_path='' as $
+returns trigger language plpgsql security definer set search_path='' as $$
 declare v_status text;
 begin
  select p.status into v_status from public.v5_team_projects p
@@ -118,7 +118,7 @@ begin
   raise exception '已封存專案不能新增老師' using errcode='23514';
  end if;
  return new;
-end;$;
+end;$$;
 revoke all on function tutor_private.v5_project_assignment_guard()
  from public,anon,authenticated;
 create trigger v5_project_assignment_guard
