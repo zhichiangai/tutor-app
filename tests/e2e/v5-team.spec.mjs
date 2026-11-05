@@ -268,3 +268,151 @@ test('teacher can exit a Team without changing personal workspace or history',as
   p_workspace_id:teamId
  })).status,200,'Repeated exit must not silently succeed');
 });
+
+
+test('manager transfer requires acceptance; personal V4 owner stays unchanged',async()=>{
+ const owner=await signIn('teacher');
+ const successor=await signIn('parent');
+ const outsider=await signIn('stranger');
+ const ownerId=f.actors.teacher.id,successorId=f.actors.parent.id;
+ const ws=db("select id from public.workspaces where owner_id='"+ownerId+"'");
+ const personal=db("select id from public.workspaces where owner_id='"+successorId+"'");
+ const project=db("select id from public.v5_team_projects where workspace_id='"+
+  ws+"' and name='Project Alpha'");
+ const beforeProjectCount=Number(db("select count(*) from public.v5_team_projects "+
+  "where workspace_id='"+ws+"'"));
+ const beforeLessonCount=Number(db("select count(*) from public.lesson_records "+
+  "where teacher_id='"+ownerId+"'"));
+ assert.match(project,/^[a-f0-9-]{36}$/i);
+ assert.notEqual(personal,ws);
+
+ // A team manager cannot nominate strangers or transfer to their own ID.
+ assert.notEqual((await rest(owner,'POST','rpc/v5_propose_team_manager',{
+  p_workspace_id:ws,p_target_user_id:f.actors.stranger.id
+ })).status,200);
+ assert.notEqual((await rest(owner,'POST','rpc/v5_propose_team_manager',{
+  p_workspace_id:ws,p_target_user_id:ownerId
+ })).status,200);
+ assert.notEqual((await rest(outsider,'POST','rpc/v5_propose_team_manager',{
+  p_workspace_id:ws,p_target_user_id:successorId
+ })).status,200);
+
+ // Successor previously left Team: joining again is deliberate and separate.
+ let invitation=await rest(owner,'POST','v5_team_invitations?select=id',{
+  workspace_id:ws,recipient_email:f.actors.parent.email.toLowerCase(),
+  invited_by:ownerId
+ });
+ assert.equal(invitation.status,201);
+ assert.equal((await rest(successor,'POST','rpc/v5_accept_team_invitation',{
+  p_invitation_id:invitation.data[0].id
+ })).status,200);
+ assert.equal(db("select count(*) from public.v5_team_roster where workspace_id='"+
+  ws+"' and user_id='"+successorId+"'"),'1');
+
+ let proposed=await rest(owner,'POST','rpc/v5_propose_team_manager',{
+  p_workspace_id:ws,p_target_user_id:successorId
+ });
+ assert.equal(proposed.status,200);
+ let transferId=proposed.data;
+ assert.match(transferId,/^[a-f0-9-]{36}$/i);
+ assert.equal(db("select manager_user_id from public.v5_team_governance "+
+  "where workspace_id='"+ws+"'"),ownerId);
+ assert.notEqual((await rest(owner,'POST','rpc/v5_leave_team',{
+  p_workspace_id:ws
+ })).status,200,'Proposing alone does not allow manager to leave');
+ assert.notEqual((await rest(outsider,'POST','rpc/v5_respond_team_manager',{
+  p_transfer_id:transferId,p_accept:true
+ })).status,200,'Only the nominated successor may respond');
+ assert.notEqual((await rest(owner,'POST','rpc/v5_respond_team_manager',{
+  p_transfer_id:transferId,p_accept:true
+ })).status,200,'The original manager cannot self-approve transfer');
+ let answer=await rest(successor,'POST','rpc/v5_respond_team_manager',{
+  p_transfer_id:transferId,p_accept:false
+ });
+ assert.equal(answer.status,200);
+ assert.equal(answer.data.status,'declined');
+ assert.equal(db("select manager_user_id from public.v5_team_governance "+
+  "where workspace_id='"+ws+"'"),ownerId);
+
+ proposed=await rest(owner,'POST','rpc/v5_propose_team_manager',{
+  p_workspace_id:ws,p_target_user_id:successorId
+ });
+ assert.equal(proposed.status,200);
+ transferId=proposed.data;
+ assert.equal((await rest(owner,'POST','rpc/v5_cancel_team_manager',{
+  p_transfer_id:transferId
+ })).status,204);
+ assert.notEqual((await rest(successor,'POST','rpc/v5_respond_team_manager',{
+  p_transfer_id:transferId,p_accept:true
+ })).status,200,'Cancelled transfer cannot be accepted');
+
+ proposed=await rest(owner,'POST','rpc/v5_propose_team_manager',{
+  p_workspace_id:ws,p_target_user_id:successorId
+ });
+ assert.equal(proposed.status,200);
+ transferId=proposed.data;
+ answer=await rest(successor,'POST','rpc/v5_respond_team_manager',{
+  p_transfer_id:transferId,p_accept:true
+ });
+ assert.equal(answer.status,200);
+ assert.equal(answer.data.status,'accepted');
+ assert.equal(db("select manager_user_id from public.v5_team_governance "+
+  "where workspace_id='"+ws+"'"),successorId);
+ assert.equal(db("select owner_id from public.workspaces where id='"+ws+"'"),ownerId,
+  'V4 personal workspace ownership must not be reassigned');
+ assert.equal(db("select owner_id from public.workspaces where id='"+personal+"'"),successorId);
+
+ const ownerManaged=await rest(owner,'POST','rpc/v5_my_managed_teams',{});
+ assert.equal(ownerManaged.status,200);
+ assert.equal(ownerManaged.data.some(t=>t.workspace_id===ws),false);
+ const successorManaged=await rest(successor,'POST','rpc/v5_my_managed_teams',{});
+ assert.equal(successorManaged.status,200);
+ assert.equal(successorManaged.data.some(t=>t.workspace_id===ws),true);
+
+ // No cached JWT permission may survive: old owner can no longer govern.
+ assert.notEqual((await rest(owner,'POST','v5_team_projects?select=id',{
+  workspace_id:ws,name:'Must be denied after transfer',created_by:ownerId
+ })).status,201);
+ assert.notEqual((await rest(owner,'POST','v5_team_invitations?select=id',{
+  workspace_id:ws,recipient_email:'future.teacher@example.test',invited_by:ownerId
+ })).status,201);
+ assert.notEqual((await rest(owner,'POST','rpc/v5_remove_team_teacher',{
+  p_workspace_id:ws,p_user_id:successorId
+ })).status,200);
+ assert.notEqual((await rest(successor,'POST','rpc/v5_leave_team',{
+  p_workspace_id:ws
+ })).status,200,'New manager must transfer first');
+
+ // The successor can update a project created by the old manager;
+ // immutable project creator and Team ID are retained.
+ const changed=await rest(successor,'PATCH','v5_team_projects?id=eq.'+project,
+  {name:'Project Alpha Renamed by Successor'});
+ assert.equal(changed.status,200);
+ assert.equal(changed.data.length,1);
+ const added=await rest(successor,'POST','v5_team_projects?select=id',{
+  workspace_id:ws,name:'Successor Managed Project',created_by:successorId
+ });
+ assert.equal(added.status,201);
+
+ // Old manager is still an ordinary Team member, and can now depart.
+ let departed=await rest(owner,'POST','rpc/v5_leave_team',{p_workspace_id:ws});
+ assert.equal(departed.status,200);
+ assert.equal(departed.data.left,true);
+ assert.equal(db("select owner_id from public.workspaces where id='"+ws+"'"),ownerId);
+ assert.equal(db("select count(*) from public.workspace_members where workspace_id='"+
+  ws+"' and user_id='"+ownerId+"'"),'1',
+  'Legacy V4 owner membership is never removed');
+ assert.equal(db("select count(*) from public.v5_team_roster where workspace_id='"+
+  ws+"' and user_id='"+ownerId+"'"),'0');
+ const ownerTeamView=await rows(owner,'v5_team_projects');
+ assert.equal(ownerTeamView.data.some(p=>p.workspace_id===ws),false);
+ assert.equal(Number(db("select count(*) from public.lesson_records where teacher_id='"+
+  ownerId+"'")),beforeLessonCount,'V4 personal lesson history must remain');
+ assert.equal(Number(db("select count(*) from public.v5_team_projects where workspace_id='"+
+  ws+"'")),beforeProjectCount+1,'Team projects survive transfer and exit');
+ assert.equal(db("select count(*) from tutor_private.v5_team_governance_audit "+
+  "where workspace_id='"+ws+"' and event='accepted'"),'1');
+ assert.equal(db("select count(*) from tutor_private.v5_team_membership_audit "+
+  "where workspace_id='"+ws+"' and actor_id='"+ownerId+"' "+
+  "and event='teacher_left'"),'1');
+});
