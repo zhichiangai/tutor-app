@@ -1634,6 +1634,9 @@ test('V5.4 manager GUI confirms an advance and applies a separate offset with no
  await expect(page.locator('body')).toHaveClass(/login-required/);
  await expect(page.locator('#v5-advance-panel')).toBeHidden();
  await expect(page.locator('#v5-advance-available')).toBeEmpty();
+ await expect(page.locator('#v5-advance-student-select option')).toHaveCount(0);
+ await expect(page.locator('#v5-payment-student-select option')).toHaveCount(0);
+ await expect(page.locator('#v5-advance-amount')).toHaveValue('');
 });
 
 test('V5.3 billing management follows accepted Team governance transfer, not V4 owner',async()=>{
