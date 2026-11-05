@@ -464,3 +464,163 @@ test('successor sees transferred Team in the settings UI without V4 data',async(
  await expect(page.locator('body')).toHaveClass(/login-required/);
  await expect(page.locator('#v5-team-card')).toBeHidden();
 });
+
+
+test('V5.3 Team students and lessons stay independent of V4 personal data and manager transfer',async()=>{
+ const oldOwner=await signIn('teacher');
+ const manager=await signIn('parent');
+ const outsider=await signIn('stranger');
+ const oldId=f.actors.teacher.id,managerId=f.actors.parent.id;
+ const anchor=db("select id from public.workspaces where owner_id='"+oldId+"'");
+ const personal=db("select id from public.workspaces where owner_id='"+managerId+"'");
+ const teamId=db("select id from public.v5_teams where anchor_workspace_id='"+anchor+"'");
+ const otherTeam=db("select id from public.v5_teams where anchor_workspace_id='"+personal+"'");
+ assert.match(teamId,/^[a-f0-9-]{36}$/i);
+ assert.notEqual(teamId,otherTeam,'Two Team identities must be independent');
+ const alpha=db("select id from public.v5_team_projects where workspace_id='"+
+  anchor+"' and name='Project Alpha Renamed by Successor'");
+ const foreignProject=db("select id from public.v5_team_projects where workspace_id='"+
+  personal+"' and name='Private Team B Project'");
+ assert.equal(db("select team_id from public.v5_team_projects where id='"+alpha+"'"),teamId);
+ const oldStudents=Number(db("select count(*) from public.students where workspace_id='"+
+  anchor+"'"));
+ const oldLessons=Number(db("select count(*) from public.lesson_records where owner_id='"+
+  oldId+"'"));
+ const oldV4Seats=Number(db("select count(*) from tutor_private.v5_student_seat_ledger "+
+  "where workspace_id='"+anchor+"'"));
+ assert.equal(db("select manager_user_id from public.v5_team_governance "+
+  "where workspace_id='"+anchor+"'"),managerId,
+  'Team management already transferred in preceding local isolated test');
+ assert.deepEqual((await rows(oldOwner,'v5_teams','&id=eq.'+teamId)).data,[],
+  'The original V4 owner is not entitled to view departed Team data');
+ assert.deepEqual((await rows(outsider,'v5_teams','&id=eq.'+teamId)).data,[]);
+
+ let result=await rest(oldOwner,'POST','v5_team_students?select=id',{
+  team_id:teamId,display_name:'Unauthorized V4 owner',created_by:oldId
+ });
+ assert.notEqual(result.status,201,'V4 workspace owner cannot create Team student after exit');
+ result=await rest(outsider,'POST','v5_team_students?select=id',{
+  team_id:teamId,display_name:'Cross tenant',created_by:f.actors.stranger.id
+ });
+ assert.notEqual(result.status,201,'Unrelated teacher cannot create Team student');
+ result=await rest(manager,'POST','v5_team_students?select=id,team_id',{
+  team_id:teamId,display_name:'Team scoped synthetic learner',created_by:managerId
+ });
+ assert.equal(result.status,201);
+ const student=result.data[0].id;
+ assert.equal(result.data[0].team_id,teamId);
+ assert.deepEqual((await rows(oldOwner,'v5_team_students','&id=eq.'+student)).data,[],
+  'Former manager must not see new Team students');
+
+ // Project belongs to a different Team: both composite foreign keys must
+ // reject cross-Team enrollment even for a user managing both Teams.
+ result=await rest(manager,'POST','v5_team_enrollments?select=student_id',{
+  team_id:teamId,student_id:student,project_id:foreignProject
+ });
+ assert.notEqual(result.status,201,'A student cannot be enrolled into another Team project');
+ result=await rest(manager,'POST','v5_team_enrollments?select=student_id',{
+  team_id:teamId,student_id:student,project_id:alpha
+ });
+ assert.equal(result.status,201);
+ assert.deepEqual((await rows(oldOwner,'v5_team_enrollments',
+  '&student_id=eq.'+student)).data,[]);
+
+ // Rejoin only via a fresh invitation; V4 owner membership alone has no
+ // Team access. Assigning a project is a further separate permission.
+ const invite=await rest(manager,'POST','v5_team_invitations?select=id',{
+  workspace_id:anchor,recipient_email:f.actors.teacher.email.toLowerCase(),
+  invited_by:managerId
+ });
+ assert.equal(invite.status,201);
+ assert.equal((await rest(oldOwner,'POST','rpc/v5_accept_team_invitation',{
+  p_invitation_id:invite.data[0].id
+ })).status,200);
+ assert.deepEqual((await rows(oldOwner,'v5_team_students',
+  '&id=eq.'+student)).data,[],
+  'Roster membership must not reveal all Team students');
+
+ const assignment=await rest(manager,'POST','v5_team_project_members?select=project_id',{
+  project_id:alpha,workspace_id:anchor,user_id:oldId
+ });
+ assert.equal(assignment.status,201);
+ assert.equal((await rows(oldOwner,'v5_team_students','&id=eq.'+student)).data.length,1);
+ assert.equal((await rows(oldOwner,'v5_team_enrollments',
+  '&student_id=eq.'+student)).data.length,1);
+
+ const start='2030-04-05T10:00:00.000Z',end='2030-04-05T11:30:00.000Z';
+ const bad=await rest(outsider,'POST','v5_team_lessons?select=id',{
+  team_id:teamId,project_id:alpha,student_id:student,
+  teacher_user_id:f.actors.stranger.id,subject:'Cross tenant',
+  lesson_start:start,lesson_end:end
+ });
+ assert.notEqual(bad.status,201);
+ result=await rest(oldOwner,'POST','v5_team_lessons?select=id,teacher_user_id',{
+  team_id:teamId,project_id:alpha,student_id:student,teacher_user_id:oldId,
+  subject:'V5 Team isolated math',lesson_start:start,lesson_end:end
+ });
+ assert.equal(result.status,201);
+ const lesson=result.data[0].id;
+ assert.equal(result.data[0].teacher_user_id,oldId);
+ assert.equal((await rows(oldOwner,'v5_team_lessons','&id=eq.'+lesson)).data.length,1);
+ assert.equal((await rows(manager,'v5_team_lessons','&id=eq.'+lesson)).data.length,1);
+ assert.deepEqual((await rows(outsider,'v5_team_lessons','&id=eq.'+lesson)).data,[]);
+ assert.deepEqual((await rows(outsider,'v5_team_students','&id=eq.'+student)).data,[]);
+
+ result=await rest(oldOwner,'PATCH','v5_team_lessons?id=eq.'+lesson,{
+  status:'completed',notes:'Synthetic course completed'
+ });
+ assert.equal(result.status,200);
+ assert.equal(result.data[0].status,'completed');
+ assert.notEqual((await rest(oldOwner,'PATCH','v5_team_lessons?id=eq.'+lesson,{
+  teacher_user_id:f.actors.stranger.id
+ })).status,200,'Teacher attribution cannot be reassigned through the API');
+
+ // After a teacher leaves, the same JWT must be unable to see Team student
+ // and lesson data. Historic lesson attribution is retained for the manager.
+ assert.equal((await rest(oldOwner,'POST','rpc/v5_leave_team',{
+  p_workspace_id:anchor
+ })).status,200);
+ assert.deepEqual((await rows(oldOwner,'v5_team_students','&id=eq.'+student)).data,[]);
+ assert.deepEqual((await rows(oldOwner,'v5_team_lessons','&id=eq.'+lesson)).data,[]);
+ assert.equal((await rows(manager,'v5_team_lessons','&id=eq.'+lesson)).data[0].teacher_user_id,oldId);
+ assert.equal(Number(db("select count(*) from public.students where workspace_id='"+
+  anchor+"'")),oldStudents,'No V4 students migrated or altered');
+ assert.equal(Number(db("select count(*) from public.lesson_records where owner_id='"+
+  oldId+"'")),oldLessons,'No V4 lesson records changed');
+ assert.equal(Number(db("select count(*) from tutor_private.v5_student_seat_ledger "+
+  "where workspace_id='"+anchor+"'")),oldV4Seats,'V4 personal quota ledger unchanged');
+ assert.equal(db("select count(*) from tutor_private.v5_team_student_seat_ledger "+
+  "where team_id='"+teamId+"'"),'1',
+  'Team student is counted exclusively in the Team lifetime ledger');
+ assert.equal(db("select owner_id from public.workspaces where id='"+anchor+"'"),oldId);
+});
+
+test('V5.3 Team student lifetime seats and archived status do not erase history',async()=>{
+ const manager=await signIn('parent');
+ const oldOwner=await signIn('teacher');
+ const oldId=f.actors.teacher.id,managerId=f.actors.parent.id;
+ const anchor=db("select id from public.workspaces where owner_id='"+oldId+"'");
+ const teamId=db("select id from public.v5_teams where anchor_workspace_id='"+anchor+"'");
+ const student=db("select id from public.v5_team_students where team_id='"+
+  teamId+"' and display_name='Team scoped synthetic learner'");
+ const lesson=db("select id from public.v5_team_lessons where team_id='"+
+  teamId+"' and subject='V5 Team isolated math'");
+ assert.match(student,/^[a-f0-9-]{36}$/i);
+ const ledgerCount=db("select count(*) from tutor_private.v5_team_student_seat_ledger "+
+  "where team_id='"+teamId+"'");
+ let r=await rest(manager,'PATCH','v5_team_students?id=eq.'+student,
+  {is_archived:true});
+ assert.equal(r.status,200);
+ assert.notEqual((await rest(manager,'DELETE','v5_team_students?id=eq.'+student)).status,200,
+  'Team student hard-delete is not available through the browser');
+ assert.notEqual((await rest(manager,'POST','v5_team_students?select=id',{
+  id:student,team_id:teamId,display_name:'Recycled identifier',
+  created_by:managerId
+ })).status,201,'Lifetime student UUID cannot be recycled');
+ assert.equal(db("select count(*) from tutor_private.v5_team_student_seat_ledger "+
+  "where team_id='"+teamId+"'"),ledgerCount);
+ assert.equal(db("select count(*) from public.v5_team_lessons where id='"+
+  lesson+"'"),'1','Archiving Team student must not erase historic lessons');
+ assert.deepEqual((await rows(oldOwner,'v5_team_students','&id=eq.'+student)).data,[],
+  'Departed V4 owner remains unable to see archived Team students');
+});
