@@ -98,6 +98,12 @@ test('Team projects stay isolated until teacher accepts email invitation and is 
  assert.equal(r.status,201);
  const beta=r.data[0].id;
  assert.notEqual(alpha,beta);
+ assert.notEqual((await rest(owner,'PATCH','v5_team_projects?id=eq.'+alpha,
+  {workspace_id:otherWs})).status,200,
+  'Owner cannot move a project into another workspace');
+ assert.notEqual((await rest(owner,'PATCH','v5_team_projects?id=eq.'+alpha,
+  {created_by:otherId})).status,200,
+  'Creator identity must be immutable');
  assert.deepEqual((await rows(guest,'v5_team_projects')).data,[]);
  // RLS prevents unrelated account from creating projects.
  assert.notEqual((await rest(guest,'POST','v5_team_projects?select=id',{
