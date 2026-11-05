@@ -162,7 +162,14 @@ test('Team projects stay isolated until teacher accepts email invitation and is 
  // the SAME JWT immediately stops seeing Project Alpha.
  r=await rest(owner,'DELETE','workspace_members?workspace_id=eq.'+ws+
   '&user_id=eq.'+guestId);
- assert.equal(r.status,200);
+ assert.notEqual(r.status,200,'Membership cannot be deleted without audit RPC');
+ r=await rest(owner,'POST','rpc/v5_remove_team_teacher',{
+  p_workspace_id:ws,p_user_id:guestId
+ });
+ assert.ok([200,204].includes(r.status),'Owner removal is an audited RPC');
+ assert.equal(db("select count(*) from tutor_private.v5_team_membership_audit "+
+  "where workspace_id='"+ws+"' and subject_user_id='"+guestId+"' "+
+  "and event='teacher_removed'"),'1');
  assert.deepEqual((await rows(guest,'v5_team_projects')).data,[],
   'Same valid JWT must lose project access after removing membership');
  const remaining=await rows(owner,'v5_team_projects');
@@ -206,4 +213,58 @@ test('Team settings shows authorized projects and hides private Team UI on logou
  await expect(page.locator('body')).toHaveClass(/login-required/);
  await expect(page.locator('#v5-team-card')).toBeHidden();
  await expect(page.locator('#v5-team-project-list')).toBeEmpty();
+});
+
+
+test('teacher can exit a Team without changing personal workspace or history',async()=>{
+ const owner=await signIn('teacher'),member=await signIn('parent');
+ const outsider=await signIn('stranger');
+ const ownerId=f.actors.teacher.id,memberId=f.actors.parent.id;
+ const teamId=db("select id from public.workspaces where owner_id='"+ownerId+"'");
+ const personalId=db("select id from public.workspaces where owner_id='"+memberId+"'");
+ assert.match(personalId,/^[0-9a-f-]{36}$/i,'Member owns a separate synthetic workspace');
+ assert.notEqual(teamId,personalId);
+ const alpha=db("select id from public.v5_team_projects where workspace_id='"+
+  teamId+"' and name='Project Alpha'");
+ const ownProject=db("select id from public.v5_team_projects where workspace_id='"+
+  personalId+"' and name='Private Team B Project'");
+ assert.match(ownProject,/^[0-9a-f-]{36}$/i);
+ const initialTeamRows=Number(db("select count(*) from public.v5_team_projects "+
+  "where workspace_id='"+teamId+"'"));
+ const invite=await rest(owner,'POST','v5_team_invitations?select=id',{
+  workspace_id:teamId,recipient_email:f.actors.parent.email.toLowerCase(),
+  invited_by:ownerId
+ });
+ assert.equal(invite.status,201);
+ assert.equal((await rest(member,'POST','rpc/v5_accept_team_invitation',
+  {p_invitation_id:invite.data[0].id})).status,200);
+ const assignment=await rest(owner,'POST','v5_team_project_members?select=project_id',{
+  project_id:alpha,workspace_id:teamId,user_id:memberId
+ });
+ assert.equal(assignment.status,201);
+ const before=(await rows(member,'v5_team_projects')).data.map(p=>p.id);
+ assert.ok(before.includes(alpha));
+ assert.ok(before.includes(ownProject));
+
+ const denyOwner=await rest(owner,'POST','rpc/v5_leave_team',{p_workspace_id:teamId});
+ assert.notEqual(denyOwner.status,200,'Owner must first transfer management rights');
+ const denyOther=await rest(outsider,'POST','rpc/v5_leave_team',{p_workspace_id:teamId});
+ assert.notEqual(denyOther.status,200,'Non-member cannot exit another workspace');
+
+ const departed=await rest(member,'POST','rpc/v5_leave_team',{p_workspace_id:teamId});
+ assert.equal(departed.status,200);
+ assert.equal(departed.data.left,true);
+ const after=(await rows(member,'v5_team_projects')).data.map(p=>p.id);
+ assert.ok(!after.includes(alpha),'Same JWT immediately loses Team Alpha');
+ assert.ok(after.includes(ownProject),'Personal workspace data is unaffected');
+ assert.equal(Number(db("select count(*) from public.v5_team_project_members "+
+  "where workspace_id='"+teamId+"' and user_id='"+memberId+"'")),0);
+ assert.equal(Number(db("select count(*) from public.v5_team_projects "+
+  "where workspace_id='"+teamId+"'")),initialTeamRows);
+ assert.equal(db("select count(*) from tutor_private.v5_team_membership_audit "+
+  "where workspace_id='"+teamId+"' and subject_user_id='"+memberId+"' "+
+  "and event='teacher_left'"),'1');
+ assert.notEqual((await rest(member,'POST','rpc/v5_leave_team',{
+  p_workspace_id:teamId
+ })).status,200,'Repeated exit must not silently succeed');
 });
