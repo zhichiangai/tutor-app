@@ -326,6 +326,32 @@
                 <p class="helper-note">請填每小時的新臺幣整數金額，系統會依實際課程分鐘數計算；確認後不得直接改寫，後續更正須有稽核紀錄。</p>
                 <div id="v5-billing-pending"></div>
               </div>
+              <div class="v5-team-panel" id="v5-payment-panel">
+                <h4>Team 人工收款與部分付款分配</h4>
+                <p class="helper-note">僅供管理者人工登錄已核對的款項，不是銀行或金流平台付款驗證。同一筆款項可分配不同科目、不同課程，但必須是同 Team 同一位學生；超額付款於 V5.4 處理。</p>
+                <form id="v5-payment-report-form" class="v5-payment-report-form">
+                  <label>學生<select id="v5-payment-student-select" required></select></label>
+                  <label>登錄金額（新臺幣元）<input id="v5-payment-amount" type="number" min="0.01" max="10000000" step="0.01" inputmode="decimal" placeholder="例如：500" required></label>
+                  <label>款項日期<input id="v5-payment-received-date" type="date" required></label>
+                  <label>方式<select id="v5-payment-method">
+                    <option value="bank_transfer">銀行轉帳</option>
+                    <option value="cash">現金</option>
+                    <option value="other">其他</option>
+                  </select></label>
+                  <label class="v5-payment-note">備註（勿輸入完整帳號等敏感資料）
+                    <input id="v5-payment-note" maxlength="250" placeholder="例如：10 月課程部分付款">
+                  </label>
+                  <button class="secondary-button" type="submit" id="v5-payment-report-submit">登錄待分配付款</button>
+                </form>
+                <div class="v5-payment-totals">
+                  <span>本月已確認付款 <strong id="v5-payment-confirmed-total"></strong></span>
+                  <span>本月課程尚未結清 <strong id="v5-payment-outstanding-total"></strong></span>
+                </div>
+                <h4>待分配的款項</h4>
+                <div id="v5-payment-pending-reports" aria-live="polite"></div>
+                <h4>已確認的分配紀錄</h4>
+                <div id="v5-payment-confirmed-reports"></div>
+              </div>
             </article>
             <article class="card settings-card"><h3>登入與安全</h3><p class="section-sub">使用 Google 管理登入，不會在網站儲存你的 Google 密碼。</p>
               <button class="secondary-button wide" id="sign-out" type="button">登出 Google 帳號</button>
