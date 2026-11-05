@@ -196,6 +196,102 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   if(!done.children.length)
    done.append(item('p','本月份沒有已確認的付款分配。','section-sub'));
  }
+ function renderAdvance(){
+  const panel=$('v5-advance-panel');
+  if(!panel)return;
+  const visible=ready&&valid()&&!!teamId&&!!paymentOverview;
+  panel.classList.toggle('hidden',!visible);
+  if(!visible)return;
+  const selected=$('v5-advance-student-select');
+  options(selected,advanceStudents.map(s=>({
+   value:s.id,label:s.display_name+' · '+s.id.slice(-6)
+  })));
+  if(advanceStudents.some(s=>s.id===advanceStudentId))selected.value=advanceStudentId;
+  const report=$('v5-advance-report-submit');
+  report.disabled=writing||!advanceStudentId||!advanceOverview;
+  const pending=$('v5-advance-pending-payments');
+  const creditRows=$('v5-advance-credit-rows');
+  pending.replaceChildren();creditRows.replaceChildren();
+  const total=$('v5-advance-available');
+  total.replaceChildren();
+  const snapshot=advanceOverview;
+  $('v5-advance-message').textContent=advanceStudentId?
+   snapshot?'管理者資料已核對：所有金額皆為新臺幣，抵扣尚需另外確認。':
+   '正在讀取此學生跨月份預收與應收資料…':
+   '此 Team 尚無可查看的學生。';
+  if(!snapshot){
+   pending.append(item('p','請先選擇學生。','section-sub'));
+   return;
+  }
+  total.append(item('strong','目前預收可用 '+money(snapshot.available_cents)));
+  total.append(item('p','該學生跨月份未結清課程費用 '+money(snapshot.outstanding_cents),
+   'section-sub'));
+  const fees=(snapshot.receivables||[]).filter(f=>f.outstanding_cents>0);
+  const pend=(paymentOverview.payments||[]).filter(p=>
+   p.student_id===advanceStudentId&&p.status==='pending'&&
+   p.intended_advance_cents>0);
+  for(const p of pend){
+   const row=item('div',undefined,'v5-billing-row');
+   const direct=p.amount_cents-p.intended_advance_cents;
+   row.append(item('strong','待確認付款 '+money(p.amount_cents)+
+    ' · 其中預收 '+money(p.intended_advance_cents)));
+   row.append(item('span',p.received_on+' · '+p.reference+
+    ' · 本次應直接分配 '+money(direct),'section-sub'));
+   if(direct>0){
+    for(const fee of fees){
+     const label=item('label',fee.subject+' · 尚未結清 '+money(fee.outstanding_cents));
+     const inp=item('input');
+     inp.type='number';inp.step='0.01';inp.min='0';
+     inp.max=(fee.outstanding_cents/100).toFixed(2);
+     inp.placeholder='直接分配（新臺幣元）';
+     inp.inputMode='decimal';
+     inp.dataset.v5AdvancePayment=p.payment_id;
+     inp.dataset.v5AdvanceLesson=fee.lesson_id;
+     label.append(inp);row.append(label);
+    }
+   }else{
+    row.append(item('p','本筆款項全額認列預收，不需分配到現有課程。','section-sub'));
+   }
+   const button=item('button','管理者確認付款與預收','secondary-button');
+   button.type='button';button.disabled=writing;
+   button.dataset.v5BillingAction='confirm-advance-payment';
+   button.dataset.id=p.payment_id;row.append(button);
+   pending.append(row);
+  }
+  if(!pend.length)
+   pending.append(item('p','本月此學生沒有待確認的預收付款。','section-sub'));
+  const credits=(snapshot.credits||[]).filter(c=>c.available_cents>0);
+  for(const c of credits){
+   const row=item('div',undefined,'v5-billing-row');
+   row.append(item('strong','預收餘額 '+money(c.available_cents)));
+   row.append(item('p','原始預收 '+money(c.amount_cents)+
+    ' · 已抵扣 '+money(c.used_cents)+' · '+c.credit_id.slice(-8),'section-sub'));
+   let budget=c.available_cents;
+   for(const fee of fees){
+    const suggested=Math.min(budget,fee.outstanding_cents);
+    budget-=suggested;
+    const label=item('label',fee.subject+' · 課程日期 '+
+     new Date(fee.lesson_start).toLocaleDateString('zh-TW',{timeZone:'Asia/Taipei'})+
+     ' · 尚未結清 '+money(fee.outstanding_cents));
+    const inp=item('input');
+    inp.type='number';inp.step='0.01';inp.min='0';
+    inp.max=(Math.min(c.available_cents,fee.outstanding_cents)/100).toFixed(2);
+    inp.inputMode='decimal';inp.placeholder='抵扣金額（元）';
+    if(suggested>0)inp.value=(suggested/100).toFixed(2);
+    inp.dataset.v5AdvanceCredit=c.credit_id;
+    inp.dataset.v5AdvanceLesson=fee.lesson_id;
+    label.append(inp);row.append(label);
+   }
+   const button=item('button','確認此筆預收抵扣','secondary-button');
+   button.type='button';button.disabled=writing||!fees.length;
+   button.dataset.v5BillingAction='apply-advance-credit';
+   button.dataset.id=c.credit_id;row.append(button);
+   creditRows.append(row);
+  }
+  if(!credits.length)
+   creditRows.append(item('p','此學生目前沒有可抵扣的預收餘額。','section-sub'));
+ }
+
  function cents(raw){
   if(!/^(?:0|[1-9]\d{0,7})(?:\.\d{1,2})?$/.test(String(raw).trim()))
    return null;
