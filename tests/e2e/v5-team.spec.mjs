@@ -1310,6 +1310,179 @@ test('V5.3 manager GUI reports and partially allocates a payment without V4 effe
  await expect(page.locator('#v5-payment-pending-reports')).toBeEmpty();
 });
 
+test('V5.4 isolated advance credit is split, suggested, applied and never double-settled',async()=>{
+ const manager=await signIn('parent'),teacher=await signIn('teacher');
+ const stranger=await signIn('stranger'),owner=f.actors.parent.id;
+ const ws=db("select id from public.workspaces where owner_id='"+owner+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ const project=db("select id from public.v5_team_projects where workspace_id='"+
+  ws+"' and name='Private Team B Project'");
+ assert.match(team,/^[a-f0-9-]{36}$/i);
+ const beforeV4Payments=db("select count(*) from public.payment_batches "+
+  "where workspace_id='"+ws+"'");
+ const beforeV4Lessons=db("select count(*) from public.lesson_records "+
+  "where owner_id='"+owner+"'");
+ let r=await rest(manager,'POST','v5_team_students?select=id',{
+  team_id:team,display_name:'Advance Credit Isolation Student',
+  created_by:owner
+ });
+ assert.equal(r.status,201);
+ const student=r.data[0].id;
+ r=await rest(manager,'POST','v5_team_enrollments?select=student_id',{
+  team_id:team,project_id:project,student_id:student
+ });
+ assert.equal(r.status,201);
+ const makeFee=async(subject,date,hourly)=>{
+  const lesson=await rest(manager,'POST','v5_team_lessons?select=id',{
+   team_id:team,project_id:project,student_id:student,
+   teacher_user_id:owner,subject,status:'completed',
+   lesson_start:date+'T14:00:00+08:00',
+   lesson_end:date+'T15:00:00+08:00'
+  });
+  assert.equal(lesson.status,201,'Create isolated completed course');
+  const id=lesson.data[0].id;
+  const fee=await rest(manager,'POST','rpc/v5_confirm_team_lesson_fee',{
+   p_lesson_id:id,p_hourly_rate_cents:hourly
+  });
+  assert.equal(fee.status,200,'Confirm isolated course fee');
+  assert.equal(fee.data.amount_cents,hourly);
+  return id;
+ };
+ const math=await makeFee('Advance Math','2026-10-22',100000);
+ const english=await makeFee('Advance English','2026-10-23',50000);
+ const science=await makeFee('Advance Science','2026-10-24',80000);
+ const reportArgs={
+  p_team_id:team,p_student_id:student,p_amount_cents:160000,
+  p_received_on:'2026-10-25',p_method:'bank_transfer',
+  p_reference:'ADVANCE-ISOLATED-1600',p_expected_credit_cents:60000,
+  p_note:'Synthetic manually verified entry; no real bank transaction'
+ };
+ assert.notEqual((await rest(teacher,'POST',
+  'rpc/v5_report_team_payment_with_advance',reportArgs)).status,200);
+ assert.notEqual((await rest(stranger,'POST','rpc/v5_team_advance_overview',{
+  p_team_id:team,p_student_id:student
+ })).status,200);
+ r=await rest(manager,'POST','rpc/v5_report_team_payment_with_advance',reportArgs);
+ assert.equal(r.status,200,'Manager reports payment with explicit planned credit');
+ const payment=r.data.payment_id;
+ assert.equal(r.data.expected_credit_cents,60000);
+ assert.notEqual((await rest(manager,'POST',
+  'rpc/v5_report_team_payment_with_advance',reportArgs)).status,200,
+  'The same Team payment reference cannot be reported twice');
+ // A V5.4 report cannot be confirmed using the older full-payment RPC.
+ assert.notEqual((await rest(manager,'POST',
+  'rpc/v5_confirm_team_payment_allocation',{
+  p_payment_id:payment,
+  p_allocations:[{lesson_id:math,amount_cents:100000},
+   {lesson_id:english,amount_cents:50000},
+   {lesson_id:science,amount_cents:10000}]
+ })).status,200,'Original V5.3 RPC cannot bypass advance creation');
+ assert.equal(db("select status from tutor_private.v5_team_payment_reports "+
+  "where id='"+payment+"'"),'pending');
+ assert.notEqual((await rest(manager,'POST',
+  'rpc/v5_confirm_team_advance_payment',{
+  p_payment_id:payment,
+  p_allocations:[{lesson_id:math,amount_cents:90000}]
+ })).status,200,'Mismatch between direct allocation and planned credit rolls back');
+ assert.equal(db("select count(*) from tutor_private.v5_team_payment_allocations "+
+  "where payment_id='"+payment+"'"),'0');
+ r=await rest(manager,'POST','rpc/v5_confirm_team_advance_payment',{
+  p_payment_id:payment,
+  p_allocations:[{lesson_id:math,amount_cents:100000}]
+ });
+ assert.equal(r.status,200);
+ assert.equal(r.data.status,'confirmed');
+ assert.equal(r.data.allocated_cents,100000);
+ assert.equal(r.data.credit_cents,60000);
+ const credit=r.data.credit_id;
+ assert.match(credit,/^[a-f0-9-]{36}$/i);
+ assert.notEqual((await rest(manager,'POST',
+  'rpc/v5_confirm_team_advance_payment',{
+  p_payment_id:payment,p_allocations:[{lesson_id:math,amount_cents:100000}]
+ })).status,200,'Payment confirmation is one-time');
+ assert.equal(db("select amount_cents from tutor_private.v5_team_advance_credits "+
+  "where id='"+credit+"'"),'60000');
+ assert.notEqual((await rows(teacher,'v5_team_advance_credits')).status,200,
+  'Regular Team teachers cannot fetch private credit balances');
+ let overview=await rest(manager,'POST','rpc/v5_team_advance_overview',{
+  p_team_id:team,p_student_id:student
+ });
+ assert.equal(overview.status,200);
+ assert.equal(overview.data.available_cents,60000);
+ assert.equal(overview.data.outstanding_cents,130000);
+ assert.equal(overview.data.credits.length,1);
+ assert.equal(overview.data.credits[0].available_cents,60000);
+ assert.equal(overview.data.suggestions.reduce((s,x)=>s+x.suggested_cents,0),
+  60000,'Recommendations do not yet write applications');
+ assert.equal(db("select count(*) from tutor_private.v5_team_advance_applications "+
+  "where credit_id='"+credit+"'"),'0');
+ const allocations=[
+  {lesson_id:english,amount_cents:40000},
+  {lesson_id:science,amount_cents:20000}
+ ];
+ assert.notEqual((await rest(teacher,'POST',
+  'rpc/v5_apply_team_advance_credit',{
+   p_credit_id:credit,p_allocations:allocations,
+   p_idempotency_key:'ADVANCE-APPLY-ISOLATION-001'
+  })).status,200,'A teacher cannot approve advance offsets');
+ r=await rest(manager,'POST','rpc/v5_apply_team_advance_credit',{
+  p_credit_id:credit,p_allocations:allocations,
+  p_idempotency_key:'ADVANCE-APPLY-ISOLATION-001'
+ });
+ assert.equal(r.status,200);
+ assert.equal(r.data.applied_cents,60000);
+ assert.equal(r.data.idempotent,false);
+ const initialOperation=r.data.operation_id;
+ r=await rest(manager,'POST','rpc/v5_apply_team_advance_credit',{
+  p_credit_id:credit,p_allocations:allocations,
+  p_idempotency_key:'ADVANCE-APPLY-ISOLATION-001'
+ });
+ assert.equal(r.status,200,'Retry returns original confirmed operation');
+ assert.equal(r.data.operation_id,initialOperation);
+ assert.equal(r.data.idempotent,true);
+ assert.notEqual((await rest(manager,'POST',
+  'rpc/v5_apply_team_advance_credit',{
+  p_credit_id:credit,p_allocations:[{lesson_id:english,amount_cents:1}],
+  p_idempotency_key:'ADVANCE-APPLY-ISOLATION-001'
+ })).status,200,'Reusing idempotency key with changed payload is rejected');
+ assert.notEqual((await rest(manager,'POST',
+  'rpc/v5_apply_team_advance_credit',{
+  p_credit_id:credit,p_allocations:[{lesson_id:science,amount_cents:1}],
+  p_idempotency_key:'ADVANCE-APPLY-ISOLATION-002'
+ })).status,200,'Spent credit cannot be applied again');
+ overview=await rest(manager,'POST','rpc/v5_team_advance_overview',{
+  p_team_id:team,p_student_id:student
+ });
+ assert.equal(overview.status,200);
+ assert.equal(overview.data.available_cents,0);
+ assert.equal(overview.data.outstanding_cents,70000);
+ assert.equal(overview.data.suggestions.length,0);
+ assert.equal(db("select count(*) from tutor_private.v5_team_advance_operations "+
+  "where credit_id='"+credit+"'"),'1');
+ assert.equal(db("select count(*) from tutor_private.v5_team_advance_applications "+
+  "where credit_id='"+credit+"'"),'2');
+ // The older V5.3 confirmation must not double-pay an already offset lesson.
+ const legacy=await rest(manager,'POST','rpc/v5_report_team_payment',{
+  p_team_id:team,p_student_id:student,p_amount_cents:30000,
+  p_received_on:'2026-10-26',p_method:'cash',
+  p_reference:'ADVANCE-LEGACY-OVERSETTLE'
+ });
+ assert.equal(legacy.status,200);
+ assert.notEqual((await rest(manager,'POST',
+  'rpc/v5_confirm_team_payment_allocation',{
+  p_payment_id:legacy.data.payment_id,
+  p_allocations:[{lesson_id:english,amount_cents:30000}]
+ })).status,200,'Combined-settlement trigger blocks stale V5.3 amount');
+ assert.equal(db("select status from tutor_private.v5_team_payment_reports "+
+  "where id='"+legacy.data.payment_id+"'"),'pending');
+ assert.equal(db("select count(*) from tutor_private.v5_team_advance_audit "+
+  "where credit_id='"+credit+"'"),'2','Creation and one apply audit remain immutable');
+ assert.equal(db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'"),beforeV4Payments,'V4 receipts must remain unchanged');
+ assert.equal(db("select count(*) from public.lesson_records where owner_id='"+
+  owner+"'"),beforeV4Lessons,'V4 lessons must remain unchanged');
+});
+
 test('V5.3 billing management follows accepted Team governance transfer, not V4 owner',async()=>{
  const former=await signIn('parent'),newManager=await signIn('teacher');
  const fromId=f.actors.parent.id,toId=f.actors.teacher.id;
