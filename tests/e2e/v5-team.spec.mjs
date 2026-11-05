@@ -1351,6 +1351,16 @@ test('V5.4 isolated advance credit is split, suggested, applied and never double
  const math=await makeFee('Advance Math','2026-10-22',100000);
  const english=await makeFee('Advance English','2026-10-23',50000);
  const science=await makeFee('Advance Science','2026-10-24',80000);
+ const monthly=()=>rest(manager,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ const baseline=await monthly();
+ assert.equal(baseline.status,200);
+ const initialConfirmed=baseline.data.confirmed_payments_cents;
+ const initialAdvanceApplied=baseline.data.advance_applied_cents;
+ const initialAdvanceAvailable=baseline.data.advance_available_cents;
+ const initialOutstanding=baseline.data.outstanding_cents;
+ const initialAdvanceCreated=baseline.data.advance_created_cents;
  const reportArgs={
   p_team_id:team,p_student_id:student,p_amount_cents:160000,
   p_received_on:'2026-10-25',p_method:'bank_transfer',
@@ -1396,6 +1406,17 @@ test('V5.4 isolated advance credit is split, suggested, applied and never double
  assert.equal(r.data.credit_cents,60000);
  const credit=r.data.credit_id;
  assert.match(credit,/^[a-f0-9-]{36}$/i);
+ let reconciled=await monthly();
+ assert.equal(reconciled.status,200);
+ assert.equal(reconciled.data.confirmed_payments_cents,
+  initialConfirmed+160000,'An advance payment adds receipt only once');
+ assert.equal(reconciled.data.advance_created_cents,initialAdvanceCreated+60000);
+ assert.equal(reconciled.data.advance_available_cents,initialAdvanceAvailable+60000);
+ assert.equal(reconciled.data.advance_applied_cents,initialAdvanceApplied);
+ assert.equal(reconciled.data.outstanding_cents,initialOutstanding-100000);
+ assert.equal(reconciled.data.receivables.find(x=>x.lesson_id===math).outstanding_cents,0);
+ assert.equal(reconciled.data.payments.find(x=>x.payment_id===payment).advance_credit_cents,
+  60000,'Credit is a component of confirmed payment, not another receipt');
  assert.notEqual((await rest(manager,'POST',
   'rpc/v5_confirm_team_advance_payment',{
   p_payment_id:payment,p_allocations:[{lesson_id:math,amount_cents:100000}]
@@ -1457,6 +1478,16 @@ test('V5.4 isolated advance credit is split, suggested, applied and never double
  assert.equal(overview.data.available_cents,0);
  assert.equal(overview.data.outstanding_cents,70000);
  assert.equal(overview.data.suggestions.length,0);
+ reconciled=await monthly();
+ assert.equal(reconciled.status,200);
+ assert.equal(reconciled.data.confirmed_payments_cents,initialConfirmed+160000,
+  'Applying an advance must not increase confirmed receipts again');
+ assert.equal(reconciled.data.advance_applied_cents,initialAdvanceApplied+60000);
+ assert.equal(reconciled.data.outstanding_cents,initialOutstanding-160000);
+ assert.equal(reconciled.data.advance_available_cents,initialAdvanceAvailable);
+ const englishMonthly=reconciled.data.receivables.find(x=>x.lesson_id===english);
+ assert.equal(englishMonthly.advance_applied_cents,40000);
+ assert.equal(englishMonthly.outstanding_cents,10000);
  assert.equal(db("select count(*) from tutor_private.v5_team_advance_operations "+
   "where credit_id='"+credit+"'"),'1');
  assert.equal(db("select count(*) from tutor_private.v5_team_advance_applications "+
