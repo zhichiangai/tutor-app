@@ -186,8 +186,17 @@
               <div class="v5-team-panel">
                 <h4>我的專案</h4><div id="v5-team-project-list"></div>
                 <h4>Team 邀請</h4><div id="v5-team-invite-list"></div>
+                <h4>管理權轉讓</h4>
+                <p class="helper-note">接任老師必須已加入 Team，且本人接受後才會正式移轉。轉讓後，原管理者可自行退出，個人資料保留。</p>
+                <div id="v5-team-transfer-list" aria-live="polite"></div>
               </div>
               <div id="v5-team-owner-controls" class="hidden">
+                <div class="v5-team-panel">
+                  <h4>管理的 Team</h4>
+                  <label>選擇管理中的團隊
+                    <select id="v5-team-manage-select"></select>
+                  </label>
+                </div>
                 <div class="v5-team-panel">
                   <h4>建立專案</h4>
                   <form id="v5-team-project-form">
@@ -212,6 +221,14 @@
                     <button class="secondary-button" id="v5-team-assign-submit" type="submit">指派老師</button>
                   </form>
                   <div id="v5-team-assignments"></div>
+                </div>
+                <div class="v5-team-panel">
+                  <h4>轉讓 Team 管理權</h4>
+                  <p class="helper-note">只有目前管理者可以提出。接任者接受前，管理權仍屬於原管理者。</p>
+                  <form id="v5-team-transfer-form">
+                    <label>接任老師<select id="v5-team-successor-select" required></select></label>
+                    <button class="secondary-button" id="v5-team-transfer-submit" type="submit">提出轉讓邀請</button>
+                  </form>
                 </div>
               </div>
             </article>
