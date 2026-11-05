@@ -110,7 +110,11 @@ async function mutate(payload,form){
  await refresh();
 }
 $('workspace').addEventListener('change',updateView);
-$('plan').addEventListener('change',updateView);
+$('plan').addEventListener('change',()=>{
+ const w=current();if(!w)return;
+ $('grant-phrase').textContent='SET '+$('plan').value.toUpperCase()+' '+w.workspace_id.slice(0,8);
+ $('grant-confirm').value='';
+});
 $('reload').addEventListener('click',()=>void refresh());
 $('grant-form').addEventListener('submit',event=>{
  event.preventDefault();
