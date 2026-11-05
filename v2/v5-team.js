@@ -2,6 +2,7 @@
 // This module never grants V4 lesson or payment access to teammates.
 export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspace,notify}){
  let generation=0,identity='',loading=false,ready=false,error='',data=null,writing=false;
+ let selectedManagedWorkspace='';
  const $=id=>document.getElementById(id);
  const text=(element,value)=>{element.textContent=String(value??'');return element};
  const node=(tag,className,value)=>{
@@ -11,10 +12,11 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
   return el;
  };
  function clear(){
-  generation++;identity='';loading=false;ready=false;error='';data=null;writing=false;
+  generation++;identity='';loading=false;ready=false;error='';data=null;writing=false;selectedManagedWorkspace='';
   $('v5-team-card')?.classList.add('hidden');
   for(const id of ['v5-team-invite-list','v5-team-project-list',
-   'v5-team-members-list','v5-team-assignments','v5-team-message']){
+   'v5-team-members-list','v5-team-assignments','v5-team-message',
+   'v5-team-transfer-list']){
    $(id)?.replaceChildren();
   }
  }
@@ -24,15 +26,23 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
   if(!card)return;
   if(!valid()){card.classList.add('hidden');return}
   if(!ready&&!loading){card.classList.add('hidden');return}
-  const current=data||{plan:null,projects:[],invites:[],members:[],assignments:[]};
-  const ws=getOwnWorkspace(),isOwner=Boolean(ws?.id&&current.plan?.plan==='team');
+  const current=data||{plan:null,managed:[],projects:[],invites:[],
+   members:[],assignments:[],transfers:[]};
+  const managed=current.managed||[];
+  const chosen=managed.find(t=>t.workspace_id===selectedManagedWorkspace)||managed[0]||null;
+  const ws=chosen?{id:chosen.workspace_id}:null;
+  const isOwner=Boolean(chosen?.manager_user_id===getUser()?.id);
+  if(ws)selectedManagedWorkspace=ws.id;
   const incoming=current.invites.filter(i=>i.status==='pending'&&
     i.recipient_email===String(getUser()?.email||'').toLowerCase());
   const assigned=current.projects.filter(p=>current.assignments.some(a=>
     a.project_id===p.id&&a.user_id===getUser()?.id));
   const memberOfTeam=current.members.some(m=>m.user_id===getUser()?.id&&
     m.workspace_id!==ws?.id);
-  const show=loading||!!error||isOwner||incoming.length>0||assigned.length>0||memberOfTeam;
+  const hasIncomingTransfer=(current.transfers||[]).some(t=>
+    t.to_user_id===getUser()?.id&&t.status==='pending');
+  const show=loading||!!error||isOwner||incoming.length>0||
+    assigned.length>0||memberOfTeam||hasIncomingTransfer;
   card.classList.toggle('hidden',!show);
   if(!show)return;
   const msg=$('v5-team-message');
@@ -41,6 +51,13 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
     '你只能開啟被指派的專案；加入團隊不會自動開放學費與課程資料。');
   const controls=$('v5-team-owner-controls');
   controls?.classList.toggle('hidden',!isOwner);
+  const managedSelect=$('v5-team-manage-select');
+  managedSelect.replaceChildren();
+  for(const team of managed){
+   const opt=node('option','','Team · '+team.workspace_id.slice(-8));
+   opt.value=team.workspace_id;managedSelect.append(opt);
+  }
+  if(ws)managedSelect.value=ws.id;
   const ownProjects=current.projects.filter(p=>p.workspace_id===ws?.id);
   const visibleProjects=isOwner?ownProjects:assigned;
   const projectList=$('v5-team-project-list');
@@ -80,7 +97,7 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
   // personal workspace or delete any Team project/history.
   if(!isOwner){
    for(const membership of current.members.filter(m=>
-    m.user_id===getUser()?.id&&m.role==='teacher'&&m.workspace_id!==ws?.id)){
+    m.user_id===getUser()?.id&&m.workspace_id!==ws?.id)){
     const row=node('div','v5-team-row');
     row.append(node('span','','已加入 Team（末碼 '+membership.workspace_id.slice(-6)+'）'));
     const leave=node('button','secondary-button','退出 Team');
@@ -97,11 +114,9 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
    for(const m of ownMembers){
     const row=node('div','v5-team-row');
     row.append(node('span','','老師（帳號末碼 '+m.user_id.slice(-6)+'）'));
-    if(m.role==='teacher'){
-     const button=node('button','secondary-button','移除老師');
-     button.type='button';button.dataset.v5TeamAction='remove-teacher';
-     button.dataset.id=m.user_id;row.append(button);
-    }
+    const button=node('button','secondary-button','移除老師');
+    button.type='button';button.dataset.v5TeamAction='remove-teacher';
+    button.dataset.id=m.user_id;row.append(button);
     members.append(row);
    }
   }
@@ -111,12 +126,22 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
   for(const p of ownProjects.filter(p=>p.status==='active')){
    const option=node('option','',p.name);option.value=p.id;projectSelect.append(option);
   }
-  for(const m of ownMembers.filter(m=>['teacher','admin'].includes(m.role))){
+  for(const m of ownMembers){
    const option=node('option','','老師（末碼 '+m.user_id.slice(-6)+'）');
    option.value=m.user_id;teacherSelect.append(option);
   }
   $('v5-team-assign-submit').disabled=writing||
     !projectSelect.options.length||!teacherSelect.options.length;
+  const successorSelect=$('v5-team-successor-select');
+  successorSelect.replaceChildren();
+  for(const m of ownMembers){
+   const opt=node('option','','老師（末碼 '+m.user_id.slice(-6)+'）');
+   opt.value=m.user_id;successorSelect.append(opt);
+  }
+  const pendingForTeam=(current.transfers||[]).some(t=>
+   t.workspace_id===ws?.id&&t.status==='pending');
+  $('v5-team-transfer-submit').disabled=writing||
+   !successorSelect.options.length||pendingForTeam;
   const assignedList=$('v5-team-assignments');assignedList.replaceChildren();
   if(isOwner){
    const byId=new Map(ownProjects.map(p=>[p.id,p.name]));
@@ -129,6 +154,26 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
     button.dataset.project=m.project_id;button.dataset.id=m.user_id;
     row.append(button);assignedList.append(row);
    }
+  }
+  const transfers=$('v5-team-transfer-list');transfers.replaceChildren();
+  const visibleTransfers=(current.transfers||[]).filter(t=>t.status==='pending'&&
+   (t.to_user_id===getUser()?.id||(isOwner&&t.workspace_id===ws?.id)));
+  if(!visibleTransfers.length)
+   transfers.append(node('p','section-sub','目前沒有待確認的管理權轉讓。'));
+  for(const transfer of visibleTransfers){
+   const row=node('div','v5-team-row');
+   row.append(node('span','',transfer.to_user_id===getUser()?.id?
+    '收到 Team（末碼 '+transfer.workspace_id.slice(-6)+'）管理權轉讓邀請':
+    '等待接任老師（末碼 '+transfer.to_user_id.slice(-6)+'）確認'));
+   const actions=transfer.to_user_id===getUser()?.id?
+    [['accept-transfer','接受管理權'],['decline-transfer','拒絕']]:
+    [['cancel-transfer','取消轉讓']];
+   for(const [action,label] of actions){
+    const btn=node('button','secondary-button',label);
+    btn.type='button';btn.dataset.v5TeamAction=action;
+    btn.dataset.id=transfer.id;row.append(btn);
+   }
+   transfers.append(row);
   }
   $('v5-team-owner-controls').querySelectorAll('button[type=submit]').forEach(b=>{
    if(b.id!=='v5-team-assign-submit')b.disabled=writing;
@@ -145,8 +190,11 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
     client.rpc('v5_my_plan'),
     client.from('v5_team_projects').select('id,workspace_id,name,status,created_by').order('created_at'),
     client.from('v5_team_invitations').select('id,workspace_id,recipient_email,status').order('created_at'),
-    client.from('workspace_members').select('workspace_id,user_id,role'),
-    client.from('v5_team_project_members').select('project_id,workspace_id,user_id')
+    client.from('v5_team_roster').select('workspace_id,user_id'),
+    client.from('v5_team_project_members').select('project_id,workspace_id,user_id'),
+    client.rpc('v5_my_managed_teams'),
+    client.from('v5_team_manager_transfers')
+      .select('id,workspace_id,from_user_id,to_user_id,status').order('created_at')
    ]);
    if(stamp!==generation||getUser()?.id!==id||!valid())return;
    const failure=r.find(x=>x.error);
@@ -156,7 +204,8 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
     data=null;
    }else{
     data={plan:r[0].data,projects:r[1].data||[],invites:r[2].data||[],
-     members:r[3].data||[],assignments:r[4].data||[]};
+     members:r[3].data||[],assignments:r[4].data||[],
+     managed:r[5].data||[],transfers:r[6].data||[]};
     error='';ready=true;
    }
   }catch{
@@ -179,12 +228,14 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
   }finally{writing=false;render()}
  }
  function ownerTeam(){
-  const ws=getOwnWorkspace();
-  return ws?.id&&data?.plan?.plan==='team'?ws:null;
+  const managed=(data?.managed||[]).find(t=>
+   t.workspace_id===selectedManagedWorkspace)||(data?.managed||[])[0];
+  return managed?.manager_user_id===getUser()?.id?{id:managed.workspace_id}:null;
  }
  async function handleSubmit(ev){
   const id=ev.target?.id;
-  if(!['v5-team-project-form','v5-team-invite-form','v5-team-assign-form'].includes(id))
+  if(!['v5-team-project-form','v5-team-invite-form','v5-team-assign-form',
+   'v5-team-transfer-form'].includes(id))
    return false;
   ev.preventDefault();
   const ws=ownerTeam(),client=getClient();
@@ -203,6 +254,13 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
     workspace_id:ws.id,recipient_email,invited_by:getUser().id
    }).select('id'),'老師邀請已建立，對方登入後可以接受');
    $('v5-team-invite-email').value='';
+  }else if(id==='v5-team-transfer-form'){
+   const p_target_user_id=$('v5-team-successor-select').value;
+   if(!p_target_user_id||!window.confirm(
+    '確定提出管理權轉讓？只有接任老師本人接受後才會生效。'))return true;
+   await perform(()=>client.rpc('v5_propose_team_manager',{
+    p_workspace_id:ws.id,p_target_user_id
+   }),'管理權轉讓已提出，等待接任老師確認');
   }else{
    const project_id=$('v5-team-project-select').value;
    const user_id=$('v5-team-teacher-select').value;
@@ -241,6 +299,19 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
      await perform(()=>client.rpc('v5_leave_team',{
       p_workspace_id:id
      }),'已退出 Team，個人資料不受影響');break;
+   case 'accept-transfer':
+    if(window.confirm('接受後你將成為新的 Team 管理者，負責成員與專案管理。'))
+     await perform(()=>client.rpc('v5_respond_team_manager',{
+      p_transfer_id:id,p_accept:true
+     }),'已接受 Team 管理權，原管理者改為普通老師');break;
+   case 'decline-transfer':
+    await perform(()=>client.rpc('v5_respond_team_manager',{
+     p_transfer_id:id,p_accept:false
+    }),'已拒絕管理權轉讓');break;
+   case 'cancel-transfer':
+    if(ws)await perform(()=>client.rpc('v5_cancel_team_manager',{
+     p_transfer_id:id
+    }),'已取消待處理管理權轉讓');break;
    case 'unassign':
     if(ws&&window.confirm('確定取消此專案的老師指派？'))
      await perform(()=>client.from('v5_team_project_members').delete()
@@ -249,5 +320,9 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
   }
   return true;
  }
- return {render,refresh,clear,handleSubmit,handleClick};
+ function chooseManagedWorkspace(id){
+  selectedManagedWorkspace=id;
+  render();
+ }
+ return {render,refresh,clear,handleSubmit,handleClick,chooseManagedWorkspace};
 }
