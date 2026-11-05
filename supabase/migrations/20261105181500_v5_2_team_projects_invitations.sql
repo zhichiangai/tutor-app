@@ -41,20 +41,15 @@ grant select,insert,delete on public.v5_team_project_members to authenticated;
 
 -- Existing V4 membership table remains the source of truth for teacher seats.
 -- Team owners can see/revoke their invited teachers. No role editing is allowed.
-grant delete on public.workspace_members to authenticated;
+-- Direct DELETE remains denied to clients. Membership removal and exit
+-- require audited, identity-checked RPCs further below.
 create policy v5_owner_read_team_members on public.workspace_members
  for select to authenticated
  using (exists (
    select 1 from public.workspaces w
    where w.id=public.workspace_members.workspace_id and w.owner_id=(select auth.uid())
  ));
-create policy v5_owner_remove_team_teacher on public.workspace_members
- for delete to authenticated
- using(role='teacher' and user_id<>(select auth.uid())
-  and exists (
-   select 1 from public.workspaces w
-   where w.id=public.workspace_members.workspace_id and w.owner_id=(select auth.uid())
- ));
+
 
 -- Project RLS deliberately does not broaden legacy V4 students/lessons/payments.
 create policy v5_project_owner_or_assigned_read on public.v5_team_projects
@@ -239,3 +234,71 @@ begin
 end;$$;
 revoke all on function public.v5_cancel_team_invitation(uuid) from public,anon,authenticated;
 grant execute on function public.v5_cancel_team_invitation(uuid) to authenticated;
+
+
+-- V5.2 teacher exit / owner removal: logged, atomic and authority-scoped.
+-- A Team owner cannot exit by this endpoint: management transfer must be
+-- accepted first, which is a separate governance milestone.
+create table tutor_private.v5_team_membership_audit(
+ id bigint generated always as identity primary key,
+ workspace_id uuid not null references public.workspaces(id),
+ actor_id uuid not null,
+ subject_user_id uuid not null,
+ event text not null check(event in('teacher_left','teacher_removed')),
+ occurred_at timestamptz not null default now()
+);
+alter table tutor_private.v5_team_membership_audit enable row level security;
+revoke all on tutor_private.v5_team_membership_audit from public,anon,authenticated;
+
+create function public.v5_leave_team(p_workspace_id uuid)
+returns jsonb language plpgsql security definer set search_path='' as $$
+declare v_actor uuid:=(select auth.uid());
+begin
+ if v_actor is null then
+   raise exception '請先登入' using errcode='42501';
+ end if;
+ -- Stable authorization while another owner or grant tries to modify the Team.
+ perform 1 from public.workspaces w
+  join public.v5_workspace_entitlements e on e.workspace_id=w.id
+  where w.id=p_workspace_id and e.plan_code='team'
+    and w.owner_id<>v_actor for update of w;
+ if not found then
+  raise exception 'Team 管理者必須先完成管理權轉讓' using errcode='42501';
+ end if;
+ delete from public.workspace_members m
+  where m.workspace_id=p_workspace_id and m.user_id=v_actor and m.role='teacher';
+ if not found then
+  raise exception '目前帳號不是此 Team 的授課老師' using errcode='42501';
+ end if;
+ insert into tutor_private.v5_team_membership_audit(
+   workspace_id,actor_id,subject_user_id,event)
+ values(p_workspace_id,v_actor,v_actor,'teacher_left');
+ return jsonb_build_object('left',true,'workspace_id',p_workspace_id);
+end;$$;
+revoke all on function public.v5_leave_team(uuid) from public,anon,authenticated;
+grant execute on function public.v5_leave_team(uuid) to authenticated;
+
+create function public.v5_remove_team_teacher(p_workspace_id uuid,p_user_id uuid)
+returns void language plpgsql security definer set search_path='' as $$
+declare v_actor uuid:=(select auth.uid());
+begin
+ if v_actor is null or p_user_id is null or v_actor=p_user_id then
+  raise exception '無權移除此老師' using errcode='42501';
+ end if;
+ perform 1 from public.workspaces w
+  join public.v5_workspace_entitlements e on e.workspace_id=w.id
+  where w.id=p_workspace_id and w.owner_id=v_actor
+    and e.plan_code='team' for update of w;
+ if not found then raise exception '只有 Team 管理者可以移除老師'
+   using errcode='42501'; end if;
+ delete from public.workspace_members m
+  where m.workspace_id=p_workspace_id and m.user_id=p_user_id and m.role='teacher';
+ if not found then raise exception '找不到可移除的 Team 老師'
+   using errcode='42501'; end if;
+ insert into tutor_private.v5_team_membership_audit(
+   workspace_id,actor_id,subject_user_id,event)
+ values(p_workspace_id,v_actor,p_user_id,'teacher_removed');
+end;$$;
+revoke all on function public.v5_remove_team_teacher(uuid,uuid)
+ from public,anon,authenticated;
+grant execute on function public.v5_remove_team_teacher(uuid,uuid) to authenticated;
