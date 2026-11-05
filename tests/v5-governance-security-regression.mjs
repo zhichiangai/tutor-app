@@ -36,9 +36,12 @@ test('policies use separate manager source, not V4 personal owner',()=>{
  const names=['v5_project_owner_create','v5_project_owner_update',
   'v5_project_member_owner_assign','v5_team_invite_owner_create'];
  for(const name of names){
-  const at=sql.indexOf('create policy '+name+' ');
+  const escaped=name.replace(/[.*+?^${}()|[\]\\]/g,'\\  const at=sql.indexOf('create policy '+name+' ');
   assert.ok(at>=0,name+' missing');
-  const p=sql.slice(at,sql.indexOf(';',at));
+  const p=sql.slice(at,sql.indexOf(';',at));');
+  const match=new RegExp('create policy\\s+'+escaped+'\\s+[\\s\\S]*?;','i').exec(sql);
+  assert.ok(match,name+' missing');
+  const p=match[0];
   assert.match(p,/v5_team_governance/);
   assert.doesNotMatch(p,/w\.owner_id\s*=/,'Old V4 owner must not retain Team admin access');
  }
