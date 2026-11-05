@@ -43,18 +43,14 @@ create policy v5_owner_read_team_members on public.workspace_members
  for select to authenticated
  using (exists (
    select 1 from public.workspaces w
-   join public.v5_workspace_entitlements e on e.workspace_id=w.id
    where w.id=public.workspace_members.workspace_id and w.owner_id=(select auth.uid())
-     and e.plan_code='team'
  ));
 create policy v5_owner_remove_team_teacher on public.workspace_members
  for delete to authenticated
  using(role='teacher' and user_id<>(select auth.uid())
   and exists (
    select 1 from public.workspaces w
-   join public.v5_workspace_entitlements e on e.workspace_id=w.id
    where w.id=public.workspace_members.workspace_id and w.owner_id=(select auth.uid())
-     and e.plan_code='team'
  ));
 
 -- Project RLS deliberately does not broaden legacy V4 students/lessons/payments.
