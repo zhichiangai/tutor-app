@@ -175,7 +175,7 @@ jobs:
         run: node tests/e2e/seed-v4-local.mjs
       - name: Verify real Chromium teacher-parent-student flows
         run: npx playwright test --config tests/e2e/playwright.config.mjs
-      - name: Rehearse synthetic-only private full PostgreSQL backup and restore
+      - name: Rehearse synthetic-only private selected-schema backup and restore
         run: bash tests/local/v5-disposable-backup-restore-smoke.sh
       - name: Compare current V4 schema shape against PII-free Production 43-migration snapshot
         run: |
