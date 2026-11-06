@@ -11,7 +11,7 @@
 - Supabase 原生分支**不會複製正式資料**，僅由 migration 重建 schema，不能充當備份還原；建立新分支觸發額外費用確認，本輪未獲授權、未建立。
 - 目前連接的 Supabase 工具**無備份清單／下載備份／複製正式專案至獨立備援專案的專用動作**。因此無法據此宣告正式備份存在、已下載或曾成功還原。
 - 本輪新建 `supabase/diagnostics/v5_production_schema_catalog_readonly.sql`，並將七張核心 V4 表的**不含個資**欄位、約束、政策名及觸發器名存於 `V5_PRODUCTION_V4_SCHEMA_CATALOG_20261106.json`。這不等於完整 schema backup，也不包含 RLS 的所有 SQL 語義。
-- CI 額外加入 **合成資料 pg_dump→pg_restore** 和**七表結構比對**。兩種測試均在可丟棄的 localhost Supabase 執行；是否 PASS 以最新 CI 為準，不能視為正式資料可還原。
+- CI 額外加入 **合成資料選定 Schema pg_dump→pg_restore（public、tutor_private、auth、supabase_migrations；不涵蓋 Realtime／Storage 平台物件）** 和**七表結構比對**。兩種測試均在可丟棄的 localhost Supabase 執行；是否 PASS 以最新 CI 為準，不能視為正式資料可還原。
 
 ## 1. G2：真正正式備份／還原必須如何驗證（此項尚未完成）
 
