@@ -5,7 +5,15 @@ set -euo pipefail
 trap 'echo "::error::Synthetic restore setup/operation failed at line $LINENO (disposable CI only)"' ERR
 [[ "${CI:-}" == "true" ]] || { echo "::error::Not in GitHub CI"; exit 1; }
 [[ "${V4_E2E_LOCAL:-}" == "1" ]] || { echo "::error::Not in isolated Supabase mode"; exit 1; }
-grep -q '^project_id = "tutor_v4_isolated"
+grep -q '^project_id = "tutor_v4_isolated"$' supabase/config.toml ||
+ { echo "::error::Unexpected Supabase project identifier"; exit 1; }
+[[ ! -f supabase/.temp/project-ref ]] ||
+ { echo "::error::Linked Supabase project detected; refuse backup"; exit 1; }
+# Local CLI may create a .branches marker. Refuse hosted project-ref and use
+# only the explicitly named disposable Docker database.
+[[ -n "${RUNNER_TEMP:-}" ]] || { echo "::error::Runner temporary directory missing"; exit 1; }
+umask 077
+echo "Disposable-only restore guard PASS"
 
 container="supabase_db_tutor_v4_isolated"
 restored_db="tutor_v5_synthetic_restore"
