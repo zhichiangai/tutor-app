@@ -1310,6 +1310,500 @@ test('V5.3 manager GUI reports and partially allocates a payment without V4 effe
  await expect(page.locator('#v5-payment-pending-reports')).toBeEmpty();
 });
 
+test('V5.4 isolated advance credit is split, suggested, applied and never double-settled',async()=>{
+ const manager=await signIn('parent'),teacher=await signIn('teacher');
+ const stranger=await signIn('stranger'),owner=f.actors.parent.id;
+ const ws=db("select id from public.workspaces where owner_id='"+owner+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ const project=db("select id from public.v5_team_projects where workspace_id='"+
+  ws+"' and name='Private Team B Project'");
+ assert.match(team,/^[a-f0-9-]{36}$/i);
+ const beforeV4Payments=db("select count(*) from public.payment_batches "+
+  "where workspace_id='"+ws+"'");
+ const beforeV4Lessons=db("select count(*) from public.lesson_records "+
+  "where owner_id='"+owner+"'");
+ let r=await rest(manager,'POST','v5_team_students?select=id',{
+  team_id:team,display_name:'Advance Credit Isolation Student',
+  created_by:owner
+ });
+ assert.equal(r.status,201);
+ const student=r.data[0].id;
+ r=await rest(manager,'POST','v5_team_enrollments?select=student_id',{
+  team_id:team,project_id:project,student_id:student
+ });
+ assert.equal(r.status,201);
+ const makeFee=async(subject,date,hourly)=>{
+  const lesson=await rest(manager,'POST','v5_team_lessons?select=id',{
+   team_id:team,project_id:project,student_id:student,
+   teacher_user_id:owner,subject,status:'completed',
+   lesson_start:date+'T14:00:00+08:00',
+   lesson_end:date+'T15:00:00+08:00'
+  });
+  assert.equal(lesson.status,201,'Create isolated completed course');
+  const id=lesson.data[0].id;
+  const fee=await rest(manager,'POST','rpc/v5_confirm_team_lesson_fee',{
+   p_lesson_id:id,p_hourly_rate_cents:hourly
+  });
+  assert.equal(fee.status,200,'Confirm isolated course fee');
+  assert.equal(fee.data.amount_cents,hourly);
+  return id;
+ };
+ const math=await makeFee('Advance Math','2026-10-22',100000);
+ const english=await makeFee('Advance English','2026-10-23',50000);
+ const science=await makeFee('Advance Science','2026-10-24',80000);
+ const monthly=()=>rest(manager,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ const baseline=await monthly();
+ assert.equal(baseline.status,200);
+ const initialConfirmed=baseline.data.confirmed_payments_cents;
+ const initialAdvanceApplied=baseline.data.advance_applied_cents;
+ const initialAdvanceAvailable=baseline.data.advance_available_cents;
+ const initialOutstanding=baseline.data.outstanding_cents;
+ const initialAdvanceCreated=baseline.data.advance_created_cents;
+ const reportArgs={
+  p_team_id:team,p_student_id:student,p_amount_cents:160000,
+  p_received_on:'2026-10-25',p_method:'bank_transfer',
+  p_reference:'ADVANCE-ISOLATED-1600',p_expected_credit_cents:60000,
+  p_note:'Synthetic manually verified entry; no real bank transaction'
+ };
+ assert.notEqual((await rest(teacher,'POST',
+  'rpc/v5_report_team_payment_with_advance',reportArgs)).status,200);
+ assert.notEqual((await rest(stranger,'POST','rpc/v5_team_advance_overview',{
+  p_team_id:team,p_student_id:student
+ })).status,200);
+ r=await rest(manager,'POST','rpc/v5_report_team_payment_with_advance',reportArgs);
+ assert.equal(r.status,200,'Manager reports payment with explicit planned credit');
+ const payment=r.data.payment_id;
+ assert.equal(r.data.expected_credit_cents,60000);
+ assert.notEqual((await rest(manager,'POST',
+  'rpc/v5_report_team_payment_with_advance',reportArgs)).status,200,
+  'The same Team payment reference cannot be reported twice');
+ // A V5.4 report cannot be confirmed using the older full-payment RPC.
+ assert.notEqual((await rest(manager,'POST',
+  'rpc/v5_confirm_team_payment_allocation',{
+  p_payment_id:payment,
+  p_allocations:[{lesson_id:math,amount_cents:100000},
+   {lesson_id:english,amount_cents:50000},
+   {lesson_id:science,amount_cents:10000}]
+ })).status,200,'Original V5.3 RPC cannot bypass advance creation');
+ assert.equal(db("select status from tutor_private.v5_team_payment_reports "+
+  "where id='"+payment+"'"),'pending');
+ assert.notEqual((await rest(manager,'POST',
+  'rpc/v5_confirm_team_advance_payment',{
+  p_payment_id:payment,
+  p_allocations:[{lesson_id:math,amount_cents:90000}]
+ })).status,200,'Mismatch between direct allocation and planned credit rolls back');
+ assert.equal(db("select count(*) from tutor_private.v5_team_payment_allocations "+
+  "where payment_id='"+payment+"'"),'0');
+ r=await rest(manager,'POST','rpc/v5_confirm_team_advance_payment',{
+  p_payment_id:payment,
+  p_allocations:[{lesson_id:math,amount_cents:100000}]
+ });
+ assert.equal(r.status,200);
+ assert.equal(r.data.status,'confirmed');
+ assert.equal(r.data.allocated_cents,100000);
+ assert.equal(r.data.credit_cents,60000);
+ const credit=r.data.credit_id;
+ assert.match(credit,/^[a-f0-9-]{36}$/i);
+ let reconciled=await monthly();
+ assert.equal(reconciled.status,200);
+ assert.equal(reconciled.data.confirmed_payments_cents,
+  initialConfirmed+160000,'An advance payment adds receipt only once');
+ assert.equal(reconciled.data.advance_created_cents,initialAdvanceCreated+60000);
+ assert.equal(reconciled.data.advance_available_cents,initialAdvanceAvailable+60000);
+ assert.equal(reconciled.data.advance_applied_cents,initialAdvanceApplied);
+ assert.equal(reconciled.data.outstanding_cents,initialOutstanding-100000);
+ assert.equal(reconciled.data.receivables.find(x=>x.lesson_id===math).outstanding_cents,0);
+ assert.equal(reconciled.data.payments.find(x=>x.payment_id===payment).advance_credit_cents,
+  60000,'Credit is a component of confirmed payment, not another receipt');
+ assert.notEqual((await rest(manager,'POST',
+  'rpc/v5_confirm_team_advance_payment',{
+  p_payment_id:payment,p_allocations:[{lesson_id:math,amount_cents:100000}]
+ })).status,200,'Payment confirmation is one-time');
+ assert.equal(db("select amount_cents from tutor_private.v5_team_advance_credits "+
+  "where id='"+credit+"'"),'60000');
+ assert.notEqual((await rows(teacher,'v5_team_advance_credits')).status,200,
+  'Regular Team teachers cannot fetch private credit balances');
+ let overview=await rest(manager,'POST','rpc/v5_team_advance_overview',{
+  p_team_id:team,p_student_id:student
+ });
+ assert.equal(overview.status,200);
+ assert.equal(overview.data.available_cents,60000);
+ assert.equal(overview.data.outstanding_cents,130000);
+ assert.equal(overview.data.credits.length,1);
+ assert.equal(overview.data.credits[0].available_cents,60000);
+ assert.equal(overview.data.suggestions.reduce((s,x)=>s+x.suggested_cents,0),
+  60000,'Recommendations do not yet write applications');
+ assert.equal(db("select count(*) from tutor_private.v5_team_advance_applications "+
+  "where credit_id='"+credit+"'"),'0');
+ const allocations=[
+  {lesson_id:english,amount_cents:40000},
+  {lesson_id:science,amount_cents:20000}
+ ];
+ assert.notEqual((await rest(teacher,'POST',
+  'rpc/v5_apply_team_advance_credit',{
+   p_credit_id:credit,p_allocations:allocations,
+   p_idempotency_key:'ADVANCE-APPLY-ISOLATION-001'
+  })).status,200,'A teacher cannot approve advance offsets');
+ r=await rest(manager,'POST','rpc/v5_apply_team_advance_credit',{
+  p_credit_id:credit,p_allocations:allocations,
+  p_idempotency_key:'ADVANCE-APPLY-ISOLATION-001'
+ });
+ assert.equal(r.status,200);
+ assert.equal(r.data.applied_cents,60000);
+ assert.equal(r.data.idempotent,false);
+ const initialOperation=r.data.operation_id;
+ r=await rest(manager,'POST','rpc/v5_apply_team_advance_credit',{
+  p_credit_id:credit,p_allocations:allocations,
+  p_idempotency_key:'ADVANCE-APPLY-ISOLATION-001'
+ });
+ assert.equal(r.status,200,'Retry returns original confirmed operation');
+ assert.equal(r.data.operation_id,initialOperation);
+ assert.equal(r.data.idempotent,true);
+ assert.notEqual((await rest(manager,'POST',
+  'rpc/v5_apply_team_advance_credit',{
+  p_credit_id:credit,p_allocations:[{lesson_id:english,amount_cents:1}],
+  p_idempotency_key:'ADVANCE-APPLY-ISOLATION-001'
+ })).status,200,'Reusing idempotency key with changed payload is rejected');
+ assert.notEqual((await rest(manager,'POST',
+  'rpc/v5_apply_team_advance_credit',{
+  p_credit_id:credit,p_allocations:[{lesson_id:science,amount_cents:1}],
+  p_idempotency_key:'ADVANCE-APPLY-ISOLATION-002'
+ })).status,200,'Spent credit cannot be applied again');
+ overview=await rest(manager,'POST','rpc/v5_team_advance_overview',{
+  p_team_id:team,p_student_id:student
+ });
+ assert.equal(overview.status,200);
+ assert.equal(overview.data.available_cents,0);
+ assert.equal(overview.data.outstanding_cents,70000);
+ assert.equal(overview.data.suggestions.length,0);
+ reconciled=await monthly();
+ assert.equal(reconciled.status,200);
+ assert.equal(reconciled.data.confirmed_payments_cents,initialConfirmed+160000,
+  'Applying an advance must not increase confirmed receipts again');
+ assert.equal(reconciled.data.advance_applied_cents,initialAdvanceApplied+60000);
+ assert.equal(reconciled.data.outstanding_cents,initialOutstanding-160000);
+ assert.equal(reconciled.data.advance_available_cents,initialAdvanceAvailable);
+ const englishMonthly=reconciled.data.receivables.find(x=>x.lesson_id===english);
+ assert.equal(englishMonthly.advance_applied_cents,40000);
+ assert.equal(englishMonthly.outstanding_cents,10000);
+ assert.equal(db("select count(*) from tutor_private.v5_team_advance_operations "+
+  "where credit_id='"+credit+"'"),'1');
+ assert.equal(db("select count(*) from tutor_private.v5_team_advance_applications "+
+  "where credit_id='"+credit+"'"),'2');
+ // The older V5.3 confirmation must not double-pay an already offset lesson.
+ const legacy=await rest(manager,'POST','rpc/v5_report_team_payment',{
+  p_team_id:team,p_student_id:student,p_amount_cents:30000,
+  p_received_on:'2026-10-26',p_method:'cash',
+  p_reference:'ADVANCE-LEGACY-OVERSETTLE'
+ });
+ assert.equal(legacy.status,200);
+ assert.notEqual((await rest(manager,'POST',
+  'rpc/v5_confirm_team_payment_allocation',{
+  p_payment_id:legacy.data.payment_id,
+  p_allocations:[{lesson_id:english,amount_cents:30000}]
+ })).status,200,'Combined-settlement trigger blocks stale V5.3 amount');
+ assert.equal(db("select status from tutor_private.v5_team_payment_reports "+
+  "where id='"+legacy.data.payment_id+"'"),'pending');
+ assert.equal(db("select count(*) from tutor_private.v5_team_advance_audit "+
+  "where credit_id='"+credit+"'"),'2','Creation and one apply audit remain immutable');
+ assert.equal(db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'"),beforeV4Payments,'V4 receipts must remain unchanged');
+ assert.equal(db("select count(*) from public.lesson_records where owner_id='"+
+  owner+"'"),beforeV4Lessons,'V4 lessons must remain unchanged');
+});
+
+test('V5.4 concurrent advance offsets cannot spend the same credit twice',async()=>{
+ const manager=await signIn('parent');
+ const m=f.actors.parent.id;
+ const ws=db("select id from public.workspaces where owner_id='"+m+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ const project=db("select id from public.v5_team_projects where workspace_id='"+
+  ws+"' and name='Private Team B Project'");
+ const makeStudentWithFee=async(name,subject,day)=>{
+  let response=await rest(manager,'POST','v5_team_students?select=id',{
+   team_id:team,display_name:name,created_by:m
+  });
+  assert.equal(response.status,201);
+  const student=response.data[0].id;
+  response=await rest(manager,'POST','v5_team_enrollments?select=student_id',{
+   team_id:team,project_id:project,student_id:student
+  });
+  assert.equal(response.status,201);
+  response=await rest(manager,'POST','v5_team_lessons?select=id',{
+   team_id:team,project_id:project,student_id:student,teacher_user_id:m,
+   subject,status:'completed',
+   lesson_start:'2026-10-'+day+'T11:00:00+08:00',
+   lesson_end:'2026-10-'+day+'T12:00:00+08:00'
+  });
+  assert.equal(response.status,201);
+  const lesson=response.data[0].id;
+  response=await rest(manager,'POST','rpc/v5_confirm_team_lesson_fee',{
+   p_lesson_id:lesson,p_hourly_rate_cents:10000
+  });
+  assert.equal(response.status,200);
+  return {student,lesson};
+ };
+ const current=await makeStudentWithFee(
+  'Concurrency Advance Student 01','Concurrency Math','29');
+ const other=await makeStudentWithFee(
+  'Concurrency Advance Student 02','Concurrency English','30');
+ const beforeV4=db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'");
+ let result=await rest(manager,'POST','rpc/v5_report_team_payment_with_advance',{
+  p_team_id:team,p_student_id:current.student,p_amount_cents:6000,
+  p_expected_credit_cents:6000,p_received_on:'2026-10-30',
+  p_method:'cash',p_reference:'CONCURRENT-ADVANCE-ISOLATION-001'
+ });
+ assert.equal(result.status,200);
+ result=await rest(manager,'POST','rpc/v5_confirm_team_advance_payment',{
+  p_payment_id:result.data.payment_id,p_allocations:[]
+ });
+ assert.equal(result.status,200);
+ const credit=result.data.credit_id;
+ // This fails for the student's identity, even while the credit is available.
+ const cross=await rest(manager,'POST','rpc/v5_apply_team_advance_credit',{
+  p_credit_id:credit,p_idempotency_key:'CONCURRENT-WRONG-STUDENT',
+  p_allocations:[{lesson_id:other.lesson,amount_cents:1000}]
+ });
+ assert.equal(cross.status,403,'A credit cannot pay another student in the same Team');
+ const attempt=key=>rest(manager,'POST','rpc/v5_apply_team_advance_credit',{
+  p_credit_id:credit,p_idempotency_key:key,
+  p_allocations:[{lesson_id:current.lesson,amount_cents:6000}]
+ });
+ const both=await Promise.all([
+  attempt('CONCURRENT-ADVANCE-WRITER-A'),
+  attempt('CONCURRENT-ADVANCE-WRITER-B')
+ ]);
+ assert.equal(both.filter(x=>x.status===200).length,1,
+  'Two simultaneous writers must not both spend the same advance');
+ assert.equal(both.filter(x=>x.status!==200).length,1);
+ const balance=await rest(manager,'POST','rpc/v5_team_advance_overview',{
+  p_team_id:team,p_student_id:current.student
+ });
+ assert.equal(balance.status,200);
+ assert.equal(balance.data.available_cents,0);
+ assert.equal(balance.data.outstanding_cents,4000);
+ assert.equal(db("select count(*) from tutor_private.v5_team_advance_operations "+
+  "where credit_id='"+credit+"'"),'1','Only one operation is committed');
+ assert.equal(db("select coalesce(sum(amount_cents),0) "+
+  "from tutor_private.v5_team_advance_applications "+
+  "where credit_id='"+credit+"'"),'6000','Exactly one credit consumption');
+ assert.equal(db("select count(*) from tutor_private.v5_team_advance_audit "+
+  "where credit_id='"+credit+"' and event='credit_applied'"),'1',
+  'Only one append-only application audit');
+ assert.equal(db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'"),beforeV4,'No V4 receipt changes during concurrent credit application');
+});
+
+test('V5.4 month boundaries count October cash once and September advance settlement only',async()=>{
+ const actor=f.actors.parent,manager=await signIn('parent');
+ const ws=db("select id from public.workspaces where owner_id='"+actor.id+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ const project=db("select id from public.v5_team_projects where workspace_id='"+
+  ws+"' and name='Private Team B Project'");
+ let r=await rest(manager,'POST','v5_team_students?select=id',{
+  team_id:team,display_name:'Cross Month Advance Isolation Student',
+  created_by:actor.id
+ });
+ assert.equal(r.status,201);
+ const student=r.data[0].id;
+ r=await rest(manager,'POST','v5_team_enrollments?select=student_id',{
+  team_id:team,project_id:project,student_id:student
+ });
+ assert.equal(r.status,201);
+ const create=async(date,subject,hourly)=>{
+  let resp=await rest(manager,'POST','v5_team_lessons?select=id',{
+   team_id:team,project_id:project,student_id:student,
+   teacher_user_id:actor.id,subject,status:'completed',
+   lesson_start:date+'T13:00:00+08:00',
+   lesson_end:date+'T14:00:00+08:00'
+  });
+  assert.equal(resp.status,201);
+  const id=resp.data[0].id;
+  resp=await rest(manager,'POST','rpc/v5_confirm_team_lesson_fee',{
+   p_lesson_id:id,p_hourly_rate_cents:hourly
+  });
+  assert.equal(resp.status,200);
+  return id;
+ };
+ const september=await create('2026-09-18','Cross Month Math',50000);
+ const october=await create('2026-10-19','Cross Month English',100000);
+ const monthly=m=>rest(manager,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:m
+ });
+ const beforeSept=await monthly('2026-09-01');
+ const beforeOct=await monthly('2026-10-01');
+ assert.equal(beforeSept.status,200);
+ assert.equal(beforeOct.status,200);
+ const entry=await rest(manager,'POST','rpc/v5_report_team_payment_with_advance',{
+  p_team_id:team,p_student_id:student,
+  p_amount_cents:60000,p_expected_credit_cents:20000,
+  p_received_on:'2026-10-20',p_method:'cash',
+  p_reference:'CROSS-MONTH-ADVANCE-ISOLATED'
+ });
+ assert.equal(entry.status,200);
+ r=await rest(manager,'POST','rpc/v5_confirm_team_advance_payment',{
+  p_payment_id:entry.data.payment_id,
+  p_allocations:[{lesson_id:october,amount_cents:40000}]
+ });
+ assert.equal(r.status,200);
+ const credit=r.data.credit_id;
+ let sep=await monthly('2026-09-01'),oct=await monthly('2026-10-01');
+ assert.equal(sep.data.confirmed_payments_cents,
+  beforeSept.data.confirmed_payments_cents,'October cash is not a September receipt');
+ assert.equal(oct.data.confirmed_payments_cents,
+  beforeOct.data.confirmed_payments_cents+60000);
+ assert.equal(oct.data.advance_created_cents,beforeOct.data.advance_created_cents+20000);
+ assert.equal(oct.data.receivables.find(x=>x.lesson_id===october).outstanding_cents,
+  60000);
+ r=await rest(manager,'POST','rpc/v5_apply_team_advance_credit',{
+  p_credit_id:credit,p_idempotency_key:'CROSS-MONTH-APPLY-SEPTEMBER',
+  p_allocations:[{lesson_id:september,amount_cents:20000}]
+ });
+ assert.equal(r.status,200);
+ sep=await monthly('2026-09-01');oct=await monthly('2026-10-01');
+ assert.equal(sep.data.confirmed_payments_cents,
+  beforeSept.data.confirmed_payments_cents,
+  'September offset must not create a second cash receipt');
+ assert.equal(sep.data.advance_applied_cents,beforeSept.data.advance_applied_cents+20000);
+ assert.equal(sep.data.outstanding_cents,beforeSept.data.outstanding_cents-20000);
+ assert.equal(sep.data.receivables.find(x=>x.lesson_id===september).outstanding_cents,
+  30000);
+ assert.equal(oct.data.confirmed_payments_cents,
+  beforeOct.data.confirmed_payments_cents+60000,
+  'October received cash must not increase a second time');
+ assert.equal(oct.data.receivables.find(x=>x.lesson_id===october).outstanding_cents,
+  60000);
+ assert.equal(oct.data.advance_available_cents,beforeOct.data.advance_available_cents);
+});
+
+test('V5.4 manager GUI confirms an advance and applies a separate offset with no V4 writes',async({page})=>{
+ test.setTimeout(120_000);
+ const actor=f.actors.parent,manager=await signIn('parent');
+ const ws=db("select id from public.workspaces where owner_id='"+actor.id+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ const project=db("select id from public.v5_team_projects where workspace_id='"+
+  ws+"' and name='Private Team B Project'");
+ const beforeV4=db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'");
+ let r=await rest(manager,'POST','v5_team_students?select=id',{
+  team_id:team,display_name:'GUI Advance Isolated Student',created_by:actor.id
+ });
+ assert.equal(r.status,201);
+ const student=r.data[0].id;
+ r=await rest(manager,'POST','v5_team_enrollments?select=student_id',{
+  team_id:team,project_id:project,student_id:student
+ });
+ assert.equal(r.status,201);
+ const fee=async(subject,date,hourly)=>{
+  let t=await rest(manager,'POST','v5_team_lessons?select=id',{
+   team_id:team,project_id:project,student_id:student,teacher_user_id:actor.id,
+   subject,lesson_start:date+'T14:00:00+08:00',
+   lesson_end:date+'T15:00:00+08:00',status:'completed'
+  });
+  assert.equal(t.status,201);
+  const id=t.data[0].id;
+  t=await rest(manager,'POST','rpc/v5_confirm_team_lesson_fee',{
+   p_lesson_id:id,p_hourly_rate_cents:hourly
+  });
+  assert.equal(t.status,200);
+  return id;
+ };
+ const math=await fee('Advance GUI Math','2026-10-27',100000);
+ const english=await fee('Advance GUI English','2026-10-28',50000);
+ const moneyBefore=await rest(manager,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal(moneyBefore.status,200);
+ const baseReceived=moneyBefore.data.confirmed_payments_cents;
+ await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
+  route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
+   contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+ await page.addInitScript(({url,key})=>{
+  window.V4_LOCAL_BACKEND={environment:'local',isolated:true,projectRef:'local',
+   url,publishableKey:key};
+ },{url:f.apiUrl,key:f.anonKey});
+ await page.goto('/v2/index.html');
+ await page.waitForFunction(()=>!!window.supabase?.createClient,{timeout:20_000});
+ await page.evaluate(async({url,key,email,password})=>{
+  const client=window.supabase.createClient(url,key,{
+   auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+  });
+  const {error}=await client.auth.signInWithPassword({email,password});
+  if(error)throw Error('Synthetic advance GUI login failed');
+  client.auth.stopAutoRefresh?.();
+ },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
+ await page.reload();
+ await expect(page.locator('body')).not.toHaveClass(/login-required/);
+ await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await expect(page.locator('#v5-billing-card')).toBeVisible();
+ await page.locator('#v5-billing-team-select').selectOption(team);
+ await page.locator('#v5-billing-prev').click();
+ await expect(page.locator('#v5-advance-panel')).toBeVisible();
+ await expect(page.locator('#v5-advance-student-select option[value="'+student+'"]')).toBeAttached();
+ await page.locator('#v5-advance-student-select').selectOption(student);
+ await expect(page.locator('#v5-advance-panel')).toBeVisible();
+ await expect(page.locator('#v5-advance-student-select')).toHaveValue(student);
+ await expect(page.locator('#v5-advance-message')).toContainText('管理者資料已核對');
+ await page.locator('#v5-advance-amount').fill('1000');
+ await page.locator('#v5-advance-credit').fill('300');
+ await page.locator('#v5-advance-received-date').fill('2026-10-29');
+ await page.locator('#v5-advance-note').fill('Synthetic GUI advance, no bank verification');
+ page.on('dialog',dialog=>dialog.accept());
+ await page.locator('#v5-advance-report-submit').click();
+ const manualId=()=>db("select id from tutor_private.v5_team_payment_reports "+
+  "where student_id='"+student+"' and reference like 'manual-advance-%' "+
+  "order by reported_at desc limit 1");
+ await expect.poll(manualId,{timeout:20_000}).toMatch(/^[a-f0-9-]{36}$/i);
+ const payment=manualId();
+ const field=page.locator('[data-v5-advance-payment="'+payment+'"]'+
+  '[data-v5-advance-lesson="'+math+'"]');
+ await expect(field).toBeVisible();
+ await field.fill('700');
+ await page.locator('[data-v5-billing-action="confirm-advance-payment"]'+
+  '[data-id="'+payment+'"]').click();
+ await expect.poll(()=>db("select status from tutor_private.v5_team_payment_reports "+
+  "where id='"+payment+"'"),{timeout:20_000}).toBe('confirmed');
+ const credit=db("select id from tutor_private.v5_team_advance_credits "+
+  "where payment_id='"+payment+"'");
+ assert.match(credit,/^[a-f0-9-]{36}$/i);
+ assert.equal(db("select amount_cents from tutor_private.v5_team_advance_credits "+
+  "where id='"+credit+"'"),'30000');
+ assert.equal(db("select amount_cents from tutor_private.v5_team_payment_allocations "+
+  "where payment_id='"+payment+"' and lesson_id='"+math+"'"),'70000');
+ await expect(page.locator('#v5-advance-available')).toContainText('300');
+ const apply=page.locator('[data-v5-billing-action="apply-advance-credit"]'+
+  '[data-id="'+credit+'"]');
+ await expect(apply).toBeVisible();
+ const suggested=page.locator('[data-v5-advance-credit="'+credit+'"]'+
+  '[data-v5-advance-lesson="'+math+'"]');
+ await expect(suggested).toHaveValue('300.00');
+ await apply.click();
+ await expect.poll(()=>db("select coalesce(sum(amount_cents),0) "+
+  "from tutor_private.v5_team_advance_applications "+
+  "where credit_id='"+credit+"'"),{timeout:20_000}).toBe('30000');
+ await expect(page.locator('#v5-advance-available')).toContainText('$0');
+ const final=await rest(manager,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal(final.status,200);
+ assert.equal(final.data.confirmed_payments_cents,baseReceived+100000,
+  'Advance GUI must count cash exactly once even after offset');
+ assert.equal(final.data.receivables.find(x=>x.lesson_id===math).outstanding_cents,0);
+ assert.equal(final.data.receivables.find(x=>x.lesson_id===english).outstanding_cents,50000);
+ assert.equal(db("select count(*) from public.payment_batches where workspace_id='"+
+  ws+"'"),beforeV4,'GUI advance never writes V4 receipts');
+ await page.locator('#sign-out').click();
+ await expect(page.locator('body')).toHaveClass(/login-required/);
+ await expect(page.locator('#v5-advance-panel')).toBeHidden();
+ await expect(page.locator('#v5-advance-available')).toBeEmpty();
+ await expect(page.locator('#v5-advance-student-select option')).toHaveCount(0);
+ await expect(page.locator('#v5-payment-student-select option')).toHaveCount(0);
+ await expect(page.locator('#v5-advance-amount')).toHaveValue('');
+});
+
 test('V5.3 billing management follows accepted Team governance transfer, not V4 owner',async()=>{
  const former=await signIn('parent'),newManager=await signIn('teacher');
  const fromId=f.actors.parent.id,toId=f.actors.teacher.id;
@@ -1355,6 +1849,20 @@ test('V5.3 billing management follows accepted Team governance transfer, not V4 
  setup=await reportForTransfer('PENDING-TRANSFER-ISOLATED',100);
  assert.equal(setup.status,200);
  const pending=setup.data.payment_id;
+ // The same governance transfer must revoke V5.4 credit read/write with the
+ // old JWT, while preserving an already confirmed credit for the new manager.
+ let transferAdvance=await rest(former,'POST',
+  'rpc/v5_report_team_payment_with_advance',{
+   p_team_id:team,p_student_id:freshStudent,p_amount_cents:100,
+   p_expected_credit_cents:100,p_received_on:'2026-10-26',
+   p_method:'cash',p_reference:'TRANSFER-ADVANCE-ISOLATION'
+  });
+ assert.equal(transferAdvance.status,200);
+ transferAdvance=await rest(former,'POST','rpc/v5_confirm_team_advance_payment',{
+  p_payment_id:transferAdvance.data.payment_id,p_allocations:[]
+ });
+ assert.equal(transferAdvance.status,200);
+ const transferCredit=transferAdvance.data.credit_id;
  const auditBefore=db("select count(*) from tutor_private.v5_team_billing_audit "+
   "where team_id='"+team+"'");
  const feesBefore=await rest(former,'POST','rpc/v5_team_billing_overview',{
@@ -1391,6 +1899,24 @@ test('V5.3 billing management follows accepted Team governance transfer, not V4 
   p_team_id:team,p_month:'2026-10-01'
  });
  assert.equal(oldView.status,403,'Previous manager immediately loses payment records');
+ const inheritedCredit=await rest(newManager,'POST','rpc/v5_team_advance_overview',{
+  p_team_id:team,p_student_id:freshStudent
+ });
+ assert.equal(inheritedCredit.status,200);
+ assert.ok(inheritedCredit.data.credits.some(c=>c.credit_id===transferCredit));
+ assert.equal((await rest(former,'POST','rpc/v5_team_advance_overview',{
+  p_team_id:team,p_student_id:freshStudent
+ })).status,403,'Previous manager loses advance credit read authority');
+ assert.notEqual((await rest(former,'POST','rpc/v5_apply_team_advance_credit',{
+  p_credit_id:transferCredit,
+  p_allocations:[{lesson_id:freshLesson,amount_cents:100}],
+  p_idempotency_key:'TRANSFER-OLD-MANAGER-BLOCKED'
+ })).status,200,'Previous manager cannot offset any credit with an old JWT');
+ assert.notEqual((await rest(former,'POST','rpc/v5_report_team_payment_with_advance',{
+  p_team_id:team,p_student_id:freshStudent,p_amount_cents:100,
+  p_expected_credit_cents:100,p_received_on:'2026-10-26',
+  p_method:'cash',p_reference:'TRANSFER-FORMER-BLOCKED'
+ })).status,200,'Previous manager cannot create advance credit');
  assert.notEqual((await rest(former,'POST','rpc/v5_report_team_payment',{
   p_team_id:team,p_student_id:newView.data.receivables[0].student_id,
   p_amount_cents:100,p_received_on:'2026-10-26',

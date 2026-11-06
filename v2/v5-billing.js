@@ -16,6 +16,9 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
  };
  let generation=0,attached=false,ready=false,loading=false,writing=false,error='';
  let availableTeams=[],teamId='',overview=null,paymentOverview=null;
+ let advanceStudents=[],advanceStudentId='',advanceOverview=null;
+ let advanceReference='manual-advance-'+crypto.randomUUID();
+ const retryAdvanceOperations=new Map();
  let paymentReference='manual-'+crypto.randomUUID();
  const today=new Date();
  let month=new Date(today.getFullYear(),today.getMonth(),1);
@@ -23,13 +26,27 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
  function reset(){
   generation++;ready=false;loading=false;writing=false;error='';
   availableTeams=[];teamId='';overview=null;paymentOverview=null;
+  advanceStudents=[];advanceStudentId='';advanceOverview=null;
+  advanceReference='manual-advance-'+crypto.randomUUID();
+  retryAdvanceOperations.clear();
+  $('v5-advance-panel')?.classList.add('hidden');
   paymentReference='manual-'+crypto.randomUUID();
   $('v5-billing-card')?.classList.add('hidden');
   for(const id of ['v5-billing-message','v5-billing-pending',
     'v5-billing-confirmed','v5-billing-total',
     'v5-payment-pending-reports','v5-payment-confirmed-reports',
-    'v5-payment-confirmed-total','v5-payment-outstanding-total']){
+    'v5-payment-confirmed-total','v5-payment-outstanding-total',
+    'v5-payment-advance-created-total','v5-payment-advance-applied-total',
+    'v5-payment-advance-available-total',
+    'v5-advance-message','v5-advance-pending-payments',
+    'v5-advance-available','v5-advance-credit-rows']){
    $(id)?.replaceChildren();
+  }
+  for(const id of ['v5-billing-team-select','v5-payment-student-select',
+   'v5-advance-student-select'])$(id)?.replaceChildren();
+  for(const id of ['v5-payment-amount','v5-payment-note',
+   'v5-advance-amount','v5-advance-credit','v5-advance-note']){
+   const input=$(id);if(input)input.value='';
   }
  }
  function options(element,items){
@@ -67,6 +84,9 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    }
    $('v5-payment-confirmed-total').textContent='';
    $('v5-payment-outstanding-total').textContent='';
+   $('v5-payment-advance-created-total').textContent='';
+   $('v5-payment-advance-applied-total').textContent='';
+   $('v5-payment-advance-available-total').textContent='';
    $('v5-payment-student-select').replaceChildren();
    $('v5-payment-report-submit').disabled=true;
    return;
@@ -105,6 +125,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    confirmed.append(wrap);
   }
   renderPayments();
+  renderAdvance();
  }
  function taipeiDate(){
   const fields=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',
@@ -120,6 +141,12 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    money(report.confirmed_payments_cents):'—';
   $('v5-payment-outstanding-total').textContent=report?
    money(report.outstanding_cents):'—';
+  $('v5-payment-advance-created-total').textContent=report?
+   money(report.advance_created_cents??0):'—';
+  $('v5-payment-advance-applied-total').textContent=report?
+   money(report.advance_applied_cents??0):'—';
+  $('v5-payment-advance-available-total').textContent=report?
+   money(report.advance_available_cents??0):'—';
   const fees=Array.isArray(report?.receivables)?report.receivables:[];
   const studentNames=new Map(fees.filter(x=>x.outstanding_cents>0)
    .map(x=>[x.student_id,x.student_name]));
@@ -137,6 +164,12 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
     cash:'現金',bank_transfer:'銀行轉帳',other:'其他'
    }[p.method]||'其他')+' · '+p.status,'section-sub'));
    if(p.status==='pending'){
+    if(p.intended_advance_cents>0){
+     row.append(item('span','預計認列預收 '+money(p.intended_advance_cents)+
+      '，須使用管理者預收款確認流程，不可當作一般付款分配。','section-sub'));
+     pending.append(row);
+     continue;
+    }
     const available=fees.filter(x=>x.student_id===p.student_id&&x.outstanding_cents>0);
     for(const f of available){
      const field=item('label',f.subject+' · 尚欠 '+money(f.outstanding_cents));
@@ -153,6 +186,10 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
     button.dataset.id=p.payment_id;row.append(button);
     pending.append(row);
    }else{
+    if(p.advance_credit_cents>0){
+     row.append(item('span','其中預收款 '+money(p.advance_credit_cents)+
+      '（已包含在上述已確認付款，不重複計入收款）','section-sub'));
+    }
     const allocations=Array.isArray(p.allocations)?p.allocations:[];
     for(const a of allocations){
      row.append(item('span',a.subject+'：'+money(a.amount_cents),'section-sub'));
@@ -165,13 +202,158 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   if(!done.children.length)
    done.append(item('p','本月份沒有已確認的付款分配。','section-sub'));
  }
+ function renderAdvance(){
+  const panel=$('v5-advance-panel');
+  if(!panel)return;
+  const visible=ready&&valid()&&!!teamId&&!!paymentOverview;
+  panel.classList.toggle('hidden',!visible);
+  if(!visible)return;
+  const selected=$('v5-advance-student-select');
+  options(selected,advanceStudents.map(s=>({
+   value:s.id,label:s.display_name+' · '+s.id.slice(-6)
+  })));
+  if(advanceStudents.some(s=>s.id===advanceStudentId))selected.value=advanceStudentId;
+  const report=$('v5-advance-report-submit');
+  report.disabled=writing||!advanceStudentId||!advanceOverview;
+  const pending=$('v5-advance-pending-payments');
+  const creditRows=$('v5-advance-credit-rows');
+  pending.replaceChildren();creditRows.replaceChildren();
+  const total=$('v5-advance-available');
+  total.replaceChildren();
+  const snapshot=advanceOverview;
+  $('v5-advance-message').textContent=advanceStudentId?
+   snapshot?'管理者資料已核對：所有金額皆為新臺幣，抵扣尚需另外確認。':
+   '正在讀取此學生跨月份預收與應收資料…':
+   '此 Team 尚無可查看的學生。';
+  if(!snapshot){
+   pending.append(item('p','請先選擇學生。','section-sub'));
+   return;
+  }
+  total.append(item('strong','目前預收可用 '+money(snapshot.available_cents)));
+  total.append(item('p','該學生跨月份未結清課程費用 '+money(snapshot.outstanding_cents),
+   'section-sub'));
+  const fees=(snapshot.receivables||[]).filter(f=>f.outstanding_cents>0);
+  const pend=(paymentOverview.payments||[]).filter(p=>
+   p.student_id===advanceStudentId&&p.status==='pending'&&
+   p.intended_advance_cents>0);
+  for(const p of pend){
+   const row=item('div',undefined,'v5-billing-row');
+   const direct=p.amount_cents-p.intended_advance_cents;
+   row.append(item('strong','待確認付款 '+money(p.amount_cents)+
+    ' · 其中預收 '+money(p.intended_advance_cents)));
+   row.append(item('span',p.received_on+' · '+p.reference+
+    ' · 本次應直接分配 '+money(direct),'section-sub'));
+   if(direct>0){
+    for(const fee of fees){
+     const label=item('label',fee.subject+' · 尚未結清 '+money(fee.outstanding_cents));
+     const inp=item('input');
+     inp.type='number';inp.step='0.01';inp.min='0';
+     inp.max=(fee.outstanding_cents/100).toFixed(2);
+     inp.placeholder='直接分配（新臺幣元）';
+     inp.inputMode='decimal';
+     inp.dataset.v5AdvancePayment=p.payment_id;
+     inp.dataset.v5AdvanceLesson=fee.lesson_id;
+     label.append(inp);row.append(label);
+    }
+   }else{
+    row.append(item('p','本筆款項全額認列預收，不需分配到現有課程。','section-sub'));
+   }
+   const button=item('button','管理者確認付款與預收','secondary-button');
+   button.type='button';button.disabled=writing;
+   button.dataset.v5BillingAction='confirm-advance-payment';
+   button.dataset.id=p.payment_id;row.append(button);
+   pending.append(row);
+  }
+  if(!pend.length)
+   pending.append(item('p','本月此學生沒有待確認的預收付款。','section-sub'));
+  const credits=(snapshot.credits||[]).filter(c=>c.available_cents>0);
+  for(const c of credits){
+   const row=item('div',undefined,'v5-billing-row');
+   row.append(item('strong','預收餘額 '+money(c.available_cents)));
+   row.append(item('p','原始預收 '+money(c.amount_cents)+
+    ' · 已抵扣 '+money(c.used_cents)+' · '+c.credit_id.slice(-8),'section-sub'));
+   let budget=c.available_cents;
+   for(const fee of fees){
+    const suggested=Math.min(budget,fee.outstanding_cents);
+    budget-=suggested;
+    const label=item('label',fee.subject+' · 課程日期 '+
+     new Date(fee.lesson_start).toLocaleDateString('zh-TW',{timeZone:'Asia/Taipei'})+
+     ' · 尚未結清 '+money(fee.outstanding_cents));
+    const inp=item('input');
+    inp.type='number';inp.step='0.01';inp.min='0';
+    inp.max=(Math.min(c.available_cents,fee.outstanding_cents)/100).toFixed(2);
+    inp.inputMode='decimal';inp.placeholder='抵扣金額（元）';
+    if(suggested>0)inp.value=(suggested/100).toFixed(2);
+    inp.dataset.v5AdvanceCredit=c.credit_id;
+    inp.dataset.v5AdvanceLesson=fee.lesson_id;
+    label.append(inp);row.append(label);
+   }
+   const button=item('button','確認此筆預收抵扣','secondary-button');
+   button.type='button';button.disabled=writing||!fees.length;
+   button.dataset.v5BillingAction='apply-advance-credit';
+   button.dataset.id=c.credit_id;row.append(button);
+   creditRows.append(row);
+  }
+  if(!credits.length)
+   creditRows.append(item('p','此學生目前沒有可抵扣的預收餘額。','section-sub'));
+ }
+
  function cents(raw){
   if(!/^(?:0|[1-9]\d{0,7})(?:\.\d{1,2})?$/.test(String(raw).trim()))
    return null;
   const n=Math.round(Number(raw)*100);
   return Number.isSafeInteger(n)?n:null;
  }
+ async function submitAdvanceReport(){
+  if(!ready||!valid()||writing||!teamId||!advanceStudentId||!advanceOverview)
+   return true;
+  const amount=cents($('v5-advance-amount').value);
+  const credit=cents($('v5-advance-credit').value);
+  const date=$('v5-advance-received-date').value;
+  const method=$('v5-advance-method').value;
+  const note=$('v5-advance-note').value.trim();
+  if(amount===null||credit===null||amount<=0||credit<=0||
+   credit>amount||amount>1000000000||note.length>250||
+   !/^\d{4}-\d{2}-\d{2}$/.test(date)||date>taipeiDate()){
+   notify('請確認付款總額、預收金額及日期。預收須大於零且不能超過本次付款。');
+   return true;
+  }
+  const direct=amount-credit;
+  const total=(advanceOverview.receivables||[])
+   .reduce((sum,f)=>sum+f.outstanding_cents,0);
+  if(direct>total){
+   notify('直接分配金額超過此學生跨月份尚未結清的課程費用。');
+   return true;
+  }
+  if(!window.confirm('人工登錄付款 '+money(amount)+'：其中預收 '+
+   money(credit)+'、待分配到課程 '+money(direct)+
+   '。此操作不驗證銀行交易，須再由管理者確認後才正式入帳。'))
+   return true;
+  writing=true;
+  try{
+   const {data,error:failure}=await getClient().rpc(
+    'v5_report_team_payment_with_advance',{
+     p_team_id:teamId,p_student_id:advanceStudentId,
+     p_amount_cents:amount,p_expected_credit_cents:credit,
+     p_received_on:date,p_method:method,
+     p_reference:advanceReference,p_note:note
+    });
+   if(failure||data?.status!=='pending')throw failure||new Error('Unreported advance');
+   advanceReference='manual-advance-'+crypto.randomUUID();
+   $('v5-advance-amount').value='';$('v5-advance-credit').value='';
+   $('v5-advance-note').value='';
+   month=new Date(Number(date.slice(0,4)),Number(date.slice(5,7))-1,1);
+   notify('已建立待確認付款。請在下方確認直接分配與預收差額後入帳。');
+   await refresh();
+  }catch{
+   notify('預收款登錄未完成；請查詢是否已有同 reference 的待確認付款，避免重複登錄。');
+  }finally{writing=false;render()}
+  return true;
+ }
  async function handleSubmit(e){
+  if(e.target?.id==='v5-advance-report-form'){
+   e.preventDefault();return submitAdvanceReport();
+  }
   if(e.target?.id!=='v5-payment-report-form')return false;
   e.preventDefault();
   if(!ready||!valid()||writing||!teamId||!paymentOverview)return true;
@@ -212,8 +394,12 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   if(attached)return;attached=true;
   $('v5-payment-received-date').value=taipeiDate();
   $('v5-billing-team-select').addEventListener('change',ev=>{
-   teamId=ev.target.value;void refresh();
+   teamId=ev.target.value;advanceStudentId='';void refresh();
   });
+  $('v5-advance-student-select').addEventListener('change',ev=>{
+   advanceStudentId=ev.target.value;void refresh();
+  });
+  $('v5-advance-received-date').value=taipeiDate();
   $('v5-billing-prev').addEventListener('click',()=>{
    month=new Date(month.getFullYear(),month.getMonth()-1,1);void refresh();
   });
@@ -225,7 +411,11 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   if(!valid()){reset();return}
   attach();
   const stamp=++generation,userId=getUser().id;
-  loading=true;error='';overview=null;paymentOverview=null;
+  loading=true;error='';overview=null;paymentOverview=null;advanceOverview=null;
+  $('v5-advance-panel')?.classList.add('hidden');
+  for(const id of ['v5-advance-message','v5-advance-pending-payments',
+   'v5-advance-available','v5-advance-credit-rows'])
+   $(id)?.replaceChildren();
   render();
   const client=getClient();
   try{
@@ -240,22 +430,41 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    if(!availableTeams.some(t=>t.id===teamId))teamId=availableTeams[0]?.id||'';
    if(teamId){
     const first=[month.getFullYear(),String(month.getMonth()+1).padStart(2,'0'),'01'].join('-');
-    const [result,payments]=await Promise.all([
+    const [result,payments,students]=await Promise.all([
      client.rpc('v5_team_billing_overview',{
       p_team_id:teamId,p_month:first
      }),
      client.rpc('v5_team_payment_overview',{
       p_team_id:teamId,p_month:first
-     })
+     }),
+     client.from('v5_team_students').select('id,team_id,display_name')
+      .eq('team_id',teamId)
     ]);
     if(stamp!==generation||!valid()||getUser()?.id!==userId)return;
-    if(result.error||payments.error)throw result.error||payments.error;
+    if(result.error||payments.error||students.error)
+     throw result.error||payments.error||students.error;
     overview=result.data;paymentOverview=payments.data;
-   }else overview=null;
+    advanceStudents=students.data||[];
+    if(!advanceStudents.some(s=>s.id===advanceStudentId))
+     advanceStudentId=advanceStudents[0]?.id||'';
+    advanceOverview=null;
+    if(advanceStudentId){
+     const credit=await client.rpc('v5_team_advance_overview',{
+      p_team_id:teamId,p_student_id:advanceStudentId
+     });
+     if(stamp!==generation||!valid()||getUser()?.id!==userId)return;
+     if(credit.error)throw credit.error;
+     advanceOverview=credit.data;
+    }
+   }else{
+    overview=null;paymentOverview=null;
+    advanceStudents=[];advanceStudentId='';advanceOverview=null;
+   }
    ready=true;
   }catch{
    if(stamp!==generation||!valid()||getUser()?.id!==userId)return;
-   overview=null;paymentOverview=null;
+   overview=null;paymentOverview=null;advanceOverview=null;
+   advanceStudents=[];advanceStudentId='';
    error='Team 帳務暫時無法讀取，請重新進入設定頁。';
   }finally{
    if(stamp===generation&&valid()&&getUser()?.id===userId){
@@ -267,6 +476,87 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   const btn=target?.closest?.('[data-v5-billing-action]');
   if(!btn)return false;
   if(!valid()||!ready||writing||!overview)return true;
+  if(btn.dataset.v5BillingAction==='confirm-advance-payment'){
+   const p=(paymentOverview?.payments||[]).find(x=>
+    x.payment_id===btn.dataset.id&&x.status==='pending'&&
+    x.student_id===advanceStudentId&&x.intended_advance_cents>0);
+   if(!p||!advanceOverview)return true;
+   const inputs=[...$('v5-advance-pending-payments').querySelectorAll(
+    '[data-v5-advance-payment="'+p.payment_id+'"]')];
+   const allocations=[];
+   for(const input of inputs){
+    if(!input.value.trim())continue;
+    const amount=cents(input.value);
+    if(amount===null){notify('課程分配金額格式不正確');return true;}
+    if(amount>0)allocations.push({
+     lesson_id:input.dataset.v5AdvanceLesson,amount_cents:amount
+    });
+   }
+   const total=allocations.reduce((n,x)=>n+x.amount_cents,0);
+   if(total!==p.amount_cents-p.intended_advance_cents){
+    notify('直接分配須合計 '+money(p.amount_cents-p.intended_advance_cents)+
+     '，剩餘 '+money(p.intended_advance_cents)+' 才能確認預收。');
+    return true;
+   }
+   if(!window.confirm('確認本次人工付款 '+money(p.amount_cents)+
+    '：直接分配 '+money(total)+'，新增預收 '+money(p.intended_advance_cents)+
+    '？確認後不能直接修改，須留存稽核紀錄。'))return true;
+   writing=true;
+   try{
+    const {data,error:failure}=await getClient().rpc(
+     'v5_confirm_team_advance_payment',{
+      p_payment_id:p.payment_id,p_allocations:allocations
+     });
+    if(failure||data?.status!=='confirmed')throw failure||new Error('Not confirmed');
+    notify('付款已確認；已認列預收 '+money(data.credit_cents)+
+     '，直接分配 '+money(data.allocated_cents));
+    await refresh();
+   }catch{notify('未完成預收款確認：請核對權限、應收與分配金額，勿重複建立付款。')}
+   finally{writing=false;render()}
+   return true;
+  }
+  if(btn.dataset.v5BillingAction==='apply-advance-credit'){
+   const credit=(advanceOverview?.credits||[]).find(x=>
+    x.credit_id===btn.dataset.id&&x.available_cents>0);
+   if(!credit)return true;
+   const inputs=[...$('v5-advance-credit-rows').querySelectorAll(
+    '[data-v5-advance-credit="'+credit.credit_id+'"]')];
+   const allocations=[];
+   for(const input of inputs){
+    if(!input.value.trim())continue;
+    const amount=cents(input.value);
+    if(amount===null){notify('抵扣金額僅接受最多兩位小數');return true;}
+    if(amount>0)allocations.push({
+     lesson_id:input.dataset.v5AdvanceLesson,amount_cents:amount
+    });
+   }
+   const total=allocations.reduce((n,x)=>n+x.amount_cents,0);
+   if(!allocations.length||total>credit.available_cents){
+    notify('抵扣總額須大於零且不能超過預收餘額 '+money(credit.available_cents));
+    return true;
+   }
+   if(!window.confirm('管理者確認抵扣 '+money(total)+
+    ' 至 '+allocations.length+' 堂課？這會減少應收與預收餘額，不會新增收款。'))
+    return true;
+   const signature=credit.credit_id+':'+JSON.stringify(allocations);
+   if(!retryAdvanceOperations.has(signature))
+    retryAdvanceOperations.set(signature,'v5-offset-'+crypto.randomUUID());
+   writing=true;
+   try{
+    const {data,error:failure}=await getClient().rpc(
+     'v5_apply_team_advance_credit',{
+      p_credit_id:credit.credit_id,p_allocations:allocations,
+      p_idempotency_key:retryAdvanceOperations.get(signature)
+     });
+    if(failure||data?.status!=='confirmed')throw failure||new Error('Not applied');
+    retryAdvanceOperations.delete(signature);
+    notify(data.idempotent?'已確認先前抵扣操作，不會重複扣款':
+     '預收款抵扣成功 '+money(data.applied_cents)+'（不增加收款）');
+    await refresh();
+   }catch{notify('抵扣未確認；請查看目前餘額再重試，系統會沿用同操作識別避免重複入帳。')}
+   finally{writing=false;render()}
+   return true;
+  }
   if(btn.dataset.v5BillingAction==='allocate-payment'){
    const p=(paymentOverview?.payments||[]).find(x=>
     x.payment_id===btn.dataset.id&&x.status==='pending');

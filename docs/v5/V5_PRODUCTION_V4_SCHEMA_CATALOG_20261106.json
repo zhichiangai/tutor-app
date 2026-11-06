@@ -1,0 +1,644 @@
+{
+  "snapshot_date": "2026-11-06",
+  "source_project_ref": "vctisuglfoxyuwlvyjee",
+  "observed_production_migration_count": 43,
+  "scope": "pg_catalog metadata only: no student, payment, auth rows, passwords, tokens, or function bodies",
+  "limitations": "Column/constraint/policy/trigger name shape only; not a pg_dump backup or an isolated restore proof. Exact RLS expressions and function behavior require separate review.",
+  "query_path": "supabase/diagnostics/v5_production_schema_catalog_readonly.sql",
+  "tables": [
+    {
+      "rls": true,
+      "table": "public.lesson_records",
+      "exists": true,
+      "columns": [
+        {
+          "name": "actual_end_time",
+          "type": "text",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "actual_hours",
+          "type": "numeric(8,2)",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "actual_start_time",
+          "type": "text",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "attitude_rating",
+          "type": "integer",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "end_time",
+          "type": "text",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "focus_rating",
+          "type": "integer",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "hourly_rate",
+          "type": "numeric(12,2)",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "hours",
+          "type": "numeric(8,2)",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "leave_source",
+          "type": "text",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "legacy_id",
+          "type": "text",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "lesson_content",
+          "type": "text",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "lesson_date",
+          "type": "date",
+          "not_null": true,
+          "has_default": false
+        },
+        {
+          "name": "mood_rating",
+          "type": "smallint",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "owner_id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": false
+        },
+        {
+          "name": "parent_note",
+          "type": "text",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "payment_date",
+          "type": "date",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "payment_group_id",
+          "type": "text",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "received_date",
+          "type": "date",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "remarks",
+          "type": "text",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "schedule_id",
+          "type": "uuid",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "scheduled_date",
+          "type": "date",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "source_updated_at",
+          "type": "timestamp with time zone",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "start_time",
+          "type": "text",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "student",
+          "type": "text",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "student_id",
+          "type": "uuid",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "subject",
+          "type": "text",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "time_accuracy",
+          "type": "text",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "total_amount",
+          "type": "numeric(12,2)",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "type",
+          "type": "text",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "workspace_id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": false
+        }
+      ],
+      "policy_names": [
+        "lessons_owner_or_guardian_select",
+        "owners_delete_lessons",
+        "owners_insert_lessons",
+        "owners_update_lessons"
+      ],
+      "trigger_names": [
+        "trg_assign_workspace",
+        "trg_guard_paid_lesson",
+        "trg_prevent_financial_lesson_delete",
+        "trg_v34_guard_lesson_write",
+        "trg_v34_lesson_revision",
+        "trg_v35_track_lesson_feedback"
+      ],
+      "constraint_names": [
+        "actual_hours_range",
+        "actual_time_format",
+        "lesson_content_length",
+        "lesson_mood_rating_valid",
+        "lesson_occurrence_complete",
+        "lesson_records_attitude_rating_check",
+        "lesson_records_focus_rating_check",
+        "lesson_records_owner_id_fkey",
+        "lesson_records_owner_legacy_unique",
+        "lesson_records_pkey",
+        "lesson_records_schedule_id_fkey",
+        "lesson_records_student_id_fkey",
+        "lesson_records_student_owner_match",
+        "lesson_records_time_accuracy_check",
+        "lesson_student_same_workspace",
+        "lessons_id_workspace_unique",
+        "lessons_workspace_fk"
+      ]
+    },
+    {
+      "rls": true,
+      "table": "public.payment_batch_items",
+      "exists": true,
+      "columns": [
+        {
+          "name": "allocated_amount",
+          "type": "numeric(12,2)",
+          "not_null": true,
+          "has_default": false
+        },
+        {
+          "name": "batch_id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": false
+        },
+        {
+          "name": "lesson_id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": false
+        },
+        {
+          "name": "workspace_id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": false
+        }
+      ],
+      "policy_names": [
+        "items_read_by_batch_participant"
+      ],
+      "trigger_names": [
+        "trg_assign_workspace"
+      ],
+      "constraint_names": [
+        "item_batch_same_workspace",
+        "item_lesson_same_workspace",
+        "payment_batch_items_allocated_amount_check",
+        "payment_batch_items_batch_id_fkey",
+        "payment_batch_items_lesson_id_fkey",
+        "payment_batch_items_pkey"
+      ]
+    },
+    {
+      "rls": true,
+      "table": "public.payment_batches",
+      "exists": true,
+      "columns": [
+        {
+          "name": "confirmed_at",
+          "type": "timestamp with time zone",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "paid_amount",
+          "type": "numeric(12,2)",
+          "not_null": true,
+          "has_default": false
+        },
+        {
+          "name": "paid_on",
+          "type": "date",
+          "not_null": true,
+          "has_default": false
+        },
+        {
+          "name": "parent_id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": false
+        },
+        {
+          "name": "period_end",
+          "type": "date",
+          "not_null": true,
+          "has_default": false
+        },
+        {
+          "name": "period_start",
+          "type": "date",
+          "not_null": true,
+          "has_default": false
+        },
+        {
+          "name": "received_on",
+          "type": "date",
+          "not_null": false,
+          "has_default": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "student_id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": false
+        },
+        {
+          "name": "teacher_id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": false
+        },
+        {
+          "name": "workspace_id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": false
+        }
+      ],
+      "policy_names": [
+        "batch_read_by_teacher_or_parent"
+      ],
+      "trigger_names": [
+        "trg_assign_workspace"
+      ],
+      "constraint_names": [
+        "batch_student_same_workspace",
+        "batches_id_workspace_unique",
+        "batches_workspace_fk",
+        "payment_batches_check",
+        "payment_batches_check1",
+        "payment_batches_check2",
+        "payment_batches_paid_amount_check",
+        "payment_batches_parent_id_fkey",
+        "payment_batches_pkey",
+        "payment_batches_status_check",
+        "payment_batches_student_id_teacher_id_fkey",
+        "payment_batches_teacher_id_fkey"
+      ]
+    },
+    {
+      "rls": true,
+      "table": "public.student_guardians",
+      "exists": true,
+      "columns": [
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "guardian_id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": false
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "invite_id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": false
+        },
+        {
+          "name": "student_id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": false
+        },
+        {
+          "name": "teacher_id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": false
+        },
+        {
+          "name": "workspace_id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": false
+        }
+      ],
+      "policy_names": [
+        "links_guardian_claim_invite",
+        "links_teacher_or_guardian_read",
+        "links_teacher_or_guardian_remove"
+      ],
+      "trigger_names": [
+        "trg_assign_workspace",
+        "v4_legacy_guardian_connected"
+      ],
+      "constraint_names": [
+        "guardian_student_same_workspace",
+        "student_guardians_guardian_id_fkey",
+        "student_guardians_invite_id_fkey",
+        "student_guardians_pkey",
+        "student_guardians_student_id_guardian_id_key",
+        "student_guardians_student_id_teacher_id_fkey",
+        "student_guardians_teacher_id_fkey"
+      ]
+    },
+    {
+      "rls": true,
+      "table": "public.students",
+      "exists": true,
+      "columns": [
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "hourly_rate",
+          "type": "numeric(12,2)",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "is_qa",
+          "type": "boolean",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "not_null": true,
+          "has_default": false
+        },
+        {
+          "name": "subject",
+          "type": "text",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "teacher_id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": false
+        },
+        {
+          "name": "workspace_id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": false
+        }
+      ],
+      "policy_names": [
+        "students_teacher_and_guardian_read",
+        "students_teacher_delete",
+        "students_teacher_insert",
+        "students_teacher_update"
+      ],
+      "trigger_names": [
+        "audit_qa_student_mark",
+        "trg_assign_workspace"
+      ],
+      "constraint_names": [
+        "students_hourly_rate_check",
+        "students_id_teacher_id_key",
+        "students_id_workspace_unique",
+        "students_name_check",
+        "students_pkey",
+        "students_teacher_id_fkey",
+        "students_workspace_fk"
+      ]
+    },
+    {
+      "rls": true,
+      "table": "public.workspace_members",
+      "exists": true,
+      "columns": [
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "not_null": true,
+          "has_default": false
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": false
+        },
+        {
+          "name": "workspace_id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": false
+        }
+      ],
+      "policy_names": [
+        "member_self_read"
+      ],
+      "trigger_names": [],
+      "constraint_names": [
+        "workspace_members_pkey",
+        "workspace_members_role_check",
+        "workspace_members_user_id_fkey",
+        "workspace_members_workspace_id_fkey"
+      ]
+    },
+    {
+      "rls": true,
+      "table": "public.workspaces",
+      "exists": true,
+      "columns": [
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "not_null": true,
+          "has_default": true
+        },
+        {
+          "name": "owner_id",
+          "type": "uuid",
+          "not_null": true,
+          "has_default": false
+        }
+      ],
+      "policy_names": [
+        "workspace_owner_or_invited_read",
+        "workspace_owner_rename",
+        "workspace_self_create"
+      ],
+      "trigger_names": [
+        "trg_create_owner_membership"
+      ],
+      "constraint_names": [
+        "workspaces_kind_check",
+        "workspaces_name_check",
+        "workspaces_owner_id_fkey",
+        "workspaces_owner_id_key",
+        "workspaces_pkey"
+      ]
+    }
+  ]
+}
