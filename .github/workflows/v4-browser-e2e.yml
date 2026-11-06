@@ -166,6 +166,14 @@ jobs:
         env:
           V4_QA_PAYMENT_RPC_TEST: '1'
         run: node tests/local/v4-qa-payment-rpc-rest.mjs
+      - name: Compare current V4 schema shape against PII-free Production 43-migration snapshot
+        id: v5_catalog_probe
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          test "$V4_E2E_LOCAL" = "1"
+          test ! -f supabase/.temp/project-ref
+          node tests/local/v5-production-schema-catalog-compare.mjs
       - name: Install pinned Playwright and site Supabase bundle
         run: |
           npm install --no-save --no-package-lock \
@@ -176,13 +184,20 @@ jobs:
       - name: Verify real Chromium teacher-parent-student flows
         run: npx playwright test --config tests/e2e/playwright.config.mjs
       - name: Rehearse synthetic-only private selected-schema backup and restore
+        id: v5_restore_probe
+        continue-on-error: true
         run: bash tests/local/v5-disposable-backup-restore-smoke.sh
-      - name: Compare current V4 schema shape against PII-free Production 43-migration snapshot
+      - name: Enforce both independent V5 compatibility probes
+        if: always()
         run: |
-          set -euo pipefail
-          test "$V4_E2E_LOCAL" = "1"
-          test ! -f supabase/.temp/project-ref
-          node tests/local/v5-production-schema-catalog-compare.mjs
+          test "${{ steps.v5_catalog_probe.outcome }}" = "success" || {
+            echo "::error::V5 schema catalog mismatch or probe was skipped"
+            exit 1
+          }
+          test "${{ steps.v5_restore_probe.outcome }}" = "success" || {
+            echo "::error::Synthetic selected-schema restore failed or was skipped"
+            exit 1
+          }
       - name: Remove ephemeral auth fixture
         if: always()
         run: rm -f "$V4_E2E_FIXTURE_FILE"
