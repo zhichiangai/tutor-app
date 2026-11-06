@@ -175,6 +175,12 @@ jobs:
         run: node tests/e2e/seed-v4-local.mjs
       - name: Verify real Chromium teacher-parent-student flows
         run: npx playwright test --config tests/e2e/playwright.config.mjs
+      - name: Compare current V4 schema shape against PII-free Production 43-migration snapshot
+        run: |
+          set -euo pipefail
+          test "$V4_E2E_LOCAL" = "1"
+          test ! -f supabase/.temp/project-ref
+          node tests/local/v5-production-schema-catalog-compare.mjs
       - name: Remove ephemeral auth fixture
         if: always()
         run: rm -f "$V4_E2E_FIXTURE_FILE"
