@@ -46,6 +46,10 @@ docker exec "$container" pg_dump --format=custom --no-owner --no-privileges \
 test -s "$backup"
 docker exec -i "$container" pg_restore --list < "$backup" > /dev/null
 docker exec "$container" createdb -U postgres "$restored_db"
+# A fresh PostgreSQL database already has an empty "public" schema. pg_dump
+# includes CREATE SCHEMA public, so remove ONLY the empty target database copy.
+docker exec "$container" psql -X -v ON_ERROR_STOP=1 \
+  -U postgres -d "$restored_db" -c 'DROP SCHEMA public CASCADE;' >/dev/null
 # Restore into a distinct disposable database in the SAME LOCAL CI Postgres container.
 docker exec -i "$container" pg_restore --exit-on-error --no-owner --no-privileges \
   -U postgres -d "$restored_db" < "$backup" > /dev/null
