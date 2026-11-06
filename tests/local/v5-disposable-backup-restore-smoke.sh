@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SYNTHETIC-ONLY PostgreSQL pg_dump/pg_restore rehearsal.
+# SYNTHETIC-ONLY selected-schema PostgreSQL pg_dump/pg_restore rehearsal.
 # NEVER use this script with a hosted Production URL or production credentials.
 set -euo pipefail
 trap 'echo "::error::Synthetic restore setup/operation failed at line $LINENO (disposable CI only)"' ERR
@@ -41,7 +41,8 @@ test -n "$before"
 
 # Keep the full synthetic dump in a private, short-lived runner file.
 docker exec "$container" pg_dump --format=custom --no-owner --no-privileges \
-  -U postgres -d postgres > "$backup"
+  --schema=public --schema=tutor_private --schema=auth \
+  --schema=supabase_migrations -U postgres -d postgres > "$backup"
 test -s "$backup"
 docker exec -i "$container" pg_restore --list < "$backup" > /dev/null
 docker exec "$container" createdb -U postgres "$restored_db"
@@ -55,6 +56,7 @@ if [ "$before" != "$after" ]; then
   echo "::error::Synthetic backup/restore count reconciliation failed (values suppressed)"
   exit 1
 fi
-echo "SYNTHETIC BACKUP/RESTORE PASS: pg_dump/pg_restore succeeded in disposable localhost CI"
+echo "SYNTHETIC SELECTED-SCHEMA RESTORE PASS: pg_dump/pg_restore succeeded in disposable localhost CI"
 echo "Validated synthetic migration/auth/V4/V5 ledger row counts and removed backup on exit."
+echo "Scope: public, tutor_private, auth and supabase_migrations. Realtime/Storage platform objects excluded."
 echo "NOT a Production backup; NOT evidence of Production data recovery or exact 43-migration restore."
