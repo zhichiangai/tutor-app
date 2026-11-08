@@ -45,6 +45,8 @@ test('teacher changes workspace in Settings and V4 personal navigation remains a
  await expect(page.locator('#settings-page-title')).toHaveText('Team 學生與課表');
  await page.locator('.side-nav [data-team-section="billing"]').click();
  await expect(page.locator('#settings-page-title')).toHaveText('Team 帳務');
+ await page.locator('#account-action').click();
+ await expect(page.locator('#settings-page-title')).toHaveText('設定');
  await page.reload();
  await expect(page.locator('body')).toHaveClass(/teacher-team-workspace/);
  await page.locator('.side-nav [data-team-section="settings"]').click();
