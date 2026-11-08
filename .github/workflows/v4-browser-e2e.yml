@@ -172,6 +172,13 @@ jobs:
           test "$CI" = "true"
           test "$V4_E2E_LOCAL" = "1"
           node tests/local/v5-production-function-drift-review.mjs
+      - name: Assert full V4 catalog parity after isolated service_role grant overlay
+        run: |
+          set -euo pipefail
+          test "$CI" = "true"
+          test "$V4_E2E_LOCAL" = "1"
+          test ! -f supabase/.temp/project-ref
+          node tests/local/v5-v4-service-role-grant-parity.mjs
       - name: Real GoTrue JWT and PostgREST QA classification, RLS and unlink acceptance
         env:
           V4_QA_LOCAL_JWT_TEST: '1'
