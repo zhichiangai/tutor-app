@@ -2,7 +2,7 @@
 // Plan changes are ONLY allowed through privileged audited backend operations.
 const PLAN_TEXT={
  free:{name:'Free',price:'免費',student:3,teacher:1},
- pro:{name:'Pro',price:'NT$99／月',student:30,teacher:1},
+ pro:{name:'Plus',price:'NT$99／月',student:30,teacher:1},
  team:{name:'Team',price:'NT$399／月',student:100,teacher:10}
 };
 const safeNumber=value=>{
@@ -19,6 +19,29 @@ export function createV5PlanUI({getClient,getUser,getRole,isReady}){
   const card=$('v5-plan-card');
   if(card)card.classList.add('hidden');
  }
+ function appendPlanOptions(root,currentPlan=null){
+  const options=document.createElement('div');
+  options.className='v5-plan-options';
+  for(const [key,item] of Object.entries(PLAN_TEXT)){
+   const cardEl=document.createElement('div');
+   cardEl.className='v5-plan-option'+(key===currentPlan?' current':'');
+   const head=document.createElement('strong');
+   head.textContent=item.name+(key===currentPlan?' · 目前使用':'');
+   const price=document.createElement('span');
+   price.textContent=item.price;
+   const limits=document.createElement('small');
+   limits.textContent='累計學生 '+item.student+' 人 · 老師 '+item.teacher+' 位';
+   const availability=document.createElement('small');
+   availability.textContent=key==='free'?'免費開放':'即將推出，暫不提供線上購買';
+   cardEl.append(head,price,limits,availability);
+   options.append(cardEl);
+  }
+  root.append(options);
+  const footer=document.createElement('p');
+  footer.className='helper-note';
+  footer.textContent='Plus／Team 正式金流尚未開放。需要測試授權或增加名額，請聯絡管理員。';
+  root.append(footer);
+ }
  function render(){
   const card=$('v5-plan-card'),root=$('v5-plan-content');
   if(!card||!root)return;
@@ -29,16 +52,17 @@ export function createV5PlanUI({getClient,getUser,getRole,isReady}){
    root.textContent='正在讀取會員方案及名額…';
    return;
   }
-  if(status==='unavailable'){
-   root.textContent='V5 方案資料尚未啟用，現有課程與帳務可繼續使用。';
-   return;
-  }
-  if(status==='error'){
-   root.textContent='暫時無法讀取名額，請重新進入設定頁再試。';
-   return;
-  }
-  if(!data){
-   root.textContent='建立家教空間後，即可查看方案與學生名額。';
+  if(status==='unavailable'||status==='error'||!data){
+   root.replaceChildren();
+   const note=document.createElement('p');
+   note.className='section-sub';
+   note.textContent=status==='unavailable'?
+    '方案後端尚未啟用，以下為方案介紹；目前使用方案及名額尚無法確認。現有課程與帳務可繼續使用。':
+    status==='error'?
+    '暫時無法讀取目前方案及名額，以下僅供方案介紹。請重新進入設定頁再試。':
+    '建立家教空間後，即可查看目前方案及學生名額。以下為方案介紹。';
+   root.append(note);
+   appendPlanOptions(root);
    return;
   }
   const plan=PLAN_TEXT[data.plan];
@@ -62,27 +86,7 @@ export function createV5PlanUI({getClient,getUser,getRole,isReady}){
   summary.append(strong,student,teachers,note);
   root.append(summary);
 
-  const options=document.createElement('div');
-  options.className='v5-plan-options';
-  for(const [key,item] of Object.entries(PLAN_TEXT)){
-   const cardEl=document.createElement('div');
-   cardEl.className='v5-plan-option'+(key===data.plan?' current':'');
-   const head=document.createElement('strong');
-   head.textContent=item.name+(key===data.plan?' · 目前使用':'');
-   const price=document.createElement('span');
-   price.textContent=item.price;
-   const limits=document.createElement('small');
-   limits.textContent='累計學生 '+item.student+' 人 · 老師 '+item.teacher+' 位';
-   const availability=document.createElement('small');
-   availability.textContent=key==='free'?'免費開放': '即將推出，暫不提供線上購買';
-   cardEl.append(head,price,limits,availability);
-   options.append(cardEl);
-  }
-  root.append(options);
-  const footer=document.createElement('p');
-  footer.className='helper-note';
-  footer.textContent='Pro／Team 正式金流尚未開放。需要測試授權或增加名額，請聯絡管理員。';
-  root.append(footer);
+  appendPlanOptions(root,data.plan);
  }
  async function refresh(){
   const id=getUser()?.id;

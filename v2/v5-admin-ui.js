@@ -2,6 +2,9 @@
 // This intentionally works only with an isolated Preview backend.
 const $=id=>document.getElementById(id);
 const state={client:null,workspaces:[],selected:null,busy:false};
+// Keep the persisted plan code `pro`; only human-facing names change to Plus.
+const displayPlan=code=>({free:'Free',pro:'Plus',team:'Team'})[code]||'—';
+const confirmationPlan=code=>code==='pro'?'PLUS':String(code).toUpperCase();
 function showStatus(message,isError=false){
  const status=$('status');
  status.textContent=String(message);
@@ -28,7 +31,7 @@ function updateView(){
   $('qa-submit').disabled=true;return;
  }
  root.append(
-  metric('方案',String(w.plan||'—').toUpperCase()),
+  metric('方案',displayPlan(w.plan)),
   metric('累計學生',String(w.student_used)+'／'+String(w.student_limit)),
   metric('老師席次',String(w.teacher_used)+'／'+String(w.teacher_limit)),
   metric('已刪除 QA 可釋放',String(w.qa_deleted_eligible))
@@ -36,7 +39,7 @@ function updateView(){
  $('plan').value=w.plan;
  $('extra').value=String(w.extra_student_seats);
  $('qa-count').value=String(w.qa_deleted_eligible);
- const phrase='SET '+String($('plan').value).toUpperCase()+' '+w.workspace_id.slice(0,8);
+ const phrase='SET '+confirmationPlan($('plan').value)+' '+w.workspace_id.slice(0,8);
  $('grant-phrase').textContent=phrase;
  $('qa-phrase').textContent='RELEASE QA '+w.qa_deleted_eligible+' '+w.workspace_id.slice(0,8);
  $('qa-submit').disabled=state.busy||Number(w.qa_deleted_eligible)<1;
@@ -112,7 +115,7 @@ async function mutate(payload,form){
 $('workspace').addEventListener('change',updateView);
 $('plan').addEventListener('change',()=>{
  const w=current();if(!w)return;
- $('grant-phrase').textContent='SET '+$('plan').value.toUpperCase()+' '+w.workspace_id.slice(0,8);
+ $('grant-phrase').textContent='SET '+confirmationPlan($('plan').value)+' '+w.workspace_id.slice(0,8);
  $('grant-confirm').value='';
 });
 $('reload').addEventListener('click',()=>void refresh());

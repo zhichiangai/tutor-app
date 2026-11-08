@@ -125,7 +125,7 @@ test('Free cumulative student quota, manual Pro/Team grants and teacher cap',asy
 });
 
 
-test('teacher settings shows Free/Pro/Team without checkout or hidden quotas',async ({page})=>{
+test('teacher settings shows Free/Plus/Team without checkout or hidden quotas',async ({page})=>{
  const actor=f.actors.teacher;
  await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
   route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
@@ -149,6 +149,9 @@ test('teacher settings shows Free/Pro/Team without checkout or hidden quotas',as
  await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
  await expect(page.locator('#v5-plan-card')).toBeVisible();
  await expect(page.locator('#v5-plan-content')).toContainText('Free');
+ await expect(page.locator('#v5-plan-content')).toContainText('Plus');
+ await expect(page.locator('#v5-plan-content')).toContainText('Team');
+ await expect(page.locator('#v5-plan-content')).toContainText('Plus／Team 正式金流尚未開放');
  await expect(page.locator('#v5-plan-content')).toContainText('NT$99／月');
  await expect(page.locator('#v5-plan-content')).toContainText('NT$399／月');
  await expect(page.locator('#v5-plan-content')).toContainText('不會釋放已使用名額');
@@ -161,6 +164,50 @@ test('teacher settings shows Free/Pro/Team without checkout or hidden quotas',as
  await expect(page.locator('#student-modal')).not.toBeVisible();
 });
 
+
+test('missing V5 RPC still shows read-only Free/Plus/Team cards to signed-in teacher',async ({page})=>{
+ const actor=f.actors.teacher;
+ await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
+  route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
+   contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+ await page.addInitScript(({url,key})=>{
+  window.V4_LOCAL_BACKEND={environment:'local',isolated:true,projectRef:'local',
+   url,publishableKey:key};
+ },{url:f.apiUrl,key:f.anonKey});
+ await page.route('**/rest/v1/rpc/v5_my_plan',route=>{
+  if(route.request().method()==='OPTIONS')return route.continue();
+  return route.fulfill({
+   status:404,contentType:'application/json',
+   headers:{'access-control-allow-origin':'*'},
+   body:JSON.stringify({code:'PGRST202',
+    message:'Could not find the function public.v5_my_plan'})
+  });
+ });
+ await page.goto('/v2/index.html');
+ await page.waitForFunction(()=>!!window.supabase?.createClient,{timeout:20_000});
+ await page.evaluate(async ({url,key,email,password})=>{
+  const client=window.supabase.createClient(url,key,{auth:{persistSession:true,
+   autoRefreshToken:true,detectSessionInUrl:true}});
+  const {error}=await client.auth.signInWithPassword({email,password});
+  if(error)throw Error('Synthetic login failed: '+error.message);
+  client.auth.stopAutoRefresh?.();
+ },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
+ await page.reload();
+ await expect(page.locator('body')).not.toHaveClass(/login-required/);
+ await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await expect(page.locator('#v5-plan-card')).toBeVisible();
+ const plan=page.locator('#v5-plan-content');
+ await expect(plan).toContainText('方案後端尚未啟用');
+ await expect(plan).toContainText('目前使用方案及名額尚無法確認');
+ await expect(plan).toContainText('Free');
+ await expect(plan).toContainText('Plus');
+ await expect(plan).toContainText('Team');
+ await expect(plan).toContainText('NT$99／月');
+ await expect(plan).toContainText('NT$399／月');
+ await expect(plan).not.toContainText('目前方案：');
+ await expect(plan).not.toContainText(' · 目前使用');
+ await expect(plan).not.toContainText('立即訂閱');
+});
 
 test('QA seat reset is operator-only, exact-count audited and never deletes live rows',async()=>{
  const teacher=await login('teacher');
