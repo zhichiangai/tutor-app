@@ -93,7 +93,8 @@ const sensitiveRpcs=[
  'public.v5_confirm_team_lesson_fee(uuid,bigint)',
  'public.v5_team_billing_overview(uuid,date)',
  'public.v5_team_payment_overview(uuid,date)',
- 'public.v5_apply_team_advance_credit(uuid,jsonb,text)'
+ 'public.v5_apply_team_advance_credit(uuid,jsonb,text)',
+ 'public.v5_team_operations_overview(uuid,date)'
 ];
 for(const signature of sensitiveRpcs){
  const escaped=signature.replaceAll("'","''");

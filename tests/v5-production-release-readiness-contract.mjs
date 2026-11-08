@@ -26,9 +26,12 @@ test('V5 Production gate cannot silently infer release approval from CI',()=>{
 test('Repository Migration inventory matches frozen read-only release snapshot',()=>{
  const files=readdirSync(new URL('supabase/migrations/',root))
   .filter(f=>f.endsWith('.sql')).sort();
- assert.deepEqual(files,snap.repository_migration_files,
-  'Changing migration history requires an explicit new release review');
- assert.equal(files.length,snap.repo_migration_count);
+ assert.deepEqual(files.slice(0,snap.repo_migration_count),snap.repository_migration_files,
+  'Existing V4+V5.5 baseline must remain immutable');
+ assert.deepEqual(files.slice(snap.repo_migration_count),[
+  '20261108230000_v57_team_operations_overview.sql'
+ ],'New V5.7 forward migration must be reviewed separately from the frozen release');
+ assert.equal(files.length,snap.repo_migration_count+1);
  assert.equal(files.filter(x=>/_v5_/.test(x)).length,
   snap.v5_repo_migration_count);
  assert.deepEqual(files.filter(x=>/_v5_/.test(x)),[

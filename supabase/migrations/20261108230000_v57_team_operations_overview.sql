@@ -131,25 +131,25 @@ begin
  -- claim to prove bank transfer, refund execution, alert delivery or receipt.
  select coalesce(jsonb_agg(jsonb_build_object(
   'kind',e.kind,'event',e.event,
-  'actor_tail',right(e.actor_id::text,6),'occurred_at',e.at
- ) order by e.at desc,e.kind),'[]'::jsonb)
+  'actor_tail',right(e.actor_id::text,6),'occurred_at',e.event_time
+ ) order by e.event_time desc,e.kind),'[]'::jsonb)
  into v_activity
  from (
-  select kind,event,actor_id,at from (
+  select kind,event,actor_id,event_time from (
    select 'lesson_fee'::text kind,a.event,a.actor_id,
-    a.created_at at
+    a.created_at as event_time
    from tutor_private.v5_team_billing_audit a
    where a.team_id=p_team_id
    union all
-   select 'payment'::text kind,a.event,a.actor_id,a.occurred_at at
+   select 'payment'::text kind,a.event,a.actor_id,a.occurred_at as event_time
    from tutor_private.v5_team_payment_audit a
    where a.team_id=p_team_id
    union all
-   select 'advance'::text kind,a.event,a.actor_id,a.occurred_at at
+   select 'advance'::text kind,a.event,a.actor_id,a.occurred_at as event_time
    from tutor_private.v5_team_advance_audit a
    where a.team_id=p_team_id
   ) all_events
-  order by at desc,kind
+  order by event_time desc,kind
   limit 20
  ) e;
 
