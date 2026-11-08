@@ -282,7 +282,7 @@ function setTeamSection(section){
 function renderWorkspaceModeSettings(){
  const eligible=state.role==="teacher"&&!!activeUser&&authPhase==="ready";
  $("#workspace-mode-card").classList.toggle("hidden",!eligible);
- $("[data-workspace-mode]").forEach(button=>{
+ document.querySelectorAll("[data-workspace-mode]").forEach(button=>{
   button.setAttribute("aria-pressed",String(eligible&&button.dataset.workspaceMode===state.workspaceMode));
  });
  const team=eligible&&state.workspaceMode==="team";
@@ -297,7 +297,7 @@ function renderWorkspaceModeSettings(){
  $("#settings-page-description").textContent=team&&section!=="settings"?
   "資料與個人家教分開；沒有被指派的專案或帳務不會開放。":
   "在設定管理帳號及使用模式，切換不會刪除課程或變更權限。";
- $("[data-team-section]").forEach(button=>{
+ document.querySelectorAll("[data-team-section]").forEach(button=>{
   const selected=team&&button.dataset.teamSection===section;
   button.classList.toggle("active",selected);
   button.setAttribute("aria-current",selected?"page":"false");
