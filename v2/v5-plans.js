@@ -2,7 +2,7 @@
 // Plan changes are ONLY allowed through privileged audited backend operations.
 const PLAN_TEXT={
  free:{name:'Free',price:'免費',student:3,teacher:1},
- pro:{name:'Pro',price:'NT$99／月',student:30,teacher:1},
+ pro:{name:'Plus',price:'NT$99／月',student:30,teacher:1},
  team:{name:'Team',price:'NT$399／月',student:100,teacher:10}
 };
 const safeNumber=value=>{
@@ -81,7 +81,7 @@ export function createV5PlanUI({getClient,getUser,getRole,isReady}){
   root.append(options);
   const footer=document.createElement('p');
   footer.className='helper-note';
-  footer.textContent='Pro／Team 正式金流尚未開放。需要測試授權或增加名額，請聯絡管理員。';
+  footer.textContent='Plus／Team 正式金流尚未開放。需要測試授權或增加名額，請聯絡管理員。';
   root.append(footer);
  }
  async function refresh(){
