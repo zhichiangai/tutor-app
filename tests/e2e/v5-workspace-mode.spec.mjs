@@ -74,3 +74,24 @@ test('parent and student keep legacy role navigation without Team switch',async(
   }finally{await page.close()}
  }
 });
+
+test('320/375/390/430 mobile workspace switch keeps distinct personal and Team tabs',async({browser})=>{
+ for(const width of [320,375,390,430]){
+  const page=await browser.newPage({viewport:{width,height:760}});
+  try{
+   await signIn(page,'teacher');
+   await page.locator('.mobile-nav .nav-standard[data-view="settings"]').click();
+   await expect(page.locator('#workspace-mode-card')).toBeVisible();
+   await page.locator('#workspace-mode-card [data-workspace-mode="team"]').click();
+   await expect(page.locator('.mobile-nav .nav-team[data-team-section="projects"]')).toBeVisible();
+   await expect(page.locator('.mobile-nav .nav-standard[data-view="billing"]')).toBeHidden();
+   await page.locator('.mobile-nav .nav-team[data-team-section="learning"]').click();
+   await expect(page.locator('#settings-page-title')).toHaveText('Team 學生與課表');
+   await page.locator('.mobile-nav .nav-team[data-team-section="settings"]').click();
+   await page.locator('#workspace-mode-card [data-workspace-mode="personal"]').click();
+   await expect(page.locator('.mobile-nav .nav-standard[data-view="calendar"]')).toBeVisible();
+   await page.locator('.mobile-nav .nav-standard[data-view="calendar"]').click();
+   await expect(page.locator('#view-calendar')).toBeVisible();
+  }finally{await page.close()}
+ }
+});
