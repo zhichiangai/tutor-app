@@ -1284,6 +1284,22 @@ test('V5.3 manager GUI reports and partially allocates a payment without V4 effe
  await expect(page.locator('#v5-ops-pending-payments')).toHaveText(/^\d+$/);
  await expect(page.locator('#v5-ops-unpaid-lessons')).toHaveText(/^\d+$/);
  await expect(page.locator('#v5-ops-reconciliation')).toContainText('銀行入帳');
+ await expect(page.locator('#v5-ops-report-message')).toContainText('管理者');
+ await expect(page.locator('#v5-ops-projects')).toContainText('Private Team B Project');
+ await expect(page.locator('#v5-ops-teachers')).toContainText('老師');
+ const managerJwt=await signIn('parent'),strangerJwt=await signIn('stranger');
+ const allowedOps=await rest(managerJwt,'POST','rpc/v5_team_operations_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal(allowedOps.status,200);
+ assert.equal(allowedOps.data.team_id,team);
+ assert.ok(allowedOps.data.projects.some(p=>p.name==='Private Team B Project'));
+ assert.equal(allowedOps.data.cash_verified_by_bank,false);
+ const deniedOps=await rest(strangerJwt,'POST','rpc/v5_team_operations_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.notEqual(deniedOps.status,200,'Unrelated JWT cannot read manager metrics');
+
  await expect(page.locator('#v5-payment-student-select')).toHaveValue(student);
  await page.locator('#v5-payment-amount').fill('500');
  await page.locator('#v5-payment-received-date').fill('2026-10-25');
@@ -1331,6 +1347,9 @@ test('V5.3 manager GUI reports and partially allocates a payment without V4 effe
  await expect(page.locator('#v5-billing-card')).toBeHidden();
  await expect(page.locator('#v5-operations-card')).toBeHidden();
  await expect(page.locator('#v5-ops-pending-fees')).toBeEmpty();
+ await expect(page.locator('#v5-ops-projects')).toBeEmpty();
+ await expect(page.locator('#v5-ops-teachers')).toBeEmpty();
+ await expect(page.locator('#v5-ops-activity')).toBeEmpty();
  await expect(page.locator('#v5-payment-confirmed-reports')).toBeEmpty();
  await expect(page.locator('#v5-payment-pending-reports')).toBeEmpty();
 });

@@ -16,7 +16,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    minimumFractionDigits:0,maximumFractionDigits:2}).format(amount/100);
  };
  let generation=0,attached=false,ready=false,loading=false,writing=false,error='';
- let availableTeams=[],teamId='',overview=null,paymentOverview=null;
+ let availableTeams=[],teamId='',overview=null,paymentOverview=null,operationsOverview=null;
  let advanceStudents=[],advanceStudentId='',advanceOverview=null;
  let advanceReference='manual-advance-'+crypto.randomUUID();
  const retryAdvanceOperations=new Map();
@@ -26,14 +26,16 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
  const valid=()=>!!(isReady()&&getRole()==='teacher'&&getUser()?.id&&getClient());
  function reset(){
   generation++;ready=false;loading=false;writing=false;error='';
-  availableTeams=[];teamId='';overview=null;paymentOverview=null;
+  availableTeams=[];teamId='';overview=null;paymentOverview=null;operationsOverview=null;
   advanceStudents=[];advanceStudentId='';advanceOverview=null;
   advanceReference='manual-advance-'+crypto.randomUUID();
   retryAdvanceOperations.clear();
   $('v5-operations-card')?.classList.add('hidden');
+  for(const id of ['v5-ops-projects','v5-ops-teachers','v5-ops-activity'])
+   $(id)?.replaceChildren();
   for(const id of ['v5-ops-pending-fees','v5-ops-pending-payments',
    'v5-ops-unpaid-lessons','v5-ops-unpaid-students',
-   'v5-ops-reconciliation']){
+   'v5-ops-reconciliation','v5-ops-report-message']){
    if($(id))$(id).textContent='';
   }
   $('v5-advance-panel')?.classList.add('hidden');
@@ -83,6 +85,76 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   if(msg)msg.textContent=!summary?'':summary.needsReconciliation?
    '帳務摘要與明細需人工複核，請暫停更正與退款。':
    '僅顯示課程及人工付款待辦；不代表已驗證銀行入帳或完成退款。';
+  const projectList=$('v5-ops-projects'),teacherList=$('v5-ops-teachers'),
+   history=$('v5-ops-activity'),note=$('v5-ops-report-message');
+  for(const view of [projectList,teacherList,history])view?.replaceChildren();
+  const ops=operationsOverview;
+  const number=x=>Number.isSafeInteger(x)&&x>=0;
+  const same=!!summary&&ops?.team_id===summary.teamId&&
+   ops?.month===summary.month&&ops?.currency==='TWD'&&
+   ops?.financial_authority==='manager_only'&&
+   ops?.cash_verified_by_bank===false;
+  const validProjects=same&&Array.isArray(ops.projects)&&
+   ops.projects.every(p=>p.project_id&&typeof p.name==='string'&&
+    ['active','archived'].includes(p.status)&&[
+     p.assigned_teacher_count,p.enrolled_student_count,p.scheduled_lessons,
+     p.completed_lessons,p.cancelled_lessons,p.unconfirmed_completed_lessons,
+     p.confirmed_receivable_cents,p.outstanding_cents
+    ].every(number));
+  const validTeachers=same&&Array.isArray(ops.teacher_workload)&&
+   ops.teacher_workload.every(t=>typeof t.teacher_user_id==='string'&&
+    [t.assigned_project_count,t.scheduled_lessons,t.completed_lessons]
+     .every(number));
+  const validHistory=same&&Array.isArray(ops.recent_activity)&&
+   ops.recent_activity.every(e=>['payment','advance','lesson_fee'].includes(e.kind)
+    &&typeof e.event==='string'&&typeof e.actor_tail==='string'
+    &&typeof e.occurred_at==='string');
+  if(note)note.textContent=!summary?'':!same?
+   '完整專案營運報表尚無有效資料；上述待辦僅供參考。':
+   !(validProjects&&validTeachers&&validHistory)?
+   '專案營運資料需要重新核對，請重新整理。':
+   '以下報表由現任 Team 管理者授權 RPC 提供，並非銀行入帳、退款或法定會計報表。';
+  if(!validProjects||!validTeachers||!validHistory)return;
+  if(!ops.projects.length)projectList?.append(
+   item('p','尚無 Team 專案。','section-sub'));
+  for(const p of ops.projects){
+   const row=item('div',undefined,'v5-billing-row');
+   row.append(item('strong',p.name+(p.status==='archived'?' · 已封存':'')));
+   row.append(item('span','老師 '+p.assigned_teacher_count+
+    ' 人 · 學生 '+p.enrolled_student_count+
+    ' 人 · 排程 '+p.scheduled_lessons+
+    ' 堂 · 完成 '+p.completed_lessons+
+    ' 堂 · 取消 '+p.cancelled_lessons+' 堂','section-sub'));
+   row.append(item('span','待確認費用 '+p.unconfirmed_completed_lessons+
+    ' 堂 · 已確認應收 '+money(p.confirmed_receivable_cents)+
+    ' · 未結清 '+money(p.outstanding_cents),'section-sub'));
+   projectList?.append(row);
+  }
+  if(!ops.teacher_workload.length)teacherList?.append(
+   item('p','尚無老師名單。','section-sub'));
+  for(const t of ops.teacher_workload){
+   const row=item('div',undefined,'v5-billing-row');
+   row.append(item('strong','老師（帳號末碼 '+
+    t.teacher_user_id.slice(-6)+'）'));
+   row.append(item('span','指派專案 '+t.assigned_project_count+
+    ' · 本月排程 '+t.scheduled_lessons+
+    ' · 已完成 '+t.completed_lessons,'section-sub'));
+   teacherList?.append(row);
+  }
+  if(!ops.recent_activity.length)history?.append(
+   item('p','目前沒有近期帳務操作。','section-sub'));
+  for(const e of ops.recent_activity){
+   const row=item('div',undefined,'v5-billing-row');
+   const label={payment:'人工付款',advance:'預收抵扣',lesson_fee:'應收費用'}[e.kind];
+   const when=new Date(e.occurred_at);
+   const at=Number.isFinite(when.valueOf())?
+    when.toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}):
+    '時間不可用';
+   row.append(item('strong',label+' · '+e.event));
+   row.append(item('span',at+' · 操作者末碼 '+
+    e.actor_tail.slice(-6),'section-sub'));
+   history?.append(row);
+  }
  }
  function render(){
   const card=$('v5-billing-card');
@@ -442,7 +514,8 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   if(!valid()){reset();return}
   attach();
   const stamp=++generation,userId=getUser().id;
-  loading=true;error='';overview=null;paymentOverview=null;advanceOverview=null;
+  loading=true;error='';overview=null;paymentOverview=null;
+  operationsOverview=null;advanceOverview=null;
   $('v5-advance-panel')?.classList.add('hidden');
   for(const id of ['v5-advance-message','v5-advance-pending-payments',
    'v5-advance-available','v5-advance-credit-rows'])
@@ -461,7 +534,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    if(!availableTeams.some(t=>t.id===teamId))teamId=availableTeams[0]?.id||'';
    if(teamId){
     const first=[month.getFullYear(),String(month.getMonth()+1).padStart(2,'0'),'01'].join('-');
-    const [result,payments,students]=await Promise.all([
+    const [result,payments,students,operations]=await Promise.all([
      client.rpc('v5_team_billing_overview',{
       p_team_id:teamId,p_month:first
      }),
@@ -469,12 +542,16 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
       p_team_id:teamId,p_month:first
      }),
      client.from('v5_team_students').select('id,team_id,display_name')
-      .eq('team_id',teamId)
+      .eq('team_id',teamId),
+     client.rpc('v5_team_operations_overview',{
+      p_team_id:teamId,p_month:first
+     })
     ]);
     if(stamp!==generation||!valid()||getUser()?.id!==userId)return;
     if(result.error||payments.error||students.error)
      throw result.error||payments.error||students.error;
     overview=result.data;paymentOverview=payments.data;
+    operationsOverview=operations.error?null:operations.data;
     advanceStudents=students.data||[];
     if(!advanceStudents.some(s=>s.id===advanceStudentId))
      advanceStudentId=advanceStudents[0]?.id||'';
@@ -488,13 +565,13 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
      advanceOverview=credit.data;
     }
    }else{
-    overview=null;paymentOverview=null;
+    overview=null;paymentOverview=null;operationsOverview=null;
     advanceStudents=[];advanceStudentId='';advanceOverview=null;
    }
    ready=true;
   }catch{
    if(stamp!==generation||!valid()||getUser()?.id!==userId)return;
-   overview=null;paymentOverview=null;advanceOverview=null;
+   overview=null;paymentOverview=null;operationsOverview=null;advanceOverview=null;
    advanceStudents=[];advanceStudentId='';
    error='Team 帳務暫時無法讀取，請重新進入設定頁。';
   }finally{

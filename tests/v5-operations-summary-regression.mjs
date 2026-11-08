@@ -91,3 +91,15 @@ test('operations card remains manager-only and sourced from existing guarded bil
  assert.match(html,/id="v5-operations-card"/);
  assert.match(html,/v5-team-panel hidden" id="v5-operations-card"/);
 });
+
+test('V5.7 project, teacher and audit sections remain guarded by manager RPC and auto-cleared',()=>{
+ const frontend=readFileSync(new URL('../v2/v5-billing.js',import.meta.url),'utf8');
+ const html=readFileSync(new URL('../v2/index.html',import.meta.url),'utf8');
+ for(const id of ['v5-ops-projects','v5-ops-teachers','v5-ops-activity',
+  'v5-ops-report-message'])assert.ok(html.includes('id="'+id+'"'));
+ assert.match(frontend,/client\.rpc\('v5_team_operations_overview'/);
+ assert.match(frontend,/operationsOverview=operations\.error\?null:operations\.data/);
+ assert.match(frontend,/operationsOverview=null/);
+ assert.match(frontend,/cash_verified_by_bank===false/);
+ assert.match(frontend,/projectList\?\.append/);
+});
