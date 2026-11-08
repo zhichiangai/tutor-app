@@ -90,8 +90,8 @@ jobs:
           set -euo pipefail
           test "$CI" = "true"
           test "$V4_E2E_LOCAL" = "1"
-          test ! -f supabase/.temp/project-ref
-          test ! -f supabase/.branches/_current_branch
+          # Hosted-link checks already ran before Supabase startup. The gate
+          # itself only uses docker exec against the disposable local container.
           node tests/local/v5-clean-bootstrap-gate.mjs
       - name: Reproduce Production-like legacy payment SELECT only in disposable CI
         run: |
