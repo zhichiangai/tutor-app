@@ -34,6 +34,22 @@ async function rest(jwt,method,path,body=null){
 }
 const rows=(jwt,resource,where='')=>rest(jwt,'GET',resource+'?select=*'+where);
 
+// V5.5: Team panels are deliberately absent in personal mode. Test the
+// actual Settings switch before requesting project, lesson or billing access.
+async function openTeamSection(page,section){
+ assert.ok(['projects','learning','billing'].includes(section));
+ await page.locator('#account-action').click();
+ const mode=page.locator('#workspace-mode-card [data-workspace-mode="team"]');
+ await expect(mode).toBeVisible();
+ if(await mode.getAttribute('aria-pressed')!=='true')await mode.click();
+ await page.locator('.side-nav .nav-team[data-team-section="'+section+'"]').click();
+}
+async function signOutFromTeam(page){
+ // Login/security controls are on Team's Settings section, not on its ledgers.
+ await page.locator('#account-action').click();
+ await page.locator('#sign-out').click();
+}
+
 test('Team projects stay isolated until teacher accepts email invitation and is assigned',async()=>{
  const owner=await signIn('teacher');
  const guest=await signIn('stranger');
@@ -201,7 +217,7 @@ test('Team settings shows authorized projects and hides private Team UI on logou
  },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
  await page.reload();
  await expect(page.locator('body')).not.toHaveClass(/login-required/);
- await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await openTeamSection(page,'projects');
  await expect(page.locator('#v5-team-card')).toBeVisible();
  await expect(page.locator('#v5-team-owner-controls')).toBeVisible();
  await expect(page.locator('#v5-team-project-list')).toContainText('Project Alpha');
@@ -209,7 +225,7 @@ test('Team settings shows authorized projects and hides private Team UI on logou
  await page.locator('#v5-team-project-name').fill('Project Gamma via GUI');
  await page.locator('#v5-team-project-form button[type="submit"]').click();
  await expect(page.locator('#v5-team-project-list')).toContainText('Project Gamma via GUI');
- await page.locator('#sign-out').click();
+ await signOutFromTeam(page);
  await expect(page.locator('body')).toHaveClass(/login-required/);
  await expect(page.locator('#v5-team-card')).toBeHidden();
  await expect(page.locator('#v5-team-project-list')).toBeEmpty();
@@ -448,7 +464,7 @@ test('successor sees transferred Team in the settings UI without V4 data',async(
  },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
  await page.reload();
  await expect(page.locator('body')).not.toHaveClass(/login-required/);
- await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await openTeamSection(page,'projects');
  await expect(page.locator('#v5-team-card')).toBeVisible();
  await expect(page.locator('#v5-team-owner-controls')).toBeVisible();
  const teams=await page.locator('#v5-team-manage-select option').evaluateAll(
@@ -460,7 +476,7 @@ test('successor sees transferred Team in the settings UI without V4 data',async(
   'Project Alpha Renamed by Successor');
  await expect(page.locator('#v5-team-transfer-list')).toContainText(
   '目前沒有待確認的管理權轉讓');
- await page.locator('#sign-out').click();
+ await signOutFromTeam(page);
  await expect(page.locator('body')).toHaveClass(/login-required/);
  await expect(page.locator('#v5-team-card')).toBeHidden();
 });
@@ -665,7 +681,7 @@ test('V5.3 manager uses Team student and shared lesson calendar UI without V4 wr
  },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
  await page.reload();
  await expect(page.locator('body')).not.toHaveClass(/login-required/);
- await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await openTeamSection(page,'learning');
  await expect(page.locator('#v5-learning-card')).toBeVisible();
  await expect(page.locator('#v5-learning-manager-controls')).toBeVisible();
  await page.locator('#v5-learning-team-select').selectOption(teamId);
@@ -709,7 +725,7 @@ test('V5.3 manager uses Team student and shared lesson calendar UI without V4 wr
  assert.equal(Number(db("select count(*) from tutor_private.v5_team_student_seat_ledger "+
   "where team_id='"+teamId+"'")),beforeTeamSeats+1);
 
- await page.locator('#sign-out').click();
+ await signOutFromTeam(page);
  await expect(page.locator('body')).toHaveClass(/login-required/);
  await expect(page.locator('#v5-learning-card')).toBeHidden();
  await expect(page.locator('#v5-learning-students')).toBeEmpty();
@@ -765,7 +781,7 @@ test('V5.3 shared calendar shows two teachers; assigned teacher has no manager c
   },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
   await page.reload();
   await expect(page.locator('body')).not.toHaveClass(/login-required/);
-  await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+  await openTeamSection(page,'learning');
   await expect(page.locator('#v5-learning-card')).toBeVisible();
   await page.locator('#v5-learning-team-select').selectOption(teamId);
   await expect(page.locator('#v5-learning-project-select')).toHaveValue(project);
@@ -791,7 +807,7 @@ test('V5.3 shared calendar shows two teachers; assigned teacher has no manager c
   '老師 · '+teacherActor.id.slice(-6));
  await expect(page.locator('#v5-learning-calendar')).toContainText('Cross Teacher English GUI');
 
- await page.locator('#sign-out').click();
+ await signOutFromTeam(page);
  await expect(page.locator('#v5-learning-students')).toBeEmpty();
  await enter('teacher');
  await expect(page.locator('#v5-learning-manager-controls')).toBeHidden();
@@ -804,7 +820,7 @@ test('V5.3 shared calendar shows two teachers; assigned teacher has no manager c
  assert.deepEqual((await rows(teacherJwt,'v5_team_students',
   '&team_id=eq.'+oldTeam)).data,[],
   'Assigned Teacher B may not read their former Team A students');
- await page.locator('#sign-out').click();
+ await signOutFromTeam(page);
  await expect(page.locator('#v5-learning-card')).toBeHidden();
  await expect(page.locator('#v5-learning-calendar')).toBeEmpty();
 });
@@ -849,7 +865,7 @@ test('V5.3 manager safely renames Team student, edits lesson, archives without l
  },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
  await page.reload();
  await expect(page.locator('body')).not.toHaveClass(/login-required/);
- await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await openTeamSection(page,'learning');
  await expect(page.locator('#v5-learning-card')).toBeVisible();
  await page.locator('#v5-learning-team-select').selectOption(teamId);
  await expect(page.locator('[data-v5-learning-edit-student="'+student+'"]')).toBeAttached();
@@ -892,7 +908,7 @@ test('V5.3 manager safely renames Team student, edits lesson, archives without l
  assert.equal(db("select count(*) from public.lesson_records where owner_id='"+
   actor.id+"'"),beforeV4,'No V4 personal lessons changed');
 
- await page.locator('#sign-out').click();
+ await signOutFromTeam(page);
  await expect(page.locator('body')).toHaveClass(/login-required/);
  await expect(page.locator('#v5-learning-card')).toBeHidden();
 });
@@ -1032,7 +1048,7 @@ test('V5.3 Team manager GUI confirms a lesson receivable; regular teachers canno
    environment:'local',isolated:true,projectRef:'local',url,publishableKey:key
   };
  },{url:f.apiUrl,key:f.anonKey});
- const login=async(role)=>{
+ const login=async(role,section='billing')=>{
   const actor=f.actors[role];
   await page.goto('/v2/index.html');
   await page.waitForFunction(()=>!!window.supabase?.createClient,{timeout:20_000});
@@ -1046,7 +1062,7 @@ test('V5.3 Team manager GUI confirms a lesson receivable; regular teachers canno
   },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
   await page.reload();
   await expect(page.locator('body')).not.toHaveClass(/login-required/);
-  await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+  await openTeamSection(page,section);
  };
  await login('parent');
  await expect(page.locator('#v5-billing-card')).toBeVisible();
@@ -1063,14 +1079,14 @@ test('V5.3 Team manager GUI confirms a lesson receivable; regular teachers canno
   "where lesson_id='"+lesson+"'"),'100000');
  assert.equal(db("select count(*) from public.payment_batches where workspace_id='"+
   ws+"'"),beforeV4,'Confirming Team receivable does not receive money or write V4 payments');
- await page.locator('#sign-out').click();
+ await signOutFromTeam(page);
  await expect(page.locator('body')).toHaveClass(/login-required/);
  await expect(page.locator('#v5-billing-card')).toBeHidden();
  await expect(page.locator('#v5-billing-confirmed')).toBeEmpty();
- await login('teacher');
+ await login('teacher','learning');
  await expect(page.locator('#v5-learning-card')).toBeVisible();
  await expect(page.locator('#v5-billing-card')).toBeHidden();
- await page.locator('#sign-out').click();
+ await signOutFromTeam(page);
  await expect(page.locator('#v5-billing-total')).toBeEmpty();
 });
 
@@ -1257,7 +1273,7 @@ test('V5.3 manager GUI reports and partially allocates a payment without V4 effe
  },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
  await page.reload();
  await expect(page.locator('body')).not.toHaveClass(/login-required/);
- await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await openTeamSection(page,'billing');
  await expect(page.locator('#v5-billing-card')).toBeVisible();
  await page.locator('#v5-billing-team-select').selectOption(team);
  await page.locator('#v5-billing-prev').click();
@@ -1303,7 +1319,7 @@ test('V5.3 manager GUI reports and partially allocates a payment without V4 effe
   "where payment_id='"+pid+"' and lesson_id='"+lesson+"'"),'50000');
  assert.equal(db("select count(*) from public.payment_batches where workspace_id='"+
   ws+"'"),beforeV4,'Manager report/allocate GUI never changes V4 receipts');
- await page.locator('#sign-out').click();
+ await signOutFromTeam(page);
  await expect(page.locator('body')).toHaveClass(/login-required/);
  await expect(page.locator('#v5-billing-card')).toBeHidden();
  await expect(page.locator('#v5-payment-confirmed-reports')).toBeEmpty();
@@ -1737,7 +1753,7 @@ test('V5.4 manager GUI confirms an advance and applies a separate offset with no
  },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
  await page.reload();
  await expect(page.locator('body')).not.toHaveClass(/login-required/);
- await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await openTeamSection(page,'billing');
  await expect(page.locator('#v5-billing-card')).toBeVisible();
  await page.locator('#v5-billing-team-select').selectOption(team);
  await page.locator('#v5-billing-prev').click();
@@ -1795,7 +1811,7 @@ test('V5.4 manager GUI confirms an advance and applies a separate offset with no
  assert.equal(final.data.receivables.find(x=>x.lesson_id===english).outstanding_cents,50000);
  assert.equal(db("select count(*) from public.payment_batches where workspace_id='"+
   ws+"'"),beforeV4,'GUI advance never writes V4 receipts');
- await page.locator('#sign-out').click();
+ await signOutFromTeam(page);
  await expect(page.locator('body')).toHaveClass(/login-required/);
  await expect(page.locator('#v5-advance-panel')).toBeHidden();
  await expect(page.locator('#v5-advance-available')).toBeEmpty();

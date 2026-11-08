@@ -81,6 +81,7 @@ const STORAGE = "tutor_v2_preview_data_20261019";
 const ROLE_STORAGE = "tutor_v2_role";
 const ROLE_PENDING_STORAGE = "tutor_v2_role_pending";
 const MODE_STORAGE = "tutor_v2_mode";
+const WORKSPACE_MODE_STORAGE = "tutor_v5_workspace_mode";
 const CALENDAR_MODE_STORAGE = "tutor_v22_calendar_mode";
 const NAMES = ["日","一","二","三","四","五","六"];
 const $ = (s) => document.querySelector(s);
@@ -97,7 +98,7 @@ const timeLabel = (s) => asText(s).slice(0,5);
 const tick = ()=>new Date();
 const uid = ()=>crypto.randomUUID();
 let client=null, activeUser=null, loading=false, teacherPreferences={};
-const state={mode:"live",enabledRoles:["teacher"],lessonRatings:{focus:null,mood:null},role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:"month",studentCalendarMode:"month",recentChangesOpen:false,historyReadFailed:false,paymentBatches:[],paymentBatchItems:[],paymentCorrections:[],paymentCorrectionItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",studentInvites:[],studentLinks:[],studentLegacyInvites:[],managedStudentId:null,studentSearch:"",studentAccountFilter:"all",studentPortal:{students:[],lessons:[],schedules:[]},sharedCourseDraft:null,sharedCourseHistory:{},receiptBatch:null,activeLesson:null,actualHoursManual:false,showQaAccounting:false,qaTags:{qaBatchIds:[],qaLessonIds:[],qaLegacyReceiptLessonIds:[]},qaClassificationReady:false};
+const state={mode:"live",workspaceMode:"personal",teamSection:"settings",enabledRoles:["teacher"],lessonRatings:{focus:null,mood:null},role:["teacher","parent","student"].includes(localStorage.getItem(ROLE_STORAGE))?localStorage.getItem(ROLE_STORAGE):"teacher",view:"home",month:new Date(new Date().getFullYear(),new Date().getMonth(),1),selected:dateKey(tick()),students:[],lessons:[],invites:[],guardians:[],requests:[],schedules:[],exceptions:[],editing:null,editingSchedule:null,changingLesson:null,calendarMode:"month",studentCalendarMode:"month",recentChangesOpen:false,historyReadFailed:false,paymentBatches:[],paymentBatchItems:[],paymentCorrections:[],paymentCorrectionItems:[],profiles:[],workspaces:[],workspaceMembers:[],parentTeacherFilter:"all",studentInvites:[],studentLinks:[],studentLegacyInvites:[],managedStudentId:null,studentSearch:"",studentAccountFilter:"all",studentPortal:{students:[],lessons:[],schedules:[]},sharedCourseDraft:null,sharedCourseHistory:{},receiptBatch:null,activeLesson:null,actualHoursManual:false,showQaAccounting:false,qaTags:{qaBatchIds:[],qaLessonIds:[],qaLegacyReceiptLessonIds:[]},qaClassificationReady:false};
 
 // Older Node harnesses evaluate app.js with imports stripped. Keep the V4 adapter optional there.
 const v4ConnectionUI=typeof createV4Connections==="function"?createV4Connections({getClient:()=>client,getUser:()=>activeUser,
@@ -240,7 +241,70 @@ function setBusy(yes){
 function showModal(id){const dialog=$("#"+id);if(dialog&&!dialog.open)dialog.showModal()}
 function closeModal(id){const dialog=$("#"+id);if(dialog?.open)dialog.close()}
 const STUDENT_VIEWS=["student-today","student-calendar","student-learning"];
+const TEAM_SECTIONS=new Set(["projects","learning","billing","settings"]);
+function isTeamWorkspace(){
+ return state.role==="teacher"&&state.workspaceMode==="team"&&!!activeUser;
+}
+function restoreWorkspaceMode(){
+ const id=activeUser?.id;
+ state.workspaceMode=id&&localStorage.getItem(WORKSPACE_MODE_STORAGE+"_"+id)==="team"?"team":"personal";
+ state.teamSection=state.workspaceMode==="team"?"projects":"settings";
+}
+function refreshWorkspacePanels(){
+ if(state.role!=="teacher"||!activeUser||state.view!=="settings")return;
+ if(isTeamWorkspace()){
+  if(state.teamSection==="projects")void v5TeamUI.refresh();
+  if(state.teamSection==="learning")void v5LearningUI.refresh();
+  if(state.teamSection==="billing")void v5BillingUI.refresh();
+ }else void v5PlanUI.refresh();
+}
+function setWorkspaceMode(next){
+ if(!["personal","team"].includes(next)||state.role!=="teacher"||
+    !activeUser||authPhase!=="ready"||state.workspaceMode===next)return;
+ state.workspaceMode=next;
+ state.teamSection=next==="team"?"projects":"settings";
+ localStorage.setItem(WORKSPACE_MODE_STORAGE+"_"+activeUser.id,next);
+ // A UI preference is not an entitlement. Clear earlier Team finance/roster
+ // state before showing another workspace, even for the same Google user.
+ v5TeamUI.clear();v5LearningUI.clear();v5BillingUI.clear();
+ state.receiptBatch=null;state.activeLesson=null;
+ setView("settings");
+ toast(next==="team"?"已切換至 Team 團隊工作空間":"已切換至個人家教工作空間");
+}
+function setTeamSection(section){
+ if(!isTeamWorkspace()||!TEAM_SECTIONS.has(section)||authPhase!=="ready")return;
+ if(state.teamSection!==section){
+  v5TeamUI.clear();v5LearningUI.clear();v5BillingUI.clear();
+  state.teamSection=section;
+ }
+ setView("settings");
+}
+function renderWorkspaceModeSettings(){
+ const eligible=state.role==="teacher"&&!!activeUser&&authPhase==="ready";
+ $("#workspace-mode-card").classList.toggle("hidden",!eligible);
+ document.querySelectorAll("[data-workspace-mode]").forEach(button=>{
+  button.setAttribute("aria-pressed",String(eligible&&button.dataset.workspaceMode===state.workspaceMode));
+ });
+ const team=eligible&&state.workspaceMode==="team";
+ $("#workspace-mode-message").textContent=team?
+  "目前使用 Team；進入專案、課表或帳務仍須通過資料庫權限驗證。":
+  "目前使用個人家教；原有 V4 課程、家長、學生與收付款功能不變。";
+ const section=team?state.teamSection:"settings";
+ const titles={projects:"Team 團隊與專案",learning:"Team 學生與課表",
+  billing:"Team 帳務",settings:"設定"};
+ $("#settings-page-eyebrow").textContent=team?"TEAM · 團隊工作空間":"SETTINGS · 個人偏好";
+ $("#settings-page-title").textContent=titles[section];
+ $("#settings-page-description").textContent=team&&section!=="settings"?
+  "資料與個人家教分開；沒有被指派的專案或帳務不會開放。":
+  "在設定管理帳號及使用模式，切換不會刪除課程或變更權限。";
+ document.querySelectorAll("[data-team-section]").forEach(button=>{
+  const selected=team&&button.dataset.teamSection===section;
+  button.classList.toggle("active",selected);
+  button.setAttribute("aria-current",selected?"page":"false");
+ });
+}
 function normalizeView(view){
+ if(isTeamWorkspace())return "settings";
  if(state.role==="student"){
   if(view==="settings")return "settings";
   if(view==="student")return "student-learning"; // previous internal route
@@ -273,14 +337,9 @@ function setView(view){
  state.view=normalizeView(view);
  render();
  applyPreviewReadOnlyControls();
- // Plan usage is queried only on the owner's settings view. This avoids
- // repeated RPCs for each calendar render and never blocks V4 functionality.
- if(state.view==="settings"&&state.role==="teacher"&&activeUser){
-  void v5PlanUI.refresh();
-  void v5TeamUI.refresh();
-  void v5LearningUI.refresh();
-  void v5BillingUI.refresh();
- }
+ // V4 personal views do not request Team records, and Team mode refreshes
+ // only the currently selected, database-authorised section.
+ refreshWorkspacePanels();
 }
 const VALID_ROLES=["teacher","parent","student"];
 const ROLE_SUFFIX={teacher:"老師",parent:"家長",student:"同學"};
@@ -388,7 +447,7 @@ function setRole(role){
  const id=state.mode==="live"&&activeUser?activeUser.id:null;
  const storageKey=id?ROLE_STORAGE+"_"+id:ROLE_STORAGE;
  localStorage.setItem(storageKey,role);
- setView(role==="student"?"student-today":"home");
+ setView(role==="student"?"student-today":role==="teacher"&&state.workspaceMode==="team"?"settings":"home");
  if(roleChanged&&id&&(role==="teacher"||role==="parent")){
   // Refetch only the now-current role's server-owned connection history.
   void v4ConnectionUI.refresh();
@@ -562,6 +621,12 @@ function renderAuthUI(){
 function render(){
  const role=state.role,teacher=role==="teacher",student=role==="student";
  const identified=authPhase==="ready"&&!!activeUser;
+ const teamMode=identified&&teacher&&state.workspaceMode==="team";
+ document.body?.classList?.toggle("teacher-personal-workspace",identified&&teacher&&!teamMode);
+ document.body?.classList?.toggle("teacher-team-workspace",teamMode);
+ for(const section of TEAM_SECTIONS){
+  document.body?.classList?.toggle("team-section-"+section,teamMode&&state.teamSection===section);
+ }
  document.body?.classList?.toggle("auth-pending",authPhase==="checking");
  document.body?.classList?.toggle("student-mode",identified&&student);
  // Login initialization sets state.view directly; always sync the visible page
@@ -573,9 +638,9 @@ function render(){
  $("#role-indicator").setAttribute("aria-label",identified?
   "目前使用："+identity+"，"+ROLE_TITLE[role]+"，點擊切換":identity);
  $$("[data-role-choice]").forEach(el=>el.setAttribute("aria-pressed",String(el.dataset.roleChoice===role)));
- $("#greeting-title").innerHTML=teacher?"今天的課程，<em>從這裡開始。</em>":student?"我的學習，<em>一步一步進步。</em>":"孩子的每堂課，<em>都在這裡。</em>";
- $("#greeting-copy").textContent=teacher?"先看看今天的課程、需要補寫的紀錄，以及等你確認的收款。":student?"在這裡查看你的課表和老師的課後回饋。":"下一堂課、最新學習紀錄和付款狀態，不用再四處尋找。";
- $("#top-add").style.display=teacher?"":"none";
+ $("#greeting-title").innerHTML=teamMode?"Team 協作，<em>一起把課上好。</em>":teacher?"今天的課程，<em>從這裡開始。</em>":student?"我的學習，<em>一步一步進步。</em>":"孩子的每堂課，<em>都在這裡。</em>";
+ $("#greeting-copy").textContent=teamMode?"從側邊團隊選單管理專案、跨老師課表與應收；個人家教紀錄不會被變更。":teacher?"先看看今天的課程、需要補寫的紀錄，以及等你確認的收款。":student?"在這裡查看你的課表和老師的課後回饋。":"下一堂課、最新學習紀錄和付款狀態，不用再四處尋找。";
+ $("#top-add").style.display=teacher&&!teamMode?"":"none";
  document.body?.classList?.toggle("login-required",authPhase!=="ready"||!activeUser);
  $("#connection-status").classList.toggle("live",authPhase==="ready"&&!!activeUser);
  $("#connection-status").innerHTML=authPhase==="checking"?"<i></i> 正在準備課程":
@@ -589,6 +654,7 @@ function render(){
  if(document.activeElement!==$("#profile-display-name"))$("#profile-display-name").value=state.mode==="live"&&identified?userDisplayName():"";
  $("#profile-display-form").classList.toggle("hidden",!activeUser);
  renderRoleSettings();
+ renderWorkspaceModeSettings();
  $("#settings-role-card").classList.toggle("hidden",!activeUser);
  v5PlanUI.render();
  v5TeamUI.render();
@@ -2586,6 +2652,7 @@ function clearUserSessionState(){
  state.actualHoursManual=false;
  state.lessonRatings={focus:null,mood:null};
  state.enabledRoles=["teacher"];
+ state.workspaceMode="personal";state.teamSection="settings";
  state.preferredLoginRole=null;
  state.role="teacher";
  state.calendarMode="month";
@@ -2732,6 +2799,7 @@ async function initializeLive(){
    }else state.enabledRoles=normalizedRoles(profile.enabled_roles);
    if(!state.enabledRoles.length)state.enabledRoles=["teacher"];
    state.role=resolveLoginRole({remote,cached,pending,isStudent,guardian,invited});
+   restoreWorkspaceMode();
    restoreCalendarMode();
    state.preferredLoginRole=state.role;
    localStorage.setItem(roleKey,state.role);
@@ -2744,6 +2812,8 @@ async function initializeLive(){
    }
    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    state.view=state.role==="student"?"student-today":"home";
+   // Preserve the original V4 first-login route; Team stays inside settings.
+   if(isTeamWorkspace())state.view="settings";
    await loadSharedCourseHistory();
    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    await loadTeacherPreferences();
@@ -2759,7 +2829,7 @@ async function initializeLive(){
   render();
   if(activeUser){
    void v4ConnectionUI.refresh();void v4ContactsUI.refresh();
-   if(state.role==="teacher")void v5PlanUI.refresh();
+   if(state.role==="teacher")refreshWorkspacePanels();
   }
   if(!activeUser)showModal("account-modal");
  }catch(err){
@@ -2883,6 +2953,10 @@ function bindEvents(){
   const trigger=ev.target.closest("#role-indicator");
   if(trigger){if(enabledRoles().length<2)return;const menu=$("#role-menu");const open=!menu.classList.toggle("hidden");trigger.setAttribute("aria-expanded",String(open));return}
   if(!ev.target.closest("#role-menu")){$("#role-menu").classList.add("hidden");$("#role-indicator").setAttribute("aria-expanded","false")}
+  const modeChoice=ev.target.closest("[data-workspace-mode]");
+  if(modeChoice){setWorkspaceMode(modeChoice.dataset.workspaceMode);return}
+  const teamNav=ev.target.closest("[data-team-section]");
+  if(teamNav){setTeamSection(teamNav.dataset.teamSection);return}
   const nav=ev.target.closest("[data-view]");if(nav){setView(nav.dataset.view);if(nav.dataset.date){state.selected=nav.dataset.date;state.month=parseDate(state.selected);render()}return}
   const close=ev.target.closest("[data-close]");if(close){closeModal(close.dataset.close);return}
   const recentToggle=ev.target.closest("[data-recent-changes-toggle]");
@@ -3053,8 +3127,8 @@ function bindEvents(){
  $("#workspace-create").onclick=()=>saveMyWorkspace(false);
  $("#workspace-rename").onclick=()=>saveMyWorkspace(true);
  $("#parent-teacher-select").onchange=()=>{state.parentTeacherFilter=$("#parent-teacher-select").value;render()};
- $("#profile-button").onclick=()=>activeUser?setView("settings"):showModal("account-modal");
- $("#account-action").onclick=()=>activeUser?setView("settings"):showModal("account-modal");
+ $("#profile-button").onclick=()=>activeUser?(isTeamWorkspace()?setTeamSection("settings"):setView("settings")):showModal("account-modal");
+ $("#account-action").onclick=()=>activeUser?(isTeamWorkspace()?setTeamSection("settings"):setView("settings")):showModal("account-modal");
  $("#google-login").onclick=googleLogin;
  $("#login-retry").onclick=initializeLive;
  $("#login-preview-dismiss").onclick=()=>{if(!previewBackendUnavailable())return;enterPreviewReadOnly();closeModal("account-modal")};

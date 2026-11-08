@@ -25,6 +25,10 @@
         <button class="nav-item nav-standard" data-view="billing"><span class="nav-icon">◈</span>收付款</button>
         <button class="nav-item nav-standard" data-view="students"><span class="nav-icon">♧</span>學生與家長</button>
         <button class="nav-item nav-standard" data-view="settings"><span class="nav-icon">⚙</span>設定</button>
+        <button class="nav-item nav-team" data-team-section="projects"><span class="nav-icon">♧</span>團隊與專案</button>
+        <button class="nav-item nav-team" data-team-section="learning"><span class="nav-icon">▦</span>學生與課表</button>
+        <button class="nav-item nav-team" data-team-section="billing"><span class="nav-icon">◈</span>Team 帳務</button>
+        <button class="nav-item nav-team" data-team-section="settings"><span class="nav-icon">⚙</span>設定與切換</button>
         <button class="nav-item nav-student" data-view="student-today"><span class="nav-icon">⌂</span>今天<span class="nav-active-dot"></span></button>
         <button class="nav-item nav-student" data-view="student-calendar"><span class="nav-icon">▦</span>課表</button>
         <button class="nav-item nav-student" data-view="student-learning"><span class="nav-icon">✎</span>學習紀錄</button>
@@ -145,9 +149,22 @@
           <article class="card v4-connection-card hidden" id="v4-account-contact-card"><div class="section-row"><div><h2>我的聯絡人</h2><p class="section-sub">先連結老師或家長，之後再決定是否共享學生課程。</p></div></div><div id="v4-account-contact-content" aria-live="polite"></div></article>
         </section>
         <section id="view-settings" class="page-view hidden">
-          <div class="section-row page-head"><div><p class="eyebrow">SETTINGS · 個人偏好</p><h2>設定</h2><p class="section-sub">帳號、家教空間及啟用的角色模式都放在這裡。</p></div></div>
+          <div class="section-row page-head"><div><p class="eyebrow" id="settings-page-eyebrow">SETTINGS · 個人偏好</p><h2 id="settings-page-title">設定</h2><p class="section-sub" id="settings-page-description">帳號、家教空間及啟用的角色模式都放在這裡。</p></div></div>
           <button type="button" class="secondary-button hidden" id="settings-back-student" data-view="student">← 返回我的學習</button>
           <div class="settings-grid">
+            <article class="card settings-card workspace-mode-card hidden" id="workspace-mode-card">
+              <h3>使用模式</h3>
+              <p class="section-sub">同一個老師帳號可使用個人家教和 Team 團隊；兩邊的學生、課程與帳務分開管理。此選擇不改變帳號權限。</p>
+              <div class="workspace-mode-options" role="group" aria-label="家教使用模式">
+                <button type="button" class="workspace-mode-choice" data-workspace-mode="personal" aria-pressed="true"><strong>個人家教</strong><small>原 V4 課表、學生、家長與收付款</small></button>
+                <button type="button" class="workspace-mode-choice" data-workspace-mode="team" aria-pressed="false"><strong>Team 團隊</strong><small>多老師、專案課表與團隊帳務</small></button>
+              </div>
+              <p class="helper-note" id="workspace-mode-message" aria-live="polite">預設使用個人家教模式。</p>
+            </article>
+            <article class="card settings-card team-workspace-intro" id="team-workspace-intro">
+              <h3>Team 工作空間</h3>
+              <p class="section-sub">Team 學生和課程不會覆蓋個人家教紀錄。只有被邀請、指派或具管理權的老師，才能存取對應專案與帳務。</p>
+            </article>
             <article class="card settings-card"><h3>個人資料</h3><p class="section-sub">名稱會顯示在目前的使用模式與課程介面。</p>
               <div class="settings-account-email" id="account-current">尚未登入</div>
               <form id="profile-display-form" class="profile-display-form">
@@ -408,6 +425,10 @@
       <button class="nav-standard" data-view="billing"><span>◈</span>帳務</button>
       <button class="nav-standard" data-view="students"><span>♧</span>學生</button>
       <button class="nav-standard" data-view="settings"><span>⚙</span>設定</button>
+      <button class="nav-team" data-team-section="projects"><span>♧</span>團隊</button>
+      <button class="nav-team" data-team-section="learning"><span>▦</span>課表</button>
+      <button class="nav-team" data-team-section="billing"><span>◈</span>帳務</button>
+      <button class="nav-team" data-team-section="settings"><span>⚙</span>設定</button>
       <button class="nav-student" data-view="student-today"><span>⌂</span>今天</button>
       <button class="nav-student" data-view="student-calendar"><span>▦</span>課表</button>
       <button class="nav-student" data-view="student-learning"><span>✎</span>學習</button>

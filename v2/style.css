@@ -957,3 +957,37 @@ body.preview-readonly .app-shell [aria-disabled="true"]{cursor:not-allowed}
  .v5-payment-note{grid-column:auto}
  .v5-payment-report-form button[type=submit]{width:100%}
 }
+
+/* V5 workspace mode: personal V4 remains the default. Team is teacher-only. */
+.nav-team{display:none!important}
+.teacher-team-workspace .side-nav .nav-standard,
+.teacher-team-workspace .mobile-nav .nav-standard{display:none!important}
+.teacher-team-workspace .side-nav .nav-team{display:flex!important}
+@media(max-width:900px){.teacher-team-workspace .mobile-nav .nav-team{display:flex!important}}
+.teacher-personal-workspace #v5-team-card,
+.teacher-personal-workspace #v5-learning-card,
+.teacher-personal-workspace #v5-billing-card,
+.teacher-personal-workspace #team-workspace-intro{display:none!important}
+#workspace-mode-card{grid-column:1/-1}
+.workspace-mode-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.workspace-mode-choice{display:grid;gap:8px;text-align:left;cursor:pointer;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--white);color:var(--ink)}
+.workspace-mode-choice[aria-pressed="true"]{border:2px solid var(--rose);background:var(--rose-soft)}
+.workspace-mode-choice strong{font-size:1rem}
+.workspace-mode-choice small{line-height:1.6;color:var(--muted)}
+@media(max-width:550px){.workspace-mode-options{grid-template-columns:1fr}}
+.teacher-team-workspace #view-settings #workspace-account,
+.teacher-team-workspace #view-settings #v5-plan-card{display:none!important}
+.teacher-team-workspace.team-section-projects #view-settings .settings-grid > :not(#v5-team-card):not(#team-workspace-intro){display:none!important}
+.teacher-team-workspace.team-section-learning #view-settings .settings-grid > :not(#v5-learning-card):not(#team-workspace-intro){display:none!important}
+.teacher-team-workspace.team-section-billing #view-settings .settings-grid > :not(#v5-billing-card):not(#team-workspace-intro){display:none!important}
+.teacher-team-workspace.team-section-settings #view-settings #v5-team-card,
+.teacher-team-workspace.team-section-settings #view-settings #v5-learning-card,
+.teacher-team-workspace.team-section-settings #view-settings #v5-billing-card,
+.teacher-team-workspace.team-section-settings #view-settings #team-workspace-intro{display:none!important}
+.teacher-team-workspace .nav-team[aria-current="page"]{font-weight:700}
+
+/* Keep Team-only help absent for parent/student and personal teachers. */
+.team-workspace-intro{display:none!important}
+.teacher-team-workspace.team-section-projects #team-workspace-intro,
+.teacher-team-workspace.team-section-learning #team-workspace-intro,
+.teacher-team-workspace.team-section-billing #team-workspace-intro{display:flex!important}
