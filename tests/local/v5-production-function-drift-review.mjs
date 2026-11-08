@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 
 const root=new URL('../../',import.meta.url);
 const baseline=JSON.parse(readFileSync(new URL(
@@ -25,13 +26,31 @@ assert.equal(current.source,'function_component_fingerprint');
 assert.ok(Array.isArray(current.functions),'Missing current component fingerprint');
 const right=new Map(current.functions.map(x=>[x.id,x]));
 const kinds=['body','mode','path','grants'];
+const grantTriads=new Map();
+for(const anon of [false,true])for(const authenticated of [false,true])
+ for(const service_role of [false,true]){
+  const text='['+[anon,authenticated,service_role].join(', ')+']';
+  grantTriads.set(createHash('md5').update(text).digest('hex'),
+   {anon,authenticated,service_role});
+ }
+function decodeGrants(h){
+ const flags=grantTriads.get(h);
+ assert.ok(flags,'Unknown PostgreSQL function grant fingerprint');
+ return flags;
+}
+
 const changed=[],missing=[],breakdown=Object.fromEntries(kinds.map(x=>[x,0]));
 for(const original of baseline.functions){
  const actual=right.get(original.id);
  if(!actual){missing.push(original.id);continue;}
  const causes=kinds.filter(kind=>actual[kind+'_h']!==original[kind+'_h']);
  for(const cause of causes)breakdown[cause]++;
- if(causes.length)changed.push({id:original.id,causes});
+ if(causes.length){
+  const item={id:original.id,causes};
+  if(causes.includes('grants'))item.execute_grants={
+   production:decodeGrants(original.grants_h),disposable:decodeGrants(actual.grants_h)};
+  changed.push(item);
+ }
 }
 const left=new Set(baseline.functions.map(x=>x.id));
 const added=current.functions.map(x=>x.id).filter(id=>!left.has(id));
