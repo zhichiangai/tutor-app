@@ -9,7 +9,7 @@ const sql=read('supabase/diagnostics/v5_production_a1_ten_migration_gate_readonl
 test('Ten-file read-only A1 metadata preflight matches the exact locked source versions',()=>{
  const versions=manifest.migration_files.map(x=>x.version);
  assert.equal(versions.length,10);
- const block=sql.match(/v5\(version\)\s+AS\s*\(\s*VALUES([\s\S]*?)\)/i);
+ const block=sql.match(/v5\(version\)\s+AS\s*\(\s*VALUES([\s\S]*?)\n\), v4 AS \(/i);
  assert.ok(block,'Missing v5 version list');
  const rows=Array.from(block[1].matchAll(/'(\d{14})'/g),x=>x[1]);
  assert.deepEqual(rows,versions,'Preflight must cover all ten A1 migrations');
