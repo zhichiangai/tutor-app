@@ -1048,7 +1048,7 @@ test('V5.3 Team manager GUI confirms a lesson receivable; regular teachers canno
    environment:'local',isolated:true,projectRef:'local',url,publishableKey:key
   };
  },{url:f.apiUrl,key:f.anonKey});
- const login=async(role)=>{
+ const login=async(role,section='billing')=>{
   const actor=f.actors[role];
   await page.goto('/v2/index.html');
   await page.waitForFunction(()=>!!window.supabase?.createClient,{timeout:20_000});
@@ -1062,7 +1062,7 @@ test('V5.3 Team manager GUI confirms a lesson receivable; regular teachers canno
   },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
   await page.reload();
   await expect(page.locator('body')).not.toHaveClass(/login-required/);
-  await openTeamSection(page,'billing');
+  await openTeamSection(page,section);
  };
  await login('parent');
  await expect(page.locator('#v5-billing-card')).toBeVisible();
@@ -1083,7 +1083,7 @@ test('V5.3 Team manager GUI confirms a lesson receivable; regular teachers canno
  await expect(page.locator('body')).toHaveClass(/login-required/);
  await expect(page.locator('#v5-billing-card')).toBeHidden();
  await expect(page.locator('#v5-billing-confirmed')).toBeEmpty();
- await login('teacher');
+ await login('teacher','learning');
  await expect(page.locator('#v5-learning-card')).toBeVisible();
  await expect(page.locator('#v5-billing-card')).toBeHidden();
  await signOutFromTeam(page);
