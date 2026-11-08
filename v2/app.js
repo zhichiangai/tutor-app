@@ -2616,7 +2616,7 @@ function forgetCachedAuth(){
  if(ref)try{localStorage.removeItem?.("sb-"+ref+"-auth-token")}catch{}
 }
 function scrubOAuthCallback(){
- const loc=window.location;if(!loc||!window.history?.replaceState)return;
+ const loc=typeof window==='undefined'?null:window.location;if(!loc||!window.history?.replaceState)return;
  const p=new URLSearchParams(loc.search||"");let changed=false;
  for(const k of ["code","access_token","refresh_token","token_type","expires_in",
   "expires_at","provider_token","provider_refresh_token"]){
@@ -2959,7 +2959,7 @@ async function signOut(){
    toast("此裝置已清除登入狀態，請重新使用 Google 登入");
   }else{
    console.warn("Google 遠端登出未完成",err);
-   toast("此裝置已鎖定私人資料，但遠端登出尚未確認；請稍後重新登入",8000);
+   toast("此裝置已鎖定私人資料，但遠端登出未完成確認；請稍後重新登入",8000);
   }
  }finally{
   forgetCachedAuth();signOutRequested=false;
