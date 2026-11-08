@@ -9,6 +9,8 @@ test('Production document title is version-neutral across releases',()=>{
  const title=html.split('<title>')[1]?.split('</title>')[0];
  assert.equal(title,'好好上課 · 家教課程管理');
  assert.ok(!title.includes('V4.0.0-dev.2'));
+ assert.ok(html.includes('服務條款</a> · Made with care.'));
+ assert.ok(!html.includes('V4 Beta · Made with care.'));
 });
 
 test('Signed-in teacher retains the personal / Team workspace selector in Settings',()=>{

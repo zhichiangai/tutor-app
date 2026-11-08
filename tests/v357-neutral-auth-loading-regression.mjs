@@ -48,9 +48,9 @@ function harness(){
   );
  return {api,el};
 }
-test("page title and footer both show V4.0.0-dev.2",()=>{
- assert.match(html,/<title>好好上課 · V4\.0\.0-dev\.2 家教課程管理<\/title>/);
- assert.match(html,/V4 Beta · Made with care/);
+test("page title and footer no longer advertise an old V4 dev version",()=>{
+ assert.ok(html.includes('<title>好好上課 · 家教課程管理</title>'));
+ assert.ok(html.includes('服務條款</a> · Made with care.'));
  assert.doesNotMatch(html,/V3\.5\.5 家教課程管理/);
 });
 test("checking session hides the stale student role, including accessible labels",()=>{
