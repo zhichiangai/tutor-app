@@ -174,11 +174,15 @@ test('missing V5 RPC still shows read-only Free/Plus/Team cards to signed-in tea
   window.V4_LOCAL_BACKEND={environment:'local',isolated:true,projectRef:'local',
    url,publishableKey:key};
  },{url:f.apiUrl,key:f.anonKey});
- await page.route('**/rest/v1/rpc/v5_my_plan',route=>route.fulfill({
-  status:404,contentType:'application/json',
-  body:JSON.stringify({code:'PGRST202',
-   message:'Could not find the function public.v5_my_plan'})
- }));
+ await page.route('**/rest/v1/rpc/v5_my_plan',route=>{
+  if(route.request().method()==='OPTIONS')return route.continue();
+  return route.fulfill({
+   status:404,contentType:'application/json',
+   headers:{'access-control-allow-origin':'*'},
+   body:JSON.stringify({code:'PGRST202',
+    message:'Could not find the function public.v5_my_plan'})
+  });
+ });
  await page.goto('/v2/index.html');
  await page.waitForFunction(()=>!!window.supabase?.createClient,{timeout:20_000});
  await page.evaluate(async ({url,key,email,password})=>{
