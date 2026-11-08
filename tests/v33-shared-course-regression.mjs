@@ -11,7 +11,7 @@ const libs={
  ...moduleFns("../v2/lesson-actual.js",["durationHours","actualDefaults","validateActual","isPaymentLocked"])
 };
 const source=read("../v2/app.js").replace(/^import .* from "\.\/[^"]+";/gm,"").replace(/\nmain\(\);\s*$/,"");
-function harness(){
+function harness({onConfirm=()=>true}={}){
  const nodes=new Map(),store=new Map(),shown=[];
  const node=(id)=>{
   if(!nodes.has(id))nodes.set(id,{
@@ -29,7 +29,7 @@ function harness(){
  const app=new Function("document","localStorage","crypto","confirm","console","setTimeout","FormData","window",...Object.keys(libs),
   source+"\nreturn {state,renderSharedPlanner,sharedCourseStudents,sharedCourseLessons,openSharedCourseForm,submitSharedCourse,"+
   "cancelSharedCourse,setUser(v){activeUser=v},setClient(v){client=v}}")(
-  document,localStorage,{randomUUID:()=> "test-id"},()=>true,console,()=>0,FormData,{},...Object.values(libs));
+  document,localStorage,{randomUUID:()=> "test-id"},onConfirm,console,()=>0,FormData,{},...Object.values(libs));
  return {app,node,shown};
 }
 test("parent and student have accessible shared planner, single and recurring course actions",()=>{
@@ -94,6 +94,74 @@ test("shared course submit invokes authenticated RPC without owner or hourly rat
  assert.ok(!("hourly_rate" in calls[0].args.p_payload));
  assert.ok(!("owner_id" in calls[0].args.p_payload));
 });
+test("shared planner and edit guidance hide finance jargon only for student",()=>{
+ const lesson={
+  id:"synthetic-lesson",student_id:"mine",lesson_date:"2026-11-20",
+  subject:"數學",start_time:"18:00",end_time:"19:00",type:"planned",
+  updated_at:"2026-11-08T12:00:00+00:00"
+ };
+ for(const role of ["student","parent"]){
+  const {app,node}=harness();
+  app.state.mode="live";app.state.role=role;app.state.month=new Date(2026,10,1);
+  app.setUser({id:role+"-user",email:role+"@test.example"});
+  if(role==="student"){
+   app.state.studentPortal={
+    students:[{id:"mine",name:"模擬學生",teacher_id:"teacher-user",subject:"數學"}],
+    lessons:[lesson],schedules:[],exceptions:[]
+   };
+  }else{
+   app.state.students=[{id:"mine",teacher_id:"teacher-user",name:"模擬學生",subject:"數學"}];
+   app.state.guardians=[{student_id:"mine",teacher_id:"teacher-user",guardian_id:"parent-user"}];
+   app.state.lessons=[lesson];
+   app.state.schedules=[];
+   app.state.exceptions=[];
+  }
+  app.renderSharedPlanner();
+  const planner=node(role==="student"?"#shared-student-content":"#shared-parent-content").innerHTML;
+  app.openSharedCourseForm("new-lesson");
+  const editor=node("#shared-course-note").textContent;
+  if(role==="student"){
+   assert.match(planner,/這份課表與老師及家長同步/);
+   assert.match(editor,/如需更動科目，請先與老師確認/);
+   for(const forbidden of [/鐘點費/,/收款/,/已付款/,/計費/,/金額/,/帳務/]){
+    assert.doesNotMatch(planner,forbidden,"student planner displays finance copy");
+    assert.doesNotMatch(editor,forbidden,"student editor displays finance copy");
+   }
+  }else{
+   assert.match(planner,/鐘點費與收款仍由老師管理/);
+   assert.match(editor,/科目更動不會自動換算鐘點費/);
+  }
+ }
+});
+
+test("student cancellation confirmation contains only course guidance; parent text remains unchanged",async()=>{
+ const lesson={
+  id:"synthetic-lesson",student_id:"mine",lesson_date:"2026-11-20",
+  subject:"數學",start_time:"18:00",end_time:"19:00",type:"planned",
+  updated_at:"2026-11-08T12:00:00+00:00"
+ };
+ for(const role of ["student","parent"]){
+  const confirmations=[];
+  const {app}=harness({onConfirm:message=>{confirmations.push(message);return false;}});
+  app.state.mode="live";app.state.role=role;
+  app.setUser({id:role+"-user",email:role+"@test.example"});
+  if(role==="student"){
+   app.state.studentPortal={students:[{id:"mine",name:"模擬學生",subject:"數學"}],
+    lessons:[lesson],schedules:[],exceptions:[]};
+  }else{
+   app.state.students=[{id:"mine",teacher_id:"teacher-user",name:"模擬學生",subject:"數學"}];
+   app.state.guardians=[{student_id:"mine",teacher_id:"teacher-user",guardian_id:"parent-user"}];
+   app.state.lessons=[lesson];
+  }
+  await app.cancelSharedCourse("lesson","synthetic-lesson");
+  assert.equal(confirmations.length,1,"cancel must show one confirmation without writing");
+  if(role==="student"){
+   assert.match(confirmations[0],/原有課程紀錄會保留/);
+   assert.doesNotMatch(confirmations[0],/帳務|收款|金額|學費|鐘點費/);
+  }else assert.match(confirmations[0],/帳務歷史保留/);
+ }
+});
+
 test("server migration checks student/guardian linkage and financial locks",()=>{
  const sql=read("../supabase/migrations/20261021030000_v33_shared_course_management.sql");
  for(const fragment of ["public.student_guardians","public.student_links","v_st.teacher_id=v_actor",
