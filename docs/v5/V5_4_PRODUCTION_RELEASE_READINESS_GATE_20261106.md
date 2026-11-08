@@ -1,5 +1,7 @@
 # 好好上課 V5.1–V5.4｜正式發布安全門檻與 Migration 對照（唯讀，2026-11-06）
 
+> **2026-11-08 最新決策／歷史文件提示：** 使用者已確認現有課程、帳務及登入資料均為可捨棄測試資料，不再將舊測試資料備份與完整歷史還原列為 V5 開發必要門檻。本文若要求 G2 舊資料備份／還原，僅代表 **2026-11-06 的歷史發布假設**，不可視為現行決策。正式發行安全關卡改以 [V5.5 正式 Schema／RLS 唯讀審核](./V5_5_PRODUCTION_SCHEMA_RLS_RELEASE_AUDIT_20261108.md) 為準；但仍禁止未授權清空 Production、修改 Auth／RLS 或合併 Main。
+
 > **結論：NO-GO。** 本文件是從目前 GitHub、正式 Supabase metadata 與 Vercel 的唯讀查證整理，不是發布授權或正式資料備份。
 > 禁止對 Production 執行 `supabase db push`、`migration repair`、`db reset`、未審查的 SQL、Main 合併、部署或資料更正。V5 只能在隔離資料庫測試。
 > 動態證據檔：[`V5_PRODUCTION_MIGRATION_READONLY_SNAPSHOT_20261106.json`](./V5_PRODUCTION_MIGRATION_READONLY_SNAPSHOT_20261106.json)。每次發布前必須重新唯讀查證，不可當作未來永遠正確的狀態。
