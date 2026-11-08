@@ -1005,7 +1005,10 @@ function renderSharedPlanner(){
  esc(l.lesson_date)+' '+esc(timeLabel(l.start_time))+'–'+esc(timeLabel(l.end_time))+' · '+(l.type==="lesson"?"已完成":l.type==="leave"?"已取消":"已安排")+'</small></div>'+
  (l.type==="planned"?'<div class="shared-course-actions"><button type="button" class="mini-action" data-action="shared-edit-lesson" data-id="'+esc(l.id)+'">改期／修改</button>'+
  '<button type="button" class="mini-action" data-action="shared-cancel-lesson" data-id="'+esc(l.id)+'">取消這堂</button></div>':"")+'</div>').join("");
- $(dest).innerHTML=buttons+'<p class="helper-note">三方操作的是同一份課表，修改後直接生效。已完成與已付款課程受保護；鐘點費與收款仍由老師管理。</p>'+
+ const courseNotice=state.role==="student"?
+  "這份課表與老師及家長同步。修改後會更新安排，已完成課程的紀錄仍會保留。":
+  "三方操作的是同一份課表，修改後直接生效。已完成與已付款課程受保護；鐘點費與收款仍由老師管理。";
+ $(dest).innerHTML=buttons+'<p class="helper-note">'+courseNotice+'</p>'+
  '<h3 class="shared-course-heading">固定課表</h3>'+(ruleRows||'<p class="muted-small">目前沒有進行中的固定課表。</p>')+
  '<h3 class="shared-course-heading">本月及後續課程</h3>'+(lessonRows||'<p class="muted-small">目前沒有課程安排。</p>')+
  '';
@@ -1099,6 +1102,8 @@ function openSharedCourseForm(action,id=null){
  if(isSchedule)syncRecurringWeekdays("shared-course-date","shared-course-weekdays","shared-weekday-hint");
  $("#shared-course-note").textContent=virtual?
   "這是單堂補課：可以改到其他星期或雙週的非上課週，但新日期不可撞期；原固定課表及其他課程不會跟著更改。若要改整組規則，請回固定課表操作。":
+  state.role==="student"?
+  "這份課表與老師及家長同步。系統會檢查撞期及過期修改；如需更動科目，請先與老師確認。":
   "三方共用同一份課表，系統會阻止撞期及過期修改。科目更動不會自動換算鐘點費：計費仍按老師既有學生預設費率或原課程費率，特殊科目請老師確認。";
  showModal("shared-course-modal");
 }
@@ -1141,7 +1146,9 @@ async function cancelSharedCourse(kind,id){
    ? sharedCourseRules().find(r=>r.id===lesson.schedule_id)?.updated_at
    : lesson.updated_at):rule?.updated_at;
  if(!version){toast("課程版本資訊未更新，請重新整理後再操作");return}
- if(!confirm(lesson?"確定取消這一堂課？不會影響其他星期，帳務歷史保留。":
+ if(!confirm(lesson?(state.role==="student"?
+   "確定取消這一堂課？不會影響其他星期，原有課程紀錄會保留。":
+   "確定取消這一堂課？不會影響其他星期，帳務歷史保留。"):
    "確定停止此固定課表從 "+from+" 起的剩餘課程？過去及已完成課程不會受到影響。"))return;
  const payload=lesson?(lesson.virtual_occurrence
     ? {original_date:originalOccurrenceDate(lesson),expected_updated_at:version}
