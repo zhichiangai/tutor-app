@@ -28,7 +28,10 @@ test('release blocks blindly replaying incompatible historical migrations',()=>{
   '20261106043000_v5_4_team_advance_credit.sql',
   '20261106050000_v5_4_team_monthly_reconciliation.sql'
  ],'Review the separate V5 release map before accepting new V5 migrations');
- const v4Files=files.filter(p=>!v5Files.includes(p));
+ const futureAdditions=['20261108230000_v57_team_operations_overview.sql'];
+ assert.deepEqual(files.filter(p=>futureAdditions.includes(p)),futureAdditions,
+  'Additional V5.7 SQL must be separately reviewed, never replayed as V4');
+ const v4Files=files.filter(p=>!v5Files.includes(p)&&!futureAdditions.includes(p));
  assert.deepEqual(v4Files,[...replay,...pending].sort(),
   'Review and update V4 release map if historical migrations change');
  assert.equal(manifest.production_history.length,29,'Production baseline requires fresh read-only recheck');

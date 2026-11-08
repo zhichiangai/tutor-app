@@ -13,7 +13,7 @@ test('V5.7 reporting is add-only and cannot alter V4 personal records',()=>{
 
 test('V5.7 manager-only RPC checks fresh governance and Team entitlement',()=>{
  assert.match(src,/security definer set search_path=''/);
- assert.match(src,/v_actor uuid:=(select auth\.uid\(\))/);
+ assert.match(src,/v_actor uuid:=\(select auth\.uid\(\)\)/);
  assert.match(src,/g\.manager_user_id=v_actor/);
  assert.match(src,/e\.plan_code='team'/);
  assert.match(src,/revoke all on function public\.v5_team_operations_overview\(uuid,date\)/);
