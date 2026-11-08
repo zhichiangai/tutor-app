@@ -1277,6 +1277,13 @@ test('V5.3 manager GUI reports and partially allocates a payment without V4 effe
  await expect(page.locator('#v5-billing-card')).toBeVisible();
  await page.locator('#v5-billing-team-select').selectOption(team);
  await page.locator('#v5-billing-prev').click();
+ // V5.7 manager-only operational queue is derived from the same protected
+ // billing/payment RPCs; never treat the hint as proof of real bank settlement.
+ await expect(page.locator('#v5-operations-card')).toBeVisible();
+ await expect(page.locator('#v5-ops-pending-fees')).toHaveText(/^\d+$/);
+ await expect(page.locator('#v5-ops-pending-payments')).toHaveText(/^\d+$/);
+ await expect(page.locator('#v5-ops-unpaid-lessons')).toHaveText(/^\d+$/);
+ await expect(page.locator('#v5-ops-reconciliation')).toContainText('銀行入帳');
  await expect(page.locator('#v5-payment-student-select')).toHaveValue(student);
  await page.locator('#v5-payment-amount').fill('500');
  await page.locator('#v5-payment-received-date').fill('2026-10-25');
@@ -1322,6 +1329,8 @@ test('V5.3 manager GUI reports and partially allocates a payment without V4 effe
  await signOutFromTeam(page);
  await expect(page.locator('body')).toHaveClass(/login-required/);
  await expect(page.locator('#v5-billing-card')).toBeHidden();
+ await expect(page.locator('#v5-operations-card')).toBeHidden();
+ await expect(page.locator('#v5-ops-pending-fees')).toBeEmpty();
  await expect(page.locator('#v5-payment-confirmed-reports')).toBeEmpty();
  await expect(page.locator('#v5-payment-pending-reports')).toBeEmpty();
 });
