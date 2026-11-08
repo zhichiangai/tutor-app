@@ -10,6 +10,10 @@ on:
       - '.github/workflows/v4-browser-e2e.yml'
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -39,7 +43,7 @@ jobs:
           test ! -f supabase/.temp/project-ref
           test ! -f supabase/.branches/_current_branch
           test "$V4_E2E_LOCAL" = "1"
-      - name: Start local Supabase and replay V4 migrations only
+      - name: Start disposable Supabase and replay complete V4 plus V5 migrations
         run: |
           set -euo pipefail
           start_log="$RUNNER_TEMP/v4-browser-start.log"
@@ -81,6 +85,14 @@ jobs:
             exit 1
           fi
           echo "Disposable local Supabase ready; no hosted project touched"
+      - name: Assert clean V4 plus V5 schema, RLS, RPC grants and zero-row baseline
+        run: |
+          set -euo pipefail
+          test "$CI" = "true"
+          test "$V4_E2E_LOCAL" = "1"
+          # Hosted-link checks already ran before Supabase startup. The gate
+          # itself only uses docker exec against the disposable local container.
+          node tests/local/v5-clean-bootstrap-gate.mjs
       - name: Reproduce Production-like legacy payment SELECT only in disposable CI
         run: |
           set -euo pipefail
@@ -146,6 +158,27 @@ jobs:
             docker exec -i supabase_db_tutor_v4_isolated psql \
               -v ON_ERROR_STOP=1 -U postgres -d postgres < "$file" >/dev/null
           done
+      - name: Diagnose complete Production 43-history V4 catalog against clean V4+V5
+        run: |
+          set -euo pipefail
+          test "$CI" = "true"
+          test "$V4_E2E_LOCAL" = "1"
+          # Diagnostic-only: any drift is explicitly NO-GO in the JSON result.
+          # No linked/remote DB is accessed; only disposable Docker Postgres.
+          node tests/local/v5-production-schema-fingerprint-compare.mjs
+      - name: Explain V4 function body, security, search_path and grant drift (metadata-only)
+        run: |
+          set -euo pipefail
+          test "$CI" = "true"
+          test "$V4_E2E_LOCAL" = "1"
+          node tests/local/v5-production-function-drift-review.mjs
+      - name: Assert full V4 catalog parity after isolated service_role grant overlay
+        run: |
+          set -euo pipefail
+          test "$CI" = "true"
+          test "$V4_E2E_LOCAL" = "1"
+          test ! -f supabase/.temp/project-ref
+          node tests/local/v5-v4-service-role-grant-parity.mjs
       - name: Real GoTrue JWT and PostgREST QA classification, RLS and unlink acceptance
         env:
           V4_QA_LOCAL_JWT_TEST: '1'
@@ -162,6 +195,14 @@ jobs:
         env:
           V4_QA_PAYMENT_RPC_TEST: '1'
         run: node tests/local/v4-qa-payment-rpc-rest.mjs
+      - name: Compare current V4 schema shape against PII-free Production 43-migration snapshot
+        id: v5_catalog_probe
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          test "$V4_E2E_LOCAL" = "1"
+          test ! -f supabase/.temp/project-ref
+          node tests/local/v5-production-schema-catalog-compare.mjs
       - name: Install pinned Playwright and site Supabase bundle
         run: |
           npm install --no-save --no-package-lock \
@@ -171,6 +212,21 @@ jobs:
         run: node tests/e2e/seed-v4-local.mjs
       - name: Verify real Chromium teacher-parent-student flows
         run: npx playwright test --config tests/e2e/playwright.config.mjs
+      - name: Rehearse synthetic-only private selected-schema backup and restore
+        id: v5_restore_probe
+        continue-on-error: true
+        run: bash tests/local/v5-disposable-backup-restore-smoke.sh
+      - name: Enforce both independent V5 compatibility probes
+        if: always()
+        run: |
+          test "${{ steps.v5_catalog_probe.outcome }}" = "success" || {
+            echo "::error::V5 schema catalog mismatch or probe was skipped"
+            exit 1
+          }
+          test "${{ steps.v5_restore_probe.outcome }}" = "success" || {
+            echo "::error::Synthetic selected-schema restore failed or was skipped"
+            exit 1
+          }
       - name: Remove ephemeral auth fixture
         if: always()
         run: rm -f "$V4_E2E_FIXTURE_FILE"

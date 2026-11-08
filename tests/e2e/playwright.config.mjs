@@ -2,7 +2,7 @@ import {defineConfig} from '@playwright/test';
 
 export default defineConfig({
  testDir:'.',
- testMatch:['v4-browser.spec.mjs','v4-correction.spec.mjs'],
+ testMatch:['v4-browser.spec.mjs','v4-correction.spec.mjs','v5-plan.spec.mjs','v5-team.spec.mjs','v5-workspace-mode.spec.mjs'],
  timeout:60_000,
  expect:{timeout:25_000},
  fullyParallel:false,

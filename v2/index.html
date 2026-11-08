@@ -25,6 +25,10 @@
         <button class="nav-item nav-standard" data-view="billing"><span class="nav-icon">◈</span>收付款</button>
         <button class="nav-item nav-standard" data-view="students"><span class="nav-icon">♧</span>學生與家長</button>
         <button class="nav-item nav-standard" data-view="settings"><span class="nav-icon">⚙</span>設定</button>
+        <button class="nav-item nav-team" data-team-section="projects"><span class="nav-icon">♧</span>團隊與專案</button>
+        <button class="nav-item nav-team" data-team-section="learning"><span class="nav-icon">▦</span>學生與課表</button>
+        <button class="nav-item nav-team" data-team-section="billing"><span class="nav-icon">◈</span>Team 帳務</button>
+        <button class="nav-item nav-team" data-team-section="settings"><span class="nav-icon">⚙</span>設定與切換</button>
         <button class="nav-item nav-student" data-view="student-today"><span class="nav-icon">⌂</span>今天<span class="nav-active-dot"></span></button>
         <button class="nav-item nav-student" data-view="student-calendar"><span class="nav-icon">▦</span>課表</button>
         <button class="nav-item nav-student" data-view="student-learning"><span class="nav-icon">✎</span>學習紀錄</button>
@@ -145,9 +149,22 @@
           <article class="card v4-connection-card hidden" id="v4-account-contact-card"><div class="section-row"><div><h2>我的聯絡人</h2><p class="section-sub">先連結老師或家長，之後再決定是否共享學生課程。</p></div></div><div id="v4-account-contact-content" aria-live="polite"></div></article>
         </section>
         <section id="view-settings" class="page-view hidden">
-          <div class="section-row page-head"><div><p class="eyebrow">SETTINGS · 個人偏好</p><h2>設定</h2><p class="section-sub">帳號、家教空間及啟用的角色模式都放在這裡。</p></div></div>
+          <div class="section-row page-head"><div><p class="eyebrow" id="settings-page-eyebrow">SETTINGS · 個人偏好</p><h2 id="settings-page-title">設定</h2><p class="section-sub" id="settings-page-description">帳號、家教空間及啟用的角色模式都放在這裡。</p></div></div>
           <button type="button" class="secondary-button hidden" id="settings-back-student" data-view="student">← 返回我的學習</button>
           <div class="settings-grid">
+            <article class="card settings-card workspace-mode-card hidden" id="workspace-mode-card">
+              <h3>使用模式</h3>
+              <p class="section-sub">同一個老師帳號可使用個人家教和 Team 團隊；兩邊的學生、課程與帳務分開管理。此選擇不改變帳號權限。</p>
+              <div class="workspace-mode-options" role="group" aria-label="家教使用模式">
+                <button type="button" class="workspace-mode-choice" data-workspace-mode="personal" aria-pressed="true"><strong>個人家教</strong><small>原 V4 課表、學生、家長與收付款</small></button>
+                <button type="button" class="workspace-mode-choice" data-workspace-mode="team" aria-pressed="false"><strong>Team 團隊</strong><small>多老師、專案課表與團隊帳務</small></button>
+              </div>
+              <p class="helper-note" id="workspace-mode-message" aria-live="polite">預設使用個人家教模式。</p>
+            </article>
+            <article class="card settings-card team-workspace-intro" id="team-workspace-intro">
+              <h3>Team 工作空間</h3>
+              <p class="section-sub">Team 學生和課程不會覆蓋個人家教紀錄。只有被邀請、指派或具管理權的老師，才能存取對應專案與帳務。</p>
+            </article>
             <article class="card settings-card"><h3>個人資料</h3><p class="section-sub">名稱會顯示在目前的使用模式與課程介面。</p>
               <div class="settings-account-email" id="account-current">尚未登入</div>
               <form id="profile-display-form" class="profile-display-form">
@@ -174,6 +191,245 @@
               <button class="primary-button" type="button" id="workspace-create">建立家教空間</button>
               <button class="secondary-button hidden" type="button" id="workspace-rename">更新空間名稱</button>
             </article>
+            <article class="card settings-card v5-plan-card hidden" id="v5-plan-card" aria-labelledby="v5-plan-heading">
+              <h3 id="v5-plan-heading">會員方案與名額</h3>
+              <p class="section-sub">Free 開放使用；Pro 與 Team 目前僅提供方案介紹，不收取訂閱費用。</p>
+              <div id="v5-plan-content" aria-live="polite"></div>
+            </article>
+            <article class="card settings-card v5-plan-card hidden" id="v5-team-card" aria-labelledby="v5-team-heading">
+              <h3 id="v5-team-heading">Team 團隊與專案</h3>
+              <p class="section-sub">每位老師只會看到被指派的專案；加入 Team 不會自動開放其他老師的學費、學生與課程。</p>
+              <p id="v5-team-message" class="section-sub" role="status" aria-live="polite"></p>
+              <div class="v5-team-panel">
+                <h4>我的專案</h4><div id="v5-team-project-list"></div>
+                <h4>Team 邀請</h4><div id="v5-team-invite-list"></div>
+                <h4>管理權轉讓</h4>
+                <p class="helper-note">接任老師必須已加入 Team，且本人接受後才會正式移轉。轉讓後，原管理者可自行退出，個人資料保留。</p>
+                <div id="v5-team-transfer-list" aria-live="polite"></div>
+              </div>
+              <div id="v5-team-owner-controls" class="hidden">
+                <div class="v5-team-panel">
+                  <h4>管理的 Team</h4>
+                  <label>選擇管理中的團隊
+                    <select id="v5-team-manage-select"></select>
+                  </label>
+                </div>
+                <div class="v5-team-panel">
+                  <h4>建立專案</h4>
+                  <form id="v5-team-project-form">
+                    <label>專案名稱<input id="v5-team-project-name" type="text" required maxlength="80" placeholder="例如：數學教學專案"></label>
+                    <button class="secondary-button" type="submit">建立專案</button>
+                  </form>
+                </div>
+                <div class="v5-team-panel">
+                  <h4>邀請老師</h4>
+                  <form id="v5-team-invite-form">
+                    <label>老師的電子郵件<input id="v5-team-invite-email" type="email" required maxlength="254" placeholder="老師的登入 Email" autocomplete="off"></label>
+                    <button class="secondary-button" type="submit">送出 Team 邀請</button>
+                  </form>
+                  <p class="helper-note">對方需要登入並主動接受邀請，才會佔用老師席次。</p>
+                  <h4>現有老師</h4><div id="v5-team-members-list"></div>
+                </div>
+                <div class="v5-team-panel">
+                  <h4>指定專案老師</h4>
+                  <form id="v5-team-assign-form">
+                    <label>專案<select id="v5-team-project-select" required></select></label>
+                    <label>老師<select id="v5-team-teacher-select" required></select></label>
+                    <button class="secondary-button" id="v5-team-assign-submit" type="submit">指派老師</button>
+                  </form>
+                  <div id="v5-team-assignments"></div>
+                </div>
+                <div class="v5-team-panel">
+                  <h4>轉讓 Team 管理權</h4>
+                  <p class="helper-note">只有目前管理者可以提出。接任者接受前，管理權仍屬於原管理者。</p>
+                  <form id="v5-team-transfer-form">
+                    <label>接任老師<select id="v5-team-successor-select" required></select></label>
+                    <button class="secondary-button" id="v5-team-transfer-submit" type="submit">提出轉讓邀請</button>
+                  </form>
+                </div>
+              </div>
+            </article>
+            <article class="card settings-card v5-plan-card hidden" id="v5-learning-card" aria-labelledby="v5-learning-heading">
+              <div class="section-row">
+                <div>
+                  <h3 id="v5-learning-heading">Team 學生與跨老師課表</h3>
+                  <p class="section-sub">團隊專案的課程與學生獨立於個人家教空間。只有被指派的老師能看見相應內容。</p>
+                </div>
+              </div>
+              <p id="v5-learning-message" role="status" aria-live="polite" class="section-sub"></p>
+              <div class="v5-learning-controls">
+                <label>Team
+                  <select id="v5-learning-team-select" aria-label="選擇 Team"></select>
+                </label>
+                <label>專案
+                  <select id="v5-learning-project-select" aria-label="選擇 Team 專案"></select>
+                </label>
+              </div>
+              <p id="v5-learning-no-project" class="helper-note hidden">此 Team 尚未建立可用專案，請先到 Team 團隊與專案建立。</p>
+              <div class="v5-team-panel">
+                <h4>專案學生</h4>
+                <div id="v5-learning-students"></div>
+              </div>
+              <div class="v5-learning-management hidden" id="v5-learning-manager-controls">
+                <div class="v5-team-panel">
+                  <h4>新增 Team 學生</h4>
+                  <p class="helper-note">每位學生只計一次 Team 累計名額；加入多個專案不會重複計算。</p>
+                  <form id="v5-learning-student-form">
+                    <label>學生名稱
+                      <input id="v5-learning-student-name" maxlength="100" placeholder="例如：王同學" required>
+                    </label>
+                    <button class="secondary-button" type="submit">新增 Team 學生</button>
+                  </form>
+                </div>
+                <div class="v5-team-panel">
+                  <h4>學生加入此專案</h4>
+                  <form id="v5-learning-enroll-form">
+                    <label>未加入此專案的 Team 學生
+                      <select id="v5-learning-enroll-student" required></select>
+                    </label>
+                    <button id="v5-learning-enroll-submit" class="secondary-button" type="submit">加入專案</button>
+                  </form>
+                </div>
+              </div>
+              <div class="v5-team-panel">
+                <div class="v5-learning-calendar-head">
+                  <h4>跨老師課表</h4>
+                  <div class="v5-learning-month-controls">
+                    <button id="v5-learning-prev-month" type="button" class="secondary-button" aria-label="Team 上個月">上一月</button>
+                    <strong id="v5-learning-month-label"></strong>
+                    <button id="v5-learning-next-month" type="button" class="secondary-button" aria-label="Team 下個月">下一月</button>
+                  </div>
+                </div>
+                <p class="helper-note">僅顯示這個專案的課程。管理者可查看團隊老師排課，老師只能查看獲指派專案的課程；不顯示學費金額。</p>
+                <div id="v5-learning-calendar" class="v5-learning-calendar" aria-label="Team 月課表"></div>
+                <div id="v5-learning-lessons" class="v5-learning-lessons" aria-live="polite"></div>
+              </div>
+              <div class="v5-team-panel">
+                <h4>新增 Team 課程</h4>
+                <form id="v5-learning-lesson-form" class="v5-learning-lesson-form">
+                  <label>學生<select id="v5-learning-lesson-student" required></select></label>
+                  <label>授課老師<select id="v5-learning-lesson-teacher" required></select></label>
+                  <label>科目<input id="v5-learning-lesson-subject" maxlength="100" placeholder="例如：數學" required></label>
+                  <label>開始時間<input id="v5-learning-lesson-start" type="datetime-local" required></label>
+                  <label>結束時間<input id="v5-learning-lesson-end" type="datetime-local" required></label>
+                  <label class="v5-learning-notes-field">備註
+                    <textarea id="v5-learning-lesson-notes" maxlength="1000" rows="2" placeholder="本堂課需要注意的事（不含付款資訊）"></textarea>
+                  </label>
+                  <button id="v5-learning-lesson-submit" type="submit" class="secondary-button">建立 Team 課程</button>
+                </form>
+              </div>
+            </article>
+            <article class="card settings-card v5-plan-card hidden" id="v5-billing-card" aria-labelledby="v5-billing-title">
+              <h3 id="v5-billing-title">Team 應收費用（管理者）</h3>
+              <p class="section-sub">這裡是確認已完成課程的費用，不代表家長已付款。一般老師與學生不能查看金額。</p>
+              <p id="v5-billing-message" class="section-sub" role="status" aria-live="polite"></p>
+              <div class="v5-billing-controls">
+                <label>Team
+                  <select id="v5-billing-team-select" aria-label="選擇查看應收費用的 Team"></select>
+                </label>
+                <div class="v5-billing-month">
+                  <button type="button" id="v5-billing-prev" class="secondary-button" aria-label="上個月 Team 應收">上月</button>
+                  <strong id="v5-billing-month-label"></strong>
+                  <button type="button" id="v5-billing-next" class="secondary-button" aria-label="下個月 Team 應收">下月</button>
+                </div>
+              </div>
+              <div class="v5-team-panel">
+                <h4>本月份已確認應收</h4>
+                <div id="v5-billing-total" class="v5-billing-total" aria-live="polite"></div>
+                <div id="v5-billing-confirmed"></div>
+              </div>
+              <div class="v5-team-panel">
+                <h4>待確認費用的已完成課程</h4>
+                <p class="helper-note">請填每小時的新臺幣整數金額，系統會依實際課程分鐘數計算；確認後不得直接改寫，後續更正須有稽核紀錄。</p>
+                <div id="v5-billing-pending"></div>
+              </div>
+              <section class="v5-team-panel hidden" id="v5-operations-card" aria-labelledby="v5-operations-title">
+                <h4 id="v5-operations-title">Team 營運待辦（管理者唯讀）</h4>
+                <p class="helper-note">僅整理已取得管理者權限的當月資料；「未結清」不等於逾期，人工付款不等於銀行已核實入帳。</p>
+                <div class="v5-payment-totals">
+                  <span>待確認課程費用 <strong id="v5-ops-pending-fees"></strong></span>
+                  <span>待確認人工付款 <strong id="v5-ops-pending-payments"></strong></span>
+                  <span>尚未結清課程 <strong id="v5-ops-unpaid-lessons"></strong></span>
+                  <span>尚有未結清課程的學生 <strong id="v5-ops-unpaid-students"></strong></span>
+                </div>
+                <p id="v5-ops-reconciliation" class="section-sub" role="status" aria-live="polite"></p>
+                <h4>各專案與老師工作量（唯讀）</h4>
+                <p class="helper-note">專案/老師工作量僅依目前 Team 的授權資料顯示。已完成課程不等於已付款。</p>
+                <p id="v5-ops-report-message" class="section-sub" role="status" aria-live="polite"></p>
+                <div id="v5-ops-projects"></div>
+                <h4>老師工作量</h4>
+                <div id="v5-ops-teachers"></div>
+                <h4>近期帳務操作（最近 20 筆）</h4>
+                <div id="v5-ops-activity"></div>
+              </section>
+              <div class="v5-team-panel" id="v5-payment-panel">
+                <h4>Team 人工收款與部分付款分配</h4>
+                <p class="helper-note">僅供管理者人工登錄已核對的款項，不是銀行或金流平台付款驗證。同一筆款項可分配不同科目、不同課程，但必須是同 Team 同一位學生；超額付款於 V5.4 處理。</p>
+                <form id="v5-payment-report-form" class="v5-payment-report-form">
+                  <label>學生<select id="v5-payment-student-select" required></select></label>
+                  <label>登錄金額（新臺幣元）<input id="v5-payment-amount" type="number" min="0.01" max="10000000" step="0.01" inputmode="decimal" placeholder="例如：500" required></label>
+                  <label>款項日期<input id="v5-payment-received-date" type="date" required></label>
+                  <label>方式<select id="v5-payment-method">
+                    <option value="bank_transfer">銀行轉帳</option>
+                    <option value="cash">現金</option>
+                    <option value="other">其他</option>
+                  </select></label>
+                  <label class="v5-payment-note">備註（勿輸入完整帳號等敏感資料）
+                    <input id="v5-payment-note" maxlength="250" placeholder="例如：10 月課程部分付款">
+                  </label>
+                  <button class="secondary-button" type="submit" id="v5-payment-report-submit">登錄待分配付款</button>
+                </form>
+                <div class="v5-payment-totals">
+                  <span>本月已確認人工付款 <strong id="v5-payment-confirmed-total"></strong></span>
+                  <span>本月課程未結清（已扣預收） <strong id="v5-payment-outstanding-total"></strong></span>
+                  <span>本月確認付款內含預收 <strong id="v5-payment-advance-created-total"></strong></span>
+                  <span>本月課程已使用預收抵扣 <strong id="v5-payment-advance-applied-total"></strong></span>
+                  <span>Team 目前可用預收款（跨月） <strong id="v5-payment-advance-available-total"></strong></span>
+                </div>
+                <p class="helper-note">預收款是已確認付款中的未分配部分；抵扣只減少尚未結清金額，不代表再收到一次款項。這些數字由資料庫依現任管理者權限計算。</p>
+                <h4>待分配的款項</h4>
+                <div id="v5-payment-pending-reports" aria-live="polite"></div>
+                <h4>已確認的分配紀錄</h4>
+                <div id="v5-payment-confirmed-reports"></div>
+              </div>
+              <div class="v5-team-panel hidden" id="v5-advance-panel">
+                <h4>Team 預收款與管理者確認抵扣</h4>
+                <p class="helper-note">預收款須由現任 Team 管理者核對並確認；系統不會驗證銀行或金流交易。預收款與課程抵扣都只能歸屬同 Team 同學生。抵扣不會再次增加收款金額。</p>
+                <label>查看學生預收款
+                  <select id="v5-advance-student-select" aria-label="選擇查看預收款的 Team 學生"></select>
+                </label>
+                <p class="section-sub" id="v5-advance-message" role="status" aria-live="polite"></p>
+                <form id="v5-advance-report-form" class="v5-payment-report-form">
+                  <label>本次人工付款總額（新臺幣元）
+                    <input id="v5-advance-amount" type="number" step="0.01" min="0.01" max="10000000" inputmode="decimal" required placeholder="例如：1500">
+                  </label>
+                  <label>其中預收金額（新臺幣元）
+                    <input id="v5-advance-credit" type="number" step="0.01" min="0.01" max="10000000" inputmode="decimal" required placeholder="例如：500">
+                  </label>
+                  <label>款項日期
+                    <input id="v5-advance-received-date" type="date" required>
+                  </label>
+                  <label>付款方式
+                    <select id="v5-advance-method">
+                      <option value="bank_transfer">銀行轉帳（人工核對）</option>
+                      <option value="cash">現金（人工核對）</option>
+                      <option value="other">其他（人工核對）</option>
+                    </select>
+                  </label>
+                  <label>備註（不可填完整銀行帳號）
+                    <input id="v5-advance-note" maxlength="250" placeholder="例如：部分分配、其餘記為預收">
+                  </label>
+                  <button id="v5-advance-report-submit" class="secondary-button" type="submit">登錄待確認預收付款</button>
+                </form>
+                <h4>本月待確認的預收付款</h4>
+                <p class="helper-note">下一步須指定直接分配至哪些已確認課程；直接分配總額加預收金額必須等於本次付款總額，才可由管理者確認。</p>
+                <div id="v5-advance-pending-payments"></div>
+                <h4>學生預收款餘額與建議抵扣（跨月份）</h4>
+                <p class="helper-note">下方數值為資料庫即時計算的建議，可手動修改。只有點擊「確認抵扣」且驗證成功後才正式抵扣。</p>
+                <div id="v5-advance-available"></div>
+                <div id="v5-advance-credit-rows"></div>
+              </div>
+            </article>
             <article class="card settings-card"><h3>登入與安全</h3><p class="section-sub">使用 Google 管理登入，不會在網站儲存你的 Google 密碼。</p>
               <button class="secondary-button wide" id="sign-out" type="button">登出 Google 帳號</button>
             </article>
@@ -188,6 +444,10 @@
       <button class="nav-standard" data-view="billing"><span>◈</span>帳務</button>
       <button class="nav-standard" data-view="students"><span>♧</span>學生</button>
       <button class="nav-standard" data-view="settings"><span>⚙</span>設定</button>
+      <button class="nav-team" data-team-section="projects"><span>♧</span>團隊</button>
+      <button class="nav-team" data-team-section="learning"><span>▦</span>課表</button>
+      <button class="nav-team" data-team-section="billing"><span>◈</span>帳務</button>
+      <button class="nav-team" data-team-section="settings"><span>⚙</span>設定</button>
       <button class="nav-student" data-view="student-today"><span>⌂</span>今天</button>
       <button class="nav-student" data-view="student-calendar"><span>▦</span>課表</button>
       <button class="nav-student" data-view="student-learning"><span>✎</span>學習</button>

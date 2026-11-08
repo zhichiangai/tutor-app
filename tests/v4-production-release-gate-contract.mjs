@@ -14,7 +14,26 @@ test('release blocks blindly replaying incompatible historical migrations',()=>{
  const files=readdirSync(new URL('supabase/migrations/',root)).filter(p=>p.endsWith('.sql')).sort();
  const replay=manifest.local_replay_baseline_files;
  const pending=manifest.proposed_forward_files;
- assert.deepEqual(files,[...replay,...pending].sort(),'Review and update release map if migrations change');
+ // This file is a frozen V4 release snapshot. New V5 migrations have a
+ // separate release gate and must never be silently folded into V4 history.
+ const v5Files=files.filter(p=>/^202611[0-9]{8}_v5_/.test(p));
+ assert.deepEqual(v5Files,[
+  '20261104131300_v5_1_entitlements_student_seats.sql',
+  '20261105171000_v5_1_admin_qa_release.sql',
+  '20261105181500_v5_2_team_projects_invitations.sql',
+  '20261105192000_v5_2_team_governance_transfer.sql',
+  '20261105201500_v5_3_team_data_boundaries.sql',
+  '20261106031000_v5_3_team_billing_foundation.sql',
+  '20261106034000_v5_3_partial_payment_allocation.sql',
+  '20261106043000_v5_4_team_advance_credit.sql',
+  '20261106050000_v5_4_team_monthly_reconciliation.sql'
+ ],'Review the separate V5 release map before accepting new V5 migrations');
+ const futureAdditions=['20261108230000_v57_team_operations_overview.sql'];
+ assert.deepEqual(files.filter(p=>futureAdditions.includes(p)),futureAdditions,
+  'Additional V5.7 SQL must be separately reviewed, never replayed as V4');
+ const v4Files=files.filter(p=>!v5Files.includes(p)&&!futureAdditions.includes(p));
+ assert.deepEqual(v4Files,[...replay,...pending].sort(),
+  'Review and update V4 release map if historical migrations change');
  assert.equal(manifest.production_history.length,29,'Production baseline requires fresh read-only recheck');
  assert.equal(replay.length,28,'Recovered local replay is NOT one-to-one with Production');
  assert.equal(pending.length,9,'All V4 forward candidates require independent review');

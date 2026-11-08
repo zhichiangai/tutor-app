@@ -9,8 +9,14 @@ on:
       - 'supabase/candidates/*v4*qa*.sql'
       - 'tests/sql/v4_qa_*.sql'
       - 'tests/v4-qa-*.mjs'
+      - 'tests/v5-*.mjs'
+      - 'supabase/migrations/**'
       - '.github/workflows/v4-qa-isolated-postgres.yml'
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

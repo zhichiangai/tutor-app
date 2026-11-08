@@ -1,0 +1,3127 @@
+{
+  "source": "production_catalog_metadata_only",
+  "tables": [
+    {
+      "h": "d2c5e87be43d3d4f80d652d96cce78b5",
+      "id": "public.family_requests",
+      "rls": true
+    },
+    {
+      "h": "d2c5e87be43d3d4f80d652d96cce78b5",
+      "id": "public.guardian_invites",
+      "rls": true
+    },
+    {
+      "h": "e9ce4cfca4cbb0a33394becf937630b6",
+      "id": "public.lesson_records",
+      "rls": true
+    },
+    {
+      "h": "c7a0abdfeb2ef976af846298e50d505e",
+      "id": "public.payment_batch_correction_items",
+      "rls": true
+    },
+    {
+      "h": "c7a0abdfeb2ef976af846298e50d505e",
+      "id": "public.payment_batch_corrections",
+      "rls": true
+    },
+    {
+      "h": "c7a0abdfeb2ef976af846298e50d505e",
+      "id": "public.payment_batch_items",
+      "rls": true
+    },
+    {
+      "h": "c7a0abdfeb2ef976af846298e50d505e",
+      "id": "public.payment_batches",
+      "rls": true
+    },
+    {
+      "h": "7346486d5894d77ff2162877cc6bf5ae",
+      "id": "public.profiles",
+      "rls": true
+    },
+    {
+      "h": "e9ce4cfca4cbb0a33394becf937630b6",
+      "id": "public.recurring_schedules",
+      "rls": true
+    },
+    {
+      "h": "e9ce4cfca4cbb0a33394becf937630b6",
+      "id": "public.schedule_exceptions",
+      "rls": true
+    },
+    {
+      "h": "e9ce4cfca4cbb0a33394becf937630b6",
+      "id": "public.student_guardians",
+      "rls": true
+    },
+    {
+      "h": "d2c5e87be43d3d4f80d652d96cce78b5",
+      "id": "public.student_invitations",
+      "rls": true
+    },
+    {
+      "h": "d2c5e87be43d3d4f80d652d96cce78b5",
+      "id": "public.student_invites",
+      "rls": true
+    },
+    {
+      "h": "54c465a76bff4f4ea923597f9ae301b9",
+      "id": "public.student_links",
+      "rls": true
+    },
+    {
+      "h": "e9ce4cfca4cbb0a33394becf937630b6",
+      "id": "public.students",
+      "rls": true
+    },
+    {
+      "h": "432569c3724dc542b29625cbf7adf6a7",
+      "id": "public.teacher_preferences",
+      "rls": true
+    },
+    {
+      "h": "ad30d1bcf19937cbe0b7cda5205a9f6a",
+      "id": "public.v4_account_contacts",
+      "rls": true
+    },
+    {
+      "h": "ad30d1bcf19937cbe0b7cda5205a9f6a",
+      "id": "public.v4_connection_requests",
+      "rls": true
+    },
+    {
+      "h": "ad30d1bcf19937cbe0b7cda5205a9f6a",
+      "id": "public.v4_contact_outgoing_invites",
+      "rls": true
+    },
+    {
+      "h": "432569c3724dc542b29625cbf7adf6a7",
+      "id": "public.v4_lesson_qa_marks",
+      "rls": true
+    },
+    {
+      "h": "432569c3724dc542b29625cbf7adf6a7",
+      "id": "public.v4_payment_batch_qa_marks",
+      "rls": true
+    },
+    {
+      "h": "c7a0abdfeb2ef976af846298e50d505e",
+      "id": "public.workspace_members",
+      "rls": true
+    },
+    {
+      "h": "7346486d5894d77ff2162877cc6bf5ae",
+      "id": "public.workspaces",
+      "rls": true
+    },
+    {
+      "h": "1b5071e3632f2b9747c38eb4a73326fd",
+      "id": "tutor_private.legacy_receipt_reversal_audit",
+      "rls": false
+    },
+    {
+      "h": "1b5071e3632f2b9747c38eb4a73326fd",
+      "id": "tutor_private.lesson_feedback_audit",
+      "rls": false
+    },
+    {
+      "h": "1b5071e3632f2b9747c38eb4a73326fd",
+      "id": "tutor_private.payment_correction_status_authorizations",
+      "rls": false
+    },
+    {
+      "h": "1b5071e3632f2b9747c38eb4a73326fd",
+      "id": "tutor_private.qa_student_mark_audit",
+      "rls": false
+    },
+    {
+      "h": "1b5071e3632f2b9747c38eb4a73326fd",
+      "id": "tutor_private.shared_course_events",
+      "rls": false
+    },
+    {
+      "h": "ad30d1bcf19937cbe0b7cda5205a9f6a",
+      "id": "tutor_private.v4_email_outbox",
+      "rls": true
+    },
+    {
+      "h": "ad30d1bcf19937cbe0b7cda5205a9f6a",
+      "id": "tutor_private.v4_invitation_links",
+      "rls": true
+    },
+    {
+      "h": "ad30d1bcf19937cbe0b7cda5205a9f6a",
+      "id": "tutor_private.v4_lesson_qa_audit",
+      "rls": true
+    },
+    {
+      "h": "ad30d1bcf19937cbe0b7cda5205a9f6a",
+      "id": "tutor_private.v4_mail_settings",
+      "rls": true
+    },
+    {
+      "h": "ad30d1bcf19937cbe0b7cda5205a9f6a",
+      "id": "tutor_private.v4_payment_batch_qa_audit",
+      "rls": true
+    },
+    {
+      "h": "ad30d1bcf19937cbe0b7cda5205a9f6a",
+      "id": "tutor_private.v4_qa_receipt_reconciliation_authorizations",
+      "rls": true
+    },
+    {
+      "h": "ad30d1bcf19937cbe0b7cda5205a9f6a",
+      "id": "tutor_private.v4_rate_limits",
+      "rls": true
+    }
+  ],
+  "columns": [
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.family_requests.created_at"
+    },
+    {
+      "h": "13e9270fa022ac946152dc60a6dd657c",
+      "id": "public.family_requests.id"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "public.family_requests.kind"
+    },
+    {
+      "h": "ff704ef6f5c71d38b6bdc7e421d7ae9d",
+      "id": "public.family_requests.lesson_id"
+    },
+    {
+      "h": "29d3ec7fdc9d7a9460808367997fc928",
+      "id": "public.family_requests.note"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.family_requests.parent_id"
+    },
+    {
+      "h": "caa7919374f039aed435779a88819598",
+      "id": "public.family_requests.requested_actual_end_time"
+    },
+    {
+      "h": "7b03297e478d872e606078ebfe0d4cc0",
+      "id": "public.family_requests.requested_actual_hours"
+    },
+    {
+      "h": "caa7919374f039aed435779a88819598",
+      "id": "public.family_requests.requested_actual_start_time"
+    },
+    {
+      "h": "ac1b2dd841b7f3a82f4616ff34325fc2",
+      "id": "public.family_requests.reviewed_at"
+    },
+    {
+      "h": "ff704ef6f5c71d38b6bdc7e421d7ae9d",
+      "id": "public.family_requests.schedule_id"
+    },
+    {
+      "h": "38ef9244a3b89f5f7a45ba21ed794e43",
+      "id": "public.family_requests.scheduled_date"
+    },
+    {
+      "h": "3370b8ca7f9c498fbdf99b21ef27da63",
+      "id": "public.family_requests.status"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.family_requests.student_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.family_requests.teacher_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.family_requests.workspace_id"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.guardian_invites.created_at"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "public.guardian_invites.email"
+    },
+    {
+      "h": "13e9270fa022ac946152dc60a6dd657c",
+      "id": "public.guardian_invites.id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.guardian_invites.student_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.guardian_invites.teacher_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.guardian_invites.workspace_id"
+    },
+    {
+      "h": "caa7919374f039aed435779a88819598",
+      "id": "public.lesson_records.actual_end_time"
+    },
+    {
+      "h": "7b03297e478d872e606078ebfe0d4cc0",
+      "id": "public.lesson_records.actual_hours"
+    },
+    {
+      "h": "caa7919374f039aed435779a88819598",
+      "id": "public.lesson_records.actual_start_time"
+    },
+    {
+      "h": "60538968bf908008582d78a58a601b8e",
+      "id": "public.lesson_records.attitude_rating"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.lesson_records.created_at"
+    },
+    {
+      "h": "caa7919374f039aed435779a88819598",
+      "id": "public.lesson_records.end_time"
+    },
+    {
+      "h": "60538968bf908008582d78a58a601b8e",
+      "id": "public.lesson_records.focus_rating"
+    },
+    {
+      "h": "2f5725185aa8f8f55532994118abe041",
+      "id": "public.lesson_records.hourly_rate"
+    },
+    {
+      "h": "b92e6cc484a2139d63af0d3a2810e4c2",
+      "id": "public.lesson_records.hours"
+    },
+    {
+      "h": "13e9270fa022ac946152dc60a6dd657c",
+      "id": "public.lesson_records.id"
+    },
+    {
+      "h": "caa7919374f039aed435779a88819598",
+      "id": "public.lesson_records.leave_source"
+    },
+    {
+      "h": "caa7919374f039aed435779a88819598",
+      "id": "public.lesson_records.legacy_id"
+    },
+    {
+      "h": "caa7919374f039aed435779a88819598",
+      "id": "public.lesson_records.lesson_content"
+    },
+    {
+      "h": "a8705c31964b5b410d25adb91db22e0d",
+      "id": "public.lesson_records.lesson_date"
+    },
+    {
+      "h": "49cc4094cc4ed574256f8711a9fd7e20",
+      "id": "public.lesson_records.mood_rating"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.lesson_records.owner_id"
+    },
+    {
+      "h": "caa7919374f039aed435779a88819598",
+      "id": "public.lesson_records.parent_note"
+    },
+    {
+      "h": "38ef9244a3b89f5f7a45ba21ed794e43",
+      "id": "public.lesson_records.payment_date"
+    },
+    {
+      "h": "caa7919374f039aed435779a88819598",
+      "id": "public.lesson_records.payment_group_id"
+    },
+    {
+      "h": "38ef9244a3b89f5f7a45ba21ed794e43",
+      "id": "public.lesson_records.received_date"
+    },
+    {
+      "h": "caa7919374f039aed435779a88819598",
+      "id": "public.lesson_records.remarks"
+    },
+    {
+      "h": "ff704ef6f5c71d38b6bdc7e421d7ae9d",
+      "id": "public.lesson_records.schedule_id"
+    },
+    {
+      "h": "38ef9244a3b89f5f7a45ba21ed794e43",
+      "id": "public.lesson_records.scheduled_date"
+    },
+    {
+      "h": "ac1b2dd841b7f3a82f4616ff34325fc2",
+      "id": "public.lesson_records.source_updated_at"
+    },
+    {
+      "h": "caa7919374f039aed435779a88819598",
+      "id": "public.lesson_records.start_time"
+    },
+    {
+      "h": "a1fcdf3053a7c1b84acb99429328e67b",
+      "id": "public.lesson_records.status"
+    },
+    {
+      "h": "caa7919374f039aed435779a88819598",
+      "id": "public.lesson_records.student"
+    },
+    {
+      "h": "ff704ef6f5c71d38b6bdc7e421d7ae9d",
+      "id": "public.lesson_records.student_id"
+    },
+    {
+      "h": "caa7919374f039aed435779a88819598",
+      "id": "public.lesson_records.subject"
+    },
+    {
+      "h": "c3231ad0b403cd14a376ffe734ce5e51",
+      "id": "public.lesson_records.time_accuracy"
+    },
+    {
+      "h": "2f5725185aa8f8f55532994118abe041",
+      "id": "public.lesson_records.total_amount"
+    },
+    {
+      "h": "5fc14345064506421bc4c2e3e9c9db54",
+      "id": "public.lesson_records.type"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.lesson_records.updated_at"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.lesson_records.workspace_id"
+    },
+    {
+      "h": "c09e29055ad0c530862d78dfd5a8dd95",
+      "id": "public.payment_batch_correction_items.amount"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.payment_batch_correction_items.batch_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.payment_batch_correction_items.correction_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.payment_batch_correction_items.lesson_id"
+    },
+    {
+      "h": "c09e29055ad0c530862d78dfd5a8dd95",
+      "id": "public.payment_batch_corrections.amount"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.payment_batch_corrections.batch_id"
+    },
+    {
+      "h": "6a9358f71c42626a1b02a8d128a8dd0a",
+      "id": "public.payment_batch_corrections.created_at"
+    },
+    {
+      "h": "13e9270fa022ac946152dc60a6dd657c",
+      "id": "public.payment_batch_corrections.id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.payment_batch_corrections.idempotency_key"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "public.payment_batch_corrections.reason"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "public.payment_batch_corrections.request_hash"
+    },
+    {
+      "h": "c09e29055ad0c530862d78dfd5a8dd95",
+      "id": "public.payment_batch_items.allocated_amount"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.payment_batch_items.batch_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.payment_batch_items.lesson_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.payment_batch_items.workspace_id"
+    },
+    {
+      "h": "ac1b2dd841b7f3a82f4616ff34325fc2",
+      "id": "public.payment_batches.confirmed_at"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.payment_batches.created_at"
+    },
+    {
+      "h": "13e9270fa022ac946152dc60a6dd657c",
+      "id": "public.payment_batches.id"
+    },
+    {
+      "h": "29d3ec7fdc9d7a9460808367997fc928",
+      "id": "public.payment_batches.note"
+    },
+    {
+      "h": "c09e29055ad0c530862d78dfd5a8dd95",
+      "id": "public.payment_batches.paid_amount"
+    },
+    {
+      "h": "a8705c31964b5b410d25adb91db22e0d",
+      "id": "public.payment_batches.paid_on"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.payment_batches.parent_id"
+    },
+    {
+      "h": "a8705c31964b5b410d25adb91db22e0d",
+      "id": "public.payment_batches.period_end"
+    },
+    {
+      "h": "a8705c31964b5b410d25adb91db22e0d",
+      "id": "public.payment_batches.period_start"
+    },
+    {
+      "h": "38ef9244a3b89f5f7a45ba21ed794e43",
+      "id": "public.payment_batches.received_on"
+    },
+    {
+      "h": "3370b8ca7f9c498fbdf99b21ef27da63",
+      "id": "public.payment_batches.status"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.payment_batches.student_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.payment_batches.teacher_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.payment_batches.workspace_id"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.profiles.created_at"
+    },
+    {
+      "h": "09468ed9daf0533ff869c96b93026235",
+      "id": "public.profiles.display_name"
+    },
+    {
+      "h": "1ad20c93c46d7cea4b100135795dd5b3",
+      "id": "public.profiles.enabled_roles"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.profiles.id"
+    },
+    {
+      "h": "caa7919374f039aed435779a88819598",
+      "id": "public.profiles.last_role"
+    },
+    {
+      "h": "1e4d037aae3e5a706b4edd9c8e01de99",
+      "id": "public.profiles.roles_configured"
+    },
+    {
+      "h": "38ef9244a3b89f5f7a45ba21ed794e43",
+      "id": "public.recurring_schedules.cancelled_from"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.recurring_schedules.created_at"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "public.recurring_schedules.end_time"
+    },
+    {
+      "h": "38ef9244a3b89f5f7a45ba21ed794e43",
+      "id": "public.recurring_schedules.ends_on"
+    },
+    {
+      "h": "50a58b6212ce74992e01269aafbe8319",
+      "id": "public.recurring_schedules.every_weeks"
+    },
+    {
+      "h": "c09e29055ad0c530862d78dfd5a8dd95",
+      "id": "public.recurring_schedules.hourly_rate"
+    },
+    {
+      "h": "13e9270fa022ac946152dc60a6dd657c",
+      "id": "public.recurring_schedules.id"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "public.recurring_schedules.start_time"
+    },
+    {
+      "h": "a8705c31964b5b410d25adb91db22e0d",
+      "id": "public.recurring_schedules.starts_on"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.recurring_schedules.student_id"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "public.recurring_schedules.subject"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.recurring_schedules.teacher_id"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.recurring_schedules.updated_at"
+    },
+    {
+      "h": "0cda323c9677d3a6043aba928f07799f",
+      "id": "public.recurring_schedules.weekdays"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.recurring_schedules.workspace_id"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "public.schedule_exceptions.action"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.schedule_exceptions.created_at"
+    },
+    {
+      "h": "13e9270fa022ac946152dc60a6dd657c",
+      "id": "public.schedule_exceptions.id"
+    },
+    {
+      "h": "38ef9244a3b89f5f7a45ba21ed794e43",
+      "id": "public.schedule_exceptions.moved_to"
+    },
+    {
+      "h": "a8705c31964b5b410d25adb91db22e0d",
+      "id": "public.schedule_exceptions.original_date"
+    },
+    {
+      "h": "29d3ec7fdc9d7a9460808367997fc928",
+      "id": "public.schedule_exceptions.remarks"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.schedule_exceptions.schedule_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.schedule_exceptions.teacher_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.schedule_exceptions.workspace_id"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.student_guardians.created_at"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.student_guardians.guardian_id"
+    },
+    {
+      "h": "13e9270fa022ac946152dc60a6dd657c",
+      "id": "public.student_guardians.id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.student_guardians.invite_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.student_guardians.student_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.student_guardians.teacher_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.student_guardians.workspace_id"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.student_invitations.created_at"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "public.student_invitations.email"
+    },
+    {
+      "h": "13e9270fa022ac946152dc60a6dd657c",
+      "id": "public.student_invitations.id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.student_invitations.student_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.student_invitations.teacher_id"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.student_invites.created_at"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "public.student_invites.email"
+    },
+    {
+      "h": "13e9270fa022ac946152dc60a6dd657c",
+      "id": "public.student_invites.id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.student_invites.student_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.student_invites.teacher_id"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.student_links.created_at"
+    },
+    {
+      "h": "13e9270fa022ac946152dc60a6dd657c",
+      "id": "public.student_links.id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.student_links.invitation_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.student_links.student_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.student_links.teacher_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.student_links.user_id"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.students.created_at"
+    },
+    {
+      "h": "09984c426f01695b26e96589acd9f218",
+      "id": "public.students.hourly_rate"
+    },
+    {
+      "h": "13e9270fa022ac946152dc60a6dd657c",
+      "id": "public.students.id"
+    },
+    {
+      "h": "1e4d037aae3e5a706b4edd9c8e01de99",
+      "id": "public.students.is_qa"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "public.students.name"
+    },
+    {
+      "h": "433c9fb2b3599ed8fe9f1012a047fb85",
+      "id": "public.students.subject"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.students.teacher_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.students.workspace_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.teacher_preferences.owner_id"
+    },
+    {
+      "h": "7a3eec54b8b66bae79195b20eca91b05",
+      "id": "public.teacher_preferences.settings"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.teacher_preferences.updated_at"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.v4_account_contacts.created_at"
+    },
+    {
+      "h": "592ce4748b8aed30452ab6442d6db79e",
+      "id": "public.v4_account_contacts.expires_at"
+    },
+    {
+      "h": "13e9270fa022ac946152dc60a6dd657c",
+      "id": "public.v4_account_contacts.id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.v4_account_contacts.parent_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.v4_account_contacts.requested_by"
+    },
+    {
+      "h": "3370b8ca7f9c498fbdf99b21ef27da63",
+      "id": "public.v4_account_contacts.status"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.v4_account_contacts.teacher_id"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.v4_account_contacts.updated_at"
+    },
+    {
+      "h": "29d3ec7fdc9d7a9460808367997fc928",
+      "id": "public.v4_connection_requests.child_label"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.v4_connection_requests.created_at"
+    },
+    {
+      "h": "b7628fe1cf8c6923c6e9996d2d45aab0",
+      "id": "public.v4_connection_requests.expires_at"
+    },
+    {
+      "h": "13e9270fa022ac946152dc60a6dd657c",
+      "id": "public.v4_connection_requests.id"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "public.v4_connection_requests.origin"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.v4_connection_requests.parent_id"
+    },
+    {
+      "h": "05d893d82548a5b1280b88416b365ca0",
+      "id": "public.v4_connection_requests.status"
+    },
+    {
+      "h": "ff704ef6f5c71d38b6bdc7e421d7ae9d",
+      "id": "public.v4_connection_requests.student_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.v4_connection_requests.teacher_id"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.v4_connection_requests.updated_at"
+    },
+    {
+      "h": "ff704ef6f5c71d38b6bdc7e421d7ae9d",
+      "id": "public.v4_contact_outgoing_invites.contact_id"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.v4_contact_outgoing_invites.created_at"
+    },
+    {
+      "h": "592ce4748b8aed30452ab6442d6db79e",
+      "id": "public.v4_contact_outgoing_invites.expires_at"
+    },
+    {
+      "h": "13e9270fa022ac946152dc60a6dd657c",
+      "id": "public.v4_contact_outgoing_invites.id"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "public.v4_contact_outgoing_invites.my_role"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.v4_contact_outgoing_invites.requested_by"
+    },
+    {
+      "h": "3370b8ca7f9c498fbdf99b21ef27da63",
+      "id": "public.v4_contact_outgoing_invites.status"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "public.v4_contact_outgoing_invites.target_email"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.v4_contact_outgoing_invites.updated_at"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "public.v4_lesson_qa_marks.classification"
+    },
+    {
+      "h": "6a9358f71c42626a1b02a8d128a8dd0a",
+      "id": "public.v4_lesson_qa_marks.classified_at"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.v4_lesson_qa_marks.classified_by"
+    },
+    {
+      "h": "57ef470e7d998d9db0d7fe04bfa674be",
+      "id": "public.v4_lesson_qa_marks.is_qa"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.v4_lesson_qa_marks.lesson_id"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "public.v4_lesson_qa_marks.reason"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.v4_payment_batch_qa_marks.batch_id"
+    },
+    {
+      "h": "6a9358f71c42626a1b02a8d128a8dd0a",
+      "id": "public.v4_payment_batch_qa_marks.classified_at"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.v4_payment_batch_qa_marks.classified_by"
+    },
+    {
+      "h": "57ef470e7d998d9db0d7fe04bfa674be",
+      "id": "public.v4_payment_batch_qa_marks.is_qa"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "public.v4_payment_batch_qa_marks.reason"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.workspace_members.created_at"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "public.workspace_members.role"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.workspace_members.user_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.workspace_members.workspace_id"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "public.workspaces.created_at"
+    },
+    {
+      "h": "13e9270fa022ac946152dc60a6dd657c",
+      "id": "public.workspaces.id"
+    },
+    {
+      "h": "5cd175ad35f046e09a95b4ffdab8ca88",
+      "id": "public.workspaces.kind"
+    },
+    {
+      "h": "f625b799c9e8ad001d410b79cbcf5e3c",
+      "id": "public.workspaces.name"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "public.workspaces.owner_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.legacy_receipt_reversal_audit.actor_id"
+    },
+    {
+      "h": "1e4d037aae3e5a706b4edd9c8e01de99",
+      "id": "tutor_private.legacy_receipt_reversal_audit.applied"
+    },
+    {
+      "h": "780eaf2b033bd53dc8c98065585be6db",
+      "id": "tutor_private.legacy_receipt_reversal_audit.authorized_txid"
+    },
+    {
+      "h": "6a9358f71c42626a1b02a8d128a8dd0a",
+      "id": "tutor_private.legacy_receipt_reversal_audit.created_at"
+    },
+    {
+      "h": "166ae5d85a4993dda515d131e0deeb04",
+      "id": "tutor_private.legacy_receipt_reversal_audit.id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.legacy_receipt_reversal_audit.lesson_id"
+    },
+    {
+      "h": "37847266753db699592ce1b3367886bf",
+      "id": "tutor_private.legacy_receipt_reversal_audit.previous_actual_hours"
+    },
+    {
+      "h": "37847266753db699592ce1b3367886bf",
+      "id": "tutor_private.legacy_receipt_reversal_audit.previous_hourly_rate"
+    },
+    {
+      "h": "37847266753db699592ce1b3367886bf",
+      "id": "tutor_private.legacy_receipt_reversal_audit.previous_hours"
+    },
+    {
+      "h": "38ef9244a3b89f5f7a45ba21ed794e43",
+      "id": "tutor_private.legacy_receipt_reversal_audit.previous_payment_date"
+    },
+    {
+      "h": "38ef9244a3b89f5f7a45ba21ed794e43",
+      "id": "tutor_private.legacy_receipt_reversal_audit.previous_received_date"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "tutor_private.legacy_receipt_reversal_audit.previous_status"
+    },
+    {
+      "h": "37847266753db699592ce1b3367886bf",
+      "id": "tutor_private.legacy_receipt_reversal_audit.previous_total_amount"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "tutor_private.legacy_receipt_reversal_audit.reason"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.legacy_receipt_reversal_audit.teacher_id"
+    },
+    {
+      "h": "ff704ef6f5c71d38b6bdc7e421d7ae9d",
+      "id": "tutor_private.lesson_feedback_audit.actor_id"
+    },
+    {
+      "h": "6a9358f71c42626a1b02a8d128a8dd0a",
+      "id": "tutor_private.lesson_feedback_audit.edited_at"
+    },
+    {
+      "h": "426e4fa69647ac100e126457c9163fb5",
+      "id": "tutor_private.lesson_feedback_audit.id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.lesson_feedback_audit.lesson_id"
+    },
+    {
+      "h": "a4c66c3f6add4681a941d361da2add8d",
+      "id": "tutor_private.lesson_feedback_audit.previous"
+    },
+    {
+      "h": "a4c66c3f6add4681a941d361da2add8d",
+      "id": "tutor_private.lesson_feedback_audit.updated"
+    },
+    {
+      "h": "1e4d037aae3e5a706b4edd9c8e01de99",
+      "id": "tutor_private.payment_correction_status_authorizations.applied"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.payment_correction_status_authorizations.correction_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.payment_correction_status_authorizations.lesson_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.payment_correction_status_authorizations.teacher_id"
+    },
+    {
+      "h": "780eaf2b033bd53dc8c98065585be6db",
+      "id": "tutor_private.payment_correction_status_authorizations.txid"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.qa_student_mark_audit.actor_id"
+    },
+    {
+      "h": "6a9358f71c42626a1b02a8d128a8dd0a",
+      "id": "tutor_private.qa_student_mark_audit.changed_at"
+    },
+    {
+      "h": "0be539079cbc5c2e2e2dc0f270a1d6c4",
+      "id": "tutor_private.qa_student_mark_audit.id"
+    },
+    {
+      "h": "57ef470e7d998d9db0d7fe04bfa674be",
+      "id": "tutor_private.qa_student_mark_audit.new_is_qa"
+    },
+    {
+      "h": "57ef470e7d998d9db0d7fe04bfa674be",
+      "id": "tutor_private.qa_student_mark_audit.previous_is_qa"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.qa_student_mark_audit.student_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.qa_student_mark_audit.teacher_id"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "tutor_private.shared_course_events.action"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.shared_course_events.actor_id"
+    },
+    {
+      "h": "caa7919374f039aed435779a88819598",
+      "id": "tutor_private.shared_course_events.actor_role"
+    },
+    {
+      "h": "caa7919374f039aed435779a88819598",
+      "id": "tutor_private.shared_course_events.cancellation_reason"
+    },
+    {
+      "h": "caa7919374f039aed435779a88819598",
+      "id": "tutor_private.shared_course_events.cancellation_source"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "tutor_private.shared_course_events.created_at"
+    },
+    {
+      "h": "0be539079cbc5c2e2e2dc0f270a1d6c4",
+      "id": "tutor_private.shared_course_events.id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.shared_course_events.student_id"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "tutor_private.shared_course_events.summary"
+    },
+    {
+      "h": "ff704ef6f5c71d38b6bdc7e421d7ae9d",
+      "id": "tutor_private.shared_course_events.target_id"
+    },
+    {
+      "h": "41fa134da6c8606832eeb36db93ad197",
+      "id": "tutor_private.v4_email_outbox.attempts"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "tutor_private.v4_email_outbox.body"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "tutor_private.v4_email_outbox.created_at"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "tutor_private.v4_email_outbox.event_key"
+    },
+    {
+      "h": "13e9270fa022ac946152dc60a6dd657c",
+      "id": "tutor_private.v4_email_outbox.id"
+    },
+    {
+      "h": "caa7919374f039aed435779a88819598",
+      "id": "tutor_private.v4_email_outbox.last_error"
+    },
+    {
+      "h": "ff704ef6f5c71d38b6bdc7e421d7ae9d",
+      "id": "tutor_private.v4_email_outbox.lease_token"
+    },
+    {
+      "h": "ac1b2dd841b7f3a82f4616ff34325fc2",
+      "id": "tutor_private.v4_email_outbox.locked_until"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "tutor_private.v4_email_outbox.recipient"
+    },
+    {
+      "h": "ac1b2dd841b7f3a82f4616ff34325fc2",
+      "id": "tutor_private.v4_email_outbox.sent_at"
+    },
+    {
+      "h": "684b3eac6eb65c2ccd58c6e0ca3187ba",
+      "id": "tutor_private.v4_email_outbox.status"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "tutor_private.v4_email_outbox.subject"
+    },
+    {
+      "h": "c03738d3e8807f9628a4c0400456bfe8",
+      "id": "tutor_private.v4_invitation_links.created_at"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.v4_invitation_links.created_by"
+    },
+    {
+      "h": "f52278985f52156521c4c911eeacf376",
+      "id": "tutor_private.v4_invitation_links.expires_at"
+    },
+    {
+      "h": "13e9270fa022ac946152dc60a6dd657c",
+      "id": "tutor_private.v4_invitation_links.id"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "tutor_private.v4_invitation_links.side"
+    },
+    {
+      "h": "ff704ef6f5c71d38b6bdc7e421d7ae9d",
+      "id": "tutor_private.v4_invitation_links.student_id"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "tutor_private.v4_invitation_links.token_digest"
+    },
+    {
+      "h": "ac1b2dd841b7f3a82f4616ff34325fc2",
+      "id": "tutor_private.v4_invitation_links.used_at"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.v4_lesson_qa_audit.actor_id"
+    },
+    {
+      "h": "6a9358f71c42626a1b02a8d128a8dd0a",
+      "id": "tutor_private.v4_lesson_qa_audit.changed_at"
+    },
+    {
+      "h": "0be539079cbc5c2e2e2dc0f270a1d6c4",
+      "id": "tutor_private.v4_lesson_qa_audit.id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.v4_lesson_qa_audit.lesson_id"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "tutor_private.v4_lesson_qa_audit.new_classification"
+    },
+    {
+      "h": "57ef470e7d998d9db0d7fe04bfa674be",
+      "id": "tutor_private.v4_lesson_qa_audit.new_is_qa"
+    },
+    {
+      "h": "caa7919374f039aed435779a88819598",
+      "id": "tutor_private.v4_lesson_qa_audit.previous_classification"
+    },
+    {
+      "h": "c9778e2d9676fa4c0046ec559a8ce354",
+      "id": "tutor_private.v4_lesson_qa_audit.previous_is_qa"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "tutor_private.v4_lesson_qa_audit.reason"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "tutor_private.v4_mail_settings.app_url"
+    },
+    {
+      "h": "296a2f18c1157f060caa7d07118de2fe",
+      "id": "tutor_private.v4_mail_settings.singleton"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.v4_payment_batch_qa_audit.actor_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.v4_payment_batch_qa_audit.batch_id"
+    },
+    {
+      "h": "6a9358f71c42626a1b02a8d128a8dd0a",
+      "id": "tutor_private.v4_payment_batch_qa_audit.changed_at"
+    },
+    {
+      "h": "0be539079cbc5c2e2e2dc0f270a1d6c4",
+      "id": "tutor_private.v4_payment_batch_qa_audit.id"
+    },
+    {
+      "h": "57ef470e7d998d9db0d7fe04bfa674be",
+      "id": "tutor_private.v4_payment_batch_qa_audit.new_is_qa"
+    },
+    {
+      "h": "57ef470e7d998d9db0d7fe04bfa674be",
+      "id": "tutor_private.v4_payment_batch_qa_audit.previous_is_qa"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "tutor_private.v4_payment_batch_qa_audit.reason"
+    },
+    {
+      "h": "1e4d037aae3e5a706b4edd9c8e01de99",
+      "id": "tutor_private.v4_qa_receipt_reconciliation_authorizations.applied"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.v4_qa_receipt_reconciliation_authorizations.batch_id"
+    },
+    {
+      "h": "6a9358f71c42626a1b02a8d128a8dd0a",
+      "id": "tutor_private.v4_qa_receipt_reconciliation_authorizations.created_at"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.v4_qa_receipt_reconciliation_authorizations.lesson_id"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.v4_qa_receipt_reconciliation_authorizations.teacher_id"
+    },
+    {
+      "h": "780eaf2b033bd53dc8c98065585be6db",
+      "id": "tutor_private.v4_qa_receipt_reconciliation_authorizations.txid"
+    },
+    {
+      "h": "ca43beee530496c83c2aac227d9b2043",
+      "id": "tutor_private.v4_rate_limits.action"
+    },
+    {
+      "h": "40fd69c0a4372116295f69c0fde87035",
+      "id": "tutor_private.v4_rate_limits.actor_id"
+    },
+    {
+      "h": "ec2fd91fa0d326b2dafe82bcc92ba598",
+      "id": "tutor_private.v4_rate_limits.attempts"
+    },
+    {
+      "h": "f52278985f52156521c4c911eeacf376",
+      "id": "tutor_private.v4_rate_limits.bucket"
+    }
+  ],
+  "indexes": [
+    {
+      "h": "505fd106b87d91e4e379c38ef6c8d66b",
+      "id": "public.family_requests.family_requests_lesson_id_fk_idx"
+    },
+    {
+      "h": "d8d922dbefc3ca41484ad1f2f36ed12e",
+      "id": "public.family_requests.family_requests_lesson_workspace_idx"
+    },
+    {
+      "h": "39e494e1733928fe2ba737cb410eeb69",
+      "id": "public.family_requests.family_requests_one_pending"
+    },
+    {
+      "h": "dbd40175741f1539b117cfabc9a81d81",
+      "id": "public.family_requests.family_requests_parent_idx"
+    },
+    {
+      "h": "e5f2ae3bd40bd1d793cc841b688f8461",
+      "id": "public.family_requests.family_requests_pkey"
+    },
+    {
+      "h": "59c7557216066034af672ad42a51daa2",
+      "id": "public.family_requests.family_requests_schedule_id_fk_idx"
+    },
+    {
+      "h": "aad3afc6ad4699a87fae5ddf0a2e7aa5",
+      "id": "public.family_requests.family_requests_student_teacher_fk_idx"
+    },
+    {
+      "h": "88745324a49b5d4e08f8abc7fa356da8",
+      "id": "public.family_requests.family_requests_student_workspace_idx"
+    },
+    {
+      "h": "8c05fbbe11ee1e20507dd0595f014753",
+      "id": "public.family_requests.family_requests_teacher_idx"
+    },
+    {
+      "h": "6d38f70ab7884e25d0f0837e14a99e07",
+      "id": "public.family_requests.family_requests_workspace_idx"
+    },
+    {
+      "h": "497140967a6d00e6bf540d6e92411570",
+      "id": "public.family_requests.request_virtual_pending_unique"
+    },
+    {
+      "h": "7928c65a4d0580d99451f7fd57002e76",
+      "id": "public.guardian_invites.guardian_invites_email_idx"
+    },
+    {
+      "h": "f24e6f9ef88ecd92c76b2722e7d7f957",
+      "id": "public.guardian_invites.guardian_invites_pkey"
+    },
+    {
+      "h": "749e773c94fd9297c74a2be5698ee4ce",
+      "id": "public.guardian_invites.guardian_invites_student_id_email_key"
+    },
+    {
+      "h": "7de1b0296222dbc2df2a8fd17e6fbd50",
+      "id": "public.guardian_invites.guardian_invites_student_teacher_fk_idx"
+    },
+    {
+      "h": "d209213cd08cfe8312c1a7949e7fc627",
+      "id": "public.guardian_invites.guardian_invites_student_workspace_idx"
+    },
+    {
+      "h": "ed18c00f1e4aa3615aeeadcdbfd94abf",
+      "id": "public.guardian_invites.guardian_invites_teacher_fk_idx"
+    },
+    {
+      "h": "40789e8dc3005b4629e63196032a905c",
+      "id": "public.guardian_invites.guardian_invites_workspace_idx"
+    },
+    {
+      "h": "e2bb8d5a3074cbcf1492f86266eedf0d",
+      "id": "public.lesson_records.lesson_occurrence_unique"
+    },
+    {
+      "h": "20aa86fcf0fad335b63ab049eae41ba3",
+      "id": "public.lesson_records.lesson_records_owner_date_idx"
+    },
+    {
+      "h": "8c0e5fb981043cd5f4397fd72707cb61",
+      "id": "public.lesson_records.lesson_records_owner_legacy_unique"
+    },
+    {
+      "h": "7dff0f17c2e893686bfc9c9c78552433",
+      "id": "public.lesson_records.lesson_records_pkey"
+    },
+    {
+      "h": "5a979292eb018df79034612c8a704472",
+      "id": "public.lesson_records.lesson_records_student_owner_fk_idx"
+    },
+    {
+      "h": "1f096e2de6cee28d1814383ca8e2f331",
+      "id": "public.lesson_records.lesson_records_student_workspace_idx"
+    },
+    {
+      "h": "4f9b4affe9a932127ee8aba8655efe6d",
+      "id": "public.lesson_records.lesson_records_workspace_idx"
+    },
+    {
+      "h": "88c444884658331dfdb3b7998052f5f5",
+      "id": "public.lesson_records.lesson_student_idx"
+    },
+    {
+      "h": "2deaee10a85103d3fc3f2c0b37dc1b1a",
+      "id": "public.lesson_records.lessons_id_workspace_unique"
+    },
+    {
+      "h": "74b0c655ef7a968c02f93f65bf1855c1",
+      "id": "public.payment_batch_correction_items.payment_batch_correction_items_lesson_idx"
+    },
+    {
+      "h": "45d983def6da87469522f8aaa9c15db1",
+      "id": "public.payment_batch_correction_items.payment_batch_correction_items_pkey"
+    },
+    {
+      "h": "d3873a8fa2a622c3e7287ef42ce52d52",
+      "id": "public.payment_batch_corrections.payment_batch_corrections_batch_id_idempotency_key_key"
+    },
+    {
+      "h": "341f220c78fbb343e409ca06c9a42405",
+      "id": "public.payment_batch_corrections.payment_batch_corrections_batch_idx"
+    },
+    {
+      "h": "9db0d098dbbeaf28c680e50fba91601f",
+      "id": "public.payment_batch_corrections.payment_batch_corrections_id_batch_id_key"
+    },
+    {
+      "h": "68094e45c2ba307bded04e74beaae856",
+      "id": "public.payment_batch_corrections.payment_batch_corrections_pkey"
+    },
+    {
+      "h": "50b6a8c4514bc36140790a147b50621c",
+      "id": "public.payment_batch_items.payment_batch_items_batch_workspace_idx"
+    },
+    {
+      "h": "b0e4cd720136330645e3e6281cc4223c",
+      "id": "public.payment_batch_items.payment_batch_items_lesson_idx"
+    },
+    {
+      "h": "36f329ab6a8694b876c733d748de73cc",
+      "id": "public.payment_batch_items.payment_batch_items_lesson_workspace_idx"
+    },
+    {
+      "h": "c56235586274931377cebaf9089b23b8",
+      "id": "public.payment_batch_items.payment_batch_items_pkey"
+    },
+    {
+      "h": "206ed8fd9541e99b2d13a348db0f9472",
+      "id": "public.payment_batch_items.payment_batch_items_workspace_idx"
+    },
+    {
+      "h": "f18290780a99c701dce44967d5a80b47",
+      "id": "public.payment_batches.batches_id_workspace_unique"
+    },
+    {
+      "h": "eb5fba13f9c40d75dae57ffeaf25b775",
+      "id": "public.payment_batches.payment_batches_parent_idx"
+    },
+    {
+      "h": "be93c5dc7633debfdaa8881930c5041a",
+      "id": "public.payment_batches.payment_batches_pkey"
+    },
+    {
+      "h": "0188ecb3483426e9ed105bd0c2caceef",
+      "id": "public.payment_batches.payment_batches_student_teacher_fk_idx"
+    },
+    {
+      "h": "f549f339f49ad5eb2146df322f28668f",
+      "id": "public.payment_batches.payment_batches_student_workspace_idx"
+    },
+    {
+      "h": "3524120f6b1f5013eda34ecebbc9851b",
+      "id": "public.payment_batches.payment_batches_teacher_idx"
+    },
+    {
+      "h": "9d9623b3cd1fa80fb333d62961e406df",
+      "id": "public.payment_batches.payment_batches_workspace_idx"
+    },
+    {
+      "h": "b7142bbffc23de763c1bd9f00489ec05",
+      "id": "public.profiles.profiles_pkey"
+    },
+    {
+      "h": "fae6e667f07717367efb8f094a978545",
+      "id": "public.recurring_schedules.recurring_id_workspace_unique"
+    },
+    {
+      "h": "4848cce5030bc52c27f20e6f2f071ae9",
+      "id": "public.recurring_schedules.recurring_schedule_student"
+    },
+    {
+      "h": "ca25df72a5ffcba6e42ca8fe522bff8a",
+      "id": "public.recurring_schedules.recurring_schedules_id_teacher_id_key"
+    },
+    {
+      "h": "4e2d8c230030dc9950ff2c4994b0f55e",
+      "id": "public.recurring_schedules.recurring_schedules_pkey"
+    },
+    {
+      "h": "c918bdcc109458959ce9fc309b67d435",
+      "id": "public.recurring_schedules.recurring_schedules_student_teacher_fk_idx"
+    },
+    {
+      "h": "9cd21d70d3446c77c433501fb6ce4de6",
+      "id": "public.recurring_schedules.recurring_schedules_student_workspace_idx"
+    },
+    {
+      "h": "e3293c8ab74d7db8b638cd51c00a4801",
+      "id": "public.recurring_schedules.recurring_schedules_teacher_fk_idx"
+    },
+    {
+      "h": "9569474274564dce15a6905fee401ae5",
+      "id": "public.recurring_schedules.recurring_schedules_workspace_idx"
+    },
+    {
+      "h": "7e0325225b1327671a0db43997d779c5",
+      "id": "public.schedule_exceptions.schedule_exceptions_pkey"
+    },
+    {
+      "h": "a29612ced8f5cf3d126494e87a81c518",
+      "id": "public.schedule_exceptions.schedule_exceptions_schedule_id_original_date_key"
+    },
+    {
+      "h": "feb7db30b4200931f304c7d53b1aef7e",
+      "id": "public.schedule_exceptions.schedule_exceptions_schedule_teacher_fk_idx"
+    },
+    {
+      "h": "106f9506a8a7e27510b61e58e1895d31",
+      "id": "public.schedule_exceptions.schedule_exceptions_schedule_workspace_idx"
+    },
+    {
+      "h": "b19c7f5345fafeb2981e09190c355c80",
+      "id": "public.schedule_exceptions.schedule_exceptions_teacher"
+    },
+    {
+      "h": "7969cdbe34c7a64c58bb790c8e1f65c3",
+      "id": "public.schedule_exceptions.schedule_exceptions_workspace_idx"
+    },
+    {
+      "h": "971cadb09c014f16912a08d2fa654606",
+      "id": "public.student_guardians.guardian_student_idx"
+    },
+    {
+      "h": "cf0abe637a66c592b120280fde009323",
+      "id": "public.student_guardians.student_guardians_invite_fk_idx"
+    },
+    {
+      "h": "8e16093ca66dfee56350f9f44c9c1aab",
+      "id": "public.student_guardians.student_guardians_pkey"
+    },
+    {
+      "h": "8b5fdccf4d7dfa74640bc1d4e1f63f61",
+      "id": "public.student_guardians.student_guardians_student_id_guardian_id_key"
+    },
+    {
+      "h": "63918dbc9d274128808b3509c6367188",
+      "id": "public.student_guardians.student_guardians_student_teacher_fk_idx"
+    },
+    {
+      "h": "00a6f5d4d7870b3934a284e5d84d9921",
+      "id": "public.student_guardians.student_guardians_student_workspace_idx"
+    },
+    {
+      "h": "036d39eb79f3b66e988cec7a6c1eba88",
+      "id": "public.student_guardians.student_guardians_teacher_fk_idx"
+    },
+    {
+      "h": "e4e895d61303ecd13871caa2e27d0fd8",
+      "id": "public.student_guardians.student_guardians_workspace_idx"
+    },
+    {
+      "h": "00ba23562ac45fafe3d792183bcf7ef3",
+      "id": "public.student_invitations.student_invitations_pkey"
+    },
+    {
+      "h": "7368fadeed9cdac15e10424ba861bbde",
+      "id": "public.student_invitations.student_invitations_student_id_email_key"
+    },
+    {
+      "h": "8d83efe23e6f2c564b6af0470710fbfd",
+      "id": "public.student_invitations.student_invites_email_idx"
+    },
+    {
+      "h": "857f0d5c3779186ec01d8d24246481f5",
+      "id": "public.student_invites.student_invites_pkey"
+    },
+    {
+      "h": "72b079946d2d058575e1427ef15cacef",
+      "id": "public.student_invites.student_invites_student_id_email_key"
+    },
+    {
+      "h": "2d1a7ce7008abfd16868c90c7523786d",
+      "id": "public.student_links.student_links_invitation_id_key"
+    },
+    {
+      "h": "997286b922352dcdd204dc15de04c656",
+      "id": "public.student_links.student_links_pkey"
+    },
+    {
+      "h": "b8ede190396908d69803fc9c702cb5c4",
+      "id": "public.student_links.student_links_student_id_user_id_key"
+    },
+    {
+      "h": "049fa0a891efb360f9f87c0bbc6d0f5d",
+      "id": "public.student_links.student_links_user_idx"
+    },
+    {
+      "h": "f86426669a7cdf1298549c0e43f76f0c",
+      "id": "public.students.students_id_teacher_id_key"
+    },
+    {
+      "h": "cb06df5c312954a7f7f2592b03f6b784",
+      "id": "public.students.students_id_workspace_unique"
+    },
+    {
+      "h": "6b6fb718684f89f13adef0ddece3d2c0",
+      "id": "public.students.students_pkey"
+    },
+    {
+      "h": "880dab344c45c2ee011384bfe08ccd7e",
+      "id": "public.students.students_teacher_idx"
+    },
+    {
+      "h": "4ec69e846b5041be97aacb7f0f4c30af",
+      "id": "public.students.students_workspace_idx"
+    },
+    {
+      "h": "18816964a9d4835af73eee3a30b261ea",
+      "id": "public.teacher_preferences.teacher_preferences_pkey"
+    },
+    {
+      "h": "86863d6cd415d42512b09275fc0c50b0",
+      "id": "public.v4_account_contacts.v4_account_contacts_active_pair"
+    },
+    {
+      "h": "e187ea5f23cfa0887914de1005abc6d9",
+      "id": "public.v4_account_contacts.v4_account_contacts_parent_idx"
+    },
+    {
+      "h": "6a52cadda4a09bd416416cfdfe1e56e9",
+      "id": "public.v4_account_contacts.v4_account_contacts_pkey"
+    },
+    {
+      "h": "1f27b713ab3fdc80ae312a57accf1d8c",
+      "id": "public.v4_account_contacts.v4_account_contacts_teacher_idx"
+    },
+    {
+      "h": "2e7e5f2ff5726f02ba52113cefba8415",
+      "id": "public.v4_connection_requests.v4_connection_requests_pkey"
+    },
+    {
+      "h": "ea8b4734afc0b70e987674545cc17651",
+      "id": "public.v4_connection_requests.v4_requests_parent_pending_idx"
+    },
+    {
+      "h": "063ef9629b3c8be6b1a041e1941daa00",
+      "id": "public.v4_connection_requests.v4_requests_teacher_pending_idx"
+    },
+    {
+      "h": "c39a5cdc097355ec5ac679956128c99a",
+      "id": "public.v4_contact_outgoing_invites.v4_contact_outgoing_invites_pkey"
+    },
+    {
+      "h": "56f4822e4a545e313b0da0a3c983985d",
+      "id": "public.v4_contact_outgoing_invites.v4_outgoing_actor_idx"
+    },
+    {
+      "h": "b061692bedb93fea8e4fb8463157d7f7",
+      "id": "public.v4_contact_outgoing_invites.v4_outgoing_pending_unique"
+    },
+    {
+      "h": "23a1543ee557f2c26b97dc21f2490761",
+      "id": "public.v4_lesson_qa_marks.v4_lesson_qa_marks_pkey"
+    },
+    {
+      "h": "86ff4b4ae68630e119ddd6d9e3f47788",
+      "id": "public.v4_payment_batch_qa_marks.v4_payment_batch_qa_marks_pkey"
+    },
+    {
+      "h": "dbcdc214bf6b4524083634f3c51ab828",
+      "id": "public.workspace_members.workspace_members_pkey"
+    },
+    {
+      "h": "330728f817a7a2dfa531f936f91f711e",
+      "id": "public.workspace_members.workspace_members_user_idx"
+    },
+    {
+      "h": "9463f9ab2de11e748a10d8167178fa5c",
+      "id": "public.workspaces.workspaces_owner_id_key"
+    },
+    {
+      "h": "41f0e58f7ebe5dcbd33370575bd45eff",
+      "id": "public.workspaces.workspaces_pkey"
+    },
+    {
+      "h": "c9e75fc14625681b760a3e4f33e344aa",
+      "id": "tutor_private.legacy_receipt_reversal_audit.idx_legacy_receipt_reversal_audit_transaction"
+    },
+    {
+      "h": "7b7b387be11b8f79de365a96a4482742",
+      "id": "tutor_private.legacy_receipt_reversal_audit.legacy_receipt_reversal_audit_pkey"
+    },
+    {
+      "h": "56c2a8db24138b46abe646a64ed0cfe3",
+      "id": "tutor_private.lesson_feedback_audit.lesson_feedback_audit_pkey"
+    },
+    {
+      "h": "a077d0010ef1ebfc836768cb6e268cac",
+      "id": "tutor_private.payment_correction_status_authorizations.payment_correction_status_authorizations_pkey"
+    },
+    {
+      "h": "e0605ad8d49760b6afc3c8b251a22918",
+      "id": "tutor_private.qa_student_mark_audit.qa_student_mark_audit_pkey"
+    },
+    {
+      "h": "4ed60900219752df506beeb861db60ab",
+      "id": "tutor_private.shared_course_events.shared_course_events_pkey"
+    },
+    {
+      "h": "dcf6c784bf82b63f472b364c282a4a31",
+      "id": "tutor_private.shared_course_events.shared_course_events_student_idx"
+    },
+    {
+      "h": "9a0bd2011dad408068abf16c8e34cca5",
+      "id": "tutor_private.v4_email_outbox.v4_email_outbox_event_key_key"
+    },
+    {
+      "h": "bdfbd2d96f49c6089f1b1ab80eadb9fe",
+      "id": "tutor_private.v4_email_outbox.v4_email_outbox_pkey"
+    },
+    {
+      "h": "f11f7e7f33ac67faa2e829f69d887e35",
+      "id": "tutor_private.v4_invitation_links.v4_invitation_links_pkey"
+    },
+    {
+      "h": "b10a684441144005c491bbda5444a992",
+      "id": "tutor_private.v4_invitation_links.v4_invitation_links_token_digest_key"
+    },
+    {
+      "h": "0f58b64884481611061ec3704a3ee3e5",
+      "id": "tutor_private.v4_lesson_qa_audit.v4_lesson_qa_audit_lesson_time_idx"
+    },
+    {
+      "h": "02bca6b28859922e402a25516cb1cf6c",
+      "id": "tutor_private.v4_lesson_qa_audit.v4_lesson_qa_audit_pkey"
+    },
+    {
+      "h": "a1b6b71a941decddd12a8f66d3215dcd",
+      "id": "tutor_private.v4_mail_settings.v4_mail_settings_pkey"
+    },
+    {
+      "h": "0d5a4b641e6efaa35b3f534d8a0bdb15",
+      "id": "tutor_private.v4_payment_batch_qa_audit.v4_payment_batch_qa_audit_pkey"
+    },
+    {
+      "h": "b1cb6d9ecf01393e23f3ec54e47cb653",
+      "id": "tutor_private.v4_payment_batch_qa_audit.v4_qa_audit_batch_time_idx"
+    },
+    {
+      "h": "ac227a496f0643577f27c6b92852d1d2",
+      "id": "tutor_private.v4_qa_receipt_reconciliation_authorizations.v4_qa_receipt_reconciliation_authorizations_pkey"
+    },
+    {
+      "h": "2170f0a0f9d4e004e0678a8665553896",
+      "id": "tutor_private.v4_rate_limits.v4_rate_limits_pkey"
+    }
+  ],
+  "policies": [
+    {
+      "h": "fe28aad91c4712ae1f777048c5c66db8",
+      "id": "public.family_requests.requests_guardian_create"
+    },
+    {
+      "h": "3828d240732a696552797bbba0b576f2",
+      "id": "public.family_requests.requests_teacher_or_parent_view"
+    },
+    {
+      "h": "ed2e6fa10f16a9044e1a27f5f0271e09",
+      "id": "public.family_requests.requests_teacher_update"
+    },
+    {
+      "h": "d0a5067ad36025d581f02dc73b40dd55",
+      "id": "public.guardian_invites.invites_teacher_delete"
+    },
+    {
+      "h": "c7d9df14eb88cbf624eb2c436b8f62b0",
+      "id": "public.guardian_invites.invites_teacher_insert"
+    },
+    {
+      "h": "88404089f15cdacce53387d72a32b9a7",
+      "id": "public.guardian_invites.invites_teacher_or_email_read"
+    },
+    {
+      "h": "50c5ff625505afa07b2a447258d209e1",
+      "id": "public.guardian_invites.invites_teacher_update_pending"
+    },
+    {
+      "h": "ccc84d18cd11e4caeefdcb19e8068384",
+      "id": "public.lesson_records.lessons_owner_or_guardian_select"
+    },
+    {
+      "h": "34780540575f54de83872507c39aadf4",
+      "id": "public.lesson_records.owners_delete_lessons"
+    },
+    {
+      "h": "a122eb6ca190940431b78af739b4315f",
+      "id": "public.lesson_records.owners_insert_lessons"
+    },
+    {
+      "h": "4b0809a893e575538c566cf3d53ec026",
+      "id": "public.lesson_records.owners_update_lessons"
+    },
+    {
+      "h": "c94238a06687870c56125a511e767bf3",
+      "id": "public.payment_batch_correction_items.v4_correction_items_select"
+    },
+    {
+      "h": "5f6b93ab02e849946eec5e976b192e89",
+      "id": "public.payment_batch_corrections.v4_corrections_select"
+    },
+    {
+      "h": "a1025902962d74f964fdea415c70648b",
+      "id": "public.payment_batch_items.items_read_by_batch_participant"
+    },
+    {
+      "h": "2a2a48cd2db9c016e71573fc4684db54",
+      "id": "public.payment_batches.batch_read_by_teacher_or_parent"
+    },
+    {
+      "h": "4efbd932e59fb9c125a5f8f3ba119c70",
+      "id": "public.profiles.profile_self_create"
+    },
+    {
+      "h": "39b4bc6a6d2a320447f98fab76cb2fcc",
+      "id": "public.profiles.profile_self_read"
+    },
+    {
+      "h": "38632964d28a7ba24485f3c49e1d3b0c",
+      "id": "public.profiles.profile_self_update"
+    },
+    {
+      "h": "d0a5067ad36025d581f02dc73b40dd55",
+      "id": "public.recurring_schedules.recurring_teacher_delete"
+    },
+    {
+      "h": "66bc1a4ee16e4ff38d6f8a936c6e560d",
+      "id": "public.recurring_schedules.recurring_teacher_insert"
+    },
+    {
+      "h": "d6261d0d14a442044ef4627285c29510",
+      "id": "public.recurring_schedules.recurring_teacher_or_guardian_read"
+    },
+    {
+      "h": "ed2e6fa10f16a9044e1a27f5f0271e09",
+      "id": "public.recurring_schedules.recurring_teacher_update"
+    },
+    {
+      "h": "d0a5067ad36025d581f02dc73b40dd55",
+      "id": "public.schedule_exceptions.exception_teacher_delete"
+    },
+    {
+      "h": "66bc1a4ee16e4ff38d6f8a936c6e560d",
+      "id": "public.schedule_exceptions.exception_teacher_insert"
+    },
+    {
+      "h": "f416ef7e3d90b3dd43e7cdfa5f75fadd",
+      "id": "public.schedule_exceptions.exception_teacher_or_guardian_read"
+    },
+    {
+      "h": "ed2e6fa10f16a9044e1a27f5f0271e09",
+      "id": "public.schedule_exceptions.exception_teacher_update"
+    },
+    {
+      "h": "11dfae5b46015afe0560c5157d2fa96d",
+      "id": "public.student_guardians.links_guardian_claim_invite"
+    },
+    {
+      "h": "52d7779392fb4c7b2d04937d7db7d9e5",
+      "id": "public.student_guardians.links_teacher_or_guardian_read"
+    },
+    {
+      "h": "f320528bc19d0662ce1c39191f6d7ddd",
+      "id": "public.student_guardians.links_teacher_or_guardian_remove"
+    },
+    {
+      "h": "b58a3ded436532c12377bdc09c2a01ba",
+      "id": "public.student_invitations.student_invites_teacher_edit_pending"
+    },
+    {
+      "h": "87f34aad551de50521a0f4397792006d",
+      "id": "public.student_invitations.student_invites_teacher_insert"
+    },
+    {
+      "h": "dcf938343dba1beac3679fea82615fae",
+      "id": "public.student_invitations.student_invites_teacher_or_email_read"
+    },
+    {
+      "h": "d0a5067ad36025d581f02dc73b40dd55",
+      "id": "public.student_invitations.student_invites_teacher_revoke"
+    },
+    {
+      "h": "d0a5067ad36025d581f02dc73b40dd55",
+      "id": "public.student_invites.student_invites_teacher_delete"
+    },
+    {
+      "h": "261abc38e450cb21369098048d0bb493",
+      "id": "public.student_invites.student_invites_teacher_insert"
+    },
+    {
+      "h": "2ea0f4d148d9f99afccb18e9735d5529",
+      "id": "public.student_invites.student_invites_teacher_or_recipient_select"
+    },
+    {
+      "h": "e2e4e346f36db2f76ac40708bc2c77ba",
+      "id": "public.student_links.student_links_invitee_accept"
+    },
+    {
+      "h": "07f694e4e661d36d5cf456a09623d0a3",
+      "id": "public.student_links.student_links_teacher_or_self_delete"
+    },
+    {
+      "h": "85b4b9a6a7ffec32fcc78f9ffc4916dc",
+      "id": "public.student_links.student_links_teacher_or_self_select"
+    },
+    {
+      "h": "43497b5e313139e04c6cce99ad58dba9",
+      "id": "public.students.students_teacher_and_guardian_read"
+    },
+    {
+      "h": "d0a5067ad36025d581f02dc73b40dd55",
+      "id": "public.students.students_teacher_delete"
+    },
+    {
+      "h": "66bc1a4ee16e4ff38d6f8a936c6e560d",
+      "id": "public.students.students_teacher_insert"
+    },
+    {
+      "h": "ed2e6fa10f16a9044e1a27f5f0271e09",
+      "id": "public.students.students_teacher_update"
+    },
+    {
+      "h": "ae5edaf83348632ba36647bbe5420ebe",
+      "id": "public.teacher_preferences.teacher_preferences_own_insert"
+    },
+    {
+      "h": "ff3356868aadafe7ec181142fef885c9",
+      "id": "public.teacher_preferences.teacher_preferences_own_select"
+    },
+    {
+      "h": "57b9b286c695e3e58fa32ccb98cda809",
+      "id": "public.teacher_preferences.teacher_preferences_own_update"
+    },
+    {
+      "h": "8ee002f10bc237d5d3792018af4c88fe",
+      "id": "public.v4_lesson_qa_marks.v4_lesson_qa_teacher_insert"
+    },
+    {
+      "h": "56c106ef984e82c2606a3ab5daeec7aa",
+      "id": "public.v4_lesson_qa_marks.v4_lesson_qa_teacher_select"
+    },
+    {
+      "h": "8cc888372c16b2c89cb36900afe24b7b",
+      "id": "public.v4_lesson_qa_marks.v4_lesson_qa_teacher_update"
+    },
+    {
+      "h": "c2a89a1337b400d020bab170ac2d66f8",
+      "id": "public.v4_payment_batch_qa_marks.v4_qa_mark_teacher_insert"
+    },
+    {
+      "h": "f62be1781f301421a907313284bdedc6",
+      "id": "public.v4_payment_batch_qa_marks.v4_qa_mark_teacher_select"
+    },
+    {
+      "h": "1e6f46bb61381c5d85f2cf17a13f00bc",
+      "id": "public.v4_payment_batch_qa_marks.v4_qa_mark_teacher_update"
+    },
+    {
+      "h": "82939d96b573137186a792f201794850",
+      "id": "public.workspace_members.member_self_read"
+    },
+    {
+      "h": "14936da729cbcb8e50e4d7e0200b69dd",
+      "id": "public.workspaces.workspace_owner_or_invited_read"
+    },
+    {
+      "h": "133a91d0243ce69c8a1becf8f92a7156",
+      "id": "public.workspaces.workspace_owner_rename"
+    },
+    {
+      "h": "6beb98748ae3b2e79b9c3627307d4272",
+      "id": "public.workspaces.workspace_self_create"
+    }
+  ],
+  "triggers": [
+    {
+      "h": "34b392bb361e1c7e75dabcdf0e45092c",
+      "id": "public.family_requests.trg_assign_workspace"
+    },
+    {
+      "h": "07e0c33193177e64308d4b0032f7d87f",
+      "id": "public.guardian_invites.trg_assign_workspace"
+    },
+    {
+      "h": "ab3192bd532fa1bb5766e1b0d7d0cdff",
+      "id": "public.guardian_invites.v4_legacy_guardian_invite_created"
+    },
+    {
+      "h": "017ad694980c71425219a53ad206bf80",
+      "id": "public.guardian_invites.v4_legacy_guardian_invite_revoked"
+    },
+    {
+      "h": "4ae0ca9c6488749f8bc2bb3c5c61dc3d",
+      "id": "public.lesson_records.trg_assign_workspace"
+    },
+    {
+      "h": "da2b4502aab7e0009cc63d8c06445ea2",
+      "id": "public.lesson_records.trg_guard_paid_lesson"
+    },
+    {
+      "h": "587c45ad31406c44c7bf556e26660c32",
+      "id": "public.lesson_records.trg_prevent_financial_lesson_delete"
+    },
+    {
+      "h": "f1b7972dd7f59207493572201d4ed293",
+      "id": "public.lesson_records.trg_v34_guard_lesson_write"
+    },
+    {
+      "h": "badc8059e694a27829937fe3baa2977b",
+      "id": "public.lesson_records.trg_v34_lesson_revision"
+    },
+    {
+      "h": "ae474f1a1bf5e62a59856c8bda09ff48",
+      "id": "public.lesson_records.trg_v35_track_lesson_feedback"
+    },
+    {
+      "h": "23d501c86e334b222e5ba9123b34ad96",
+      "id": "public.payment_batch_correction_items.v4_correction_items_immutable"
+    },
+    {
+      "h": "06aae0afb213f4dd3c76364eb42260c2",
+      "id": "public.payment_batch_corrections.v4_correction_header_immutable"
+    },
+    {
+      "h": "462746a067403ea856c884db42cd719d",
+      "id": "public.payment_batch_items.trg_assign_workspace"
+    },
+    {
+      "h": "1432f17dddcfd6ceb342e59b02dabfce",
+      "id": "public.payment_batches.trg_assign_workspace"
+    },
+    {
+      "h": "a986d7a7a5bd6e18f0a4782237babc2a",
+      "id": "public.recurring_schedules.trg_assign_workspace"
+    },
+    {
+      "h": "27625c3a0341cdb02339b8048bebffa0",
+      "id": "public.recurring_schedules.trg_v34_guard_rule_write"
+    },
+    {
+      "h": "30d281ad5074c030ad2ed303f3bbe44f",
+      "id": "public.recurring_schedules.trg_v34_schedule_revision"
+    },
+    {
+      "h": "821ad361556f8eed605ac1fa5a7805f8",
+      "id": "public.schedule_exceptions.trg_assign_workspace"
+    },
+    {
+      "h": "8d413a915c12fb65a98500cb57ea7e0a",
+      "id": "public.schedule_exceptions.trg_v34_guard_exception_write"
+    },
+    {
+      "h": "b3ab23126df1ba0d2002dc8e1040943a",
+      "id": "public.student_guardians.trg_assign_workspace"
+    },
+    {
+      "h": "c976eba15f940642d43a0baf2f26b975",
+      "id": "public.student_guardians.v4_legacy_guardian_connected"
+    },
+    {
+      "h": "5524181ed6d924dfac2201846b7f708a",
+      "id": "public.student_invites.trg_revoke_shared_student_invite"
+    },
+    {
+      "h": "419c4810d0d013179294674d7762fa42",
+      "id": "public.students.audit_qa_student_mark"
+    },
+    {
+      "h": "e0b7e002491e8505c4666ac0f7950e74",
+      "id": "public.students.trg_assign_workspace"
+    },
+    {
+      "h": "57a4513a50775dcc636320a5e7d50425",
+      "id": "public.v4_lesson_qa_marks.v4_guard_audit_lesson_qa_classification"
+    },
+    {
+      "h": "67fcb0bd8e75c2770cbdf33bc4b0d9c3",
+      "id": "public.v4_payment_batch_qa_marks.v4_guard_audit_qa_payment_classification"
+    },
+    {
+      "h": "63a28472fcddd810449df7218dd992b3",
+      "id": "public.workspaces.trg_create_owner_membership"
+    }
+  ],
+  "functions": [
+    {
+      "h": "db7c335372b3794dfbcb29fbecae38c9",
+      "id": "public.cancel_recurring_schedule(p_schedule_id uuid, p_from date)"
+    },
+    {
+      "h": "fa8aa0de714d8200705e5744e39afb97",
+      "id": "public.claim_student_invite(p_invite_id uuid)"
+    },
+    {
+      "h": "d4d408dc88aafba7476918cad840f773",
+      "id": "public.reverse_legacy_lesson_receipt(p_lesson_id uuid, p_expected_updated_at timestamp with time zone, p_reason text)"
+    },
+    {
+      "h": "8c34145d7ef261b79cca103b579b7407",
+      "id": "public.review_family_request(p_request_id uuid, p_approve boolean)"
+    },
+    {
+      "h": "c1556e9f5e35001dc6738096d997fa4b",
+      "id": "public.review_range_payment(p_batch_id uuid, p_confirm boolean, p_received_on date)"
+    },
+    {
+      "h": "a4f721568c974ae094d75845930cadde",
+      "id": "public.revoke_student_account_connection(p_student_id uuid, p_email text)"
+    },
+    {
+      "h": "7cb8bc75dec873027a9e22a4221d56a8",
+      "id": "public.shared_course_action(p_action text, p_student_id uuid, p_target_id uuid, p_payload jsonb)"
+    },
+    {
+      "h": "8389aead8b620d2514153ffc7aa0811f",
+      "id": "public.shared_course_history(p_student_id uuid)"
+    },
+    {
+      "h": "227c5b7fea628eb946393b78e594805b",
+      "id": "public.split_recurring_schedule(p_id uuid, p_effective date, p_student_id uuid, p_subject text, p_weekdays smallint[], p_every_weeks smallint, p_end_date date, p_start_time text, p_end_time text, p_hourly_rate numeric)"
+    },
+    {
+      "h": "dafddaa37f3b8cadd22130b26c7f8f65",
+      "id": "public.student_portal_data()"
+    },
+    {
+      "h": "3449c1b0b6517b52e2f2bde4b1cf687f",
+      "id": "public.student_portal_snapshot()"
+    },
+    {
+      "h": "8130eb97a5529b3301262c6c79430d24",
+      "id": "public.submit_range_payment(p_teacher_id uuid, p_student_id uuid, p_period_start date, p_period_end date, p_paid_on date, p_paid_amount numeric, p_note text)"
+    },
+    {
+      "h": "12efd60c42ebe77f07615ab6a64b3b37",
+      "id": "public.update_lesson_learning(p_lesson_id uuid, p_expected_updated_at timestamp with time zone, p_lesson_content text, p_focus_rating smallint, p_mood_rating smallint, p_remarks text)"
+    },
+    {
+      "h": "c59429d9bc1dd89a9e8c2d3c91255de4",
+      "id": "public.v4_accounting_qa_snapshot()"
+    },
+    {
+      "h": "b6a72a3d74986eb6b1bbf62d204e76b2",
+      "id": "public.v4_apply_payment_correction(p_batch_id uuid, p_idempotency_key uuid, p_reason text, p_lines jsonb)"
+    },
+    {
+      "h": "7fa0d75788fb3a67aec773e6a43538f9",
+      "id": "public.v4_cancel_connection_request(p_request_id uuid)"
+    },
+    {
+      "h": "4918365922192b2e59bf133df3eeb4d9",
+      "id": "public.v4_claim_connection_link(p_token text, p_child_label text, p_student_id uuid)"
+    },
+    {
+      "h": "3cd822c9abb19f9cf31ee28e731458bf",
+      "id": "public.v4_connection_inbox()"
+    },
+    {
+      "h": "780bd6fc64a0a9b359666b14381a0406",
+      "id": "public.v4_contact_action(p_id uuid, p_action text)"
+    },
+    {
+      "h": "9a8dfefe928a42f0acbb232e58d2b71a",
+      "id": "public.v4_contact_inbox()"
+    },
+    {
+      "h": "345c7c4855ad71454d590ef9fcda7f79",
+      "id": "public.v4_contact_request(p_email text, p_my_role text)"
+    },
+    {
+      "h": "07680c23dacf4dfea86282be6838f406",
+      "id": "public.v4_create_connection_link(p_side text, p_student_id uuid, p_share boolean)"
+    },
+    {
+      "h": "92f67a9c39187fbb858c0da835aeca06",
+      "id": "public.v4_decide_connection_request(p_request_id uuid, p_approve boolean, p_student_id uuid)"
+    },
+    {
+      "h": "788e0464cc765ec45bd013e206e39460",
+      "id": "public.v4_disconnect_guardian(p_student_guardian_id uuid)"
+    },
+    {
+      "h": "6aaf8133c89b71c14da07cb2ed5e0f04",
+      "id": "public.v4_mail_ack(p_id uuid, p_lease uuid, p_ok boolean, p_error text, p_uncertain boolean)"
+    },
+    {
+      "h": "3c83c1f11f6d1dc18694074820013db5",
+      "id": "public.v4_mail_claim(p_limit integer)"
+    },
+    {
+      "h": "3353ce5e623adb0b39e883deeddcdc8a",
+      "id": "public.v4_mail_retry(p_id uuid, p_confirm_no_delivery boolean)"
+    },
+    {
+      "h": "49f67e1257278ef2e07947d6e7397002",
+      "id": "public.v4_mail_set_app_url(p_app_url text)"
+    },
+    {
+      "h": "de06dad5bde0034425f7a7dc167656cb",
+      "id": "public.v4_payment_correction_preview(p_batch_id uuid)"
+    },
+    {
+      "h": "d654f0a86613ddef090bb902b21f5fd4",
+      "id": "public.v4_preview_connection_link(p_token text)"
+    },
+    {
+      "h": "553a025c3705b83bef9a4cf580234424",
+      "id": "public.v4_request_teacher(p_teacher_email text, p_child_label text)"
+    },
+    {
+      "h": "2415cb3b05b88829a34d71a2055e4338",
+      "id": "tutor_private.audit_qa_student_mark()"
+    },
+    {
+      "h": "861a7f1a1ffbf2dd1efc5075ce63e396",
+      "id": "tutor_private.create_workspace_owner_membership()"
+    },
+    {
+      "h": "131a73845b91f85e0f7cadb221014335",
+      "id": "tutor_private.guard_paid_lesson()"
+    },
+    {
+      "h": "f61bda916a43e9f595d749f74c67bb80",
+      "id": "tutor_private.prevent_financial_lesson_delete()"
+    },
+    {
+      "h": "1348e891812e18674f2023deaac2ac78",
+      "id": "tutor_private.review_range_payment(p_batch_id uuid, p_confirm boolean, p_received_on date)"
+    },
+    {
+      "h": "0e8f7fe609d7c42432e47f0dc210791b",
+      "id": "tutor_private.revoke_shared_student_invite()"
+    },
+    {
+      "h": "1ae7444267c834924d392012cab6fc5e",
+      "id": "tutor_private.set_payment_item_workspace_id()"
+    },
+    {
+      "h": "0829957ffa27a33f2929f77661f71ee2",
+      "id": "tutor_private.set_teacher_workspace_id()"
+    },
+    {
+      "h": "29f99590c691eb818ff3ee71e4a57df3",
+      "id": "tutor_private.submit_range_payment(p_teacher_id uuid, p_student_id uuid, p_period_start date, p_period_end date, p_paid_on date, p_paid_amount numeric, p_note text)"
+    },
+    {
+      "h": "35844c2dfe7773956714f72e33b37fd0",
+      "id": "tutor_private.v34_assert_schedule_available(p_teacher uuid, p_student uuid, p_starts date, p_ends date, p_days smallint[], p_every smallint, p_start_time text, p_end_time text, p_ignored_rule uuid)"
+    },
+    {
+      "h": "c0161deda7fdaea5d5a181e933152325",
+      "id": "tutor_private.v34_guard_exception_write()"
+    },
+    {
+      "h": "31e85ed97b3ae3672d1549559c30e17e",
+      "id": "tutor_private.v34_guard_lesson_write()"
+    },
+    {
+      "h": "a2ffc23d508297a559448ea52a3d52cf",
+      "id": "tutor_private.v34_guard_rule_write()"
+    },
+    {
+      "h": "205b9f9979c526346902fa1b4cc33f20",
+      "id": "tutor_private.v34_has_conflict(p_teacher uuid, p_student uuid, p_date date, p_start text, p_end text, p_ignore_lesson uuid, p_ignore_occurrence_rule uuid, p_ignore_occurrence_date date, p_superseded_rule uuid, p_superseded_from date)"
+    },
+    {
+      "h": "279167f9e1fcd18c7df8ba4821989be1",
+      "id": "tutor_private.v34_occurs(p_start date, p_end date, p_cancel date, p_days smallint[], p_frequency smallint, p_day date)"
+    },
+    {
+      "h": "f9cbc7d67ae52f58eae3bf211486efc3",
+      "id": "tutor_private.v34_revision_stamp()"
+    },
+    {
+      "h": "c5dc9c13796ff4cd82ebfe44c52f2cdb",
+      "id": "tutor_private.v35_track_lesson_feedback()"
+    },
+    {
+      "h": "3faa6a4a1761aa840464b58712180b30",
+      "id": "tutor_private.v4_enqueue(p_event_key text, p_recipient text, p_subject text, p_body text)"
+    },
+    {
+      "h": "9322246105a8e42d0c17ceef9fb7d503",
+      "id": "tutor_private.v4_guard_and_audit_lesson_qa_mark()"
+    },
+    {
+      "h": "4127ec3ca7d72d8c4028c6c50da0a499",
+      "id": "tutor_private.v4_guard_and_audit_payment_qa_mark()"
+    },
+    {
+      "h": "e048eeca87d40990d1bbaf49c1608ed4",
+      "id": "tutor_private.v4_keep_correction_immutable()"
+    },
+    {
+      "h": "b70cac1106f7c74ef5b314ec9935a0d4",
+      "id": "tutor_private.v4_limit(p_action text, p_max integer)"
+    },
+    {
+      "h": "2dac6ecaec98f44a742fbf92151ca22f",
+      "id": "tutor_private.v4_notify_legacy_invitation()"
+    }
+  ],
+  "constraints": [
+    {
+      "h": "b5f1d9677b1540635e58d9e3546da8a1",
+      "id": "public.family_requests.correction_payload_required"
+    },
+    {
+      "h": "c18417c5135e7805f2af918f27544b9a",
+      "id": "public.family_requests.correction_time_format"
+    },
+    {
+      "h": "2b16d809ad1ac3de531409d97b855eef",
+      "id": "public.family_requests.family_requests_kind_check"
+    },
+    {
+      "h": "c81c96f712d6444f52dce76eecc507ea",
+      "id": "public.family_requests.family_requests_lesson_id_fkey"
+    },
+    {
+      "h": "21d0c88889a3a9e512a2b11f9079f96b",
+      "id": "public.family_requests.family_requests_parent_id_fkey"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "public.family_requests.family_requests_pkey"
+    },
+    {
+      "h": "83f10d3bf0e6c1d09da1bb0550a0e58b",
+      "id": "public.family_requests.family_requests_schedule_id_fkey"
+    },
+    {
+      "h": "67d15025a6bcbd0cdbf2094d5b03e18b",
+      "id": "public.family_requests.family_requests_status_check"
+    },
+    {
+      "h": "d8ea5b3fbaa36521a380b6f4dc4ae401",
+      "id": "public.family_requests.family_requests_student_id_teacher_id_fkey"
+    },
+    {
+      "h": "8c2e75a17466f9daf269ef95a52a776e",
+      "id": "public.family_requests.family_requests_teacher_id_fkey"
+    },
+    {
+      "h": "b88de25c62a5ac59f42d07d525310e41",
+      "id": "public.family_requests.request_lesson_same_workspace"
+    },
+    {
+      "h": "4350d9b2087a5ec0e25bbcbb1e946605",
+      "id": "public.family_requests.request_student_same_workspace"
+    },
+    {
+      "h": "be0f696482137f9e30707825e6867502",
+      "id": "public.family_requests.requested_hours_range"
+    },
+    {
+      "h": "929da631bf2606326d98328cdd57eef6",
+      "id": "public.guardian_invites.guardian_invites_email_check"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "public.guardian_invites.guardian_invites_pkey"
+    },
+    {
+      "h": "0c8aac0f34ce031835c8a3f428877f17",
+      "id": "public.guardian_invites.guardian_invites_student_id_email_key"
+    },
+    {
+      "h": "d8ea5b3fbaa36521a380b6f4dc4ae401",
+      "id": "public.guardian_invites.guardian_invites_student_owner_fk"
+    },
+    {
+      "h": "8c2e75a17466f9daf269ef95a52a776e",
+      "id": "public.guardian_invites.guardian_invites_teacher_id_fkey"
+    },
+    {
+      "h": "4350d9b2087a5ec0e25bbcbb1e946605",
+      "id": "public.guardian_invites.invite_student_same_workspace"
+    },
+    {
+      "h": "c872d26974a7bbaa4d5ce15da47f1ff9",
+      "id": "public.lesson_records.actual_hours_range"
+    },
+    {
+      "h": "891f5830305f09ce296ae123690a39f8",
+      "id": "public.lesson_records.actual_time_format"
+    },
+    {
+      "h": "54dac6f2e1ad07453f017c61fc1d399d",
+      "id": "public.lesson_records.lesson_content_length"
+    },
+    {
+      "h": "0727470dc0df7dc7a8440847b99b03f3",
+      "id": "public.lesson_records.lesson_mood_rating_valid"
+    },
+    {
+      "h": "08f7d30b1fdbec7cc5490cddcce58f5c",
+      "id": "public.lesson_records.lesson_occurrence_complete"
+    },
+    {
+      "h": "b9f3fa7eab7e621988bad96d1880971e",
+      "id": "public.lesson_records.lesson_records_attitude_rating_check"
+    },
+    {
+      "h": "004a0ed47d5713236742cb706e0ba942",
+      "id": "public.lesson_records.lesson_records_focus_rating_check"
+    },
+    {
+      "h": "25d819d50e681484275fcfe361b3d472",
+      "id": "public.lesson_records.lesson_records_owner_id_fkey"
+    },
+    {
+      "h": "a126e9b4e7b1d5c1db2a30b03f40a74a",
+      "id": "public.lesson_records.lesson_records_owner_legacy_unique"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "public.lesson_records.lesson_records_pkey"
+    },
+    {
+      "h": "83f10d3bf0e6c1d09da1bb0550a0e58b",
+      "id": "public.lesson_records.lesson_records_schedule_id_fkey"
+    },
+    {
+      "h": "4833ca3820ffccff2c9e72f0ad833df5",
+      "id": "public.lesson_records.lesson_records_student_id_fkey"
+    },
+    {
+      "h": "3d154da892852dcdc3fe528459c13257",
+      "id": "public.lesson_records.lesson_records_student_owner_match"
+    },
+    {
+      "h": "ebcd9d32d21bd892d17b9f821f3841b6",
+      "id": "public.lesson_records.lesson_records_time_accuracy_check"
+    },
+    {
+      "h": "4350d9b2087a5ec0e25bbcbb1e946605",
+      "id": "public.lesson_records.lesson_student_same_workspace"
+    },
+    {
+      "h": "ec89a73c7997baec4547c65dd9d7d1c0",
+      "id": "public.lesson_records.lessons_id_workspace_unique"
+    },
+    {
+      "h": "d9af72caa5b3d997a179e6f439b84a82",
+      "id": "public.lesson_records.lessons_workspace_fk"
+    },
+    {
+      "h": "bc1148cb06f4448406482919e3cee05a",
+      "id": "public.payment_batch_correction_items.payment_batch_correction_items_amount_check"
+    },
+    {
+      "h": "6ddfd17a0d75db03d9ec153ebc87edba",
+      "id": "public.payment_batch_correction_items.payment_batch_correction_items_batch_id_lesson_id_fkey"
+    },
+    {
+      "h": "31627d0bfbd3ff0bcadf0fe8f94d1dc5",
+      "id": "public.payment_batch_correction_items.payment_batch_correction_items_correction_id_batch_id_fkey"
+    },
+    {
+      "h": "60368a585488ccdfb698be0050215b8d",
+      "id": "public.payment_batch_correction_items.payment_batch_correction_items_pkey"
+    },
+    {
+      "h": "bc1148cb06f4448406482919e3cee05a",
+      "id": "public.payment_batch_corrections.payment_batch_corrections_amount_check"
+    },
+    {
+      "h": "00b6459a0aa49bb23262bbd35cf70c97",
+      "id": "public.payment_batch_corrections.payment_batch_corrections_batch_id_fkey"
+    },
+    {
+      "h": "fbfd9535325e55dce9c4fd05173dfab3",
+      "id": "public.payment_batch_corrections.payment_batch_corrections_batch_id_idempotency_key_key"
+    },
+    {
+      "h": "29db1bbe7a6d976ce03abe21d13ac1b4",
+      "id": "public.payment_batch_corrections.payment_batch_corrections_id_batch_id_key"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "public.payment_batch_corrections.payment_batch_corrections_pkey"
+    },
+    {
+      "h": "53fbe852e0d252deab246d96f7fd8241",
+      "id": "public.payment_batch_corrections.payment_batch_corrections_reason_check"
+    },
+    {
+      "h": "fe37bd147d09cf3c4f2848c89c3ca8d9",
+      "id": "public.payment_batch_corrections.payment_batch_corrections_request_hash_check"
+    },
+    {
+      "h": "47de31c96f1ff5d1dc4f9c16575e021d",
+      "id": "public.payment_batch_items.item_batch_same_workspace"
+    },
+    {
+      "h": "b88de25c62a5ac59f42d07d525310e41",
+      "id": "public.payment_batch_items.item_lesson_same_workspace"
+    },
+    {
+      "h": "72a8837a1f6d9a4ebb9cadb214d5a383",
+      "id": "public.payment_batch_items.payment_batch_items_allocated_amount_check"
+    },
+    {
+      "h": "62c8a5f66e284a23d5435e5ef0edffa4",
+      "id": "public.payment_batch_items.payment_batch_items_batch_id_fkey"
+    },
+    {
+      "h": "d4dda6ea3f168ba576f9998cc9e72b83",
+      "id": "public.payment_batch_items.payment_batch_items_lesson_id_fkey"
+    },
+    {
+      "h": "857ee743f8172d01e8bbfb30ac5d7d59",
+      "id": "public.payment_batch_items.payment_batch_items_pkey"
+    },
+    {
+      "h": "4350d9b2087a5ec0e25bbcbb1e946605",
+      "id": "public.payment_batches.batch_student_same_workspace"
+    },
+    {
+      "h": "ec89a73c7997baec4547c65dd9d7d1c0",
+      "id": "public.payment_batches.batches_id_workspace_unique"
+    },
+    {
+      "h": "d9af72caa5b3d997a179e6f439b84a82",
+      "id": "public.payment_batches.batches_workspace_fk"
+    },
+    {
+      "h": "6c44662086845d7e275f4f8d09e1437f",
+      "id": "public.payment_batches.payment_batches_check"
+    },
+    {
+      "h": "f4740e63cd466159e5362a46092b519b",
+      "id": "public.payment_batches.payment_batches_check1"
+    },
+    {
+      "h": "095110f428e80f5c3e6ded4d7ea33818",
+      "id": "public.payment_batches.payment_batches_check2"
+    },
+    {
+      "h": "db8d90ca3608d19af5b1c98cf409b578",
+      "id": "public.payment_batches.payment_batches_paid_amount_check"
+    },
+    {
+      "h": "21d0c88889a3a9e512a2b11f9079f96b",
+      "id": "public.payment_batches.payment_batches_parent_id_fkey"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "public.payment_batches.payment_batches_pkey"
+    },
+    {
+      "h": "32c189842608c92a4996d3f4a6644901",
+      "id": "public.payment_batches.payment_batches_status_check"
+    },
+    {
+      "h": "d8ea5b3fbaa36521a380b6f4dc4ae401",
+      "id": "public.payment_batches.payment_batches_student_id_teacher_id_fkey"
+    },
+    {
+      "h": "8c2e75a17466f9daf269ef95a52a776e",
+      "id": "public.payment_batches.payment_batches_teacher_id_fkey"
+    },
+    {
+      "h": "b1e8ab5f6e43e1f622d204418b07f47e",
+      "id": "public.profiles.profiles_display_name_check"
+    },
+    {
+      "h": "2d58278d8a1475a26a1e50918fc44fd8",
+      "id": "public.profiles.profiles_enabled_roles_valid"
+    },
+    {
+      "h": "1d93358c10c19344358a958ef4dee812",
+      "id": "public.profiles.profiles_id_fkey"
+    },
+    {
+      "h": "de17162a9e16e49d8d3ae7f9576a73fd",
+      "id": "public.profiles.profiles_last_role_check"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "public.profiles.profiles_pkey"
+    },
+    {
+      "h": "ec89a73c7997baec4547c65dd9d7d1c0",
+      "id": "public.recurring_schedules.recurring_id_workspace_unique"
+    },
+    {
+      "h": "bd241a32e27447ec6d7c65750dc61c38",
+      "id": "public.recurring_schedules.recurring_schedules_check"
+    },
+    {
+      "h": "c42f6a739397707cf2f3ed68558fff12",
+      "id": "public.recurring_schedules.recurring_schedules_check1"
+    },
+    {
+      "h": "0eedb5c056f78b4e92a774eb658665ef",
+      "id": "public.recurring_schedules.recurring_schedules_every_weeks_check"
+    },
+    {
+      "h": "e4cd2c3eff613585ad88bfb588f63138",
+      "id": "public.recurring_schedules.recurring_schedules_hourly_rate_check"
+    },
+    {
+      "h": "8b181550ba63f22c60bbe7e64c046da6",
+      "id": "public.recurring_schedules.recurring_schedules_id_teacher_id_key"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "public.recurring_schedules.recurring_schedules_pkey"
+    },
+    {
+      "h": "f2dc2aa24c17c902622539a25f85d763",
+      "id": "public.recurring_schedules.recurring_schedules_start_time_check"
+    },
+    {
+      "h": "d8ea5b3fbaa36521a380b6f4dc4ae401",
+      "id": "public.recurring_schedules.recurring_schedules_student_id_teacher_id_fkey"
+    },
+    {
+      "h": "8c2e75a17466f9daf269ef95a52a776e",
+      "id": "public.recurring_schedules.recurring_schedules_teacher_id_fkey"
+    },
+    {
+      "h": "1c3949430c4d7ba8cc12d285a4a991c2",
+      "id": "public.recurring_schedules.recurring_schedules_weekdays_check"
+    },
+    {
+      "h": "4350d9b2087a5ec0e25bbcbb1e946605",
+      "id": "public.recurring_schedules.recurring_student_same_workspace"
+    },
+    {
+      "h": "d9af72caa5b3d997a179e6f439b84a82",
+      "id": "public.recurring_schedules.recurring_workspace_fk"
+    },
+    {
+      "h": "e609528f45cf28b91491141ac7e020d9",
+      "id": "public.schedule_exceptions.exception_schedule_same_workspace"
+    },
+    {
+      "h": "fc4d8b5750f0e01b09d40568de730d3f",
+      "id": "public.schedule_exceptions.schedule_exceptions_action_check"
+    },
+    {
+      "h": "e76ae34252f5b082572186f5771a5874",
+      "id": "public.schedule_exceptions.schedule_exceptions_check"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "public.schedule_exceptions.schedule_exceptions_pkey"
+    },
+    {
+      "h": "81e253e6dcfae9f14dd1f321e41252c2",
+      "id": "public.schedule_exceptions.schedule_exceptions_schedule_id_original_date_key"
+    },
+    {
+      "h": "a5f1334e1ef7ea4dec345387ddb8e1c7",
+      "id": "public.schedule_exceptions.schedule_exceptions_schedule_id_teacher_id_fkey"
+    },
+    {
+      "h": "8c2e75a17466f9daf269ef95a52a776e",
+      "id": "public.schedule_exceptions.schedule_exceptions_teacher_id_fkey"
+    },
+    {
+      "h": "4350d9b2087a5ec0e25bbcbb1e946605",
+      "id": "public.student_guardians.guardian_student_same_workspace"
+    },
+    {
+      "h": "8e2cbe11ca5d1edb8a9e8802f0408bf1",
+      "id": "public.student_guardians.student_guardians_guardian_id_fkey"
+    },
+    {
+      "h": "b0f0e1e821bc46eefc586174f7e2ae19",
+      "id": "public.student_guardians.student_guardians_invite_id_fkey"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "public.student_guardians.student_guardians_pkey"
+    },
+    {
+      "h": "ece1a2d51810351974abee57ba3a4b9a",
+      "id": "public.student_guardians.student_guardians_student_id_guardian_id_key"
+    },
+    {
+      "h": "d8ea5b3fbaa36521a380b6f4dc4ae401",
+      "id": "public.student_guardians.student_guardians_student_id_teacher_id_fkey"
+    },
+    {
+      "h": "8c2e75a17466f9daf269ef95a52a776e",
+      "id": "public.student_guardians.student_guardians_teacher_id_fkey"
+    },
+    {
+      "h": "714a93d547e054a500a766cd3d8b852b",
+      "id": "public.student_invitations.student_invitations_email_check"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "public.student_invitations.student_invitations_pkey"
+    },
+    {
+      "h": "0c8aac0f34ce031835c8a3f428877f17",
+      "id": "public.student_invitations.student_invitations_student_id_email_key"
+    },
+    {
+      "h": "d8ea5b3fbaa36521a380b6f4dc4ae401",
+      "id": "public.student_invitations.student_invitations_student_id_teacher_id_fkey"
+    },
+    {
+      "h": "8c2e75a17466f9daf269ef95a52a776e",
+      "id": "public.student_invitations.student_invitations_teacher_id_fkey"
+    },
+    {
+      "h": "f30354523de1e8f7dca717782e554b6e",
+      "id": "public.student_invites.student_invites_email_check"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "public.student_invites.student_invites_pkey"
+    },
+    {
+      "h": "0c8aac0f34ce031835c8a3f428877f17",
+      "id": "public.student_invites.student_invites_student_id_email_key"
+    },
+    {
+      "h": "d8ea5b3fbaa36521a380b6f4dc4ae401",
+      "id": "public.student_invites.student_invites_student_id_teacher_id_fkey"
+    },
+    {
+      "h": "2d6dea0745a52df460abc7217ce96b17",
+      "id": "public.student_invites.student_invites_teacher_id_fkey"
+    },
+    {
+      "h": "a9605b91e93dea66563360233109c93f",
+      "id": "public.student_links.student_links_invitation_id_fkey"
+    },
+    {
+      "h": "8fae94db37d0357a117a7a2b316e43dd",
+      "id": "public.student_links.student_links_invitation_id_key"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "public.student_links.student_links_pkey"
+    },
+    {
+      "h": "d8ea5b3fbaa36521a380b6f4dc4ae401",
+      "id": "public.student_links.student_links_student_id_teacher_id_fkey"
+    },
+    {
+      "h": "39ffea101e00290cd85bd52c51bf7cf3",
+      "id": "public.student_links.student_links_student_id_user_id_key"
+    },
+    {
+      "h": "8c2e75a17466f9daf269ef95a52a776e",
+      "id": "public.student_links.student_links_teacher_id_fkey"
+    },
+    {
+      "h": "5935ad1aee3549b2545122c550fe9659",
+      "id": "public.student_links.student_links_user_id_fkey"
+    },
+    {
+      "h": "e4cd2c3eff613585ad88bfb588f63138",
+      "id": "public.students.students_hourly_rate_check"
+    },
+    {
+      "h": "8b181550ba63f22c60bbe7e64c046da6",
+      "id": "public.students.students_id_teacher_id_key"
+    },
+    {
+      "h": "ec89a73c7997baec4547c65dd9d7d1c0",
+      "id": "public.students.students_id_workspace_unique"
+    },
+    {
+      "h": "365028716f5167a9c0ef1783deba49a3",
+      "id": "public.students.students_name_check"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "public.students.students_pkey"
+    },
+    {
+      "h": "8c2e75a17466f9daf269ef95a52a776e",
+      "id": "public.students.students_teacher_id_fkey"
+    },
+    {
+      "h": "d9af72caa5b3d997a179e6f439b84a82",
+      "id": "public.students.students_workspace_fk"
+    },
+    {
+      "h": "25d819d50e681484275fcfe361b3d472",
+      "id": "public.teacher_preferences.teacher_preferences_owner_id_fkey"
+    },
+    {
+      "h": "2710b2127f26aca7e3cc13ab21c70d17",
+      "id": "public.teacher_preferences.teacher_preferences_pkey"
+    },
+    {
+      "h": "1ceb3d3c97112c54807c80178c12bc5e",
+      "id": "public.teacher_preferences.teacher_prefs_json_shape"
+    },
+    {
+      "h": "759702382ec7cf7429cdf1e82fa111f1",
+      "id": "public.v4_account_contacts.v4_account_contacts_parent_id_fkey"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "public.v4_account_contacts.v4_account_contacts_pkey"
+    },
+    {
+      "h": "8a4e0b43e8f017290630fee373bbf691",
+      "id": "public.v4_account_contacts.v4_account_contacts_requested_by_fkey"
+    },
+    {
+      "h": "b12c8d596f8cda214f7b231b0e8f11d2",
+      "id": "public.v4_account_contacts.v4_account_contacts_status_check"
+    },
+    {
+      "h": "2d6dea0745a52df460abc7217ce96b17",
+      "id": "public.v4_account_contacts.v4_account_contacts_teacher_id_fkey"
+    },
+    {
+      "h": "fa0eae1b4ce3188e2fe3f0f222a4151e",
+      "id": "public.v4_account_contacts.v4_contact_distinct_people"
+    },
+    {
+      "h": "b9d992f6d3ad2e9beaa6ec2eab0116a8",
+      "id": "public.v4_account_contacts.v4_contact_requested_party"
+    },
+    {
+      "h": "1ab56adc0ae46155568a8de8bea23f0c",
+      "id": "public.v4_connection_requests.v4_child_label_length"
+    },
+    {
+      "h": "9f12ea05afac7ed9576d400491e605bc",
+      "id": "public.v4_connection_requests.v4_connection_requests_origin_check"
+    },
+    {
+      "h": "759702382ec7cf7429cdf1e82fa111f1",
+      "id": "public.v4_connection_requests.v4_connection_requests_parent_id_fkey"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "public.v4_connection_requests.v4_connection_requests_pkey"
+    },
+    {
+      "h": "1a6568dc19ba9cc6204e6735d32f1165",
+      "id": "public.v4_connection_requests.v4_connection_requests_status_check"
+    },
+    {
+      "h": "5f42e6c8f38a56fec3156acd7925939b",
+      "id": "public.v4_connection_requests.v4_connection_requests_student_id_fkey"
+    },
+    {
+      "h": "2d6dea0745a52df460abc7217ce96b17",
+      "id": "public.v4_connection_requests.v4_connection_requests_teacher_id_fkey"
+    },
+    {
+      "h": "fa0eae1b4ce3188e2fe3f0f222a4151e",
+      "id": "public.v4_connection_requests.v4_distinct_parties"
+    },
+    {
+      "h": "385755ea0becf9e277099685208caea9",
+      "id": "public.v4_contact_outgoing_invites.v4_contact_outgoing_invites_contact_id_fkey"
+    },
+    {
+      "h": "84e397c3c1cd58547d2845026856bc28",
+      "id": "public.v4_contact_outgoing_invites.v4_contact_outgoing_invites_my_role_check"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "public.v4_contact_outgoing_invites.v4_contact_outgoing_invites_pkey"
+    },
+    {
+      "h": "8a4e0b43e8f017290630fee373bbf691",
+      "id": "public.v4_contact_outgoing_invites.v4_contact_outgoing_invites_requested_by_fkey"
+    },
+    {
+      "h": "8071071fc4cbc85c9ce7121226e96b80",
+      "id": "public.v4_contact_outgoing_invites.v4_contact_outgoing_invites_status_check"
+    },
+    {
+      "h": "791aaf51cd6d5be47976f4ad71589893",
+      "id": "public.v4_lesson_qa_marks.v4_lesson_qa_marks_classification_check"
+    },
+    {
+      "h": "f6175a0037d491f92093d28356432a0f",
+      "id": "public.v4_lesson_qa_marks.v4_lesson_qa_marks_classified_by_fkey"
+    },
+    {
+      "h": "d4dda6ea3f168ba576f9998cc9e72b83",
+      "id": "public.v4_lesson_qa_marks.v4_lesson_qa_marks_lesson_id_fkey"
+    },
+    {
+      "h": "cba89c71fc960c5e7c4b8b2f86fc6868",
+      "id": "public.v4_lesson_qa_marks.v4_lesson_qa_marks_pkey"
+    },
+    {
+      "h": "53fbe852e0d252deab246d96f7fd8241",
+      "id": "public.v4_lesson_qa_marks.v4_lesson_qa_marks_reason_check"
+    },
+    {
+      "h": "00b6459a0aa49bb23262bbd35cf70c97",
+      "id": "public.v4_payment_batch_qa_marks.v4_payment_batch_qa_marks_batch_id_fkey"
+    },
+    {
+      "h": "f6175a0037d491f92093d28356432a0f",
+      "id": "public.v4_payment_batch_qa_marks.v4_payment_batch_qa_marks_classified_by_fkey"
+    },
+    {
+      "h": "54a0c7f0656b30363f7629758a1332e7",
+      "id": "public.v4_payment_batch_qa_marks.v4_payment_batch_qa_marks_pkey"
+    },
+    {
+      "h": "53fbe852e0d252deab246d96f7fd8241",
+      "id": "public.v4_payment_batch_qa_marks.v4_qa_mark_reason_length"
+    },
+    {
+      "h": "92af9dbd6faefc751b480b51981f40af",
+      "id": "public.workspace_members.workspace_members_pkey"
+    },
+    {
+      "h": "2fcd3437a774f8621caeaf5dd75b79a8",
+      "id": "public.workspace_members.workspace_members_role_check"
+    },
+    {
+      "h": "5935ad1aee3549b2545122c550fe9659",
+      "id": "public.workspace_members.workspace_members_user_id_fkey"
+    },
+    {
+      "h": "a9cd0482ab28ea7945abc92de196bb78",
+      "id": "public.workspace_members.workspace_members_workspace_id_fkey"
+    },
+    {
+      "h": "d1b4c5546e4723569dc0767e38c82c43",
+      "id": "public.workspaces.workspaces_kind_check"
+    },
+    {
+      "h": "37652ff0c339a2f56eff63ec130e6cf6",
+      "id": "public.workspaces.workspaces_name_check"
+    },
+    {
+      "h": "25d819d50e681484275fcfe361b3d472",
+      "id": "public.workspaces.workspaces_owner_id_fkey"
+    },
+    {
+      "h": "430e522d94b7d640adeb32cecb756573",
+      "id": "public.workspaces.workspaces_owner_id_key"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "public.workspaces.workspaces_pkey"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "tutor_private.legacy_receipt_reversal_audit.legacy_receipt_reversal_audit_pkey"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "tutor_private.lesson_feedback_audit.lesson_feedback_audit_pkey"
+    },
+    {
+      "h": "3c676739d363d960b65575a6237fb538",
+      "id": "tutor_private.payment_correction_status_authorizations.payment_correction_status_authorizations_correction_id_fkey"
+    },
+    {
+      "h": "10ea4b848e8acec7d3b39b9e15c3488d",
+      "id": "tutor_private.payment_correction_status_authorizations.payment_correction_status_authorizations_pkey"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "tutor_private.qa_student_mark_audit.qa_student_mark_audit_pkey"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "tutor_private.shared_course_events.shared_course_events_pkey"
+    },
+    {
+      "h": "3f4e0fb063ed9c13199fee98f4020866",
+      "id": "tutor_private.shared_course_events.shared_course_events_student_id_fkey"
+    },
+    {
+      "h": "8baf61c53fb6f5be2876bfec3d536378",
+      "id": "tutor_private.v4_email_outbox.v4_email_outbox_event_key_key"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "tutor_private.v4_email_outbox.v4_email_outbox_pkey"
+    },
+    {
+      "h": "d12a03e0517600fc108124f9b8da1aab",
+      "id": "tutor_private.v4_email_outbox.v4_email_outbox_status_check"
+    },
+    {
+      "h": "fc29082bcdab266bf42f36e69708df8f",
+      "id": "tutor_private.v4_invitation_links.v4_invitation_links_check"
+    },
+    {
+      "h": "22ea25ed141c8a7c7546a11b98f767f9",
+      "id": "tutor_private.v4_invitation_links.v4_invitation_links_created_by_fkey"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "tutor_private.v4_invitation_links.v4_invitation_links_pkey"
+    },
+    {
+      "h": "cd55c55a2e5c183e31ec4d3c9279bf91",
+      "id": "tutor_private.v4_invitation_links.v4_invitation_links_side_check"
+    },
+    {
+      "h": "5f42e6c8f38a56fec3156acd7925939b",
+      "id": "tutor_private.v4_invitation_links.v4_invitation_links_student_id_fkey"
+    },
+    {
+      "h": "4bb4b96f610b8a729153aeb4f2729cab",
+      "id": "tutor_private.v4_invitation_links.v4_invitation_links_token_digest_key"
+    },
+    {
+      "h": "654551ca7f37e2ff6d04055ea4b6942c",
+      "id": "tutor_private.v4_lesson_qa_audit.v4_lesson_qa_audit_actor_id_fkey"
+    },
+    {
+      "h": "d4dda6ea3f168ba576f9998cc9e72b83",
+      "id": "tutor_private.v4_lesson_qa_audit.v4_lesson_qa_audit_lesson_id_fkey"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "tutor_private.v4_lesson_qa_audit.v4_lesson_qa_audit_pkey"
+    },
+    {
+      "h": "a5539aaae1d83956255b15a486c20a8e",
+      "id": "tutor_private.v4_mail_settings.v4_mail_settings_pkey"
+    },
+    {
+      "h": "de8f03dff0b626ca089fc8a2abb19f04",
+      "id": "tutor_private.v4_mail_settings.v4_mail_settings_singleton_check"
+    },
+    {
+      "h": "654551ca7f37e2ff6d04055ea4b6942c",
+      "id": "tutor_private.v4_payment_batch_qa_audit.v4_payment_batch_qa_audit_actor_id_fkey"
+    },
+    {
+      "h": "00b6459a0aa49bb23262bbd35cf70c97",
+      "id": "tutor_private.v4_payment_batch_qa_audit.v4_payment_batch_qa_audit_batch_id_fkey"
+    },
+    {
+      "h": "7be13ddeaff891bbed5f2460604b3094",
+      "id": "tutor_private.v4_payment_batch_qa_audit.v4_payment_batch_qa_audit_pkey"
+    },
+    {
+      "h": "c9c7fb875ab533ed73f8d2821aa6176f",
+      "id": "tutor_private.v4_qa_receipt_reconciliation_authorizations.v4_qa_receipt_reconciliation_authorizations_batch_id_fkey"
+    },
+    {
+      "h": "55c61e093ee045d2b4b5da751c2d3dbb",
+      "id": "tutor_private.v4_qa_receipt_reconciliation_authorizations.v4_qa_receipt_reconciliation_authorizations_lesson_id_fkey"
+    },
+    {
+      "h": "1e10036a17e156d55760e86f9a11e0cc",
+      "id": "tutor_private.v4_qa_receipt_reconciliation_authorizations.v4_qa_receipt_reconciliation_authorizations_pkey"
+    },
+    {
+      "h": "2d6dea0745a52df460abc7217ce96b17",
+      "id": "tutor_private.v4_qa_receipt_reconciliation_authorizations.v4_qa_receipt_reconciliation_authorizations_teacher_id_fkey"
+    },
+    {
+      "h": "654551ca7f37e2ff6d04055ea4b6942c",
+      "id": "tutor_private.v4_rate_limits.v4_rate_limits_actor_id_fkey"
+    },
+    {
+      "h": "c107969155fda3c7f913e63980a800cb",
+      "id": "tutor_private.v4_rate_limits.v4_rate_limits_pkey"
+    }
+  ],
+  "captured_date": "2026-11-08",
+  "hash_algorithm": "md5",
+  "snapshot_schema": 1
+}
