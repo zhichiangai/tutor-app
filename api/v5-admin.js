@@ -98,13 +98,15 @@ async function handle(req,res,{env=process.env,fetchImpl=fetch}={}){
  const id=input.workspace_id;
  if(!UUID.test(String(id||''))||!isSafeReason(input.reason))
   return send(res,400,{error:'invalid_workspace_or_reason'});
- let rpcName,args,phrase;
+ let rpcName,args,phrase,legacyPhrase=null;
  if(input.action==='grant'){
   if(!['free','pro','team'].includes(input.plan)||
     !Number.isSafeInteger(input.extra_students)||input.extra_students<0||
     input.extra_students>100000)
     return send(res,400,{error:'invalid_entitlement'});
-  phrase='SET '+input.plan.toUpperCase()+' '+id.slice(0,8);
+  // Accept older operator confirmation text during the Pro -> Plus display transition.
+   phrase='SET '+(input.plan==='pro'?'PLUS':input.plan.toUpperCase())+' '+id.slice(0,8);
+   if(input.plan==='pro')legacyPhrase='SET PRO '+id.slice(0,8);
   rpcName='v5_admin_apply_plan';
   args={p_workspace_id:id,p_plan:input.plan,
     p_extra_students:input.extra_students,p_operator_label:caller.id,
@@ -117,7 +119,8 @@ async function handle(req,res,{env=process.env,fetchImpl=fetch}={}){
   args={p_workspace_id:id,p_expected_count:input.expected_count,
     p_operator_user_id:caller.id,p_reason:input.reason.trim()};
  }else return send(res,400,{error:'invalid_action'});
- if(input.confirm!==phrase)return send(res,400,{error:'confirmation_mismatch'});
+ if(input.confirm!==phrase&&input.confirm!==legacyPhrase)
+   return send(res,400,{error:'confirmation_mismatch'});
  try{
   const data=await privilegedRpc(fetchImpl,cfg,rpcName,args);
   return send(res,200,{ok:true,...(rpcName==='v5_admin_release_qa_seats'?
