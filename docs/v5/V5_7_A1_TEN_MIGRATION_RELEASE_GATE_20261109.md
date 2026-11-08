@@ -44,6 +44,14 @@
 - 不透過 `db reset`、全部歷史 `db push`、`migration repair`、`TRUNCATE` 或刪除正式 Auth 來跳過相容問題。
 - 正式環境即使資料當前可捨棄，沒有逐次授權也**不得執行 Production Migration**。
 
+### A1-R4 外部服務唯讀補查（2026-11-09）
+
+- Vercel `tutor-app-v2` 正式自訂網域 `tutor.rapid4grad.com` 顯示 verified。
+- Vercel 正式環境有三個加密變數鍵名：`V4_PRODUCTION_SUPABASE_PROJECT_REF`、`V4_PRODUCTION_SUPABASE_URL`、`V4_PRODUCTION_SUPABASE_PUBLISHABLE_KEY`；**未解密、未讀取值**，不等於已驗證值正確。
+- Supabase Project 的 `list_edge_functions` 返回空清單，尚無正式 Edge Function 部署證據。不能宣稱 V4 GAS/通知或 V5 通知整合已可用。
+- Supabase `list_branches` 只有 main，未建立真實 43-history Schema 隔離副本，也未新增付費資源。
+- Google OAuth Provider 的 Dashboard 設定與真實三角色重新登入屬正式 Codex IAB 驗收；本輪未操作、不修改 OAuth、不寄送訊息。因此 **A1-R4 仍 PARTIAL**。
+
 ### 尚未解決的風險
 
 1. 現有報告的九份發布清單落後於 Main 新增的 V5.7 SQL；本輪新增十份清單，但尚未完成真正 R3。
