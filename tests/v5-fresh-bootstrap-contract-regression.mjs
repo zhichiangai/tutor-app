@@ -24,8 +24,8 @@ test('fresh bootstrap is fenced to disposable local CI and checks RLS and no old
   "auth.users","public.lesson_records","public.payment_batches",
   "public.v5_team_students","tutor_private.v5_team_payment_reports"
  ])assert.ok(source.includes(token),'Missing guard or assertion: '+token);
- assert.doesNotMatch(source,/\bsupabase\s+db\s+(push|reset)\b|\bmigration\s+repair\b/,
-  'Schema inspection must not run a Supabase CLI write command');
+ assert.doesNotMatch(source,/\b(?:execFileSync|execSync|spawnSync|spawn)\s*\(\s*['"]supabase['"]/,
+  'Schema inspection must not execute the Supabase CLI');
 });
 
 test('fresh gate runs after isolated reset and before all synthetic account writes',()=>{
