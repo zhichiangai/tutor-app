@@ -43,7 +43,7 @@ jobs:
           test ! -f supabase/.temp/project-ref
           test ! -f supabase/.branches/_current_branch
           test "$V4_E2E_LOCAL" = "1"
-      - name: Start local Supabase and replay V4 migrations only
+      - name: Start disposable Supabase and replay complete V4 plus V5 migrations
         run: |
           set -euo pipefail
           start_log="$RUNNER_TEMP/v4-browser-start.log"
@@ -85,6 +85,14 @@ jobs:
             exit 1
           fi
           echo "Disposable local Supabase ready; no hosted project touched"
+      - name: Assert clean V4 plus V5 schema, RLS, RPC grants and zero-row baseline
+        run: |
+          set -euo pipefail
+          test "$CI" = "true"
+          test "$V4_E2E_LOCAL" = "1"
+          test ! -f supabase/.temp/project-ref
+          test ! -f supabase/.branches/_current_branch
+          node tests/local/v5-clean-bootstrap-gate.mjs
       - name: Reproduce Production-like legacy payment SELECT only in disposable CI
         run: |
           set -euo pipefail
