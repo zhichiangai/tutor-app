@@ -125,7 +125,7 @@ test('Free cumulative student quota, manual Pro/Team grants and teacher cap',asy
 });
 
 
-test('teacher settings shows Free/Pro/Team without checkout or hidden quotas',async ({page})=>{
+test('teacher settings shows Free/Plus/Team without checkout or hidden quotas',async ({page})=>{
  const actor=f.actors.teacher;
  await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
   route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
@@ -149,6 +149,9 @@ test('teacher settings shows Free/Pro/Team without checkout or hidden quotas',as
  await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
  await expect(page.locator('#v5-plan-card')).toBeVisible();
  await expect(page.locator('#v5-plan-content')).toContainText('Free');
+ await expect(page.locator('#v5-plan-content')).toContainText('Plus');
+ await expect(page.locator('#v5-plan-content')).toContainText('Team');
+ await expect(page.locator('#v5-plan-content')).toContainText('Plus／Team 正式金流尚未開放');
  await expect(page.locator('#v5-plan-content')).toContainText('NT$99／月');
  await expect(page.locator('#v5-plan-content')).toContainText('NT$399／月');
  await expect(page.locator('#v5-plan-content')).toContainText('不會釋放已使用名額');
