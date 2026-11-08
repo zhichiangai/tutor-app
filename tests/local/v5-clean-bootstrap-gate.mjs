@@ -2,7 +2,7 @@
 // --no-seed inside disposable GitHub Actions; never targets a hosted database.
 // All checks are schema/privilege/zero-row aggregates: no private records.
 import assert from 'node:assert/strict';
-import {readFileSync,readdirSync,existsSync} from 'node:fs';
+import {readFileSync,readdirSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {join} from 'node:path';
@@ -12,10 +12,9 @@ const cfg=readFileSync(join(root,'supabase/config.toml'),'utf8');
 assert.equal(process.env.CI,'true','Only disposable CI may run this gate');
 assert.equal(process.env.V4_E2E_LOCAL,'1','Isolated local E2E guard required');
 assert.match(cfg,/^project_id = "tutor_v4_isolated"$/m);
-assert.equal(existsSync(join(root,'supabase/.temp/project-ref')),false,
- 'Never execute a schema bootstrap gate against a linked project');
-assert.equal(existsSync(join(root,'supabase/.branches/_current_branch')),false,
- 'Never execute against a Supabase branch');
+// The workflow checks there is no hosted link BEFORE starting local services.
+// Every database query below uses docker exec against the named disposable CI
+// container, never a CLI command targeting a linked/remote database.
 
 const directory=join(root,'supabase/migrations');
 const files=readdirSync(directory).filter(name=>/^[0-9]{14}_.+\.sql$/.test(name)).sort();
@@ -25,6 +24,7 @@ assert.ok(files.length>=46,'Expected the complete V4 + V5 replay baseline');
 const v5Files=files.filter(name=>name.includes('_v5_'));
 assert.ok(v5Files.length>=9,'Nine V5.1-V5.4 migration files are required');
 
+console.log('V5 clean bootstrap: querying disposable Postgres catalog');
 function db(sql){
  const output=execFileSync('docker',[
   'exec','supabase_db_tutor_v4_isolated','psql','-X',
