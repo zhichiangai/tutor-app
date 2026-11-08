@@ -160,3 +160,34 @@ PR #58 Main 整合候選的上一次測試版本：`8a4de788a0111e695ce3e77f4a64
 - Advisor lint 0029：https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable
 
 **這份報告只有唯讀 metadata 與源碼分析，沒有機密資料、Token 或帳密。**
+
+
+## 9. 2026-11-08 接續準備：開發完成與發布授權分界
+
+Owner 希望直接將 PR #58 的 V5.5 完成到發布候選；但當前仍為 **方案 A（只讀正式 DB、開發分支準備）**。不得因為「繼續」而自行套用 Production Migration、刪除資料、合併 Main 或更改 Vercel 正式部署。
+
+### 9.1 最新 CI 與函式差異原因
+
+PR #58 已核對 Head `b02c455016b05a1fae2b39596a74479fb3eae0d4`：
+- Node Regression / PostgreSQL Contract / QA isolated / Supabase Chromium 四個 GitHub workflow **SUCCESS**；Chromium **38/38 PASS**（參見 [GitHub Actions #42486383853](https://github.com/zhichiangai/tutor-app/actions/runs/42486383853)）。
+- 正式庫的 54 個 V4 函式 metadata 與 clean CI 對比：27 個完整指紋不同，但逐欄分析 **body=0、mode=0、search_path=0、grants=27**。
+- 26 個函式在正式庫及 clean CI 均只允許 `authenticated`、不允許 `anon`，差別僅正式庫另外允許 `service_role`；`student_portal_snapshot()` 在兩邊都不開放 `authenticated` 或 `anon`，差別同樣僅正式庫多了 `service_role`。請**不要**為了縮小 CI 指紋漂移去撤銷正式庫原有 `service_role` 權限。
+- 這證明原指紋漂移不是 V4 函式本文或安全模式變更，但 **R3 正式 43-history Schema 副本上套用九份 V5 SQL 仍未測**；不得因此將 PR 改成 Production GO。
+
+### 9.2 最新正式 Metadata 不含資料檢查
+
+本輪透過 Supabase SELECT 唯讀檢查：
+- 正式 43 筆 Migration 全數保留 `statements` 陣列（43/43；僅檢查是否為空，**未讀取或匯出 SQL 全文**）；歷史 `rollback` 欄位沒有已登錄內容。這是建立獨立 Schema 演練的可能來源，但不是現成備份。
+- 九個 V5 Migration 版號目前都未出現在正式 History，沒有已建立的 `v5_` 表／函式／Policy／Trigger。
+- V4 八張核心表 8/8 RLS 開啟、匿名直接讀取 0；必要欄位無缺漏，`workspace_members` 複合 PK 存在。
+- 可重跑的 SELECT-only 診斷：`supabase/diagnostics/v5_production_a1_release_metadata_gate_readonly.sql`。該 SQL **沒有套用任何 Migration**。
+
+### 9.3 接續發布的 Gate 與實作順序
+
+1. **R3：正式 Schema-only 隔離演練（目前 BLOCKED）**。以合法且隔離的管道取得 43-history 的結構，不能把正式 Migration SQL 全文／可能的連線設定直接提交 GitHub 或 CI artifact，不能將正式學生資料複製進公開 CI。確認不含外寄郵件／Webhook 副作用後，在隔離環境逐份施作九份 V5-only SQL，檢查 V4 Trigger、RLS、RPC、Auth 模擬 JWT 與資料不變條件，保留每份 Migration 的 SHA256 與可追溯結果。
+2. **R4：登入與通知整合（目前 PARTIAL）**。核對正式 Supabase Google OAuth Provider / redirect、Vercel 三項 production encrypted env 的目標設定，以及 GAS/Resend 外部副作用；這個準備階段不得寄真實信件、不得讀取密鑰明文或改設定。
+3. **R5：需新的明確正式變更授權**。前面全部 GO 後，提列對 `vctisuglfoxyuwlvyjee` 的**九份 V5-only 向前增量**，依時間排序，記錄版號／hash／失敗停止條件。不執行 `db reset`、全 46 SQL `db push`、migration repair、`TRUNCATE CASCADE`；保留 V4 原有 Schema/服務／Google OAuth。舊資料可捨棄不意味著必須先清空。
+4. **R6：需新的明確 Main/Production 授權**。正式 DB 就緒、驗證 V4 健康與 V5 RLS/RPC 後，再單次合併 PR #58 到 Main，確認 Vercel Production READY 且 SHA 完全一致。前端舊版回滾不會回退資料庫；異常時先停用 V5 寫入並評估向前修復。
+5. **R7：正式 GUI 由 Codex 驗收**。老師、家長、學生、V4 個人／V5 Team 切換、Team 管理者權限及 320/375/390/430 px；Team 測試須先經後端 audit 授予指定測試工作區 Team entitlement，不能靠前端 UI 自行升級方案。
+
+**本次授權邊界：** 僅準備、唯讀核實、分支／PR 安全測試與文件；Production SQL、Auth、資料刪除、Main 合併、正式部署均未獲授權。R3/R4 未通過時仍維持 Release NO-GO。
