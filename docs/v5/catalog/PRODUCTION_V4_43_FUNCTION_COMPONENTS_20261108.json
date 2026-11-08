@@ -1,0 +1,385 @@
+{
+  "source": "production_43_history_function_components",
+  "captured_date": "2026-11-08",
+  "hash_algorithm": "md5",
+  "functions": [
+    {
+      "id": "public.cancel_recurring_schedule(p_schedule_id uuid, p_from date)",
+      "body_h": "2bf83260edfc01a971606dccce778237",
+      "mode_h": "aa1cd17dfc7e65e3be2f2cabe42840b8",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.claim_student_invite(p_invite_id uuid)",
+      "body_h": "3f02d470800b6cdb77cd4135b015d111",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.reverse_legacy_lesson_receipt(p_lesson_id uuid, p_expected_updated_at timestamp with time zone, p_reason text)",
+      "body_h": "9ceffa7e505585b8836cfb2ed5b5af19",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.review_family_request(p_request_id uuid, p_approve boolean)",
+      "body_h": "10157889b55f7891de817269e3617cce",
+      "mode_h": "aa1cd17dfc7e65e3be2f2cabe42840b8",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.review_range_payment(p_batch_id uuid, p_confirm boolean, p_received_on date)",
+      "body_h": "83ce895a3f7ddbcf4eb81d1d9de61c93",
+      "mode_h": "aa1cd17dfc7e65e3be2f2cabe42840b8",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.revoke_student_account_connection(p_student_id uuid, p_email text)",
+      "body_h": "17945f74b5bfdca0c28867debea49ba5",
+      "mode_h": "aa1cd17dfc7e65e3be2f2cabe42840b8",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.shared_course_action(p_action text, p_student_id uuid, p_target_id uuid, p_payload jsonb)",
+      "body_h": "089bfb0ee6bfffbac73718279819b490",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.shared_course_history(p_student_id uuid)",
+      "body_h": "d47f5ff229097b1b76287defae761312",
+      "mode_h": "633b583871f6f7dae08cd4bdd8566c47",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.split_recurring_schedule(p_id uuid, p_effective date, p_student_id uuid, p_subject text, p_weekdays smallint[], p_every_weeks smallint, p_end_date date, p_start_time text, p_end_time text, p_hourly_rate numeric)",
+      "body_h": "6da7d9c2b52e4ca1cbf0f0ba47c178b1",
+      "mode_h": "aa1cd17dfc7e65e3be2f2cabe42840b8",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.student_portal_data()",
+      "body_h": "7308de9ff23d580de37f04acb998c14d",
+      "mode_h": "633b583871f6f7dae08cd4bdd8566c47",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.student_portal_snapshot()",
+      "body_h": "9f9e57f1a7794488b5fbc40c9cfbc38b",
+      "mode_h": "633b583871f6f7dae08cd4bdd8566c47",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "40fb38e361050ffaaaac636353137338"
+    },
+    {
+      "id": "public.submit_range_payment(p_teacher_id uuid, p_student_id uuid, p_period_start date, p_period_end date, p_paid_on date, p_paid_amount numeric, p_note text)",
+      "body_h": "14c48644bd069c348a0ac7865fc0e8e4",
+      "mode_h": "aa1cd17dfc7e65e3be2f2cabe42840b8",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.update_lesson_learning(p_lesson_id uuid, p_expected_updated_at timestamp with time zone, p_lesson_content text, p_focus_rating smallint, p_mood_rating smallint, p_remarks text)",
+      "body_h": "22e1817a68efef24c3314131cad3cac2",
+      "mode_h": "aa1cd17dfc7e65e3be2f2cabe42840b8",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.v4_accounting_qa_snapshot()",
+      "body_h": "bb4195e7720dd0a342a15d65b8e8559c",
+      "mode_h": "633b583871f6f7dae08cd4bdd8566c47",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.v4_apply_payment_correction(p_batch_id uuid, p_idempotency_key uuid, p_reason text, p_lines jsonb)",
+      "body_h": "35c036ccc46a37be78c7357c284e9778",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.v4_cancel_connection_request(p_request_id uuid)",
+      "body_h": "b418e3b6929f43400ae1f0ff1af4bce0",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.v4_claim_connection_link(p_token text, p_child_label text, p_student_id uuid)",
+      "body_h": "fdac9f9d2a358213fa251673b7ff8f90",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.v4_connection_inbox()",
+      "body_h": "02104c0db332572c4cbf3b06a56939d2",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.v4_contact_action(p_id uuid, p_action text)",
+      "body_h": "6da26ec71c9582fedf9aafef3a9b94ad",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.v4_contact_inbox()",
+      "body_h": "9bd42b24003ea899e2407e09ffe7b387",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.v4_contact_request(p_email text, p_my_role text)",
+      "body_h": "c0f65e9d971f3651da0391c7f59cc547",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.v4_create_connection_link(p_side text, p_student_id uuid, p_share boolean)",
+      "body_h": "01147437bff68b1b38ffb854e080e39d",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.v4_decide_connection_request(p_request_id uuid, p_approve boolean, p_student_id uuid)",
+      "body_h": "0da50ec31572232b6068e6f8545bc123",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.v4_disconnect_guardian(p_student_guardian_id uuid)",
+      "body_h": "b2b349bb5199b99b491664f2641bcb86",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.v4_mail_ack(p_id uuid, p_lease uuid, p_ok boolean, p_error text, p_uncertain boolean)",
+      "body_h": "0a4a8ecbafaab531bee6c1630b8ead12",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "40fb38e361050ffaaaac636353137338"
+    },
+    {
+      "id": "public.v4_mail_claim(p_limit integer)",
+      "body_h": "ed0899c6a48f89d5dc16e2f33689d047",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "40fb38e361050ffaaaac636353137338"
+    },
+    {
+      "id": "public.v4_mail_retry(p_id uuid, p_confirm_no_delivery boolean)",
+      "body_h": "7efe34b277696662196702719f8cee6a",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "40fb38e361050ffaaaac636353137338"
+    },
+    {
+      "id": "public.v4_mail_set_app_url(p_app_url text)",
+      "body_h": "4e288ab18281f8a5e482eebe936a980e",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "40fb38e361050ffaaaac636353137338"
+    },
+    {
+      "id": "public.v4_payment_correction_preview(p_batch_id uuid)",
+      "body_h": "a9a8a1ac99e113a2960bcae173434b64",
+      "mode_h": "633b583871f6f7dae08cd4bdd8566c47",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.v4_preview_connection_link(p_token text)",
+      "body_h": "6a0445a16fafa38d17ef0eb15fd54f0f",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "public.v4_request_teacher(p_teacher_email text, p_child_label text)",
+      "body_h": "cc910934d2e23f57c4b23a9884257043",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "b751a6b8accdc7a111379bb6c6af1563"
+    },
+    {
+      "id": "tutor_private.audit_qa_student_mark()",
+      "body_h": "51c65dbb19a260a8d352dc37370f969d",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e15c87b25c5737bd4c71673cc7e60640"
+    },
+    {
+      "id": "tutor_private.create_workspace_owner_membership()",
+      "body_h": "a38021f25554e12f063386d75303bb8d",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e15c87b25c5737bd4c71673cc7e60640"
+    },
+    {
+      "id": "tutor_private.guard_paid_lesson()",
+      "body_h": "1e10cc773230f8b1ba30f1092346868a",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e15c87b25c5737bd4c71673cc7e60640"
+    },
+    {
+      "id": "tutor_private.prevent_financial_lesson_delete()",
+      "body_h": "5729d5f640e06be2d2aaa48cebe26557",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e772acdcdd39949c9037ad6295842c74"
+    },
+    {
+      "id": "tutor_private.review_range_payment(p_batch_id uuid, p_confirm boolean, p_received_on date)",
+      "body_h": "f8135236c3082f34211f0b60cf0221ff",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "5d996352fa9c4650dcdb9ce32e7afd58"
+    },
+    {
+      "id": "tutor_private.revoke_shared_student_invite()",
+      "body_h": "c43365574ecf518b575ff56082f116a1",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e15c87b25c5737bd4c71673cc7e60640"
+    },
+    {
+      "id": "tutor_private.set_payment_item_workspace_id()",
+      "body_h": "5f25ce819b4e0132c179604b9649971f",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e15c87b25c5737bd4c71673cc7e60640"
+    },
+    {
+      "id": "tutor_private.set_teacher_workspace_id()",
+      "body_h": "fe6f473fac116173c1d0bae994227cd6",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e15c87b25c5737bd4c71673cc7e60640"
+    },
+    {
+      "id": "tutor_private.submit_range_payment(p_teacher_id uuid, p_student_id uuid, p_period_start date, p_period_end date, p_paid_on date, p_paid_amount numeric, p_note text)",
+      "body_h": "48469fa6b2dfbeb645af8738b83f18c0",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "5d996352fa9c4650dcdb9ce32e7afd58"
+    },
+    {
+      "id": "tutor_private.v34_assert_schedule_available(p_teacher uuid, p_student uuid, p_starts date, p_ends date, p_days smallint[], p_every smallint, p_start_time text, p_end_time text, p_ignored_rule uuid)",
+      "body_h": "ca79fd12cd5ed54171e9424b50378c26",
+      "mode_h": "633b583871f6f7dae08cd4bdd8566c47",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e15c87b25c5737bd4c71673cc7e60640"
+    },
+    {
+      "id": "tutor_private.v34_guard_exception_write()",
+      "body_h": "7db4238f0e21861b38906e05d3b3b79a",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e15c87b25c5737bd4c71673cc7e60640"
+    },
+    {
+      "id": "tutor_private.v34_guard_lesson_write()",
+      "body_h": "abf46b2a74d4e492b7c11a23d80f3600",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e15c87b25c5737bd4c71673cc7e60640"
+    },
+    {
+      "id": "tutor_private.v34_guard_rule_write()",
+      "body_h": "6135ef7efe79de22f201e9e99204d39e",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e15c87b25c5737bd4c71673cc7e60640"
+    },
+    {
+      "id": "tutor_private.v34_has_conflict(p_teacher uuid, p_student uuid, p_date date, p_start text, p_end text, p_ignore_lesson uuid, p_ignore_occurrence_rule uuid, p_ignore_occurrence_date date, p_superseded_rule uuid, p_superseded_from date)",
+      "body_h": "53b24f9cbca5fcce67f41050952d3bfe",
+      "mode_h": "633b583871f6f7dae08cd4bdd8566c47",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e15c87b25c5737bd4c71673cc7e60640"
+    },
+    {
+      "id": "tutor_private.v34_occurs(p_start date, p_end date, p_cancel date, p_days smallint[], p_frequency smallint, p_day date)",
+      "body_h": "e01f6e3b6121d03bd9a742d74bf0cf30",
+      "mode_h": "d7912ca0144cff103d58bccfc93a6c49",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e15c87b25c5737bd4c71673cc7e60640"
+    },
+    {
+      "id": "tutor_private.v34_revision_stamp()",
+      "body_h": "5344728fb135b42c988f6e81bb368d94",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e15c87b25c5737bd4c71673cc7e60640"
+    },
+    {
+      "id": "tutor_private.v35_track_lesson_feedback()",
+      "body_h": "ee037d53e27a59d4804d3c3e22d84ed8",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e15c87b25c5737bd4c71673cc7e60640"
+    },
+    {
+      "id": "tutor_private.v4_enqueue(p_event_key text, p_recipient text, p_subject text, p_body text)",
+      "body_h": "1fc24ad9a6600d5d9847b1dd2f8422b7",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e15c87b25c5737bd4c71673cc7e60640"
+    },
+    {
+      "id": "tutor_private.v4_guard_and_audit_lesson_qa_mark()",
+      "body_h": "77ca38167d3c362d0476b9cb0ec45a20",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e15c87b25c5737bd4c71673cc7e60640"
+    },
+    {
+      "id": "tutor_private.v4_guard_and_audit_payment_qa_mark()",
+      "body_h": "91aa296c491787dd2ed82411bb774bf3",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e15c87b25c5737bd4c71673cc7e60640"
+    },
+    {
+      "id": "tutor_private.v4_keep_correction_immutable()",
+      "body_h": "1b1f05d5da76bc8bd258cc05ee47b7a7",
+      "mode_h": "aa1cd17dfc7e65e3be2f2cabe42840b8",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e15c87b25c5737bd4c71673cc7e60640"
+    },
+    {
+      "id": "tutor_private.v4_limit(p_action text, p_max integer)",
+      "body_h": "09c10dadcd3238916ce054a2982e79b4",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e15c87b25c5737bd4c71673cc7e60640"
+    },
+    {
+      "id": "tutor_private.v4_notify_legacy_invitation()",
+      "body_h": "43a3bfd81c08c3391c1c479627c7718b",
+      "mode_h": "8be631066ef125ca56e6cad2c9585453",
+      "path_h": "60c55a6c680c4053f3e3dc8044845852",
+      "grants_h": "e15c87b25c5737bd4c71673cc7e60640"
+    }
+  ]
+}
