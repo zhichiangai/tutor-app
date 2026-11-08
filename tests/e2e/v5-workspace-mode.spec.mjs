@@ -150,6 +150,8 @@ test('V5.5.1 mobile parent/student role isolation, no Team switch or student fin
     }));
     expect(widths.page,role+' mobile viewport '+width+' must not overflow horizontally')
      .toBeLessThanOrEqual(widths.viewport);
+    // The sign-out action belongs to Settings, never the billing view.
+    if(role==='parent')await page.locator('.mobile-nav .nav-standard[data-view="settings"]').click();
     await page.locator('#sign-out').click();
     await expect(page.locator('body')).toHaveClass(/login-required/);
     await expect(page.locator('#workspace-mode-card')).toBeHidden();
