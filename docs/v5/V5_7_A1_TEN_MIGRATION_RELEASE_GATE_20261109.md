@@ -17,6 +17,8 @@
 | 前九份 blob SHA | 與 2026-11-08 九份 manifest 一致，9/9 |
 | 新增第十份 | `20261108230000_v57_team_operations_overview.sql`（6,385 bytes；SHA `dc2233dc53f82eee031e9009b34756d27a05d4d1`） |
 
+本輪已實際對正式 Supabase 執行 `supabase/diagnostics/v5_production_a1_ten_migration_gate_readonly.sql`，只有 `WITH ... SELECT`，沒有新增、修改或刪除資料。結果：`migration_count=43`、`latest_migration=20261103212647`、`v5_version_collisions=0`、`existing_v5_objects={tables:0,functions:0,triggers:0,policies:0}`、`v4_core_tables=8`、`v4_core_rls_enabled=8`、`v4_core_anon_direct_select=0`、`missing_required_columns=[]`、`stored_migration_sql_missing=0`、`migration_history_rollbacks_present=0`、`actual_43_history_schema_replay_verified=false`。此結果僅是 metadata，未完成正式相容性演練。
+
 第十份 SQL 使用 `public.v5_teams`、`public.v5_team_governance`、`public.v5_workspace_entitlements`、V5.3/V5.4 私有帳務與稽核表；故**不能單獨在 V4 正式庫執行**。它提供 Team 管理者營運摘要，須獨立驗證授權檢查、跨 Team 隔離與金額彙總；SQL 檔中的 `SECURITY DEFINER` 與 `GRANT EXECUTE` 必須在真實 JWT/RLS 測試中確認安全性。
 
 原有 `V5_A1_NINE_MIGRATION_SOURCE_LOCK_20261108.json` 保留，不能覆寫歷史審核證據。新增 `V5_A1_TEN_MIGRATION_SOURCE_LOCK_20261109.json` 並用 Node 契約驗證檔案名、順序、Git blob SHA 與 bytes；**僅證明原始碼未遭非預期變更，不證明 Migration 可套用或可回滾**。
@@ -25,7 +27,7 @@
 
 | Gate | 條件 | 2026-11-09 本輪結果 |
 | --- | --- | --- |
-| A1-R1 | 43 個正式 Migration 與 V4 Schema Metadata 唯讀核對 | PARTIAL：版本、V5 物件缺席及公開表 RLS 初步確認 |
+| A1-R1 | 43 個正式 Migration 與 V4 Schema Metadata 唯讀核對 | PARTIAL：本輪新十份唯讀診斷顯示 43 筆、10 份版本碰撞 0、既有 V5 物件 0、V4 核心 8/8 RLS、anon 直接 SELECT 0、必要欄位缺漏 0；尚不等於逐 RPC 權限語意或完整 Schema replay |
 | A1-R2 | 十份 SQL SHA／順序鎖定，未來來源變更需重審 | SOURCE LOCK 檔已建立；CI 待確認 |
 | A1-R3 | 從**真實 43-history 的 Schema-only、無學生與付款資料**建立隔離副本，逐份執行 10 份 V5 SQL；驗證既有 V4 Trigger/RPC/RLS，並完成失敗停止及回復演練 | **BLOCKED／NOT TESTED**：尚未取得並驗證隔離副本 |
 | A1-R4 | Google OAuth／回呼、GAS/Resend 通知、正式設定、Privileged RPC 授權與停損 | PARTIAL：不可寄信、不可讀取密鑰；不得臆測已通過 |
