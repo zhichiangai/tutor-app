@@ -39,6 +39,9 @@ async function login(page,role){
   if(error)throw Error('Local synthetic login failed: '+error.message);
   client.auth.stopAutoRefresh?.();
  },{apiUrl:f.apiUrl,anonKey:f.anonKey,email:actor.email,password:actor.password});
+ // A local synthetic sign-in represents an intentional new Google click.
+ // The production UI only releases this lock through its Google button.
+ await page.evaluate(()=>localStorage.setItem('tutor_v4_explicit_logout','0'));
  // The real app's existing client will discover the persisted local GoTrue session.
  await page.reload();
  await expect(page.locator('body')).not.toHaveClass(/login-required/);
@@ -460,4 +463,35 @@ test('logout gate cannot be dismissed or reveal cached account data for parent a
  await expect(page.locator('#student-today-content')).toBeEmpty();
  await page.reload();
  await assertLockedGate();
+});
+
+test('QA-AUTH-01: parent/student signout blocks browser back and reload',async ({page})=>{
+ for(const role of ['parent','student']){
+  await login(page,role);
+  if(role==='student'){
+   await page.locator('.side-nav .nav-student[data-view="student-calendar"]').click();
+   await expect(page.locator('#student-calendar-panel')).toBeVisible();
+  }else{
+   await navigate(page,'billing');
+   await expect(page.locator('#billing-summary')).toContainText('NT$');
+  }
+  await page.locator('#account-action').click();
+  await page.locator('#sign-out').click();
+  await expect(page.locator('body')).toHaveClass(/login-required/);
+  await expect(page.locator('#account-modal')).toBeVisible();
+  await expect(page.locator('#billing-summary')).toBeEmpty();
+  await expect(page.locator('#student-today-content')).toBeEmpty();
+  await expect.poll(()=>page.evaluate(()=>
+   localStorage.getItem('tutor_v4_explicit_logout'))).toBe('1');
+  await page.goto('/v2/privacy.html');
+  await page.goBack();
+  await expect(page.locator('body')).toHaveClass(/login-required/);
+  await expect(page.locator('#account-modal')).toBeVisible();
+  await expect(page.locator('.main-content')).toHaveCSS('visibility','hidden');
+  await expect(page.locator('#student-today-content')).toBeEmpty();
+  await expect(page.locator('#billing-summary')).toBeEmpty();
+  await page.reload();
+  await expect(page.locator('body')).toHaveClass(/login-required/);
+  await expect(page.locator('.main-content')).toHaveCSS('visibility','hidden');
+ }
 });
