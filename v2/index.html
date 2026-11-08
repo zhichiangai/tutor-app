@@ -343,6 +343,17 @@
                 <p class="helper-note">請填每小時的新臺幣整數金額，系統會依實際課程分鐘數計算；確認後不得直接改寫，後續更正須有稽核紀錄。</p>
                 <div id="v5-billing-pending"></div>
               </div>
+              <section class="v5-team-panel hidden" id="v5-operations-card" aria-labelledby="v5-operations-title">
+                <h4 id="v5-operations-title">Team 營運待辦（管理者唯讀）</h4>
+                <p class="helper-note">僅整理已取得管理者權限的當月資料；「未結清」不等於逾期，人工付款不等於銀行已核實入帳。</p>
+                <div class="v5-payment-totals">
+                  <span>待確認課程費用 <strong id="v5-ops-pending-fees"></strong></span>
+                  <span>待確認人工付款 <strong id="v5-ops-pending-payments"></strong></span>
+                  <span>尚未結清課程 <strong id="v5-ops-unpaid-lessons"></strong></span>
+                  <span>尚有未結清課程的學生 <strong id="v5-ops-unpaid-students"></strong></span>
+                </div>
+                <p id="v5-ops-reconciliation" class="section-sub" role="status" aria-live="polite"></p>
+              </section>
               <div class="v5-team-panel" id="v5-payment-panel">
                 <h4>Team 人工收款與部分付款分配</h4>
                 <p class="helper-note">僅供管理者人工登錄已核對的款項，不是銀行或金流平台付款驗證。同一筆款項可分配不同科目、不同課程，但必須是同 Team 同一位學生；超額付款於 V5.4 處理。</p>

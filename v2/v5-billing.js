@@ -1,3 +1,4 @@
+import {deriveV5ManagerOperations} from './v5-operations-summary.js';
 // V5.3 Team receivables: manager-only, immutable course fee confirmations.
 // This module has no payment collection or V4 accounting API access.
 export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
@@ -29,6 +30,12 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   advanceStudents=[];advanceStudentId='';advanceOverview=null;
   advanceReference='manual-advance-'+crypto.randomUUID();
   retryAdvanceOperations.clear();
+  $('v5-operations-card')?.classList.add('hidden');
+  for(const id of ['v5-ops-pending-fees','v5-ops-pending-payments',
+   'v5-ops-unpaid-lessons','v5-ops-unpaid-students',
+   'v5-ops-reconciliation']){
+   if($(id))$(id).textContent='';
+  }
   $('v5-advance-panel')?.classList.add('hidden');
   paymentReference='manual-'+crypto.randomUUID();
   $('v5-billing-card')?.classList.add('hidden');
@@ -55,16 +62,38 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    const opt=item('option',it.label);opt.value=it.value;element.append(opt);
   }
  }
+ function renderOperations(){
+  const panel=$('v5-operations-card');
+  if(!panel)return;
+  // Only show after current manager's two independent RPCs succeed for
+  // the same Team/month. Never trust local UI mode as an access grant.
+  const allowed=ready&&valid()&&!loading&&!error&&!!teamId;
+  const summary=allowed?deriveV5ManagerOperations(overview,paymentOverview):null;
+  panel.classList.toggle('hidden',!summary);
+  const fields={
+   'v5-ops-pending-fees':summary?.unconfirmedLessonCount,
+   'v5-ops-pending-payments':summary?.pendingPaymentCount,
+   'v5-ops-unpaid-lessons':summary?.unpaidLessonCount,
+   'v5-ops-unpaid-students':summary?.unpaidStudentCount
+  };
+  for(const [id,value] of Object.entries(fields)){
+   if($(id))$(id).textContent=summary?String(value):'';
+  }
+  const msg=$('v5-ops-reconciliation');
+  if(msg)msg.textContent=!summary?'':summary.needsReconciliation?
+   '帳務摘要與明細需人工複核，請暫停更正與退款。':
+   '僅顯示課程及人工付款待辦；不代表已驗證銀行入帳或完成退款。';
+ }
  function render(){
   const card=$('v5-billing-card');
   if(!card)return;
   if(!valid()||(!ready&&!loading&&!error)){
-   card.classList.add('hidden');return;
+   card.classList.add('hidden');renderOperations();return;
   }
   // Never display any amount to users without a current successful manager RPC.
   const shown=availableTeams.length>0;
   card.classList.toggle('hidden',!shown);
-  if(!shown)return;
+  if(!shown){renderOperations();return;}
   $('v5-billing-message').textContent=loading?'正在檢查 Team 帳務權限…':
    error||'僅記錄應收費用，不代表家長已付款。確認後不能直接修改金額。';
   const select=$('v5-billing-team-select');
@@ -79,6 +108,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   $('v5-billing-total').textContent=overview?
    money(overview.confirmed_total_cents):'尚無可用資料';
   if(!overview){
+   renderOperations();
    for(const id of ['v5-payment-pending-reports','v5-payment-confirmed-reports']){
     $(id).replaceChildren();
    }
@@ -126,6 +156,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   }
   renderPayments();
   renderAdvance();
+  renderOperations();
  }
  function taipeiDate(){
   const fields=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',
