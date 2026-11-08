@@ -128,6 +128,19 @@ PR #58 Main 整合候選的上一次測試版本：`8a4de788a0111e695ce3e77f4a64
 
 > 不要求保留舊測試資料，不代表資料庫安全與授權測試可以省略。
 
+## 6.5 2026-11-08 補充：正式 OAuth／通知與完整 V4 結構指紋（唯讀）
+
+本節是 2026-11-08 最新追加的實查證據，未修改任何 Production 設定。
+
+- 正式 `auth.identities` 以 **provider 分組筆數**查詢：`google=5`；不讀取姓名、Email 或其他身分內容。這確認資料庫存在 Google 登入身分關聯，**不能直接證明 Google OAuth Console／Supabase Provider、Redirect URL 的現行設定正確**。
+- Vercel `tutor-app-v2` Production 的環境變數**僅讀取鍵名、型別和 target**，已確認 `V4_PRODUCTION_SUPABASE_PROJECT_REF`、`V4_PRODUCTION_SUPABASE_URL`、`V4_PRODUCTION_SUPABASE_PUBLISHABLE_KEY` 三項，均為 production encrypted。沒有讀取、列印或變更任一值；因此尚未完成值與運作狀態驗證。
+- `api/v4-config.js` 要求 Production hostname 與固定專案 ref 相符；`v2/app.js` Google OAuth 導回同一站的 `/v2/index.html`。這是**程式碼靜態條件**，不是實際 Google 登入 PASS。
+- `api/v5-admin.js` **刻意限制於 preview + isolated**，且需要 operator allowlist 和 service key。不能以此前端／API 在正式站直接調整 Team 方案；未來的正式 Team QA 方案授予須單獨規劃、保留 audit 並另行授權，不能把 service_role 鑰匙移到瀏覽器。
+- 正式 Supabase `list_edge_functions` 未列出任何已部署的 Edge Function；GitHub `supabase/functions/v4-gas-bridge` 與 GAS 通知程式明確設定為 isolated/staging-only。**通知整合的正式部署與對外寄信功能不能判定 PASS**；不應為了這項驗收在未授權下發送測試信。
+- Supabase Branch read-only list 只有正式 `main`，沒有既有的可直接使用的正式 Schema 隔離分支。
+- [完整 V4 Production Metadata 指紋](./catalog/PRODUCTION_V4_43_SCHEMA_FINGERPRINT_20261108.json) 取自正式庫（35 tables／287 columns／192 constraints／117 indexes／56 policies／27 triggers／54 functions），物件定義僅儲存雜湊，不含任何個資或付款資料。[同版唯讀 SQL](../../tests/sql/v5_production_schema_fingerprint_readonly.sql) 已在 Production 重跑，七類結果與快照**逐項一致**。
+- GitHub CI 加入 `tests/local/v5-production-schema-fingerprint-compare.mjs`：僅比較已封存的 V4 結構指紋與 disposable CI 上的 V4＋V5 結果，**不讓 CI 連接正式庫**；新增 V5 物件允許作為 additions，既有 V4 物件缺漏／內容變更列入 Release NO-GO 診斷。**即使這項指紋比對 PASS，也只能證明 Metadata 相容，不能取代實際以 43-history Schema 對九份 V5 SQL 的隔離施作。**
+
 ## 7. 下一步交接
 
 - **目前只需完成 A1 的 R3 正式 Schema 相容演練和外部 Auth/OAuth 設定檢查。** 不要重做 46 份 CI clean replay，不要修復 GitHub migration history 編號。
