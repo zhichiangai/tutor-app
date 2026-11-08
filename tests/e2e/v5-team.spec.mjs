@@ -384,6 +384,19 @@ test('manager transfer requires acceptance; personal V4 owner stays unchanged',a
  const successorManaged=await rest(successor,'POST','rpc/v5_my_managed_teams',{});
  assert.equal(successorManaged.status,200);
  assert.equal(successorManaged.data.some(t=>t.workspace_id===ws),true);
+ // V5.7 operational finance/reporting must consult CURRENT governance, not a
+ // stale JWT. It must never let the old manager continue reading Team metrics.
+ const reportTeam=db("select id from public.v5_teams where anchor_workspace_id='"+
+  ws+"'");
+ const formerReport=await rest(owner,'POST','rpc/v5_team_operations_overview',{
+  p_team_id:reportTeam,p_month:'2026-10-01'
+ });
+ assert.notEqual(formerReport.status,200,'Former manager JWT cannot query Team operations');
+ const currentReport=await rest(successor,'POST','rpc/v5_team_operations_overview',{
+  p_team_id:reportTeam,p_month:'2026-10-01'
+ });
+ assert.equal(currentReport.status,200,'Current manager can query Team operations');
+ assert.equal(currentReport.data.financial_authority,'manager_only');
 
  // No cached JWT permission may survive: old owner can no longer govern.
  assert.notEqual((await rest(owner,'POST','v5_team_projects?select=id',{
