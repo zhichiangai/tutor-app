@@ -13,7 +13,7 @@ assert.equal(process.env.CI,'true');
 assert.equal(process.env.V4_E2E_LOCAL,'1');
 assert.equal(baseline.source,'production_43_history_function_components');
 assert.equal(baseline.functions.length,54,'Expected 54 V4 functions in Production baseline');
-const stripped=sql.replace(/--[^\n]*/g,'');
+const stripped=sql.replace(/--[^\n]*/g,'').replace(/'(?:''|[^'])*'/g,"''");
 assert.ok(!/\b(?:create|alter|drop|truncate|insert|update|delete|grant|revoke|execute)\b/i.test(stripped),
  'Function component query must be SELECT-only');
 const output=execFileSync('docker',[
