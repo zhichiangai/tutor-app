@@ -34,7 +34,7 @@ async function signIn(page,role){
 test('teacher changes workspace in Settings and V4 personal navigation remains available',async({page})=>{
  await signIn(page,'teacher');
  await expect(page.locator('body')).toHaveClass(/teacher-personal-workspace/);
- await page.locator('.side-nav [data-view="settings"]').click();
+ await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
  await expect(page.locator('#workspace-mode-card')).toBeVisible();
  await page.locator('[data-workspace-mode="team"]').click();
  await expect(page.locator('body')).toHaveClass(/teacher-team-workspace/);
@@ -68,7 +68,7 @@ test('parent and student keep legacy role navigation without Team switch',async(
     await page.locator('.side-nav [data-view="student-calendar"]').click();
     await expect(page.locator('#view-student')).toBeVisible();
    }else{
-    await page.locator('.side-nav [data-view="settings"]').click();
+    await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
     await expect(page.locator('#workspace-mode-card')).toBeHidden();
     await page.locator('.side-nav [data-view="billing"]').click();
     await expect(page.locator('#view-billing')).toBeVisible();
