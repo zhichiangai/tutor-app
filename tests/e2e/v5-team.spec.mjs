@@ -792,6 +792,8 @@ test('V5.3 shared calendar shows two teachers; assigned teacher has no manager c
    if(error)throw Error('Synthetic Team GUI login failed');
    supa.auth.stopAutoRefresh?.();
   },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
+  // Disposable QA only: simulate deliberate new Google-login click.
+  await page.evaluate(()=>localStorage.setItem('tutor_v4_explicit_logout','0'));
   await page.reload();
   await expect(page.locator('body')).not.toHaveClass(/login-required/);
   await openTeamSection(page,'learning');
@@ -1073,6 +1075,8 @@ test('V5.3 Team manager GUI confirms a lesson receivable; regular teachers canno
    if(error)throw Error('Synthetic fee UI login failed');
    s.auth.stopAutoRefresh?.();
   },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
+  // Disposable QA only: simulate deliberate new Google-login click.
+  await page.evaluate(()=>localStorage.setItem('tutor_v4_explicit_logout','0'));
   await page.reload();
   await expect(page.locator('body')).not.toHaveClass(/login-required/);
   await openTeamSection(page,section);

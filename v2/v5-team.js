@@ -1,3 +1,17 @@
+// Supabase/PostgREST error codes distinguish absent schema objects from
+// temporary network failures and permission errors. Never display raw
+// backend messages (which can contain internal details) to end users.
+export function describeV5TeamLoadError(failure){
+ const code=String(failure?.code||'').toUpperCase();
+ const message=String(failure?.message||'');
+ const missing=['PGRST202','PGRST205','42P01','42883'].includes(code)||
+  /could not find (?:the )?(?:table|function).*schema cache/i.test(message)||
+  /(?:relation|function) .{1,160} does not exist/i.test(message);
+ return missing?
+  'Team 資料庫尚未啟用（資料表或 RPC 尚未就緒），目前無法使用團隊專案、邀請及帳務。個人家教可繼續使用。':
+  '暫時無法取得 Team 資料，請稍後重新進入 Team 頁面；個人家教不受影響。';
+}
+
 // V5.2 Team projects and invitations. PostgreSQL RLS/RPC is authoritative.
 // This module never grants V4 lesson or payment access to teammates.
 export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspace,notify}){
@@ -14,6 +28,7 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
  function clear(){
   generation++;identity='';loading=false;ready=false;error='';data=null;writing=false;selectedManagedWorkspace='';
   $('v5-team-card')?.classList.add('hidden');
+  $('v5-team-owner-controls')?.classList.add('hidden');
   for(const id of ['v5-team-invite-list','v5-team-project-list',
    'v5-team-members-list','v5-team-assignments','v5-team-message',
    'v5-team-transfer-list']){
@@ -25,7 +40,19 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
   const card=$('v5-team-card');
   if(!card)return;
   if(!valid()){card.classList.add('hidden');return}
-  if(!ready&&!loading){card.classList.add('hidden');return}
+  if(!ready&&!loading&&!error){card.classList.add('hidden');return}
+  // If the Team backend is missing, never render a fake empty-project state.
+  // In-flight and failed requests must also discard prior manager-only rows.
+  if(loading||error){
+   card.classList.remove('hidden');
+   $('v5-team-message').textContent=loading?
+    '正在確認 Team 權限與專案資料…':error;
+   $('v5-team-owner-controls')?.classList.add('hidden');
+   for(const key of ['v5-team-invite-list','v5-team-project-list',
+    'v5-team-members-list','v5-team-assignments','v5-team-transfer-list'])
+    $(key)?.replaceChildren();
+   return;
+  }
   const current=data||{plan:null,managed:[],projects:[],invites:[],
    members:[],assignments:[],transfers:[]};
   const managed=current.managed||[];
@@ -186,7 +213,7 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
  async function refresh(){
   if(!valid()){clear();return}
   const id=getUser().id,stamp=++generation;
-  identity=id;loading=true;error='';render();
+  identity=id;loading=true;ready=false;data=null;error='';render();
   const client=getClient();
   if(!client){error='尚未連線到授權資料庫';loading=false;render();return}
   try{
@@ -203,8 +230,8 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
    if(stamp!==generation||getUser()?.id!==id||!valid())return;
    const failure=r.find(x=>x.error);
    if(failure){
-    error=/PGRST|relation.*does not exist/i.test(failure.error?.message||'')?
-     'V5.2 Team 資料庫尚未啟用。':'無法取得 Team 資料，請重新進入設定頁。';
+    ready=false;
+    error=describeV5TeamLoadError(failure.error);
     data=null;
    }else{
     data={plan:r[0].data,projects:r[1].data||[],invites:r[2].data||[],
@@ -214,7 +241,7 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
    }
   }catch{
    if(stamp!==generation||getUser()?.id!==id||!valid())return;
-   error='無法連線 Team 資料，稍後再試。';data=null;
+   ready=false;error=describeV5TeamLoadError(null);data=null;
   }finally{
    if(stamp===generation&&getUser()?.id===id&&valid()){loading=false;render()}
   }

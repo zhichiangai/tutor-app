@@ -2605,6 +2605,50 @@ async function restoreLesson(id){
  if(ok){toast("已恢復原本的課程安排");refreshDaySheet()}
 }
 
+
+const LOGOUT_LOCK_KEY="tutor_v4_explicit_logout";
+let logoutLockMemory=false;
+function logoutLocked(){try{return logoutLockMemory||localStorage.getItem(LOGOUT_LOCK_KEY)==="1"}catch{return logoutLockMemory}}
+function markLogout(){logoutLockMemory=true;try{localStorage.setItem(LOGOUT_LOCK_KEY,"1")}catch{}}
+function allowGoogleLogin(){logoutLockMemory=false;try{localStorage.setItem(LOGOUT_LOCK_KEY,"0")}catch{}}
+function forgetCachedAuth(){
+ const ref=V4_CONFIG?.projectRef;
+ if(ref)try{localStorage.removeItem?.("sb-"+ref+"-auth-token")}catch{}
+}
+function scrubOAuthCallback(){
+ const loc=typeof window==='undefined'?null:window.location;if(!loc||!window.history?.replaceState)return;
+ const p=new URLSearchParams(loc.search||"");let changed=false;
+ for(const k of ["code","access_token","refresh_token","token_type","expires_in",
+  "expires_at","provider_token","provider_refresh_token"]){
+  if(p.has(k)){p.delete(k);changed=true}
+ }
+ const hash=String(loc.hash||"");
+ const oauthHash=/^#(?:access_token|refresh_token|token_type|expires_in)=/.test(hash);
+ if(oauthHash)changed=true;
+ if(changed)window.history.replaceState(null,"",(loc.pathname||"/v2/index.html")+
+  (p.toString()?"?"+p.toString():"")+(oauthHash?"":hash));
+}
+function showLogoutGate(){
+ authPhase="signedOut";activeUser=null;signOutRequested=false;
+ clearUserSessionState();state.mode="live";render();showModal("account-modal");
+}
+function registerHistoryGuards(){
+ window.addEventListener?.("pagehide",()=>{
+  document.body?.classList?.add?.("auth-pending");
+  authPhase="checking";activeUser=null;clearUserSessionState();
+  render();showModal("account-modal");
+ });
+ window.addEventListener?.("pageshow",event=>{
+  if(!event.persisted)return;
+  if(logoutLocked()){scrubOAuthCallback();showLogoutGate();return}
+  authPhase="checking";activeUser=null;clearUserSessionState();
+  render();showModal("account-modal");void initializeLive();
+ });
+ window.addEventListener?.("storage",event=>{
+  if(event.key===LOGOUT_LOCK_KEY&&event.newValue==="1")showLogoutGate();
+ });
+}
+
 const LIVE_TABLES=["student_invites","student_links","student_invitations","students","lesson_records","guardian_invites","student_guardians","family_requests","recurring_schedules","schedule_exceptions","payment_batches","payment_batch_items","payment_batch_corrections","payment_batch_correction_items","profiles","workspaces","workspace_members"];
 const LIVE_FIELDS=["studentInvites","studentLinks","studentLegacyInvites","students","lessons","invites","guardians","requests","schedules","exceptions","paymentBatches","paymentBatchItems","paymentCorrections","paymentCorrectionItems","profiles","workspaces","workspaceMembers"];
 let authDataGeneration=0;
@@ -2731,6 +2775,7 @@ async function ensureClient(){
  if(!createClient)throw Error("登入元件載入失敗，請重新整理頁面後再試");
  client=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
  client.auth.onAuthStateChange((event,session)=>{
+  if(logoutLocked()){showLogoutGate();return}
   if(signOutRequested&&event!=="SIGNED_OUT")return;
   if(event==="SIGNED_OUT")signOutRequested=false;
   const previousId=activeUser?.id||null;
@@ -2753,6 +2798,7 @@ async function ensureClient(){
 }
 async function initializeLive(){
  if(signOutRequested)return;
+ if(logoutLocked()){scrubOAuthCallback();showLogoutGate();return}
  const callbackIssue=captureOAuthCallbackError();
  if(callbackIssue)oauthCallbackIssue=callbackIssue;
  const bootGeneration=authDataGeneration;
@@ -2766,6 +2812,7 @@ async function initializeLive(){
   await ensureClient();
   const {data,error}=await client.auth.getSession();
   if(signOutRequested||bootGeneration!==authDataGeneration)return;
+  if(logoutLocked()){showLogoutGate();return}
   if(error)throw error;
   activeUser=data.session?.user||null;
   if(activeUser){
@@ -2819,6 +2866,8 @@ async function initializeLive(){
    await loadTeacherPreferences();
    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    oauthCallbackIssue="";
+   if(logoutLocked()){showLogoutGate();return}
+   scrubOAuthCallback();
    authPhase="ready";
    closeModal("account-modal");
    toast("歡迎回來，課程都準備好了");
@@ -2869,6 +2918,7 @@ async function initializeLive(){
 }
 async function googleLogin(){
  try{
+  allowGoogleLogin();
   signOutRequested=false;
   oauthCallbackIssue="";
   authPhase="checking";
@@ -2878,6 +2928,7 @@ async function googleLogin(){
   const {error}=await db.auth.signInWithOAuth({provider:"google",options:{redirectTo:oauthRedirectUrl()}});
   if(error)throw error;
  }catch(err){
+  markLogout();activeUser=null;clearUserSessionState();
   console.error(err);
   authPhase="signedOut";
   render();
@@ -2886,7 +2937,8 @@ async function googleLogin(){
  }
 }
 async function signOut(){
- // Immediately erase private data before awaiting the remote Auth response.
+ // Persist logout intent before asynchronous Supabase requests.
+ markLogout();
  oauthCallbackIssue="";
  signOutRequested=true;
  authPhase="signedOut";
@@ -2901,12 +2953,16 @@ async function signOut(){
    const {error}=await db.auth.signOut();
    if(error)throw error;
   }
-  signOutRequested=false;
   toast("已登出 Google 帳號");
  }catch(err){
-  // A failed remote signout must never repopulate the previous learner's DOM.
-  console.warn("Google 登出未完成",err);
-  toast("本機學習資料已清空，但遠端登出未完成；請稍後重新驗證登入狀態",8000);
+  if(err?.name==="AuthSessionMissingError"){
+   toast("此裝置已清除登入狀態，請重新使用 Google 登入");
+  }else{
+   console.warn("Google 遠端登出未完成",err);
+   toast("此裝置已鎖定私人資料，但遠端登出未完成確認；請稍後重新登入",8000);
+  }
+ }finally{
+  forgetCachedAuth();signOutRequested=false;
  }
 }
 function bindEvents(){
@@ -3146,6 +3202,7 @@ function bindEvents(){
 function moveMonth(offset){state.month=new Date(state.month.getFullYear(),state.month.getMonth()+offset,1);render();applyPreviewReadOnlyControls()}
 function main(){
  state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
+ registerHistoryGuards();
  for(const k of LIVE_FIELDS)state[k]=[];
  bindEvents();render();
  showModal("account-modal");

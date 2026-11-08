@@ -20,7 +20,7 @@ test('V5 missing RPC is a visible unavailable state, never fake membership or qu
  assert.match(plan,/status='unavailable'/);
  assert.match(plan,/現有課程與帳務可繼續使用/);
  assert.match(plan,/if\(status!=='ready'\|\|!data\|\|owner!==getUser\(\)\.id\)return true/);
- assert.match(teams,/V5\.2 Team 資料庫尚未啟用/);
+ assert.match(teams,/Team 資料庫尚未啟用/);
  assert.match(teams,/const failure=r\.find\(x=>x\.error\)/);
 });
 test('Production deployment of V5 code never silently applies SQL',()=>{
