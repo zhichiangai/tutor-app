@@ -62,6 +62,15 @@ test('parent and student keep legacy role navigation without Team switch',async(
   const page=await browser.newPage();
   try{
    await signIn(page,role);
+   // Earlier Team governance tests legitimately enable teacher mode on this
+   // synthetic parent account. Select its parent role explicitly before
+   // asserting parent-only navigation; mode is not a database permission.
+   if(role==='parent'&&
+     !(await page.locator('#role-indicator-text').textContent()).includes('家長模式')){
+    await page.locator('#role-indicator').click();
+    await page.locator('#role-menu [data-role-choice="parent"]').click();
+    await expect(page.locator('#role-indicator-text')).toContainText('家長模式');
+   }
    await expect(page.locator('body')).not.toHaveClass(/teacher-team-workspace/);
    if(role==='student'){
     await expect(page.locator('body')).toHaveClass(/student-mode/);
