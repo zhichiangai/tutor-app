@@ -985,3 +985,9 @@ body.preview-readonly .app-shell [aria-disabled="true"]{cursor:not-allowed}
 .teacher-team-workspace.team-section-settings #view-settings #v5-billing-card,
 .teacher-team-workspace.team-section-settings #view-settings #team-workspace-intro{display:none!important}
 .teacher-team-workspace .nav-team[aria-current="page"]{font-weight:700}
+
+/* Keep Team-only help absent for parent/student and personal teachers. */
+.team-workspace-intro{display:none!important}
+.teacher-team-workspace.team-section-projects #team-workspace-intro,
+.teacher-team-workspace.team-section-learning #team-workspace-intro,
+.teacher-team-workspace.team-section-billing #team-workspace-intro{display:flex!important}
