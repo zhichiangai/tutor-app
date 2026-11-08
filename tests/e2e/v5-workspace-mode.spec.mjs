@@ -106,3 +106,56 @@ test('320/375/390/430 mobile workspace switch keeps distinct personal and Team t
   }finally{await page.close()}
  }
 });
+
+test('V5.5.1 mobile parent/student role isolation, no Team switch or student financial data',async({browser})=>{
+ for(const width of [320,375,390,430]){
+  for(const role of ['parent','student']){
+   const page=await browser.newPage({viewport:{width,height:760}});
+   try{
+    await signIn(page,role);
+    if(role==='parent'&&
+      !(await page.locator('#role-indicator-text').textContent()).includes('家長模式')){
+     await page.locator('#role-indicator').click();
+     await page.locator('#role-menu [data-role-choice="parent"]').click();
+     await expect(page.locator('#role-indicator-text')).toContainText('家長模式');
+    }
+    await expect(page.locator('body')).not.toHaveClass(/teacher-team-workspace/);
+    await expect(page.locator('.mobile-nav .nav-team[data-team-section="projects"]')).toBeHidden();
+    await expect(page.locator('.mobile-nav .nav-team[data-team-section="billing"]')).toBeHidden();
+    if(role==='parent'){
+     await expect(page.locator('.mobile-nav .nav-standard[data-view="billing"]')).toBeVisible();
+     await expect(page.locator('.mobile-nav .nav-student[data-view="student-calendar"]')).toBeHidden();
+     await page.locator('.mobile-nav .nav-standard[data-view="settings"]').click();
+     await expect(page.locator('#workspace-mode-card')).toBeHidden();
+     await page.locator('.mobile-nav .nav-standard[data-view="billing"]').click();
+     await expect(page.locator('#view-billing')).toBeVisible();
+    }else{
+     await expect(page.locator('body')).toHaveClass(/student-mode/);
+     await expect(page.locator('.mobile-nav .nav-standard[data-view="billing"]')).toBeHidden();
+     for(const [view,panel] of [
+      ['student-today','student-today-panel'],
+      ['student-calendar','student-calendar-panel'],
+      ['student-learning','student-learning-panel']
+     ]){
+      await page.locator('.mobile-nav .nav-student[data-view="'+view+'"]').click();
+      await expect(page.locator('#'+panel)).toBeVisible();
+      await expect(page.locator('#'+panel)).not.toContainText('NT$');
+     }
+     await page.locator('.mobile-nav .nav-student[data-view="settings"]').click();
+     await expect(page.locator('#workspace-mode-card')).toBeHidden();
+    }
+    const widths=await page.evaluate(()=>({
+     viewport:document.documentElement.clientWidth,
+     page:document.documentElement.scrollWidth
+    }));
+    expect(widths.page,role+' mobile viewport '+width+' must not overflow horizontally')
+     .toBeLessThanOrEqual(widths.viewport);
+    await page.locator('#sign-out').click();
+    await expect(page.locator('body')).toHaveClass(/login-required/);
+    await expect(page.locator('#workspace-mode-card')).toBeHidden();
+   }finally{
+    await page.close();
+   }
+  }
+ }
+});
