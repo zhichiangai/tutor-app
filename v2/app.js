@@ -3127,8 +3127,8 @@ function bindEvents(){
  $("#workspace-create").onclick=()=>saveMyWorkspace(false);
  $("#workspace-rename").onclick=()=>saveMyWorkspace(true);
  $("#parent-teacher-select").onchange=()=>{state.parentTeacherFilter=$("#parent-teacher-select").value;render()};
- $("#profile-button").onclick=()=>activeUser?setView("settings"):showModal("account-modal");
- $("#account-action").onclick=()=>activeUser?setView("settings"):showModal("account-modal");
+ $("#profile-button").onclick=()=>activeUser?(isTeamWorkspace()?setTeamSection("settings"):setView("settings")):showModal("account-modal");
+ $("#account-action").onclick=()=>activeUser?(isTeamWorkspace()?setTeamSection("settings"):setView("settings")):showModal("account-modal");
  $("#google-login").onclick=googleLogin;
  $("#login-retry").onclick=initializeLive;
  $("#login-preview-dismiss").onclick=()=>{if(!previewBackendUnavailable())return;enterPreviewReadOnly();closeModal("account-modal")};
