@@ -73,6 +73,12 @@ V4 自己的學生在 public.students，Team 學生在 public.v5_team_students�
 
 因此目前產品行為是**模式與業務資料隔離，但方案／名額錨點共用**。若日後改成「個人訂閱和 Team 訂閱完全分開」，屬額外產品與資料模型變更；本輪不能把現況寫成已完全分離。
 
+### 3.4 Team 模式可見，不等於 Team 方案已啟用（正式驗收重要關卡）
+
+九份 V5 SQL 的首份會把既有 workspace 的 plan_code 初始化為 **free**；Team 課程、名額與管理功能透過資料庫規則檢查 plan_code='team'。管理員調整方案只能透過 service_role 專用 RPC（例如 public.v5_admin_apply_plan），**不能由老師切換前端模式或在瀏覽器自行授權**。
+
+因此，未來正式資料庫增量 Migration 全部套用後，還要先在受控的後端管理作業中，為**明確指定的合成測試老師工作區**授予 Team 測試方案，留存 audit，再由 Codex 測 Team；測完需規劃恢復／停用測試權限。這個授權尚未執行，且不得把 service_role key 放到前端、GitHub 或聊天記錄。沒有這一步，不能把「Team 選單可點」當成「Team 功能正常」。
+
 ## 4. 隔離環境驗收證據（不能推論正式相容）
 
 PR #58 Main 整合候選的上一次測試版本：`8a4de788a0111e695ce3e77f4a64205245915767`
