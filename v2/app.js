@@ -2811,7 +2811,9 @@ async function initializeLive(){
     if(localStorage.getItem(roleKey)===state.role)localStorage.setItem(pendingKey,"0");
    }
    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
-   state.view=state.role==="student"?"student-today":isTeamWorkspace()?"settings":"home";
+   state.view=state.role==="student"?"student-today":"home";
+   // Preserve the original V4 first-login route; Team stays inside settings.
+   if(isTeamWorkspace())state.view="settings";
    await loadSharedCourseHistory();
    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    await loadTeacherPreferences();
