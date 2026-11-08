@@ -93,6 +93,14 @@ jobs:
           # Hosted-link checks already ran before Supabase startup. The gate
           # itself only uses docker exec against the disposable local container.
           node tests/local/v5-clean-bootstrap-gate.mjs
+      - name: Diagnose complete Production 43-history V4 catalog against clean V4+V5
+        run: |
+          set -euo pipefail
+          test "$CI" = "true"
+          test "$V4_E2E_LOCAL" = "1"
+          # Diagnostic-only: any drift is explicitly NO-GO in the JSON result.
+          # No linked/remote DB is accessed; only disposable Docker Postgres.
+          node tests/local/v5-production-schema-fingerprint-compare.mjs
       - name: Reproduce Production-like legacy payment SELECT only in disposable CI
         run: |
           set -euo pipefail
