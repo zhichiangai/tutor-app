@@ -71,7 +71,7 @@ test('settings-only selector, intact V4 routes and distinct Team cards',()=>{
  for(const name of ['personal','team']){
   assert.match(html,new RegExp('data-workspace-mode="'+name+'"'));
  }
- assert.match(js,/localStorage\.setItem\(WORKSPACE_MODE_STORAGE\+"_ "\+activeUser\.id/); // replaced below
+ assert.ok(js.includes('localStorage.setItem(WORKSPACE_MODE_STORAGE+"_"+activeUser.id,next)'), 'Account-scoped preference must be persisted');
  assert.match(js,/v5TeamUI\.clear\(\);v5LearningUI\.clear\(\);v5BillingUI\.clear\(\)/);
  assert.match(css,/\.teacher-team-workspace \.side-nav \.nav-standard/);
  assert.match(css,/\.nav-team\{display:none!important\}/);
