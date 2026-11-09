@@ -7,6 +7,7 @@ const root=new URL('../',import.meta.url);
 const ui=readFileSync(new URL('v2/v56-adjustments.js',root),'utf8');
 const billing=readFileSync(new URL('v2/v5-billing.js',root),'utf8');
 const html=readFileSync(new URL('v2/index.html',root),'utf8');
+const app=readFileSync(new URL('v2/app.js',root),'utf8');
 
 test('V5.6 browser module and connected Team billing module parse cleanly',()=>{
  for(const name of ['v2/v56-adjustments.js','v2/v5-billing.js'])
@@ -60,4 +61,9 @@ test('V5.6 adjustment controls are isolated to Team billing and preserve histori
  assert.match(html,/退款目前只處理尚未抵扣的預收款/);
  assert.doesNotMatch(ui,/\b(?:update|delete|upsert)\s*\(\s*['"](?:lesson_records|payment_batches)/i);
  assert.doesNotMatch(ui,/service_role|SUPABASE_SERVICE_ROLE_KEY/i);
+});
+
+test('V5.6 manager buttons reach the top-level delegated click controller',()=>{
+ assert.match(app,/ev\\.target\\.closest\\(\"\\[data-v5-billing-action\\], \\[data-v56-action\\]\"\\)/);
+ assert.match(app,/await v5BillingUI\\.handleClick\\(ev\\.target\\)/);
 });
