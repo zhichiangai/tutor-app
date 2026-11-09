@@ -2185,3 +2185,69 @@ test('V5.6 append-only pending void, metadata correction and unused-credit refun
  assert.equal(db("select count(*) from public.payment_batches"),beforeV4,
   'All V4 personal billing data remains untouched');
 });
+
+
+test('V5.6 manager GUI enables append-only pending void and displays audited refund history',async({page})=>{
+ // Isolated synthetic actor and Team B from the previous manager transfer
+ // and V5.6 backend tests; no real bank, family, course, or production writes.
+ const owner=f.actors.parent.id,manager=f.actors.teacher;
+ const teamWs=db("select id from public.workspaces where owner_id='"+owner+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+teamWs+"'");
+ const student=db("select c.student_id from tutor_private.v5_team_advance_credits c "+
+  "join tutor_private.v5_team_payment_reports p on p.id=c.payment_id "+
+  "where c.team_id='"+team+"' and p.reference='TRANSFER-ADVANCE-ISOLATION'");
+ assert.match(student,/^[0-9a-f-]{36}$/i);
+ const jwt=await signIn('teacher');
+ let submitted=await rest(jwt,'POST','rpc/v5_report_team_payment',{
+  p_team_id:team,p_student_id:student,p_amount_cents:100,
+  p_received_on:'2026-10-26',p_method:'cash',
+  p_reference:'V56-UI-PENDING-001',
+  p_note:'Synthetic UI pending item, never a bank transfer'
+ });
+ assert.equal(submitted.status,200);
+ const payment=submitted.data.payment_id;
+ await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
+  route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
+   contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+ await page.addInitScript(({url,key})=>{
+  window.V4_LOCAL_BACKEND={
+   environment:'local',isolated:true,projectRef:'local',url,publishableKey:key
+  };
+ },{url:f.apiUrl,key:f.anonKey});
+ await page.goto('/v2/index.html');
+ await page.waitForFunction(()=>!!window.supabase?.createClient,{timeout:20_000});
+ await page.evaluate(async({url,key,email,password})=>{
+  const supa=window.supabase.createClient(url,key,{
+   auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+  });
+  const {error}=await supa.auth.signInWithPassword({email,password});
+  if(error)throw Error('Isolated V5.6 Team manager login failed');
+  supa.auth.stopAutoRefresh?.();
+ },{url:f.apiUrl,key:f.anonKey,email:manager.email,password:manager.password});
+ await page.reload();
+ await expect(page.locator('body')).not.toHaveClass(/login-required/);
+ await openTeamSection(page,'billing');
+ await expect(page.locator('#v5-billing-card')).toBeVisible();
+ await page.locator('#v5-billing-team-select').selectOption(team);
+ // Synthetic pending payment was received in October; its event history is
+ // added in November after the manager's UI action.
+ await page.locator('#v5-billing-prev').click();
+ await expect(page.locator('#v56-adjustments-panel')).toBeVisible();
+ await expect(page.locator('#v56-adjustments-message')).toContainText('現任 Team 管理者');
+ const pending=page.locator('#v56-adjustments-payments [data-v56-action="void"][data-id="'+payment+'"]');
+ await expect(pending).toBeVisible();
+ page.on('dialog',dialog=>dialog.type()==='prompt'?
+  dialog.accept('Synthetic GUI pending void approved for testing'):dialog.accept());
+ await pending.click();
+ await expect.poll(()=>db("select count(*) from tutor_private.v56_team_pending_payment_voids "+
+  "where payment_id='"+payment+"'"),{timeout:15000}).toBe('1');
+ await expect(page.locator('#v56-adjustments-payments')).toContainText('已沖銷');
+ await page.locator('#v5-billing-next').click();
+ await expect(page.locator('#v56-adjustments-panel')).toBeVisible();
+ await expect(page.locator('#v56-adjustments-history')).toContainText('付款更正');
+ await expect(page.locator('#v56-adjustments-history')).toContainText('預收款退款');
+ await expect(page.locator('#v56-adjustments-history')).toContainText('管理者登記已付款');
+ await expect(page.locator('#v56-adjustments-history')).toContainText('待確認付款沖銷');
+ assert.equal(db("select status from tutor_private.v5_team_payment_reports where id='"+
+  payment+"'"),'pending','GUI void preserves original unconfirmed ledger row');
+});
