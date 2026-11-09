@@ -17,7 +17,7 @@ test('release blocks blindly replaying incompatible historical migrations',()=>{
  // This file is a frozen V4 release snapshot. New V5 migrations have a
  // separate release gate and must never be silently folded into V4 history.
  const v5Files=files.filter(p=>/^202611[0-9]{8}_v5_/.test(p));
- assert.deepEqual(v5Files,[
+ assert.deepEqual(v5Files.slice(0,9),[
   '20261104131300_v5_1_entitlements_student_seats.sql',
   '20261105171000_v5_1_admin_qa_release.sql',
   '20261105181500_v5_2_team_projects_invitations.sql',
@@ -27,7 +27,10 @@ test('release blocks blindly replaying incompatible historical migrations',()=>{
   '20261106034000_v5_3_partial_payment_allocation.sql',
   '20261106043000_v5_4_team_advance_credit.sql',
   '20261106050000_v5_4_team_monthly_reconciliation.sql'
- ],'Review the separate V5 release map before accepting new V5 migrations');
+ ],'Historical nine-file V5 release snapshot is immutable');
+ assert.deepEqual(v5Files.slice(9),[
+  '20261109163000_v5_6_team_refund_correction_ledger.sql'
+ ],'V5.6 uses its own eleven-file source lock, not the frozen V4 release map');
  const futureAdditions=['20261108230000_v57_team_operations_overview.sql'];
  assert.deepEqual(files.filter(p=>futureAdditions.includes(p)),futureAdditions,
   'Additional V5.7 SQL must be separately reviewed, never replayed as V4');
