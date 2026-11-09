@@ -83,6 +83,12 @@ jobs:
             grep -iE '(error|failed|invalid|unknown|panic|docker|cannot|timeout)' "$start_log" |
               sed -E 's/eyJ[A-Za-z0-9_.-]+/[JWT_REDACTED]/g; s/sb_(publishable|secret)_[A-Za-z0-9_-]+/[KEY_REDACTED]/g; s#postgres(ql)?://[^ ]+#[DB_URI_REDACTED]#g; s#https?://[^ ]+#[URL_REDACTED]#g; s/[A-Za-z0-9_+\/=-]{80,}/[LONG_TOKEN_REDACTED]/g' |
               head -n 5 || true
+            # Only emit narrowly filtered migration/SQL failure diagnostics.
+            # Never dump the full log (which may contain local test keys).
+            echo "::notice::Sanitized migration/SQL startup diagnostics:"
+            grep -Ei 'applying migration|migration .*\.sql|^error:|^failed |^fatal:|^panic:|sqlstate|^\s*error:' "$start_log" |
+              sed -E 's/eyJ[A-Za-z0-9_.-]+/[JWT_REDACTED]/g; s/sb_(publishable|secret)_[A-Za-z0-9_-]+/[KEY_REDACTED]/g; s#postgres(ql)?://[^ ]+#[DB_URI_REDACTED]#g; s#https?://[^ ]+#[URL_REDACTED]#g; s/[A-Za-z0-9_+\/=:-]{80,}/[LONG_TOKEN_REDACTED]/g' |
+              tail -n 12 || true
             docker ps -a --filter name=tutor_v4_isolated --format 'container={{.Names}} state={{.Status}}' || true
             exit 1
           fi
