@@ -3,7 +3,7 @@
   "project": "tutor-app",
   "approved_release": "NO_GO",
   "captured_at": "2026-11-10",
-  "source_commit_sha": "eafff330468408c4dcd833ced81529207df94721",
+  "source_commit_sha": "81908998263efc863a5a315375be059c548daecb",
   "supersedes_release_candidate": "docs/v5/catalog/V5_A1_SIXTEEN_MIGRATION_SOURCE_LOCK_20261110.json",
   "verification": "git_blob_sha1_exact_bytes",
   "purpose": "17 forward V5 SQL; manager original refundable source read model and net credit refund capacity, DISPOSABLE CI, NO-GO Production.",
