@@ -3005,7 +3005,7 @@ function bindEvents(){
   if(ev.target.closest("[data-v4-action]")){await v4ConnectionUI.handleClick(ev.target);return}
   if(ev.target.closest("[data-v5-team-action]")){await v5TeamUI.handleClick(ev.target);return}
   if(ev.target.closest("[data-v5-learning-action]")){await v5LearningUI.handleClick(ev.target);return}
-  if(ev.target.closest("[data-v5-billing-action]")){await v5BillingUI.handleClick(ev.target);return}
+  if(ev.target.closest("[data-v5-billing-action], [data-v56-action]")){await v5BillingUI.handleClick(ev.target);return}
   if(ev.target.closest("[data-contact-action]")){await v4ContactsUI.handleClick(ev.target);return}
   const correctionPreview=ev.target.closest('[data-action="preview-correction"]');
   if(correctionPreview){await previewConfirmedBatchCorrection(correctionPreview.dataset.id);return}
