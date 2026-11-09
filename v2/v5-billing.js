@@ -26,11 +26,16 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
  let month=new Date(today.getFullYear(),today.getMonth(),1);
  const valid=()=>!!(isReady()&&getRole()==='teacher'&&getUser()?.id&&getClient());
  const adjustments=createV56AdjustmentsUI({getClient,notify,refresh});
- const renderAdjustments=allowed=>adjustments.render({
-  allowed:!!allowed,teamId,
-  month:[month.getFullYear(),String(month.getMonth()+1).padStart(2,'0'),'01'].join('-'),
-  paymentOverview,advanceOverview,adjustments:adjustmentsOverview
- });
+ const renderAdjustments=allowed=>{
+  const summary=allowed&&overview&&paymentOverview?
+   deriveV5ManagerOperations(overview,paymentOverview):null;
+  adjustments.render({
+   allowed:!!allowed,teamId,
+   safetyPassed:!!summary&&!summary.needsReconciliation,
+   month:[month.getFullYear(),String(month.getMonth()+1).padStart(2,'0'),'01'].join('-'),
+   paymentOverview,advanceOverview,adjustments:adjustmentsOverview
+  });
+ };
  function reset(){
   generation++;ready=false;loading=false;writing=false;error='';
   availableTeams=[];teamId='';overview=null;paymentOverview=null;operationsOverview=null;adjustmentsOverview=null;
