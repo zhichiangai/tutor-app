@@ -2230,7 +2230,7 @@ function renderLessonStars(){
 function refreshLessonLearningCopyWarning(){
  const text=($("#lesson-content").value||"")+" "+($("#lesson-feedback").value||"");
  // Advisory only: do not censor student-visible study notes or change stored data.
- const hasFinanceQaCopy=/(?:收款|付款|鐘點費|學費|帳務|全額收款|已收款|\\bQA\\b)/i.test(text);
+ const hasFinanceQaCopy=/(?:收款|付款|鐘點費|學費|帳務|QA)/i.test(text);
  $("#lesson-learning-finance-warning").classList.toggle("hidden",state.role!=="teacher"||!hasFinanceQaCopy);
 }
 function lessonLearningPayload(){
