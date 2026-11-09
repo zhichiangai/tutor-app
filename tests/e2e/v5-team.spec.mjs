@@ -2454,6 +2454,99 @@ test('V5.6 P0-C/D/E real JWT validates net applied-credit reversal, refund holds
   "where request_id='"+id+"' and approved"),'1');
 });
 
+
+test('V5.6 P0-E live V4 guardian consent allows only mapped Team student and revokes old JWT on unlink',async()=>{
+ const manager=await signIn('teacher'),parent=await signIn('parent'),child=await signIn('student');
+ const managerId=f.actors.teacher.id,parentId=f.actors.parent.id;
+ const personalWs=db("select id from public.workspaces where owner_id='"+managerId+"' limit 1");
+ const teamWs=db("select id from public.workspaces where owner_id='"+parentId+"' limit 1");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+teamWs+"'");
+ const teamStudent=db("select student_id from tutor_private.v5_team_advance_credits "+
+  "where team_id='"+team+"' limit 1");
+ for(const v of [personalWs,teamWs,team,teamStudent])assert.match(v,/^[a-f0-9-]{36}$/i);
+ // Only disposable GitHub SQL fixture: make one synthetic personal student
+ // and accepted guardian link with its own distinct, non-Team UUID.
+ const v4Student=db("insert into public.students(teacher_id,name,subject,hourly_rate,workspace_id) "+
+  "values('"+managerId+"','V56 Synthetic Family Link','數學',500,'"+personalWs+"') returning id");
+ assert.match(v4Student,/^[a-f0-9-]{36}$/i);
+ assert.notEqual(v4Student,teamStudent,'Team student IDs are not V4 student IDs');
+ const email=f.actors.parent.email.replaceAll("'","''");
+ const invite=db("insert into public.guardian_invites(teacher_id,student_id,email,workspace_id) "+
+  "values('"+managerId+"','"+v4Student+"','"+email+"','"+personalWs+"') returning id");
+ db("insert into public.student_guardians(teacher_id,student_id,guardian_id,invite_id,workspace_id) "+
+  "values('"+managerId+"','"+v4Student+"','"+parentId+"','"+invite+"','"+personalWs+"')");
+ assert.notEqual((await rest(manager,'POST','rpc/v56_propose_team_family_bridge',{
+  p_team_student_id:teamStudent,p_v4_student_id:'00000000-0000-0000-0000-000000000001',
+  p_reason:'Must never invent a V4 student relationship'
+ })).status,200);
+ let proposed=await rest(manager,'POST','rpc/v56_propose_team_family_bridge',{
+  p_team_student_id:teamStudent,p_v4_student_id:v4Student,
+  p_reason:'Synthetic V4 guardian-to-Team explicit consent QA'
+ });
+ assert.equal(proposed.status,200,JSON.stringify(proposed.data));
+ assert.equal(proposed.data.status,'proposed_waiting_guardian_acceptance');
+ const proposal=proposed.data.proposal_id;
+ const query={p_team_id:team,p_team_student_id:teamStudent,p_month:'2026-10-01'};
+ assert.equal((await rest(parent,'POST','rpc/v56_team_parent_finance_overview',query)).status,403,
+  'A proposed mapping is not a parent finance grant');
+ assert.equal((await rest(child,'POST','rpc/v56_team_parent_finance_overview',query)).status,403);
+ const list=await rest(parent,'POST','rpc/v56_my_team_family_proposals',{});
+ assert.equal(list.status,200);
+ assert.ok(list.data.proposals.some(x=>x.proposal_id===proposal&&x.status==='pending'));
+ assert.equal((await rest(child,'POST','rpc/v56_respond_team_family_proposal',{
+  p_proposal_id:proposal,p_accept:true
+ })).status,403);
+ let response=await rest(parent,'POST','rpc/v56_respond_team_family_proposal',{
+  p_proposal_id:proposal,p_accept:true
+ });
+ assert.equal(response.status,200,JSON.stringify(response.data));
+ assert.equal(response.data.status,'accepted');
+ let view=await rest(parent,'POST','rpc/v56_team_parent_finance_overview',query);
+ assert.equal(view.status,200,JSON.stringify(view.data));
+ assert.equal(view.data.team_id,team);
+ assert.equal(view.data.student_id,teamStudent);
+ assert.equal(view.data.currency,'TWD');
+ assert.equal(view.data.bank_verified,false);
+ assert.ok(Array.isArray(view.data.receivables));
+ assert.ok(Array.isArray(view.data.correction_refund_history));
+ assert.equal(JSON.stringify(view.data).includes('hourly_rate_cents'),false);
+ assert.equal(JSON.stringify(view.data).includes('teacher_user_id'),false);
+ assert.equal((await rest(parent,'POST','rpc/v56_team_parent_finance_overview',{
+  ...query,p_team_student_id:'00000000-0000-0000-0000-000000000002'
+ })).status,403,'Mapped parent cannot read a different Team student');
+ response=await rest(parent,'POST','rpc/v56_respond_team_family_proposal',{
+  p_proposal_id:proposal,p_accept:false
+ });
+ assert.equal(response.status,200);
+ assert.equal(response.data.status,'revoked');
+ assert.equal((await rest(parent,'POST','rpc/v56_team_parent_finance_overview',query)).status,403);
+ assert.notEqual((await rest(parent,'POST','rpc/v56_respond_team_family_proposal',{
+  p_proposal_id:proposal,p_accept:true
+ })).status,200,'Revocation is immutable and requires new proposal');
+ // New explicit approval; then the live V4 guardian invite disappears.
+ proposed=await rest(manager,'POST','rpc/v56_propose_team_family_bridge',{
+  p_team_student_id:teamStudent,p_v4_student_id:v4Student,
+  p_reason:'Second synthetic mapping to prove unlink revokes old JWT'
+ });
+ assert.equal(proposed.status,200);
+ const newProposal=proposed.data.proposal_id;
+ response=await rest(parent,'POST','rpc/v56_respond_team_family_proposal',{
+  p_proposal_id:newProposal,p_accept:true
+ });
+ assert.equal(response.status,200);
+ assert.equal((await rest(parent,'POST','rpc/v56_team_parent_finance_overview',query)).status,200);
+ db("delete from public.guardian_invites where id='"+invite+"'");
+ assert.equal(db("select count(*) from public.student_guardians where student_id='"+v4Student+"'"),'0',
+  'V4 invitation removal immediately revokes parent connection');
+ assert.equal((await rest(parent,'POST','rpc/v56_team_parent_finance_overview',query)).status,403,
+  'Old still-valid parent JWT cannot read after live guardian unlink');
+ const afterUnlink=await rest(parent,'POST','rpc/v56_my_team_family_proposals',{});
+ assert.equal(afterUnlink.status,200);
+ assert.deepEqual(afterUnlink.data.proposals,[]);
+ assert.notEqual((await rows(parent,'v56_team_family_bridge_acceptances')).status,200,
+  'Private consent audit must not be readable via Data API');
+});
+
 test('V5.6 manager GUI enables append-only pending void and displays audited refund history',async({page})=>{
  // Isolated synthetic actor and Team B from the previous manager transfer
  // and V5.6 backend tests; no real bank, family, course, or production writes.
