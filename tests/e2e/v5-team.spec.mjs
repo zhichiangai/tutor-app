@@ -2083,6 +2083,76 @@ test('V5.6 append-only pending void, metadata correction and unused-credit refun
  assert.notEqual((await rest(manager,'POST','rpc/v56_correct_team_payment_metadata',{
   ...correction,p_new_value:'Different text'
  })).status,200,'Same idempotency key cannot change correction payload');
+ // V5.6 P0 first tranche: request a reversal of an already confirmed
+ // direct allocation. Intake must NOT change settlement before approval.
+ const beforeDirect=await rest(manager,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal(beforeDirect.status,200);
+ const directRequest={
+  p_payment_id:confirmed,
+  p_allocations:[{lesson_id:lesson,amount_cents:5000}],
+  p_idempotency_key:'V56-DIRECT-INTAKE-001',
+  p_reason:'Synthetic refund intake pending financial approval'
+ };
+ assert.equal((await rest(former,'POST','rpc/v56_request_team_direct_refund',
+  directRequest)).status,403,'Former Team manager cannot request direct refund');
+ assert.equal((await rest(stranger,'POST','rpc/v56_request_team_direct_refund',
+  directRequest)).status,403,'Other tenant cannot request direct refund');
+ assert.equal((await rest(studentActor,'POST','rpc/v56_request_team_direct_refund',
+  directRequest)).status,403,'Student cannot request direct refund');
+ let direct=await rest(manager,'POST','rpc/v56_request_team_direct_refund',
+  directRequest);
+ assert.equal(direct.status,200);
+ assert.equal(direct.data.status,'requested_no_settlement');
+ assert.equal(direct.data.amount_cents,5000);
+ assert.equal(direct.data.settlement_changed,false);
+ assert.equal(direct.data.bank_verified,false);
+ const directId=direct.data.request_id;
+ direct=await rest(manager,'POST','rpc/v56_request_team_direct_refund',directRequest);
+ assert.equal(direct.status,200);
+ assert.equal(direct.data.request_id,directId);
+ assert.equal(direct.data.idempotent,true);
+ assert.notEqual((await rest(manager,'POST','rpc/v56_request_team_direct_refund',{
+  ...directRequest,p_allocations:[{lesson_id:lesson,amount_cents:4500}]
+ })).status,200,'Request idempotency cannot be reused with changed amount');
+ assert.notEqual((await rest(manager,'POST','rpc/v56_request_team_direct_refund',{
+  ...directRequest,p_idempotency_key:'V56-DIRECT-EXCESS-001',
+  p_allocations:[{lesson_id:lesson,amount_cents:20001}]
+ })).status,200,'Cannot request more than the original direct allocation');
+ assert.notEqual((await rest(manager,'POST','rpc/v56_request_team_direct_refund',{
+  ...directRequest,p_idempotency_key:'V56-DIRECT-DUPLICATE-001',
+  p_allocations:[{lesson_id:lesson,amount_cents:500},
+   {lesson_id:lesson,amount_cents:500}]
+ })).status,200,'Duplicate course allocation cannot be requested');
+ assert.equal(db("select amount_cents from tutor_private.v5_team_payment_allocations "+
+  "where payment_id='"+confirmed+"' and lesson_id='"+lesson+"'"),'20000',
+  'Immutable direct allocation remains intact');
+ assert.equal(db("select status from tutor_private.v5_team_payment_reports "+
+  "where id='"+confirmed+"'"),'confirmed','Confirmed payment remains immutable');
+ const afterDirect=await rest(manager,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal(afterDirect.status,200);
+ for(const k of ['outstanding_cents','confirmed_payments_cents',
+  'direct_allocated_cents','net_cash_movement_cents'])
+  assert.equal(afterDirect.data[k],beforeDirect.data[k],
+   'Request-only intake must not change financial settlement '+k);
+ const requestMonth=db("select to_char(now() at time zone 'Asia/Taipei','YYYY-MM-01')");
+ const directOverview=await rest(manager,'POST',
+  'rpc/v56_team_direct_refund_intake_overview',{
+   p_team_id:team,p_month:requestMonth
+  });
+ assert.equal(directOverview.status,200);
+ assert.ok(directOverview.data.requests.some(x=>
+  x.request_id===directId && x.status==='requested_no_settlement'));
+ assert.equal((await rest(former,'POST',
+  'rpc/v56_team_direct_refund_intake_overview',{
+   p_team_id:team,p_month:requestMonth
+  })).status,403,'Former manager cannot view refund requests');
+ assert.notEqual((await rows(studentActor,'v56_team_direct_refund_intake')).status,200,
+  'Private intake table must never be exposed directly');
+
  // Approving an unapplied-credit refund reserves the balance under
  // the same workspace lock held by every existing V5.4 credit offset.
  const refund={p_credit_id:credit,p_amount_cents:60,
