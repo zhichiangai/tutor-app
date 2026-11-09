@@ -18,6 +18,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
  };
  let generation=0,attached=false,ready=false,loading=false,writing=false,error='';
  let availableTeams=[],teamId='',overview=null,paymentOverview=null,operationsOverview=null,adjustmentsOverview=null;
+ let directRequests=null,appliedAdjustments=null,refundable=null,conservation=null;
  let advanceStudents=[],advanceStudentId='',advanceOverview=null;
  let advanceReference='manual-advance-'+crypto.randomUUID();
  const retryAdvanceOperations=new Map();
@@ -31,7 +32,11 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    deriveV5ManagerOperations(overview,paymentOverview):null;
   adjustments.render({
    allowed:!!allowed,teamId,
-   safetyPassed:!!summary&&!summary.needsReconciliation,
+   safetyPassed:!!summary&&!summary.needsReconciliation&&
+    conservation?.team_id===teamId&&conservation?.conservation_passed===true&&
+    directRequests?.team_id===teamId&&appliedAdjustments?.team_id===teamId&&
+    refundable?.team_id===teamId&&refundable?.student_id===advanceStudentId,
+   directRequests,appliedAdjustments,refundable,conservation,
    month:[month.getFullYear(),String(month.getMonth()+1).padStart(2,'0'),'01'].join('-'),
    paymentOverview,advanceOverview,adjustments:adjustmentsOverview
   });
@@ -39,6 +44,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
  function reset(){
   generation++;ready=false;loading=false;writing=false;error='';
   availableTeams=[];teamId='';overview=null;paymentOverview=null;operationsOverview=null;adjustmentsOverview=null;
+  directRequests=null;appliedAdjustments=null;refundable=null;conservation=null;
   adjustments.reset();
   advanceStudents=[];advanceStudentId='';advanceOverview=null;
   advanceReference='manual-advance-'+crypto.randomUUID();
@@ -531,6 +537,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   const stamp=++generation,userId=getUser().id;
   loading=true;error='';overview=null;paymentOverview=null;
   operationsOverview=null;advanceOverview=null;adjustmentsOverview=null;
+  directRequests=null;appliedAdjustments=null;refundable=null;conservation=null;
   $('v5-advance-panel')?.classList.add('hidden');
   for(const id of ['v5-advance-message','v5-advance-pending-payments',
    'v5-advance-available','v5-advance-credit-rows'])
@@ -549,7 +556,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    if(!availableTeams.some(t=>t.id===teamId))teamId=availableTeams[0]?.id||'';
    if(teamId){
     const first=[month.getFullYear(),String(month.getMonth()+1).padStart(2,'0'),'01'].join('-');
-    const [result,payments,students,operations,adj]=await Promise.all([
+    const [result,payments,students,operations,adj,direct,applied,integrity]=await Promise.all([
      client.rpc('v5_team_billing_overview',{
       p_team_id:teamId,p_month:first
      }),
@@ -563,6 +570,15 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
      }),
      client.rpc('v56_team_adjustment_overview',{
       p_team_id:teamId,p_month:first
+     }),
+     client.rpc('v56_team_direct_refund_intake_overview',{
+      p_team_id:teamId,p_month:first
+     }),
+     client.rpc('v56_team_applied_credit_adjustment_overview',{
+      p_team_id:teamId,p_month:first
+     }),
+     client.rpc('v56_team_conservation_overview',{
+      p_team_id:teamId
      })
     ]);
     if(stamp!==generation||!valid()||getUser()?.id!==userId)return;
@@ -571,26 +587,37 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
     overview=result.data;paymentOverview=payments.data;
     operationsOverview=operations.error?null:operations.data;
     adjustmentsOverview=adj.error?null:adj.data;
+    directRequests=direct.error?null:direct.data;
+    appliedAdjustments=applied.error?null:applied.data;
+    conservation=integrity.error?null:integrity.data;
     advanceStudents=students.data||[];
     if(!advanceStudents.some(s=>s.id===advanceStudentId))
      advanceStudentId=advanceStudents[0]?.id||'';
     advanceOverview=null;
     if(advanceStudentId){
-     const credit=await client.rpc('v5_team_advance_overview',{
-      p_team_id:teamId,p_student_id:advanceStudentId
-     });
+     const [credit,sources]=await Promise.all([
+      client.rpc('v5_team_advance_overview',{
+       p_team_id:teamId,p_student_id:advanceStudentId
+      }),
+      client.rpc('v56_team_refundable_allocations',{
+       p_team_id:teamId,p_student_id:advanceStudentId
+      })
+     ]);
      if(stamp!==generation||!valid()||getUser()?.id!==userId)return;
      if(credit.error)throw credit.error;
      advanceOverview=credit.data;
+     refundable=sources.error?null:sources.data;
     }
    }else{
     overview=null;paymentOverview=null;operationsOverview=null;adjustmentsOverview=null;
+    directRequests=null;appliedAdjustments=null;refundable=null;conservation=null;
     advanceStudents=[];advanceStudentId='';advanceOverview=null;
    }
    ready=true;
   }catch{
    if(stamp!==generation||!valid()||getUser()?.id!==userId)return;
    overview=null;paymentOverview=null;operationsOverview=null;advanceOverview=null;adjustmentsOverview=null;
+   directRequests=null;appliedAdjustments=null;refundable=null;conservation=null;
    advanceStudents=[];advanceStudentId='';
    error='Team 帳務暫時無法讀取，請重新進入設定頁。';
   }finally{
