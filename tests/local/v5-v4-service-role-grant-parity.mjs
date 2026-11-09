@@ -102,7 +102,7 @@ for(const section of ['tables','columns','constraints','indexes','policies','tri
  assert.deepEqual(changed,[],'Altered V4 baseline objects: '+section);
  summary[section]={baseline:left.size,disposable:right.size,added:right.size-left.size};
 }
-// V5.1–V5.7 original 27 tables + thirteen additive V5.6 private ledger tables.
+// V5.1–V5.7 original 27 tables + fourteen additive V5.6 private ledger tables.
 const v56TableIds=[
  'tutor_private.v56_team_pending_payment_voids',
  'tutor_private.v56_team_payment_corrections',
@@ -116,12 +116,13 @@ const v56TableIds=[
  'tutor_private.v56_team_advance_application_reversals',
  'tutor_private.v56_team_family_bridge_proposals',
  'tutor_private.v56_team_family_bridge_acceptances',
- 'tutor_private.v56_team_family_bridge_revocations'
+ 'tutor_private.v56_team_family_bridge_revocations',
+ 'tutor_private.v56_team_allocated_refund_manual_payouts'
 ];
 const actualTableIds=new Set(full.tables.map(x=>x.id));
 for(const id of v56TableIds)
  assert.equal(actualTableIds.has(id),true,'Missing V5.6 private ledger table '+id);
-assert.equal(summary.tables.added,40,'Unexpected V5/V5.6 table additions');
+assert.equal(summary.tables.added,41,'Unexpected V5/V5.6 table additions');
 console.log(JSON.stringify({
  status:'PASS_V4_METADATA_PARITY_WITH_LOCAL_GRANT_OVERLAY',
  environment:'disposable_local_CI',
