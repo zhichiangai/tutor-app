@@ -18,7 +18,7 @@ test('Twelve-source lock is additive, exact, historical eleven unchanged, NO-GO'
  assert.equal(current.verification,'git_blob_sha1_exact_bytes');
  assert.equal(current.approved_release,'NO_GO');
  assert.deepEqual(current.migration_files.slice(0,11),old.migration_files);
- assert.deepEqual(current.migration_files.map(x=>x.path.split('/').at(-1)),names);
+ assert.deepEqual(current.migration_files.map(x=>x.path.split('/').at(-1)),names.slice(0,12));
  assert.equal(current.migration_files.at(-1).path,
   'supabase/migrations/20261110032000_v5_6_team_allocated_refund_intake.sql');
  assert.equal(new Set(current.migration_files.map(x=>x.version)).size,12);
