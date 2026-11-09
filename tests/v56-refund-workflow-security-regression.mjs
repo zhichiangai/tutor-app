@@ -60,7 +60,7 @@ test('Every V5.6 exposed RPC has current manager, Team plan and workspace lock',
 test('Pending payment voids cannot be confirmed or block future pending capacity',()=>{
  const fn=block('v56_void_team_pending_payment');
  assert.match(fn,/v_payment\.status<>'pending'/);
- assert.match(fn,/unique|payment_id uuid primary key/i);
+ assert.match(sql,/payment_id uuid primary key references tutor_private\.v5_team_payment_reports/i);
  assert.match(sql,/create or replace function public\.v5_confirm_team_payment_allocation\(/);
  assert.match(sql,/create or replace function public\.v5_confirm_team_advance_payment\(/);
  assert.match(sql,/此待確認付款已沖銷/);
