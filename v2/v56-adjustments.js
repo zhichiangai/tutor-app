@@ -57,7 +57,8 @@ export function createV56AdjustmentsUI({getClient,notify,refresh}){
    return;
   }
   const data=state.adjustments;
-  const validShape=['pending_voids','corrections','refunds'].every(k=>Array.isArray(data[k]));
+  const validShape=data.refunds_bank_verified===false&&
+   ['pending_voids','corrections','refunds'].every(k=>Array.isArray(data[k]));
   if(!validShape){
    message.textContent='帳務更正紀錄格式異常，請停止操作並交由管理者核對。';
    return;
