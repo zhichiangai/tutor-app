@@ -2336,6 +2336,124 @@ test('V5.6 append-only pending void, metadata correction and unused-credit refun
 });
 
 
+
+test('V5.6 P0-C/D/E real JWT validates net applied-credit reversal, refund holds, conservation and family denial',async()=>{
+ const manager=await signIn('teacher'),former=await signIn('parent');
+ const studentActor=await signIn('student'),stranger=await signIn('stranger');
+ const oldOwner=f.actors.parent.id;
+ const ws=db("select id from public.workspaces where owner_id='"+oldOwner+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ const credit=db("select c.id from tutor_private.v5_team_advance_credits c "+
+  "join tutor_private.v5_team_payment_reports p on p.id=c.payment_id "+
+  "where p.team_id='"+team+"' and p.reference='TRANSFER-ADVANCE-ISOLATION'");
+ const op=db("select id from tutor_private.v5_team_advance_operations "+
+  "where credit_id='"+credit+"' and idempotency_key='V56-REMAINING-OFFSET-001'");
+ const lesson=db("select lesson_id from tutor_private.v5_team_advance_applications "+
+  "where operation_id='"+op+"'");
+ const student=db("select student_id from tutor_private.v5_team_advance_credits where id='"+credit+"'");
+ for(const v of [ws,team,credit,op,lesson,student])assert.match(v,/^[a-f0-9-]{36}$/i);
+ const net=()=>rest(manager,'POST','rpc/v56_team_conservation_overview',{p_team_id:team});
+ const before=await net();
+ assert.equal(before.status,200,JSON.stringify(before.data));
+ assert.equal(before.data.conservation_passed,true);
+ assert.equal(before.data.bank_verified,false);
+ const scope={p_team_id:team,p_student_id:student};
+ assert.equal((await rest(former,'POST','rpc/v56_team_refundable_allocations',scope)).status,403);
+ assert.equal((await rest(studentActor,'POST','rpc/v56_team_refundable_allocations',scope)).status,403);
+ assert.equal((await rest(stranger,'POST','rpc/v56_team_conservation_overview',{p_team_id:team})).status,403);
+ assert.equal((await rest(studentActor,'POST','rpc/v56_team_conservation_overview',{p_team_id:team})).status,403);
+ assert.equal((await rest(former,'POST','rpc/v56_team_conservation_overview',{p_team_id:team})).status,403);
+ let source=await rest(manager,'POST','rpc/v56_team_refundable_allocations',scope);
+ assert.equal(source.status,200,JSON.stringify(source.data));
+ const entry=source.data.advance_applications.find(x=>x.credit_id===credit&&x.operation_id===op&&x.lesson_id===lesson);
+ assert.equal(entry.remaining_cents,40);
+ const args={p_credit_id:credit,p_entries:[{operation_id:op,lesson_id:lesson,amount_cents:30}],
+  p_mode:'refund_reserved',p_idempotency_key:'V56-APPLIED-REFUND-001',
+  p_reason:'Synthetic request to refund previously applied credit'};
+ assert.equal((await rest(former,'POST','rpc/v56_request_team_applied_credit_adjustment',args)).status,403);
+ let requested=await rest(manager,'POST','rpc/v56_request_team_applied_credit_adjustment',args);
+ assert.equal(requested.status,200,JSON.stringify(requested.data));
+ assert.equal(requested.data.status,'requested_no_settlement');
+ const id=requested.data.request_id;
+ requested=await rest(manager,'POST','rpc/v56_request_team_applied_credit_adjustment',args);
+ assert.equal(requested.status,200);
+ assert.equal(requested.data.idempotent,true);
+ assert.notEqual((await rest(manager,'POST','rpc/v56_request_team_applied_credit_adjustment',{
+  ...args,p_entries:[{operation_id:op,lesson_id:lesson,amount_cents:29}]
+ })).status,200,'Idempotency payload cannot be rewritten');
+ assert.equal((await rest(studentActor,'POST','rpc/v56_decide_team_applied_credit_adjustment',{
+  p_request_id:id,p_approve:true,p_reason:'Student is not the manager'
+ })).status,403);
+ const beforeApproval=await net();
+ assert.equal(beforeApproval.status,200);
+ assert.equal(beforeApproval.data.advance_net_cents,before.data.advance_net_cents);
+ let decided=await rest(manager,'POST','rpc/v56_decide_team_applied_credit_adjustment',{
+  p_request_id:id,p_approve:true,p_reason:'Synthetic manager approves applied-credit refund reservation'
+ });
+ assert.equal(decided.status,200,JSON.stringify(decided.data));
+ assert.equal(decided.data.status,'approved_refund_reserved');
+ assert.equal(decided.data.manual_paid,false);
+ assert.equal(decided.data.bank_verified,false);
+ decided=await rest(manager,'POST','rpc/v56_decide_team_applied_credit_adjustment',{
+  p_request_id:id,p_approve:true,p_reason:'Synthetic manager approves applied-credit refund reservation'
+ });
+ assert.equal(decided.status,200);
+ assert.equal(decided.data.idempotent,true);
+ assert.notEqual((await rest(manager,'POST','rpc/v56_decide_team_applied_credit_adjustment',{
+  p_request_id:id,p_approve:false,p_reason:'Conflicting decision must not succeed'
+ })).status,200);
+ const after=await net();
+ assert.equal(after.status,200,JSON.stringify(after.data));
+ assert.equal(after.data.conservation_passed,true);
+ assert.equal(after.data.advance_net_cents,before.data.advance_net_cents-30);
+ assert.equal(after.data.outstanding_cents,before.data.outstanding_cents+30);
+ assert.equal(after.data.applied_credit_refund_liability_cents,
+  before.data.applied_credit_refund_liability_cents+30);
+ assert.equal(after.data.advance_available_cents,before.data.advance_available_cents,
+  'Refunded applied credit must be held, not become available for another offset');
+ assert.equal(after.data.confirmed_cash_book_cents,before.data.confirmed_cash_book_cents);
+ assert.equal(after.data.bank_verified,false);
+ assert.notEqual((await rows(studentActor,'v56_team_advance_application_reversals')).status,200);
+ assert.notEqual((await rows(former,'v56_team_applied_credit_decisions')).status,200);
+ const late={...args,p_idempotency_key:'V56-APPLIED-EXCESS-001',
+  p_entries:[{operation_id:op,lesson_id:lesson,amount_cents:11}]};
+ const reqLate=await rest(manager,'POST','rpc/v56_request_team_applied_credit_adjustment',late);
+ assert.equal(reqLate.status,200);
+ assert.notEqual((await rest(manager,'POST','rpc/v56_decide_team_applied_credit_adjustment',{
+  p_request_id:reqLate.data.request_id,p_approve:true,
+  p_reason:'Refund over original allocation must not be approved'
+ })).status,200,'Cannot approve more than remaining 10 cents');
+
+ // No valid explicit family bridge means NO parent/student Team ledger,
+ // even if the caller used to be the Team manager with a valid JWT.
+ const today=new Date();
+ const month=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),'01'].join('-');
+ const query={p_team_id:team,p_team_student_id:student,p_month:month};
+ assert.equal((await rest(former,'POST','rpc/v56_team_parent_finance_overview',query)).status,403);
+ assert.equal((await rest(studentActor,'POST','rpc/v56_team_parent_finance_overview',query)).status,403);
+ assert.equal((await rest(stranger,'POST','rpc/v56_team_parent_finance_overview',query)).status,403);
+ const listings=await rest(studentActor,'POST','rpc/v56_my_team_family_proposals',{});
+ assert.equal(listings.status,200);
+ assert.deepEqual(listings.data.proposals,[]);
+ // A refund manual payment is only a manager declaration, not bank verification.
+ const paidArgs={p_source:'applied_credit',p_request_id:id,
+  p_reference:'V56-SYNTHETIC-MANUAL-NO-BANK',p_paid_on:'2026-10-26',
+  p_reason:'Synthetic manual payout declaration for isolated QA only'};
+ assert.equal((await rest(former,'POST','rpc/v56_record_allocated_refund_manual_paid',paidArgs)).status,403);
+ let manual=await rest(manager,'POST','rpc/v56_record_allocated_refund_manual_paid',paidArgs);
+ assert.equal(manual.status,200,JSON.stringify(manual.data));
+ assert.equal(manual.data.bank_verified,false);
+ manual=await rest(manager,'POST','rpc/v56_record_allocated_refund_manual_paid',paidArgs);
+ assert.equal(manual.status,200);
+ assert.equal(manual.data.idempotent,true);
+ const final=await net();
+ assert.equal(final.status,200);
+ assert.equal(final.data.allocated_manual_paid_refunds_cents,30);
+ assert.equal(final.data.bank_verified,false);
+ assert.equal(db("select count(*) from tutor_private.v56_team_applied_credit_decisions "+
+  "where request_id='"+id+"' and approved"),'1');
+});
+
 test('V5.6 manager GUI enables append-only pending void and displays audited refund history',async({page})=>{
  // Isolated synthetic actor and Team B from the previous manager transfer
  // and V5.6 backend tests; no real bank, family, course, or production writes.
