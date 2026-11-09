@@ -53,3 +53,19 @@
 5. 套用後核對 Schema/JWT，再取得單獨 Main 及正式 GUI 發布授權。
 
 **截至本文件撰寫：A1-R3 BLOCKED，V5.6 PARTIAL，Production 一律 NO-GO。**
+
+
+---
+
+## 2026-11-10｜開發與驗收策略調整（產品負責人已確認）
+
+**本段更新作業優先順序，不降低上方 R3/R4 正式發布門檻；本文件本身不授權任何正式資料庫／Main／Production 變更。**
+
+1. **工程與測試**：以現有 GitHub Draft PR + 隔離 GitHub Actions（Node、PostgreSQL、GoTrue/JWT、Chromium）作為持續開發的主要回饋；不再把 Mac 上 Docker Compose／Supabase CLI localhost Port Binding 或 Codex IAB 修復作為 V5 功能開發前置條件。既有自動化 PASS 只涵蓋已實作案例，不能作為完整產品／Production GUI PASS。
+2. **本機 Codex**：優先維護本機交接文件，工具實際可用且發布已授權時進行正式網址的老師／家長／學生真實 GUI、RWD、截圖驗收；內建瀏覽器工具不可用時如實回報 IAB BLOCKED，不以 Playwright／CI 冒充。
+3. **低成本策略**：維持現有 Supabase Free 與 GitHub CI，暫停建立付費 Supabase Branch、額外 Pro 升級及反覆 Mac Docker 環境除錯。若之後有新的費用、外部副作用或不可逆變更，須另行取得明確授權。這不是免除 A1-R3 相容性驗證。
+4. **正式網址內部 Alpha**：待所有適用的 Migration 相容、備份／還原、JWT／RLS、帳務守恆、功能及發布安全閘通過，且取得正式資料庫 Migration、Main 合併及 Production 部署的**各別明確授權**，才可以對限定測試帳號啟用受控 Alpha。正式網址 Alpha 是最終 GUI 驗收入口，不是直接在正式資料庫試錯的授權。
+5. **優先交付 P0**：已確認且已分配款項的反向沖帳／更正／退款與淨結算守恆、家長僅讀自己孩子更正／退款歷史及跨 Team 隔離，接著處理真實 43-history Schema-only、PII-free 相容性證據及回復計畫。P1 為管理者 UI、權限／方案回歸、三角色及 320／375／390／430 px 正式 GUI；P2 為通知、人工回單、對帳與視覺精修。
+6. **資料保護**：任何對外收費或使用者正式依賴系統前，另行核對 Supabase／Vercel 商用方案、備份保留、監控與營運安全；不能因暫時沿用 Free 或使用測試資料便省略安全檢查。
+
+**當前 Gate 保持：V5.6 PARTIAL、A1-R3 BLOCKED、Production NO-GO。** 此策略不要求 Codex 變更任何已忽略的私人交接檔，該類本機檔案仍由 Codex 管理。
