@@ -2467,12 +2467,12 @@ test('V5.6 P0-E live V4 guardian consent allows only mapped Team student and rev
  // Only disposable GitHub SQL fixture: make one synthetic personal student
  // and accepted guardian link with its own distinct, non-Team UUID.
  const v4Student=db("insert into public.students(teacher_id,name,subject,hourly_rate,workspace_id) "+
-  "values('"+managerId+"','V56 Synthetic Family Link','數學',500,'"+personalWs+"') returning id");
+  "values('"+managerId+"','V56 Synthetic Family Link','數學',500,'"+personalWs+"') returning id").split('\n')[0];
  assert.match(v4Student,/^[a-f0-9-]{36}$/i);
  assert.notEqual(v4Student,teamStudent,'Team student IDs are not V4 student IDs');
  const email=f.actors.parent.email.replaceAll("'","''");
  const invite=db("insert into public.guardian_invites(teacher_id,student_id,email,workspace_id) "+
-  "values('"+managerId+"','"+v4Student+"','"+email+"','"+personalWs+"') returning id");
+  "values('"+managerId+"','"+v4Student+"','"+email+"','"+personalWs+"') returning id").split('\n')[0];
  db("insert into public.student_guardians(teacher_id,student_id,guardian_id,invite_id,workspace_id) "+
   "values('"+managerId+"','"+v4Student+"','"+parentId+"','"+invite+"','"+personalWs+"')");
  assert.notEqual((await rest(manager,'POST','rpc/v56_propose_team_family_bridge',{
