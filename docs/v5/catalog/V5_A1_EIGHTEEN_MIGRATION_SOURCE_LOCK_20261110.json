@@ -3,7 +3,7 @@
   "project": "tutor-app",
   "approved_release": "NO_GO",
   "captured_at": "2026-11-10",
-  "source_commit_sha": "7a6a8c3e18e03d1c5c2c55ed8cd474cb759dc325",
+  "source_commit_sha": "81908998263efc863a5a315375be059c548daecb",
   "supersedes_release_candidate": "docs/v5/catalog/V5_A1_SEVENTEEN_MIGRATION_SOURCE_LOCK_20261110.json",
   "verification": "git_blob_sha1_exact_bytes",
   "purpose": "18 V5 forward sources; manual allocated payout declarations only (bank_verified false), manager/parent history. Production NO-GO.",
