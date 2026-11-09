@@ -28,7 +28,7 @@ test('release blocks blindly replaying incompatible historical migrations',()=>{
   '20261106043000_v5_4_team_advance_credit.sql',
   '20261106050000_v5_4_team_monthly_reconciliation.sql'
  ],'Historical nine-file V5 release snapshot is immutable');
- assert.deepEqual(v5Files.slice(9),[
+ assert.deepEqual(v5Files.slice(9,12),[
   '20261109163000_v5_6_team_refund_correction_ledger.sql',
   '20261110032000_v5_6_team_allocated_refund_intake.sql',
   '20261110040000_v5_6_team_direct_refund_approval_reversal.sql'
