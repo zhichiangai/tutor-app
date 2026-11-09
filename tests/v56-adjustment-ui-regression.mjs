@@ -64,6 +64,6 @@ test('V5.6 adjustment controls are isolated to Team billing and preserve histori
 });
 
 test('V5.6 manager buttons reach the top-level delegated click controller',()=>{
- assert.match(app,/ev\\.target\\.closest\\(\"\\[data-v5-billing-action\\], \\[data-v56-action\\]\"\\)/);
- assert.match(app,/await v5BillingUI\\.handleClick\\(ev\\.target\\)/);
+ assert.ok(app.includes('ev.target.closest("[data-v5-billing-action], [data-v56-action]")'));
+ assert.ok(app.includes('await v5BillingUI.handleClick(ev.target)'));
 });
