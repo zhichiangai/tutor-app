@@ -248,28 +248,7 @@ test('QA-RWD-12 student: four widths, learning tabs and no billing/Team UI',asyn
    await tab.click();
    await expect(page.locator(selector)).toBeVisible();
    await expect(page.locator('#view-billing')).toBeHidden();
-   await expect(page.locator(selector)).not.toContainText('NT
-// as a legitimate, empty-but-loaded Team project list.
-test('missing V5 Team backend shows explicit unavailable state, not empty projects',async({page})=>{
- await signIn(page,'teacher');
- await page.route('**/rest/v1/rpc/v5_my_plan',route=>route.fulfill({
-  status:404,contentType:'application/json',
-  body:JSON.stringify({code:'PGRST202',
-   message:'Could not find the function public.v5_my_plan in the schema cache'})
- }));
- await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
- await page.locator('#workspace-mode-card [data-workspace-mode="team"]').click();
- await expect(page.locator('#v5-team-card')).toBeVisible();
- await expect(page.locator('#v5-team-message')).toContainText('Team 資料庫尚未啟用');
- await expect(page.locator('#v5-team-project-list')).toBeEmpty();
- await expect(page.locator('#v5-team-owner-controls')).toBeHidden();
- await expect(page.locator('#v5-team-card')).not.toContainText('目前沒有可查看的 Team 專案');
- await page.locator('.side-nav [data-team-section="settings"]').click();
- await page.locator('#workspace-mode-card [data-workspace-mode="personal"]').click();
- await page.locator('.side-nav .nav-standard[data-view="calendar"]').click();
- await expect(page.locator('#view-calendar')).toBeVisible();
-});
-);
+   await expect(page.locator(selector)).not.toContainText('NT$');
    await assertMobilePageFits(page,'student',width,view);
   }
  }
