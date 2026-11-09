@@ -29,7 +29,7 @@ test('Exactly nine reviewed forward-only SQL files are source-locked',()=>{
  assert.equal(new Set(manifest.migration_files.map(x=>x.version)).size,9);
  const names=manifest.migration_files.map(x=>x.path.replace('supabase/migrations/',''));
  assert.deepEqual(names,v5Files.slice(0,9),'Nine-file historical source lock must remain untouched');
- assert.deepEqual(v5Files.slice(9),['20261109163000_v5_6_team_refund_correction_ledger.sql']);
+ assert.deepEqual(v5Files.slice(9),['20261109163000_v5_6_team_refund_correction_ledger.sql','20261110032000_v5_6_team_allocated_refund_intake.sql']);
  assert.deepEqual([...names].sort(),names,'Migration files must be in order');
  for(const item of manifest.migration_files){
   assert.match(item.path,/^supabase\/migrations\/\d{14}_v5_[a-z0-9_]+\.sql$/);
