@@ -27,7 +27,8 @@ test('V5.6 Team billing UI is manager-only and requires guarded RPC data',()=>{
  assert.match(ui,/state\.adjustments\?\.month===state\.month/);
  assert.match(ui,/panel\.classList\.toggle\('hidden',!state\?\.allowed\)/);
  assert.match(ui,/!validShape/);
- assert.match(ui,/!state\?\.allowed\|\|busy/);
+ assert.match(ui,/!state\?\.allowed\|\|!state\.safetyPassed\|\|busy/);
+ assert.match(billing,/safetyPassed:!!summary&&!summary\.needsReconciliation/);
  assert.doesNotMatch(ui,/getClient\(\)\.from\('(?:v5_team_payment|v56_team_credit)/);
 });
 
