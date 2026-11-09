@@ -59,8 +59,10 @@ export function createV56AdjustmentsUI({getClient,notify,refresh}){
   const data=state.adjustments;
   const validShape=data.refunds_bank_verified===false&&
    ['pending_voids','corrections','refunds'].every(k=>Array.isArray(data[k]));
-  if(!validShape){
-   message.textContent='帳務更正紀錄格式異常，請停止操作並交由管理者核對。';
+  if(!validShape||!state.safetyPassed){
+   message.textContent=!state.safetyPassed?
+    '帳務摘要與明細尚未通過一致性核對，已禁止更正、沖銷與退款操作。':
+    '帳務更正紀錄格式異常，請停止操作並交由管理者核對。';
    return;
   }
   message.textContent='僅現任 Team 管理者可操作。已確認付款保留原始紀錄；人工退款不代表銀行已核驗。';
@@ -136,7 +138,8 @@ export function createV56AdjustmentsUI({getClient,notify,refresh}){
  async function handleClick(target){
   const btn=target?.closest?.('[data-v56-action]');
   if(!btn)return false;
-  if(!state?.allowed||busy||!state.adjustments||!state.teamId)return true;
+  if(!state?.allowed||!state.safetyPassed||busy||
+   !state.adjustments||!state.teamId)return true;
   const action=btn.dataset.v56Action,id=btn.dataset.id;
   const payments=(state.paymentOverview?.payments||[]);
   const credits=(state.advanceOverview?.credits||[]);
