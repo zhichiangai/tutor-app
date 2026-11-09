@@ -104,7 +104,15 @@ const sensitiveRpcs=[
  'public.v56_request_team_direct_refund(uuid,jsonb,text,text)',
  'public.v56_team_direct_refund_intake_overview(uuid,date)',
  'public.v56_decide_team_direct_refund(uuid,boolean,text)',
- 'public.v56_team_direct_refund_net_overview(uuid,date)'
+ 'public.v56_team_direct_refund_net_overview(uuid,date)',
+ 'public.v56_request_team_applied_credit_adjustment(uuid,jsonb,text,text,text)',
+ 'public.v56_decide_team_applied_credit_adjustment(uuid,boolean,text)',
+ 'public.v56_team_applied_credit_adjustment_overview(uuid,date)',
+ 'public.v56_team_conservation_overview(uuid)',
+ 'public.v56_propose_team_family_bridge(uuid,uuid,text)',
+ 'public.v56_my_team_family_proposals()',
+ 'public.v56_respond_team_family_proposal(uuid,boolean)',
+ 'public.v56_team_parent_finance_overview(uuid,uuid,date)'
 ];
 for(const signature of sensitiveRpcs){
  const escaped=signature.replaceAll("'","''");
@@ -130,7 +138,13 @@ const v56Private=[
  'tutor_private.v56_team_credit_refund_events',
  'tutor_private.v56_team_direct_refund_intake',
  'tutor_private.v56_team_direct_refund_decisions',
- 'tutor_private.v56_team_direct_refund_reversals'
+ 'tutor_private.v56_team_direct_refund_reversals',
+ 'tutor_private.v56_team_applied_credit_requests',
+ 'tutor_private.v56_team_applied_credit_decisions',
+ 'tutor_private.v56_team_advance_application_reversals',
+ 'tutor_private.v56_team_family_bridge_proposals',
+ 'tutor_private.v56_team_family_bridge_acceptances',
+ 'tutor_private.v56_team_family_bridge_revocations'
 ];
 for(const name of v56Private){
  assert.equal(rls.get(name),'true','V5.6 private table missing RLS: '+name);
