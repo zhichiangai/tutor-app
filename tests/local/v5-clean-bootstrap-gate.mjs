@@ -102,7 +102,9 @@ const sensitiveRpcs=[
  'public.v56_record_team_refund_manual_paid(uuid,text,date,text)',
  'public.v56_team_adjustment_overview(uuid,date)',
  'public.v56_request_team_direct_refund(uuid,jsonb,text,text)',
- 'public.v56_team_direct_refund_intake_overview(uuid,date)'
+ 'public.v56_team_direct_refund_intake_overview(uuid,date)',
+ 'public.v56_decide_team_direct_refund(uuid,boolean,text)',
+ 'public.v56_team_direct_refund_net_overview(uuid,date)'
 ];
 for(const signature of sensitiveRpcs){
  const escaped=signature.replaceAll("'","''");
@@ -126,7 +128,9 @@ const v56Private=[
  'tutor_private.v56_team_payment_corrections',
  'tutor_private.v56_team_credit_refund_requests',
  'tutor_private.v56_team_credit_refund_events',
- 'tutor_private.v56_team_direct_refund_intake'
+ 'tutor_private.v56_team_direct_refund_intake',
+ 'tutor_private.v56_team_direct_refund_decisions',
+ 'tutor_private.v56_team_direct_refund_reversals'
 ];
 for(const name of v56Private){
  assert.equal(rls.get(name),'true','V5.6 private table missing RLS: '+name);
