@@ -51,7 +51,7 @@ export function createV56FamilyUI({getClient,getUser,getRole,isReady,notify}){
    const wrapper=node('div',undefined,'v5-billing-row');
    wrapper.append(node('strong',String(p.display_name||'學生')+' · '+({
     pending:'等待家長同意',accepted:'已授權',revoked:'已撤回授權'
-   }[p.status]||'無法核對'));
+   })[p.status]||'無法核對'));
    if(p.status==='pending')
     wrapper.append(action('同意查看這位孩子的 Team 帳務','accept',p.proposal_id));
    if(p.status==='accepted'){
