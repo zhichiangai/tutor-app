@@ -32,11 +32,14 @@ test('Repository Migration inventory matches frozen read-only release snapshot',
   '20261108230000_v57_team_operations_overview.sql',
   '20261109163000_v5_6_team_refund_correction_ledger.sql',
   '20261110032000_v5_6_team_allocated_refund_intake.sql',
-  '20261110040000_v5_6_team_direct_refund_approval_reversal.sql'
+  '20261110040000_v5_6_team_direct_refund_approval_reversal.sql',
+  '20261110050000_v5_6_net_settlement_reconciliation.sql',
+  '20261110060000_v5_6_applied_credit_reverse_conservation.sql',
+  '20261110070000_v5_6_parent_finance_verified_bridge.sql'
  ],'New V5.7 and V5.6 forward migrations require separately frozen source review');
- assert.equal(files.length,snap.repo_migration_count+4);
+ assert.equal(files.length,snap.repo_migration_count+7);
  assert.equal(files.filter(x=>/_v5_/.test(x)).length,
-  snap.v5_repo_migration_count+3);
+  snap.v5_repo_migration_count+6);
  assert.deepEqual(files.filter(x=>/_v5_/.test(x)),[
   '20261104131300_v5_1_entitlements_student_seats.sql',
   '20261105171000_v5_1_admin_qa_release.sql',
