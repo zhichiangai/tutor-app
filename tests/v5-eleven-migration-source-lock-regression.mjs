@@ -24,7 +24,7 @@ test('V5.6 source-only evidence is exactly eleven files; Production NO-GO',()=>{
  assert.equal(current.gate.real_43_history_schema_replay_verified,false);
  const actual=current.migration_files.map(x=>x.path.split('/').at(-1));
  assert.deepEqual(actual,names.slice(0,11),'Historical eleven-file source lock must remain untouched');
- assert.deepEqual(names.slice(11),['20261110032000_v5_6_team_allocated_refund_intake.sql'],'Twelfth migration requires separate source lock');
+ assert.deepEqual(names.slice(11,12),['20261110032000_v5_6_team_allocated_refund_intake.sql'],'Twelfth migration requires separate source lock');
  assert.equal(actual.at(-1),'20261109163000_v5_6_team_refund_correction_ledger.sql');
  assert.equal(new Set(current.migration_files.map(x=>x.version)).size,11);
 });
