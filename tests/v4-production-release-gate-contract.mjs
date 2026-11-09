@@ -30,7 +30,8 @@ test('release blocks blindly replaying incompatible historical migrations',()=>{
  ],'Historical nine-file V5 release snapshot is immutable');
  assert.deepEqual(v5Files.slice(9),[
   '20261109163000_v5_6_team_refund_correction_ledger.sql',
-  '20261110032000_v5_6_team_allocated_refund_intake.sql'
+  '20261110032000_v5_6_team_allocated_refund_intake.sql',
+  '20261110040000_v5_6_team_direct_refund_approval_reversal.sql'
  ],'V5.6 uses separate eleven/twelve-file source locks, not the frozen V4 release map');
  const futureAdditions=['20261108230000_v57_team_operations_overview.sql'];
  assert.deepEqual(files.filter(p=>futureAdditions.includes(p)),futureAdditions,
