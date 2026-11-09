@@ -58,7 +58,7 @@ test('V5.6 adjustment controls are isolated to Team billing and preserve histori
   'v56-adjustments-payments','v56-adjustments-credits','v56-adjustments-history'])
   assert.ok(html.includes('id="'+id+'"'),'V5.6 management UI missing '+id);
  assert.match(html,/v5-team-panel hidden" id="v56-adjustments-panel"/);
- assert.match(html,/退款目前只處理尚未抵扣的預收款/);
+ assert.match(html,/可申請已分配付款退款、已抵扣預收款撤銷及退款/);
  assert.doesNotMatch(ui,/\b(?:update|delete|upsert)\s*\(\s*['"](?:lesson_records|payment_batches)/i);
  assert.doesNotMatch(ui,/service_role|SUPABASE_SERVICE_ROLE_KEY/i);
 });
