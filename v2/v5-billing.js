@@ -19,7 +19,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
  let generation=0,attached=false,ready=false,loading=false,writing=false,error='';
  let availableTeams=[],teamId='',overview=null,paymentOverview=null,operationsOverview=null,adjustmentsOverview=null;
  let directRequests=null,appliedAdjustments=null,refundable=null,conservation=null;
- let advanceStudents=[],advanceStudentId='',advanceOverview=null;
+ let advanceStudents=[],advanceStudentId='',advanceOverview=null,legacyStudents=[];
  let advanceReference='manual-advance-'+crypto.randomUUID();
  const retryAdvanceOperations=new Map();
  let paymentReference='manual-'+crypto.randomUUID();
@@ -46,7 +46,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   availableTeams=[];teamId='';overview=null;paymentOverview=null;operationsOverview=null;adjustmentsOverview=null;
   directRequests=null;appliedAdjustments=null;refundable=null;conservation=null;
   adjustments.reset();
-  advanceStudents=[];advanceStudentId='';advanceOverview=null;
+  advanceStudents=[];advanceStudentId='';advanceOverview=null;legacyStudents=[];
   advanceReference='manual-advance-'+crypto.randomUUID();
   retryAdvanceOperations.clear();
   $('v5-operations-card')?.classList.add('hidden');
@@ -245,6 +245,18 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
     ' · '+row.duration_minutes+' 分鐘 · 時薪 '+money(row.hourly_rate_cents),
     'section-sub'));
    confirmed.append(wrap);
+  }
+  const teamStudentSelect=$('v56-family-team-student');
+  const v4StudentSelect=$('v56-family-v4-student');
+  if(teamStudentSelect&&v4StudentSelect){
+   options(teamStudentSelect,advanceStudents.map(x=>({
+    value:x.id,label:x.display_name+' · '+x.id.slice(-6)
+   })));
+   options(v4StudentSelect,legacyStudents.map(x=>({
+    value:x.id,label:x.name+' · '+x.id.slice(-6)
+   })));
+   const submit=$('v56-family-bridge-submit');
+   if(submit)submit.disabled=writing||!advanceStudents.length||!legacyStudents.length;
   }
   renderPayments();
   renderAdvance();
@@ -475,6 +487,33 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   return true;
  }
  async function handleSubmit(e){
+  if(e.target?.id==='v56-family-bridge-form'){
+   e.preventDefault();
+   if(!ready||!valid()||writing||!teamId)return true;
+   const teamStudent=$('v56-family-team-student')?.value;
+   const v4Student=$('v56-family-v4-student')?.value;
+   if(!advanceStudents.some(x=>x.id===teamStudent)||
+    !legacyStudents.some(x=>x.id===v4Student)){
+    notify('請選擇有權限的 Team 學生與自己的 V4 學生。');return true;
+   }
+   const reason=window.prompt('請輸入對應原因（8 至 250 字）；家長仍須主動確認。');
+   if(reason===null)return true;
+   if(reason.trim().length<8||reason.length>250){
+    notify('對應原因至少 8 字，最多 250 字。');return true;
+   }
+   if(!window.confirm('只建立家長帳務對應提案；必須由有 V4 有效連結的家長親自同意。確定？'))return true;
+   writing=true;
+   try{
+    const {data,error:failure}=await getClient().rpc('v56_propose_team_family_bridge',{
+     p_team_student_id:teamStudent,p_v4_student_id:v4Student,p_reason:reason.trim()
+    });
+    if(failure||data?.status!=='proposed_waiting_guardian_acceptance')
+     throw failure||new Error('Not proposed');
+    notify('已建立對應提案；家長同意且連結有效後才可讀取 Team 帳務。');
+   }catch{notify('無法建立對應。請確認 V4 學生歸屬與 Team 管理權。')}
+   finally{writing=false;render()}
+   return true;
+  }
   if(e.target?.id==='v5-advance-report-form'){
    e.preventDefault();return submitAdvanceReport();
   }
@@ -556,7 +595,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    if(!availableTeams.some(t=>t.id===teamId))teamId=availableTeams[0]?.id||'';
    if(teamId){
     const first=[month.getFullYear(),String(month.getMonth()+1).padStart(2,'0'),'01'].join('-');
-    const [result,payments,students,operations,adj,direct,applied,integrity]=await Promise.all([
+    const [result,payments,students,operations,adj,direct,applied,integrity,v4Students]=await Promise.all([
      client.rpc('v5_team_billing_overview',{
       p_team_id:teamId,p_month:first
      }),
@@ -579,7 +618,8 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
      }),
      client.rpc('v56_team_conservation_overview',{
       p_team_id:teamId
-     })
+     }),
+     client.from('students').select('id,name').eq('teacher_id',userId)
     ]);
     if(stamp!==generation||!valid()||getUser()?.id!==userId)return;
     if(result.error||payments.error||students.error)
@@ -591,6 +631,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
     appliedAdjustments=applied.error?null:applied.data;
     conservation=integrity.error?null:integrity.data;
     advanceStudents=students.data||[];
+    legacyStudents=v4Students.error?[]:(v4Students.data||[]);
     if(!advanceStudents.some(s=>s.id===advanceStudentId))
      advanceStudentId=advanceStudents[0]?.id||'';
     advanceOverview=null;
@@ -611,14 +652,14 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    }else{
     overview=null;paymentOverview=null;operationsOverview=null;adjustmentsOverview=null;
     directRequests=null;appliedAdjustments=null;refundable=null;conservation=null;
-    advanceStudents=[];advanceStudentId='';advanceOverview=null;
+    advanceStudents=[];advanceStudentId='';advanceOverview=null;legacyStudents=[];
    }
    ready=true;
   }catch{
    if(stamp!==generation||!valid()||getUser()?.id!==userId)return;
    overview=null;paymentOverview=null;operationsOverview=null;advanceOverview=null;adjustmentsOverview=null;
    directRequests=null;appliedAdjustments=null;refundable=null;conservation=null;
-   advanceStudents=[];advanceStudentId='';
+   advanceStudents=[];advanceStudentId='';legacyStudents=[];
    error='Team 帳務暫時無法讀取，請重新進入設定頁。';
   }finally{
    if(stamp===generation&&valid()&&getUser()?.id===userId){
