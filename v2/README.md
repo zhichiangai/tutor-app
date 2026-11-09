@@ -14,7 +14,7 @@
 | 模組 | 用途 |
 | --- | --- |
 | `index.html`, `app.js`, `style.css` | 三角色畫面、登入、路由、課表與 RWD |
-| `calendar-view.js`, `scheduling.js`, `lesson-actual.js` | 日曆、固定課程、改期及實際時數 |
+| `calendar-view.js`, `scheduling.js`, `lesson-actual.js` | 日曆、固定課程、改期、補課及實際時數 |
 | `payment-ledger.js`, `payment-correction.js` | 個人家教帳務與更正 |
 | `v4-connections.js`, `v4-contacts.js`, `v4-config.js` | V4 雙向邀請、聯絡人、部署設定 |
 | `v5-plans.js`, `v5-team.js`, `v5-learning.js`, `v5-billing.js`, `v5-operations-summary.js` | V5 方案、Team 專案、老師／學生、帳務及營運摘要 |
