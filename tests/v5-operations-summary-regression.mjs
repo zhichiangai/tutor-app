@@ -103,3 +103,17 @@ test('V5.7 project, teacher and audit sections remain guarded by manager RPC and
  assert.match(frontend,/cash_verified_by_bank===false/);
  assert.match(frontend,/projectList\?\.append/);
 });
+
+
+test('V5.6 voided pending payments are excluded from pending count but retained for audit',()=>{
+ const {billing,payments}=snapshots();
+ payments.payments[1].status='void';
+ const result=deriveV5ManagerOperations(billing,payments);
+ assert.ok(result,'Voided payment is a documented valid accounting status');
+ assert.equal(result.needsReconciliation,false);
+ assert.equal(result.pendingPaymentCount,0);
+ assert.equal(result.voidedPaymentCount,1);
+ assert.equal(result.unpaidLessonCount,1);
+ assert.equal(result.issues.length,0);
+ assert.equal(payments.payments[1].status,'void','Original read model is immutable');
+});
