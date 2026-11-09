@@ -11,7 +11,7 @@ const prior=json('docs/v5/catalog/V5_A1_TEN_MIGRATION_SOURCE_LOCK_20261109.json'
 const current=json('docs/v5/catalog/V5_A1_ELEVEN_MIGRATION_SOURCE_LOCK_20261109.json');
 const dir=new URL('supabase/migrations/',root);
 const names=readdirSync(dir)
- .filter(x=/^\d{14}_v5(?:\d+)?_[a-z0-9_]+\.sql$/.test(x)).sort();
+ .filter(x=>/^\d{14}_v5(?:\d+)?_[a-z0-9_]+\.sql$/.test(x)).sort();
 
 test('V5.6 source-only evidence is exactly eleven files; Production NO-GO',()=>{
  assert.equal(prior.migration_files.length,10);
