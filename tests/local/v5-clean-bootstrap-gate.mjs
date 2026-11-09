@@ -94,7 +94,13 @@ const sensitiveRpcs=[
  'public.v5_team_billing_overview(uuid,date)',
  'public.v5_team_payment_overview(uuid,date)',
  'public.v5_apply_team_advance_credit(uuid,jsonb,text)',
- 'public.v5_team_operations_overview(uuid,date)'
+ 'public.v5_team_operations_overview(uuid,date)',
+ 'public.v56_void_team_pending_payment(uuid,text,text)',
+ 'public.v56_correct_team_payment_metadata(uuid,text,text,text,text)',
+ 'public.v56_request_team_credit_refund(uuid,bigint,text,text)',
+ 'public.v56_decide_team_credit_refund(uuid,boolean,text)',
+ 'public.v56_record_team_refund_manual_paid(uuid,text,date,text)',
+ 'public.v56_team_adjustment_overview(uuid,date)'
 ];
 for(const signature of sensitiveRpcs){
  const escaped=signature.replaceAll("'","''");
@@ -111,6 +117,20 @@ for(const signature of sensitiveRpcs.slice(0,2)){
  assert.equal(allowed,'false','Admin-only RPC exposed to authenticated role: '+signature);
 }
 
+// V5.6 correction/void/refund records are private and deliberately not
+// matched by the historical v5_ prefix inventory.
+const v56Private=[
+ 'tutor_private.v56_team_pending_payment_voids',
+ 'tutor_private.v56_team_payment_corrections',
+ 'tutor_private.v56_team_credit_refund_requests',
+ 'tutor_private.v56_team_credit_refund_events'
+];
+for(const name of v56Private){
+ assert.equal(rls.get(name),'true','V5.6 private table missing RLS: '+name);
+ const denied=db("select (not has_table_privilege('authenticated','"+name+
+   "','SELECT,INSERT,UPDATE,DELETE'))::text");
+ assert.equal(denied,'true','Browser should never directly read V5.6 private ledger: '+name);
+}
 // No test accounts, family/student links, lessons, or payments should be
 // imported into the fresh baseline. A later explicit synthetic seed is allowed.
 const cleanTables=[
