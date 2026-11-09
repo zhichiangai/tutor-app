@@ -89,6 +89,13 @@ jobs:
             grep -Ei 'applying migration|migration .*\.sql|^error:|^failed |^fatal:|^panic:|sqlstate|^\s*error:' "$start_log" |
               sed -E 's/eyJ[A-Za-z0-9_.-]+/[JWT_REDACTED]/g; s/sb_(publishable|secret)_[A-Za-z0-9_-]+/[KEY_REDACTED]/g; s#postgres(ql)?://[^ ]+#[DB_URI_REDACTED]#g; s#https?://[^ ]+#[URL_REDACTED]#g; s/[A-Za-z0-9_+\/=:-]{80,}/[LONG_TOKEN_REDACTED]/g' |
               tail -n 12 || true
+            # Startup/migration failures can omit the words 'error' and
+            # 'failed'. Provide only sanitized, short terminal context.
+            echo "::notice::Sanitized final migration context (no keys/URLs):"
+            tail -n 24 "$start_log" |
+              sed -E 's/eyJ[A-Za-z0-9_.-]+/[JWT_REDACTED]/g; s/sb_(publishable|secret)_[A-Za-z0-9_-]+/[KEY_REDACTED]/g; s#postgres(ql)?://[^ ]+#[DB_URI_REDACTED]#g; s#https?://[^ ]+#[URL_REDACTED]#g; s/[A-Za-z0-9_+\/=:-]{60,}/[LONG_TOKEN_REDACTED]/g' |
+              grep -viE 'service_role key|anon key|access_token|refresh_token|jwt secret|database password|supabase_service_role|supabase_anon_key|^ *apikey' |
+              tail -n 12 | cut -c 1-300 || true
             docker ps -a --filter name=tutor_v4_isolated --format 'container={{.Names}} state={{.Status}}' || true
             exit 1
           fi
