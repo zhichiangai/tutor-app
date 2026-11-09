@@ -1,4 +1,5 @@
 import {deriveV5ManagerOperations} from './v5-operations-summary.js';
+import {createV56AdjustmentsUI} from './v56-adjustments.js';
 // V5.3 Team receivables: manager-only, immutable course fee confirmations.
 // This module has no payment collection or V4 accounting API access.
 export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
@@ -16,7 +17,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    minimumFractionDigits:0,maximumFractionDigits:2}).format(amount/100);
  };
  let generation=0,attached=false,ready=false,loading=false,writing=false,error='';
- let availableTeams=[],teamId='',overview=null,paymentOverview=null,operationsOverview=null;
+ let availableTeams=[],teamId='',overview=null,paymentOverview=null,operationsOverview=null,adjustmentsOverview=null;
  let advanceStudents=[],advanceStudentId='',advanceOverview=null;
  let advanceReference='manual-advance-'+crypto.randomUUID();
  const retryAdvanceOperations=new Map();
@@ -24,9 +25,16 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
  const today=new Date();
  let month=new Date(today.getFullYear(),today.getMonth(),1);
  const valid=()=>!!(isReady()&&getRole()==='teacher'&&getUser()?.id&&getClient());
+ const adjustments=createV56AdjustmentsUI({getClient,notify,refresh});
+ const renderAdjustments=allowed=>adjustments.render({
+  allowed:!!allowed,teamId,
+  month:[month.getFullYear(),String(month.getMonth()+1).padStart(2,'0'),'01'].join('-'),
+  paymentOverview,advanceOverview,adjustments:adjustmentsOverview
+ });
  function reset(){
   generation++;ready=false;loading=false;writing=false;error='';
-  availableTeams=[];teamId='';overview=null;paymentOverview=null;operationsOverview=null;
+  availableTeams=[];teamId='';overview=null;paymentOverview=null;operationsOverview=null;adjustmentsOverview=null;
+  adjustments.reset();
   advanceStudents=[];advanceStudentId='';advanceOverview=null;
   advanceReference='manual-advance-'+crypto.randomUUID();
   retryAdvanceOperations.clear();
@@ -160,12 +168,12 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   const card=$('v5-billing-card');
   if(!card)return;
   if(!valid()||(!ready&&!loading&&!error)){
-   card.classList.add('hidden');renderOperations();return;
+   card.classList.add('hidden');renderOperations();renderAdjustments(false);return;
   }
   // Never display any amount to users without a current successful manager RPC.
   const shown=availableTeams.length>0;
   card.classList.toggle('hidden',!shown);
-  if(!shown){renderOperations();return;}
+  if(!shown){renderOperations();renderAdjustments(false);return;}
   $('v5-billing-message').textContent=loading?'正在檢查 Team 帳務權限…':
    error||'僅記錄應收費用，不代表家長已付款。確認後不能直接修改金額。';
   const select=$('v5-billing-team-select');
@@ -181,6 +189,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    money(overview.confirmed_total_cents):'尚無可用資料';
   if(!overview){
    renderOperations();
+   renderAdjustments(false);
    for(const id of ['v5-payment-pending-reports','v5-payment-confirmed-reports']){
     $(id).replaceChildren();
    }
@@ -229,6 +238,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   renderPayments();
   renderAdvance();
   renderOperations();
+  renderAdjustments(true);
  }
  function taipeiDate(){
   const fields=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',
@@ -515,7 +525,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   attach();
   const stamp=++generation,userId=getUser().id;
   loading=true;error='';overview=null;paymentOverview=null;
-  operationsOverview=null;advanceOverview=null;
+  operationsOverview=null;advanceOverview=null;adjustmentsOverview=null;
   $('v5-advance-panel')?.classList.add('hidden');
   for(const id of ['v5-advance-message','v5-advance-pending-payments',
    'v5-advance-available','v5-advance-credit-rows'])
@@ -534,7 +544,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    if(!availableTeams.some(t=>t.id===teamId))teamId=availableTeams[0]?.id||'';
    if(teamId){
     const first=[month.getFullYear(),String(month.getMonth()+1).padStart(2,'0'),'01'].join('-');
-    const [result,payments,students,operations]=await Promise.all([
+    const [result,payments,students,operations,adj]=await Promise.all([
      client.rpc('v5_team_billing_overview',{
       p_team_id:teamId,p_month:first
      }),
@@ -545,6 +555,9 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
       .eq('team_id',teamId),
      client.rpc('v5_team_operations_overview',{
       p_team_id:teamId,p_month:first
+     }),
+     client.rpc('v56_team_adjustment_overview',{
+      p_team_id:teamId,p_month:first
      })
     ]);
     if(stamp!==generation||!valid()||getUser()?.id!==userId)return;
@@ -552,6 +565,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
      throw result.error||payments.error||students.error;
     overview=result.data;paymentOverview=payments.data;
     operationsOverview=operations.error?null:operations.data;
+    adjustmentsOverview=adj.error?null:adj.data;
     advanceStudents=students.data||[];
     if(!advanceStudents.some(s=>s.id===advanceStudentId))
      advanceStudentId=advanceStudents[0]?.id||'';
@@ -565,13 +579,13 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
      advanceOverview=credit.data;
     }
    }else{
-    overview=null;paymentOverview=null;operationsOverview=null;
+    overview=null;paymentOverview=null;operationsOverview=null;adjustmentsOverview=null;
     advanceStudents=[];advanceStudentId='';advanceOverview=null;
    }
    ready=true;
   }catch{
    if(stamp!==generation||!valid()||getUser()?.id!==userId)return;
-   overview=null;paymentOverview=null;operationsOverview=null;advanceOverview=null;
+   overview=null;paymentOverview=null;operationsOverview=null;advanceOverview=null;adjustmentsOverview=null;
    advanceStudents=[];advanceStudentId='';
    error='Team 帳務暫時無法讀取，請重新進入設定頁。';
   }finally{
@@ -581,6 +595,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   }
  }
  async function handleClick(target){
+  if(await adjustments.handleClick(target))return true;
   const btn=target?.closest?.('[data-v5-billing-action]');
   if(!btn)return false;
   if(!valid()||!ready||writing||!overview)return true;
