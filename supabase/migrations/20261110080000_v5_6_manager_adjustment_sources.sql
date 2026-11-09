@@ -304,6 +304,6 @@ grant execute on function public.v56_team_refundable_allocations(uuid,uuid) to a
 revoke all on function public.v56_request_team_credit_refund(uuid,bigint,text,text),
  public.v56_decide_team_credit_refund(uuid,boolean,text),public.v5_team_payment_overview(uuid,date)
  from public,anon,authenticated;
-grant execute on function public.v56_request_team_credit_refund(uuid,bigint,text),
+grant execute on function public.v56_request_team_credit_refund(uuid,bigint,text,text),
  public.v56_decide_team_credit_refund(uuid,boolean,text),public.v5_team_payment_overview(uuid,date)
  to authenticated;
