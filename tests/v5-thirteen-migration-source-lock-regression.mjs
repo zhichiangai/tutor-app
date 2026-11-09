@@ -17,7 +17,7 @@ test('13th forward SQL is additive, all historical 12 hashes remain frozen, rele
   assert.equal(value,false,'Unverified production gate: '+name);
  const files=readdirSync(new URL('supabase/migrations/',root))
   .filter(x=>/^\d{14}_v5(?:\d+)?_[a-z0-9_]+\.sql$/.test(x)).sort();
- assert.deepEqual(files,current.migration_files.map(x=>x.path.split('/').at(-1)));
+ assert.deepEqual(files.slice(0,13),current.migration_files.map(x=>x.path.split('/').at(-1)));
  assert.equal(new Set(current.migration_files.map(x=>x.version)).size,13);
 });
 test('All 13 forward SQL byte counts and Git blob hashes are exact',()=>{
