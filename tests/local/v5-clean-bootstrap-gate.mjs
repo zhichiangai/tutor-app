@@ -112,7 +112,8 @@ const sensitiveRpcs=[
  'public.v56_propose_team_family_bridge(uuid,uuid,text)',
  'public.v56_my_team_family_proposals()',
  'public.v56_respond_team_family_proposal(uuid,boolean)',
- 'public.v56_team_parent_finance_overview(uuid,uuid,date)'
+ 'public.v56_team_parent_finance_overview(uuid,uuid,date)',
+ 'public.v56_team_refundable_allocations(uuid,uuid)'
 ];
 for(const signature of sensitiveRpcs){
  const escaped=signature.replaceAll("'","''");
