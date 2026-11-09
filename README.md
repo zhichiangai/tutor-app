@@ -1,51 +1,49 @@
 # 好好上課（tutor-app）｜唯一維護中的家教網站
 
-**正式網站：** https://tutor.rapid4grad.com/  
-**原始碼：** https://github.com/zhichiangai/tutor-app  
-**V4 發布候選：** [Draft PR #43](https://github.com/zhichiangai/tutor-app/pull/43)（尚未合併／發布）。
+**正式網站：** https://tutor.rapid4grad.com/v2/index.html  
+**GitHub：** https://github.com/zhichiangai/tutor-app  
+**正式來源：** GitHub `main` → Vercel `tutor-app-v2` → Production  
+**專案規範：** [AGENTS.md](AGENTS.md)；若有使用者專案知識 `AI_DEVELOPMENT_MASTER_RULES.md`，也要先閱讀。
 
-> **Codex／其他 AI 請先讀 `AGENTS.md`。** 程式庫內僅 `v2/` 是正在維護的網站前端。資料夾名稱 `v2` 是歷史命名，不代表目前要維護舊 V2。
+> `v2/` 是現行正式前端，名稱是歷史沿用，不代表目前使用舊版 V2。所有即時狀態須以 GitHub、Vercel、Supabase 實查為準，本頁的版本資訊只是有日期的快照。
 
-## 唯一正式架構
+## 現行架構
 
 ```text
 老師／家長／學生
-  ↓ https://tutor.rapid4grad.com/
-Vercel (tutor-app-v2, Production ← GitHub main)
-  ↓ vercel.json: / → /v2/index.html
-v2/index.html + v2/app.js + v2/style.css + v2/其他模組
-  ├─ Supabase Auth (Google OAuth)
-  └─ Supabase PostgreSQL (課程、三角色關聯、付款、RLS、RPC)
+  → tutor.rapid4grad.com
+  → Vercel tutor-app-v2（main 自動部署）
+  → v2/index.html、v2/app.js、v2/style.css 與 V4/V5 支援模組
+  → Supabase vctisuglfoxyuwlvyjee（Google OAuth、PostgreSQL、RLS/RPC）
 ```
 
-- **正式前端：** `v2/`（原生 HTML、CSS、JavaScript）。
-- **正式資料庫：** Supabase `tutor-app`（ref `vctisuglfoxyuwlvyjee`）。
-- **線上部署：** Vercel 專案 `tutor-app-v2`，從 GitHub `main` 發布。
-- **V4 Edge Function：** `supabase/functions/v4-gas-bridge/`。
-- **V4 通知整合：** `integrations/google-apps-script/v4-notifications/`。這是有效的 V4 整合，**不要當作舊後端刪除**。
-- **資料庫歷史與 V4 變更：** `supabase/migrations/`、`supabase/hotfixes/`、`supabase/candidates/` 等；歷史 SQL 即使包含 V2 名稱，也必須保留，不能依檔名刪除。
+- `vercel.json` 將網站根目錄 rewrite 至 `/v2/index.html`。
+- 個人家教 V4：課表／課後學習／家長帳務／角色連結與帳務更正。
+- V5 Free／Plus／Team：方案介紹與前端模式切換已存在；內部 Plus 仍使用 `pro` 方案代碼以相容既有設計。
+- Team 專案、老師權限、學生、課表、應收、部分付款、預收、對帳與營運摘要：在 repo 的十份 V5 Migration 與隔離 CI 有開發成果，但**正式 Supabase 尚未套用 V5 Migration，不代表 Team 正式可用**。
+- `supabase/functions/v4-gas-bridge/` 和 `integrations/google-apps-script/v4-notifications/` 為仍需保留的有效整合程式；是否已在正式環境部署或寄送須另外查證。
 
-## 舊版已從候選程式樹退場
+## 已核對的正式版本快照（2026-11-09，請現查）
 
-原 GitHub Pages「家教時數帳本」的 `frontend/`、`backend/apps-script/`、兩份過時 legacy README 已移出目前候選分支，防止 AI 讀錯入口。根目錄 `index.html` 僅保留為安全轉址；舊 GitHub Pages 根網址應導向正式網域。
+- PR [#66](https://github.com/zhichiangai/tutor-app/pull/66) 已合併，Main／Production SHA：`5b147cb19563d9ee75b71bbcab7f2d06a22e4794`；Vercel Deployment：`dpl_2fWTgxCQw465LSBFiU6WqpiUtGe3`（READY）。
+- 正式 Supabase：43 筆歷史 Migration，最新 `20261103212647`；未啟用 V5 Team Schema/RPC。
+- 開發中的 [Draft PR #67](https://github.com/zhichiangai/tutor-app/pull/67) 聚合學生用詞、三角色 RWD、學習備註 UX 與整合 QA。**未合併 Main，不應當成已上線功能**。
+- V5 正式資料庫 Gate 仍為 **NO-GO**：尚未對「真實 43-history Schema-only 隔離副本」依序演練 10 筆向前 Migration（A1-R3 BLOCKED）。乾淨 CI 重播 47 份原始 migration 無法取代。
+- 既有假資料是否可以清理與實際清理範圍需要另行授權；不能因資料是 QA 就自行刪除使用者或付款紀錄。
 
-**這不代表 Git 歷史或 GitHub Pages 設定自動刪除。** Git 歷史用來追溯，GitHub Pages 發布是否停用需到 GitHub Settings → Pages 個別確認；不可把仍存在的舊部署視為可繼續操作的正式版本。
+詳見 [V5.7 十份 Migration 安全 Gate](docs/v5/V5_7_A1_TEN_MIGRATION_RELEASE_GATE_20261109.md) 與 [前端模組圖](v2/README.md)。
 
-## 目前發布狀態與安全原則
+## 開發與驗收分工
 
-- `main` 為 Production 的唯一來源；Draft PR #43 仍在 V4 驗收。
-- 正式 Supabase 在 2026-10-29 的基線為 29 筆 Migration；PR #43 的 37 份本機重播與候選 SQL **不可**直接 `db push` 到 Production。
-- 正式付款 RLS 有 P0 待修，正式備份及隔離還原、Google OAuth 實機驗收尚未證明完成；V4 不得僅憑 CI 綠燈視為已正式安全發布。
-- **不得**在正式 Supabase 建立假學生、假課程或測試付款；不可在未授權情況下合併 PR、套 Migration、修改真實資料。
-- 目前以 GitHub Actions 中的一次性隔離 Supabase 進行 Node/Postgres/Chromium 自動測試；Preview 只有前端 READY 並不代表具備獨立測試資料庫。
-- 詳見 `docs/qa/V4_RELEASE_EXECUTION_GATE_20261029.md`、`docs/qa/V4_PRODUCTION_MIGRATION_BASELINE_20261029.json`、`docs/qa/V4_MAC_LOCALHOST_BIND_RECOVERY.md`。
+- ChatGPT：需求、雲端程式、GitHub Branch／PR／CI、Vercel／Supabase 與 RLS 安全、發版閘門。
+- Codex Desktop：在 Mac 讀取既有交接 MD、使用 **@瀏覽器** 實測老師／家長／學生操作、真實可支援的手機尺寸、登入登出、截圖與缺陷交接。Codex 不負責日常雲端程式改寫或正式部署。
+- 先在分支跑 `node --test tests/*.mjs` 和 GitHub Actions 隔離 Postgres／Chromium。**Playwright PASS 不等於 Production GUI PASS**。
+- Production 網站唯讀；不能在正式站新增／修改／刪除學生、課程、帳務、Team 權限或送出真實訊息來做 QA。
+- Main 合併、Production SQL/RLS/Auth、金流及不可逆操作需要各自當次授權。
+- CI 判定統一使用 PASS／FAIL／PARTIAL／BLOCKED／NOT TESTED；未實測不宣稱 PASS。
 
-## 開發與驗收
+## 其他重要規則
 
-1. 先讀 `AGENTS.md` 和 `vercel.json`，只修改 `v2/` 的活躍網站。
-2. 以功能分支與 PR 開發，不直接在 Production 嘗試 Migration。
-3. 在隔離 CI 跑 `node --test tests/*.mjs`、Postgres Contract、Chromium Playwright。
-4. 使用具備 Browser Use 權限的工具驗收老師、家長、學生，並區分唯讀正式站、隔離測試站、CI 自動化結果。
-5. V4 經正式備份／還原、RLS、Migration 對照與使用者授權後，才能發布至 Production。
-
-現行功能說明：[`v2/README.md`](v2/README.md)。專案歷次 V3/ V4 架構說明存放於 `docs/`，屬設計與回歸記錄，不代表仍有多套正式前端。
+- 歷史 SQL、現行 GAS 通知程式不可因舊檔名擅刪。
+- 已退役的舊版 GitHub Pages `frontend/` 與 `backend/apps-script/` 不可當成正式入口恢復。
+- Mac 的本機 AI 交接與 `TEST_ACCOUNT_ROLES.md` 由具有本機檔案存取的 Codex 查閱，**不要**把測試密碼、Token 或完整個人資料寫到公開 PR 或截圖。

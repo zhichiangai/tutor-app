@@ -162,6 +162,124 @@ test('V5.5.1 mobile parent/student role isolation, no Team switch or student fin
  }
 });
 
+// QA-RWD-12: three real locally authenticated roles across all four required
+// mobile viewport widths. This is Chromium evidence only, NOT Codex IAB GUI.
+async function assertMobilePageFits(page,role,width,view){
+ const dimensions=await page.evaluate(()=>({
+  viewport:document.documentElement.clientWidth,
+  scroll:document.documentElement.scrollWidth,
+  visibleMain:!document.querySelector('.main-content')?.classList.contains('hidden')
+ }));
+ expect(dimensions.viewport,role+' '+view+' viewport').toBe(width);
+ expect(dimensions.scroll,role+' '+view+' horizontal overflow at '+width)
+  .toBeLessThanOrEqual(dimensions.viewport);
+}
+test('QA-RWD-12 teacher: four widths, all personal tabs and three Team sections',async({page})=>{
+ test.setTimeout(100_000);
+ await page.setViewportSize({width:430,height:780});
+ await signIn(page,'teacher');
+ for(const width of [320,375,390,430]){
+  await page.setViewportSize({width,height:780});
+  for(const [view,selector] of [
+   ['home','#view-home'],['calendar','#calendar-grid'],
+   ['billing','#billing-summary'],['students','#view-students'],
+   ['settings','#view-settings']]){
+   const tab=page.locator('.mobile-nav .nav-standard[data-view="'+view+'"]');
+   await expect(tab).toBeVisible();
+   await tab.click();
+   await expect(page.locator(selector)).toBeVisible();
+   await assertMobilePageFits(page,'teacher',width,view);
+  }
+  await page.locator('#workspace-mode-card [data-workspace-mode="team"]').click();
+  await expect(page.locator('body')).toHaveClass(/teacher-team-workspace/);
+  for(const section of ['projects','learning','billing']){
+   const tab=page.locator('.mobile-nav .nav-team[data-team-section="'+section+'"]');
+   await expect(tab).toBeVisible();
+   await tab.click();
+   await expect(page.locator('#view-settings')).toBeVisible();
+   await assertMobilePageFits(page,'teacher',width,'Team '+section);
+  }
+  await page.locator('.mobile-nav .nav-team[data-team-section="settings"]').click();
+  await page.locator('#workspace-mode-card [data-workspace-mode="personal"]').click();
+  await expect(page.locator('body')).toHaveClass(/teacher-personal-workspace/);
+ }
+});
+test('QA-RWD-12 parent: four widths, five core tabs with no Team privileges',async({page})=>{
+ test.setTimeout(90_000);
+ await page.setViewportSize({width:430,height:780});
+ await signIn(page,'parent');
+ if(!(await page.locator('#role-indicator-text').textContent()).includes('家長模式')){
+  await page.locator('#role-indicator').click();
+  await page.locator('#role-menu [data-role-choice="parent"]').click();
+ }
+ await expect(page.locator('#role-indicator-text')).toContainText('家長');
+ for(const width of [320,375,390,430]){
+  await page.setViewportSize({width,height:780});
+  await expect(page.locator('.mobile-nav .nav-team[data-team-section="billing"]')).toBeHidden();
+  for(const [view,selector] of [
+   ['home','#view-home'],['calendar','#view-calendar'],
+   ['billing','#billing-summary'],['students','#view-students'],
+   ['settings','#view-settings']]){
+   const tab=page.locator('.mobile-nav .nav-standard[data-view="'+view+'"]');
+   await expect(tab).toBeVisible();
+   await tab.click();
+   await expect(page.locator(selector)).toBeVisible();
+   await assertMobilePageFits(page,'parent',width,view);
+  }
+  await expect(page.locator('#workspace-mode-card')).toBeHidden();
+ }
+});
+test('QA-RWD-12 student: four widths, learning tabs and no billing/Team UI',async({page})=>{
+ test.setTimeout(90_000);
+ await page.setViewportSize({width:430,height:780});
+ await signIn(page,'student');
+ await expect(page.locator('body')).toHaveClass(/student-mode/);
+ for(const width of [320,375,390,430]){
+  await page.setViewportSize({width,height:780});
+  await expect(page.locator('.mobile-nav .nav-standard[data-view="billing"]')).toBeHidden();
+  await expect(page.locator('.mobile-nav .nav-team[data-team-section="billing"]')).toBeHidden();
+  for(const [view,selector] of [
+   ['student-today','#student-today-panel'],
+   ['student-calendar','#student-calendar-panel'],
+   ['student-learning','#student-learning-panel'],
+   ['settings','#view-settings']]){
+   const tab=page.locator('.mobile-nav .nav-student[data-view="'+view+'"]');
+   await expect(tab).toBeVisible();
+   await tab.click();
+   await expect(page.locator(selector)).toBeVisible();
+   await expect(page.locator('#view-billing')).toBeHidden();
+   await expect(page.locator(selector)).not.toContainText('NT$');
+   await assertMobilePageFits(page,'student',width,view);
+  }
+ }
+});
+
+// QA-CONSOLE: isolate the reported MutationObserver error from browser tooling.
+// Passing in disposable Chromium does not attribute an IAB/Production error.
+test('QA-CONSOLE: synthetic three-panel navigation has no MutationObserver Node TypeError',async({page})=>{
+ const errors=[];
+ const observe=message=>{
+  const detail=String(message||'');
+  if(/MutationObserver|parameter 1 is not of type.*Node/i.test(detail))
+   errors.push(detail.slice(0,700));
+ };
+ page.on('pageerror',err=>observe(err.stack||err.message));
+ page.on('console',msg=>{if(msg.type()==='error')observe(msg.text());});
+ await signIn(page,'teacher');
+ for(const view of ['calendar','billing','settings']){
+  await page.locator('.side-nav .nav-standard[data-view="'+view+'"]').click();
+  await expect(page.locator('#view-'+view)).toBeVisible();
+ }
+ await page.locator('#workspace-mode-card [data-workspace-mode="team"]').click();
+ await expect(page.locator('body')).toHaveClass(/teacher-team-workspace/);
+ await page.locator('.side-nav .nav-team[data-team-section="learning"]').click();
+ await expect(page.locator('#view-settings')).toBeVisible();
+ await page.locator('.side-nav .nav-team[data-team-section="settings"]').click();
+ await page.locator('#workspace-mode-card [data-workspace-mode="personal"]').click();
+ await expect(page.locator('body')).toHaveClass(/teacher-personal-workspace/);
+ expect(errors,'Unexpected MutationObserver DOM exception in isolated Chromium').toEqual([]);
+});
+
 // QA-TEAM-01: a missing Production-style Team RPC must never masquerade
 // as a legitimate, empty-but-loaded Team project list.
 test('missing V5 Team backend shows explicit unavailable state, not empty projects',async({page})=>{

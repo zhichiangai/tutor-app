@@ -1,37 +1,35 @@
-# 好好上課｜唯一維護中的網站前端（路徑 v2/）
+# 好好上課｜現行網站前端（歷史路徑 `v2/`）
 
-> **給 Codex 和其他 AI：** `v2/` 是正式 Vercel 網站的現行前端。此資料夾保留早期命名，**不是已退役的 V2 網站**。先閱讀根目錄 `AGENTS.md`。
+> 目前唯一維護的正式 UI 位於 `v2/`；先閱讀 [根目錄 AGENTS.md](../AGENTS.md) 與 [專案 README](../README.md)。不要重新啟用舊版 V1/V2 程式。
 
 ## 對應服務
 
-- 正式網站：https://tutor.rapid4grad.com/
-- GitHub：https://github.com/zhichiangai/tutor-app
-- Vercel：`tutor-app-v2`，部署來源 `main`
-- Supabase：`vctisuglfoxyuwlvyjee`，Google OAuth + PostgreSQL + RLS/RPC
-- Root route：`vercel.json` 將 `/` rewrite 到 `/v2/index.html`。
+- 網址：https://tutor.rapid4grad.com/v2/index.html
+- GitHub：`zhichiangai/tutor-app`；Vercel：`tutor-app-v2`；正式部署從 `main`
+- Supabase：`vctisuglfoxyuwlvyjee`（Google OAuth／PostgreSQL／RLS／RPC）
+- 網站根路由：`vercel.json` rewrite 至 `/v2/index.html`
 
-## 正在維護的前端檔案
+## 檔案地圖
 
-- `index.html`：單一頁面結構、老師／家長／學生模式
-- `app.js`：狀態、登入、學習紀錄、付款與排課整合
-- `style.css`：桌面／手機介面
-- `calendar-view.js`、`scheduling.js`：日曆、固定排課、單堂改期與補課規則
-- `lesson-actual.js`：實際上課時間與時數
-- `payment-ledger.js`、`payment-correction.js`：應收與付款／更正呈現
-- `v4-connections.js`、`v4-contacts.js`、`v4-config.js`：V4 邀請、連結和設定
+| 模組 | 用途 |
+| --- | --- |
+| `index.html`, `app.js`, `style.css` | 三角色畫面、登入、路由、課表與 RWD |
+| `calendar-view.js`, `scheduling.js`, `lesson-actual.js` | 日曆、固定課程、改期、補課及實際時數 |
+| `payment-ledger.js`, `payment-correction.js` | 個人家教帳務與更正 |
+| `v4-connections.js`, `v4-contacts.js`, `v4-config.js` | V4 雙向邀請、聯絡人、部署設定 |
+| `v5-plans.js`, `v5-team.js`, `v5-learning.js`, `v5-billing.js`, `v5-operations-summary.js` | V5 方案、Team 專案、老師／學生、帳務及營運摘要 |
 
-## 使用者及權限
+## 角色與邊界
 
-- 老師：工作空間、課程、課後內容與收款確認。
-- 家長：與已連結學生共享課表、查看學習內容、付款申報。
-- 學生：與已連結老師共享課表及學習內容；**不可讀取學費、時薪或付款資料**。
-- 瀏覽器上切換角色不代表取得授權；資料讀寫必須使用 Supabase Auth、RLS、受控 RPC 查驗關聯。
+- 老師：個人家教的五頁導覽及課程、課後紀錄／帳務；在有權限且後端已啟用時可選 Team 模式。
+- 家長：已授權學生的課程、學習、付款狀態；不應看到其他家庭或 Team 管理者資料。
+- 學生：自己的今天／課表／學習／設定；**不應讀取時薪、課程金額、付款或 Team 管理帳務**。老師填寫的課後文字屬學生可見內容，輸入端應提醒避免放入財務／QA 測試文字。
+- UI 角色切換不是授權；所有存取仍應由資料庫 RLS 與經驗證的 RPC 決定。
 
-## V4 注意事項
+## 發布安全
 
-- V4 Draft PR #43 未通過正式資料庫發布 Gate；Production Schema 仍與分支候選 SQL 有落差。
-- CI 隔離環境完成的付款及瀏覽器測試不等於正式登入／真人 UI 驗收。
-- 不得在正式站使用假課程或付款做測試。
-- 不要重啟或清除未經授權的 Mac Docker Volume。
-- V4 通知的 GAS 程式位於 `integrations/google-apps-script/v4-notifications/`，仍屬有效整合。
-- 詳細發布條件參閱 `docs/qa/V4_RELEASE_EXECUTION_GATE_20261029.md`。
+截至 2026-11-09：Main／Production 是 PR #66 的 `5b147cb` 版本，V5 Team 正式後端尚未啟用；當前 [Draft PR #67](https://github.com/zhichiangai/tutor-app/pull/67) 在分支進行品質整合。**當下版本需重新查證，不能把本文快照當作即時證據。**
+
+- V5 十份 Migration 正式啟用閘門見 `docs/v5/V5_7_A1_TEN_MIGRATION_RELEASE_GATE_20261109.md`；沒有 43-history Schema-only 隔離演練證據前不得宣告 Production 可套用。
+- GitHub 隔離 CI 測試 ≠ Vercel Production 確認 ≠ Codex IAB GUI 實測。
+- Codex 優先本機 GUI，請在 Mac 按專案交接 MD 地圖及 `TEST_ACCOUNT_ROLES.md` 找對應的正式 QA 帳號；禁止將機密寫入提交、截圖或交接摘要。

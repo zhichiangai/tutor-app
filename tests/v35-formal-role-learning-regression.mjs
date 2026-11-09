@@ -24,6 +24,37 @@ test("settings and new lesson journal inputs exist",()=>{
  assert.equal((html.match(/name="enabled-role"/g)||[]).length,3);
 });
 
+test("teacher-only note warns before student-visible QA payment wording is saved",()=>{
+ assert.ok(html.includes('id="lesson-learning-visibility-note"'));
+ assert.ok(html.includes('id="lesson-learning-finance-warning" role="status"'));
+ assert.match(html,/上課內容與課後備註會出現在學生的學習紀錄/);
+ assert.ok(app.includes('addEventListener("input",refreshLessonLearningCopyWarning)'));
+ const start=app.indexOf("function refreshLessonLearningCopyWarning(){");
+ const end=app.indexOf("function lessonLearningPayload(){",start);
+ assert.ok(start>=0&&end>start,"Advice must be independent from actual payment/learning writes");
+ const factory=new Function("$","state",app.slice(start,end)+";return refreshLessonLearningCopyWarning");
+ function inspect(role,lesson,remarks){
+  let hidden;
+  const fields={
+   "#lesson-content":{value:lesson},
+   "#lesson-feedback":{value:remarks},
+   "#lesson-learning-finance-warning":{classList:{toggle:(name,flag)=>{
+    assert.equal(name,"hidden");hidden=flag;
+   }}}
+  };
+  factory(selector=>fields[selector],{role})();
+  return hidden;
+ }
+ assert.equal(inspect("teacher","今天複習三角形","下一次練習角平分線"),true);
+ assert.equal(inspect("teacher","QA 全額收款測試","備註"),false);
+ assert.equal(inspect("teacher","今天複習","已收款"),false);
+ assert.equal(inspect("parent","QA 收款測試",""),true);
+ assert.equal(inspect("student","QA 收款測試",""),true);
+ // Never mutate record content or automatically hide data from its authorized student.
+ assert.match(app,/student_portal_data/);
+ assert.match(app,/p_lesson_content:.*\.value\.trim\(\)/);
+});
+
 test("account modes are selected explicitly and verified before switching",()=>{
  assert.ok(app.includes("function normalizedRoles(list)"));
  assert.ok(app.includes('!enabledRoles().includes(role)'));
