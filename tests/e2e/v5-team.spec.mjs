@@ -2153,6 +2153,85 @@ test('V5.6 append-only pending void, metadata correction and unused-credit refun
  assert.notEqual((await rows(studentActor,'v56_team_direct_refund_intake')).status,200,
   'Private intake table must never be exposed directly');
 
+ // Approved allocated refunds reopen NET receivables; never mark a bank payout.
+ const netArgs={p_team_id:team,p_month:'2026-10-01'};
+ const netBeforeDirect=await rest(manager,'POST','rpc/v56_team_direct_refund_net_overview',netArgs);
+ assert.equal(netBeforeDirect.status,200,JSON.stringify(netBeforeDirect.data));
+ const decisionReason='Synthetic direct refund approval with no bank payout';
+ const decision={p_request_id:directId,p_approve:true,p_reason:decisionReason};
+ assert.equal((await rest(former,'POST','rpc/v56_decide_team_direct_refund',decision)).status,403);
+ assert.equal((await rest(studentActor,'POST','rpc/v56_decide_team_direct_refund',decision)).status,403);
+ assert.equal((await rest(stranger,'POST','rpc/v56_decide_team_direct_refund',decision)).status,403);
+ assert.equal((await rest(former,'POST','rpc/v56_team_direct_refund_net_overview',netArgs)).status,403);
+ assert.equal((await rest(studentActor,'POST','rpc/v56_team_direct_refund_net_overview',netArgs)).status,403);
+ let decided=await rest(manager,'POST','rpc/v56_decide_team_direct_refund',decision);
+ assert.equal(decided.status,200,JSON.stringify(decided.data));
+ assert.equal(decided.data.status,'approved_reversed_pending_manual_payout');
+ assert.equal(decided.data.settlement_changed,true);
+ assert.equal(decided.data.bank_verified,false);
+ assert.equal(decided.data.manual_paid,false);
+ decided=await rest(manager,'POST','rpc/v56_decide_team_direct_refund',decision);
+ assert.equal(decided.status,200);
+ assert.equal(decided.data.idempotent,true);
+ assert.notEqual((await rest(manager,'POST','rpc/v56_decide_team_direct_refund',{
+  ...decision,p_approve:false
+ })).status,200,'Cannot change decision after approval');
+ assert.notEqual((await rest(manager,'POST','rpc/v56_decide_team_direct_refund',{
+  ...decision,p_reason:'Changed decision reasons are not allowed'
+ })).status,200,'Cannot rewrite immutable decision reason');
+ assert.equal(db("select amount_cents from tutor_private.v5_team_payment_allocations "+
+  "where payment_id='"+confirmed+"' and lesson_id='"+lesson+"'"),'20000');
+ assert.equal(db("select coalesce(sum(amount_cents),0) from tutor_private.v56_team_direct_refund_reversals "+
+  "where payment_id='"+confirmed+"'"),'5000');
+ const netAfterDirect=await rest(manager,'POST','rpc/v56_team_direct_refund_net_overview',netArgs);
+ assert.equal(netAfterDirect.status,200);
+ assert.equal(netAfterDirect.data.outstanding_cents,
+  netBeforeDirect.data.outstanding_cents+5000,'Refund reversal reopens course receivable');
+ assert.equal(netAfterDirect.data.direct_net_allocated_cents,
+  netBeforeDirect.data.direct_net_allocated_cents-5000);
+ assert.equal(netAfterDirect.data.all_time_direct_refund_liability_cents,
+  netBeforeDirect.data.all_time_direct_refund_liability_cents+5000);
+ assert.equal(netAfterDirect.data.all_time_confirmed_receipts_cents,
+  netBeforeDirect.data.all_time_confirmed_receipts_cents,'No cash leaves on approval');
+ assert.equal(netAfterDirect.data.physical_bank_refund_verified,false);
+ // A rejected request never inserts a reversal.
+ const rejectRequest={...directRequest,p_idempotency_key:'V56-DIRECT-REJECT-001',
+  p_allocations:[{lesson_id:lesson,amount_cents:100}]};
+ const rejection=await rest(manager,'POST','rpc/v56_request_team_direct_refund',rejectRequest);
+ assert.equal(rejection.status,200);
+ decided=await rest(manager,'POST','rpc/v56_decide_team_direct_refund',{
+  p_request_id:rejection.data.request_id,p_approve:false,
+  p_reason:'Synthetic manager rejects this duplicate adjustment'
+ });
+ assert.equal(decided.status,200);
+ assert.equal(decided.data.status,'rejected');
+ assert.equal(decided.data.settlement_changed,false);
+ assert.equal(db("select count(*) from tutor_private.v56_team_direct_refund_reversals "+
+  "where request_id='"+rejection.data.request_id+"'"),'0');
+ // Two valid refund requests race for the same remaining 15000 cents.
+ // The common anchor lock must permit exactly one decision.
+ const requests=await Promise.all(['A','B'].map(k=>rest(manager,'POST',
+  'rpc/v56_request_team_direct_refund',{
+   ...directRequest,p_idempotency_key:'V56-DIRECT-RACE-'+k+'-001',
+   p_allocations:[{lesson_id:lesson,amount_cents:15000}]
+  })));
+ assert.deepEqual(requests.map(x=>x.status),[200,200]);
+ const competing=await Promise.all(requests.map(x=>rest(manager,'POST',
+  'rpc/v56_decide_team_direct_refund',{
+   p_request_id:x.data.request_id,p_approve:true,
+   p_reason:'Synthetic concurrent approved reversal under anchor lock'
+  })));
+ assert.equal(competing.filter(x=>x.status===200).length,1,
+  'Only one racing request may consume the remaining refund capacity');
+ assert.equal(db("select coalesce(sum(amount_cents),0) from tutor_private.v56_team_direct_refund_reversals "+
+  "where payment_id='"+confirmed+"'"),'20000','Reversals cannot exceed gross allocation');
+ assert.equal(db("select count(*) from tutor_private.v56_team_direct_refund_decisions "+
+  "where payment_id='"+confirmed+"' and approved"),'2',
+  'Failed conflicting approval must not leave partial decision');
+ assert.notEqual((await rows(studentActor,'v56_team_direct_refund_decisions')).status,200);
+ assert.notEqual((await rows(former,'v56_team_direct_refund_reversals')).status,200);
+
+
  // Approving an unapplied-credit refund reserves the balance under
  // the same workspace lock held by every existing V5.4 credit offset.
  const refund={p_credit_id:credit,p_amount_cents:60,
