@@ -275,6 +275,32 @@ test('missing V5 Team backend shows explicit unavailable state, not empty projec
  }
 });
 
+// QA-CONSOLE: isolate the reported MutationObserver error from browser tooling.
+// Passing in disposable Chromium does not attribute an IAB/Production error.
+test('QA-CONSOLE: synthetic three-panel navigation has no MutationObserver Node TypeError',async({page})=>{
+ const errors=[];
+ const observe=message=>{
+  const detail=String(message||'');
+  if(/MutationObserver|parameter 1 is not of type.*Node/i.test(detail))
+   errors.push(detail.slice(0,700));
+ };
+ page.on('pageerror',err=>observe(err.stack||err.message));
+ page.on('console',msg=>{if(msg.type()==='error')observe(msg.text());});
+ await signIn(page,'teacher');
+ for(const view of ['calendar','billing','settings']){
+  await page.locator('.side-nav .nav-standard[data-view="'+view+'"]').click();
+  await expect(page.locator('#view-'+view)).toBeVisible();
+ }
+ await page.locator('#workspace-mode-card [data-workspace-mode="team"]').click();
+ await expect(page.locator('body')).toHaveClass(/teacher-team-workspace/);
+ await page.locator('.side-nav .nav-team[data-team-section="learning"]').click();
+ await expect(page.locator('#view-settings')).toBeVisible();
+ await page.locator('.side-nav .nav-team[data-team-section="settings"]').click();
+ await page.locator('#workspace-mode-card [data-workspace-mode="personal"]').click();
+ await expect(page.locator('body')).toHaveClass(/teacher-personal-workspace/);
+ expect(errors,'Unexpected MutationObserver DOM exception in isolated Chromium').toEqual([]);
+});
+
 // QA-TEAM-01: a missing Production-style Team RPC must never masquerade
 // as a legitimate, empty-but-loaded Team project list.
 test('missing V5 Team backend shows explicit unavailable state, not empty projects',async({page})=>{
