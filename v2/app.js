@@ -2227,6 +2227,12 @@ function renderLessonStars(){
    '" aria-label="'+(key==="focus"?"專注度":"學生心情")+n+'星" aria-pressed="'+(selected===n)+'">★</button>').join("");
  }
 }
+function refreshLessonLearningCopyWarning(){
+ const text=($("#lesson-content").value||"")+" "+($("#lesson-feedback").value||"");
+ // Advisory only: do not censor student-visible study notes or change stored data.
+ const hasFinanceQaCopy=/(?:收款|付款|鐘點費|學費|帳務|全額收款|已收款|\\bQA\\b)/i.test(text);
+ $("#lesson-learning-finance-warning").classList.toggle("hidden",state.role!=="teacher"||!hasFinanceQaCopy);
+}
 function lessonLearningPayload(){
  return {
   p_lesson_content:$("#lesson-content").value.trim(),
@@ -2260,6 +2266,7 @@ function openLessonPopup(id){
  $("#lesson-actual-hours").value=String(d.actualHours);
  $("#lesson-content").value=lesson.lesson_content||"";
  $("#lesson-feedback").value=lesson.remarks||"";
+ refreshLessonLearningCopyWarning();
  state.lessonRatings={focus:lesson.focus_rating??null,mood:lesson.mood_rating??null};
  renderLessonStars();
  $("#lesson-learning-editor").classList.toggle("hidden",!teacher||inactive);
@@ -3103,6 +3110,8 @@ function bindEvents(){
   $("#correction-confirmation").textContent="";
  });
  $("#lesson-learning-save").addEventListener("click",saveOnlyLessonLearning);
+ ["lesson-content","lesson-feedback"].forEach(id=>
+  $("#"+id).addEventListener("input",refreshLessonLearningCopyWarning));
  $("#shared-course-form").addEventListener("submit",submitSharedCourse);
  ["lesson-actual-start","lesson-actual-end"].forEach(id=>$("#"+id).addEventListener("change",syncActualHoursFromTime));
  $("#lesson-actual-hours").addEventListener("input",()=>{state.actualHoursManual=true});
