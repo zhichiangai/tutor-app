@@ -116,8 +116,8 @@
     {
       "path": "supabase/migrations/20261110080000_v5_6_manager_adjustment_sources.sql",
       "version": "20261110080000",
-      "bytes": 16183,
-      "git_blob_sha1": "4011443e97c1d82df78d1350d0216b8a782a9c8d"
+      "bytes": 16188,
+      "git_blob_sha1": "3da6fa71101bc705be3188163e745241cefe31ab"
     },
     {
       "path": "supabase/migrations/20261110090000_v5_6_allocated_manual_payout_history.sql",
