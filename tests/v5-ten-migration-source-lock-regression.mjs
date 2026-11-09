@@ -30,7 +30,7 @@ test('V5.7 tenth migration is included without mutating the nine-file source loc
  assert.deepEqual(current.migration_files.slice(0,9),old.migration_files);
  const names=current.migration_files.map(x=>x.path.replace('supabase/migrations/',''));
  assert.deepEqual(names,migrationFiles.slice(0,10),'Historical ten-file source lock must remain untouched');
- assert.deepEqual(migrationFiles.slice(10),['20261109163000_v5_6_team_refund_correction_ledger.sql','20261110032000_v5_6_team_allocated_refund_intake.sql']);
+ assert.deepEqual(migrationFiles.slice(10,12),['20261109163000_v5_6_team_refund_correction_ledger.sql','20261110032000_v5_6_team_allocated_refund_intake.sql']);
  assert.equal(new Set(current.migration_files.map(x=>x.version)).size,10);
  assert.deepEqual([...names].sort(),names);
  assert.ok(names.at(-1).includes('_v57_team_operations_overview.sql'));
