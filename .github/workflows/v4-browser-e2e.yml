@@ -51,13 +51,19 @@ jobs:
           trap 'rm -f "$start_log" "$reset_log"' EXIT
           start_ok=0
           for attempt in 1 2 3; do
+            # Previous failed startup can leave this *disposable* local project's
+            # containers holding 54322/54324. Stop only the named localhost
+            # project before retry; never operate a linked/hosted Supabase.
+            if [ "$attempt" -gt 1 ]; then
+              supabase stop --no-backup >/dev/null 2>&1 || true
+            fi
             if supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor >"$start_log" 2>&1; then
               start_ok=1
               break
             fi
-            if grep -qiE '(toomanyrequests|too many requests|rate limit|429)' "$start_log" && [ "$attempt" -lt 3 ]; then
-              echo "::notice::Container registry rate limit on attempt $attempt, retrying isolated startup"
-              sleep $((attempt * 30))
+            if grep -qiE '(toomanyrequests|too many requests|rate limit|429|address already in use|failed to bind host port)' "$start_log" && [ "$attempt" -lt 3 ]; then
+              echo "::notice::Disposable Supabase startup retry (registry throttling or local port collision), attempt $attempt"
+              sleep $((attempt * 20))
             else
               break
             fi
