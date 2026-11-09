@@ -1,6 +1,6 @@
 # 好好上課｜V5.6 + A1-R3 隔離相容與帳務安全開發閘門（2026-11-09）
 
-**結論：NO-GO／開發進行中。** 本文件不是 Production Migration、RLS、Auth、寄信、真實轉帳或 Main 合併授權。
+**結論：NO-GO／開發進行中。正式資料庫未授權。** 本文件不是 Production Migration、RLS、Auth、寄信、真實轉帳或 Main 合併授權。
 
 ## 本批次實際範圍
 
