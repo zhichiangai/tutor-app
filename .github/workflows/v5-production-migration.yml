@@ -46,6 +46,18 @@ jobs:
           node --check scripts/release/v5-production-guard.mjs
           node --test tests/v5-production-gate-contract.mjs
 
+      - uses: supabase/setup-cli@v3
+        with:
+          version: '2.107.0'
+      - name: Enforce pinned CLI and inspected migration flags before Production
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(supabase --version)" = '2.107.0'
+          supabase db push --help > "$RUNNER_TEMP/v5-push-help.txt"
+          grep -F -- '--db-url' "$RUNNER_TEMP/v5-push-help.txt" >/dev/null
+          grep -F -- '--dry-run' "$RUNNER_TEMP/v5-push-help.txt" >/dev/null
+          grep -F -- '--yes' "$RUNNER_TEMP/v5-push-help.txt" >/dev/null
       - name: Check out actual V5 release source for offline package smoke
         uses: actions/checkout@v4
         with:
