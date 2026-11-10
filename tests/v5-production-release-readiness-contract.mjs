@@ -37,11 +37,12 @@ test('Repository Migration inventory matches frozen read-only release snapshot',
   '20261110060000_v5_6_applied_credit_reverse_conservation.sql',
   '20261110070000_v5_6_parent_finance_verified_bridge.sql',
   '20261110080000_v5_6_manager_adjustment_sources.sql',
-  '20261110090000_v5_6_allocated_manual_payout_history.sql'
+  '20261110090000_v5_6_allocated_manual_payout_history.sql',
+  '20261110100000_v5_7_team_operations_net_reconciliation.sql'
  ],'New V5.7 and V5.6 forward migrations require separately frozen source review');
- assert.equal(files.length,snap.repo_migration_count+9);
+ assert.equal(files.length,snap.repo_migration_count+10);
  assert.equal(files.filter(x=>/_v5_/.test(x)).length,
-  snap.v5_repo_migration_count+8);
+  snap.v5_repo_migration_count+9);
  assert.deepEqual(files.filter(x=>/_v5_/.test(x)),[
   '20261104131300_v5_1_entitlements_student_seats.sql',
   '20261105171000_v5_1_admin_qa_release.sql',
@@ -59,7 +60,8 @@ test('Repository Migration inventory matches frozen read-only release snapshot',
   '20261110060000_v5_6_applied_credit_reverse_conservation.sql',
   '20261110070000_v5_6_parent_finance_verified_bridge.sql',
   '20261110080000_v5_6_manager_adjustment_sources.sql',
-  '20261110090000_v5_6_allocated_manual_payout_history.sql'
+  '20261110090000_v5_6_allocated_manual_payout_history.sql',
+  '20261110100000_v5_7_team_operations_net_reconciliation.sql'
  ]);
 });
 
