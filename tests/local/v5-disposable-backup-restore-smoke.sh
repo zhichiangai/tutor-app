@@ -84,15 +84,31 @@ docker exec "$container" pg_dump --format=custom --no-owner \
   -U postgres -d postgres > "$backup"
 test -s "$backup"
 docker exec -i "$container" pg_restore --list < "$backup" > "$restore_list"
-# Exclude only platform-managed DEFAULT ACL TOC entries; retain object ACLs.
-sed -E '/^[0-9]+; .*DEFAULT ACL /s/^/; /' "$restore_list" > "$restore_list_filtered"
+# Exclude only platform-managed DEFAULT ACL TOC entries and the single
+# bootstrap "public" schema creation. PostgreSQL >=15 automatically creates
+# public owned by pg_database_owner on every new database; dropping and
+# recreating it as postgres silently breaks its ownership/ACL contract.
+# Retain all TABLE/FUNCTION/POLICY/ACL entries in the public schema.
+grep -Eq '^[0-9]+; .*SCHEMA - public( |$)' "$restore_list" || {
+  echo "::error::Archive does not contain the expected built-in public schema TOC entry"
+  exit 1
+}
+sed -E \
+  -e '/^[0-9]+; .*DEFAULT ACL /s/^/; /' \
+  -e '/^[0-9]+; .*SCHEMA - public( |$)/s/^/; /' \
+  "$restore_list" > "$restore_list_filtered"
 docker exec -i "$container" sh -c 'cat > /tmp/v5_synthetic_restore.filtered.list' \
   < "$restore_list_filtered"
 docker exec "$container" createdb -U postgres "$restored_db"
-# A fresh PostgreSQL database already has an empty "public" schema. pg_dump
-# includes CREATE SCHEMA public, so remove ONLY the empty target database copy.
-docker exec "$container" psql -X -v ON_ERROR_STOP=1 \
-  -U postgres -d "$restored_db" -c 'DROP SCHEMA public CASCADE;' >/dev/null
+# Preserve the PostgreSQL-native public schema and its pg_database_owner role.
+# The archive TOC omits only CREATE SCHEMA public, not its ACL/objects.
+native_public_owner="$(docker exec "$container" psql -X -At -v ON_ERROR_STOP=1 \
+  -U postgres -d "$restored_db" \
+  -c "SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname='public'")"
+[[ "$native_public_owner" == "pg_database_owner" ]] || {
+  echo "::error::Unexpected owner for freshly initialized PostgreSQL public schema"
+  exit 1
+}
 # Restore into a distinct disposable database in the SAME LOCAL CI Postgres container.
 docker exec -i "$container" pg_restore --exit-on-error --no-owner \
   --use-list /tmp/v5_synthetic_restore.filtered.list \
