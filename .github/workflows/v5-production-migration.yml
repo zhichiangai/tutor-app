@@ -1,0 +1,173 @@
+name: V5 protected Production database migration
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v5-production-migration.yml'
+      - 'scripts/release/v5-production-guard.mjs'
+      - 'tests/v5-production-gate-contract.mjs'
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: 'Reviewed 40-character SHA of release/v5-20261111'
+        required: true
+        type: string
+      operation:
+        description: 'preflight is read-only; apply requires Production GO'
+        required: true
+        type: choice
+        options: [preflight, apply]
+      confirmation:
+        description: 'For apply: APPLY_V5_19_<release SHA>'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v5-production-database-release
+  cancel-in-progress: false
+
+jobs:
+  verify-code:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify fail-closed release gate scripts
+        run: |
+          node --check scripts/release/v5-production-guard.mjs
+          node --test tests/v5-production-gate-contract.mjs
+
+  protected-migration:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: verify-code
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: v5-production-db
+    env:
+      V5_RELEASE_SHA: ${{ inputs.release_sha }}
+      V5_OPERATION: ${{ inputs.operation }}
+      V5_CONFIRMATION: ${{ inputs.confirmation }}
+      V5_APPROVED_RELEASE_SHA: ${{ vars.V5_APPROVED_RELEASE_SHA }}
+      V5_WRITE_ENABLED: ${{ vars.V5_WRITE_ENABLED }}
+      SUPABASE_TELEMETRY_DISABLED: '1'
+    steps:
+      - name: Check out trusted main guards
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require exact approved release HEAD
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$V5_RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          test "$V5_RELEASE_SHA" = "$V5_APPROVED_RELEASE_SHA" || {
+            echo "::error::Release SHA not approved in protected Environment"; exit 1;
+          }
+          remote_head="$(git ls-remote origin refs/heads/release/v5-20261111 | cut -f1)"
+          test "$remote_head" = "$V5_RELEASE_SHA" || {
+            echo "::error::Release branch head moved; re-review required"; exit 1;
+          }
+      - name: Check out pinned release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_sha }}
+          path: release-source
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: supabase/setup-cli@v3
+        with:
+          version: '2.107.0'
+      - name: Verify and assemble exact 43+19 SQLs without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C release-source rev-parse HEAD)" = "$V5_RELEASE_SHA"
+          node scripts/release/v5-production-guard.mjs source "$GITHUB_WORKSPACE/release-source"
+          test "$(supabase --version)" = '2.107.0'
+          node release-source/scripts/release/package-v5-43-plus-19.mjs package "$RUNNER_TEMP/v5-reviewed-package"
+          cp release-source/supabase/config.toml "$RUNNER_TEMP/v5-reviewed-package/supabase/config.toml"
+          test "$(find "$RUNNER_TEMP/v5-reviewed-package/supabase/migrations" -maxdepth 1 -type f -name '*.sql' | wc -l)" -eq 62
+      - name: Prepare PostgreSQL read-only client
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null; then
+            sudo apt-get update -qq >/dev/null
+            sudo apt-get install -y -qq postgresql-client >/dev/null
+          fi
+      - name: Check exact Supabase target without disclosing credentials
+        env:
+          V5_PRODUCTION_DB_URL: ${{ secrets.V5_PRODUCTION_DB_URL }}
+        run: node scripts/release/v5-production-guard.mjs target "$GITHUB_WORKSPACE/release-source"
+      - name: Check actual Production 43/43 SQL history (read-only)
+        shell: bash
+        env:
+          V5_PRODUCTION_DB_URL: ${{ secrets.V5_PRODUCTION_DB_URL }}
+          PGCONNECT_TIMEOUT: '10'
+          PGOPTIONS: '-c default_transaction_read_only=on'
+        run: |
+          set -euo pipefail
+          psql "$V5_PRODUCTION_DB_URL" -X -A -t -F $'\t' -v ON_ERROR_STOP=1 \
+            -c "select version,name,md5(btrim(statements[1], E' \r\n\t')) from supabase_migrations.schema_migrations order by version" \
+            > "$RUNNER_TEMP/v5-history-before.tsv"
+          node scripts/release/v5-production-guard.mjs history "$GITHUB_WORKSPACE/release-source" before "$RUNNER_TEMP/v5-history-before.tsv"
+      - name: Dry-run exact pending migrations before writing
+        shell: bash
+        env:
+          V5_PRODUCTION_DB_URL: ${{ secrets.V5_PRODUCTION_DB_URL }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/v5-reviewed-package"
+          if ! supabase db push --db-url "$V5_PRODUCTION_DB_URL" --dry-run > "$RUNNER_TEMP/v5-dry-run.log" 2>&1; then
+            echo "::error::Supabase dry-run failed; no Production migrations attempted"
+            exit 1
+          fi
+          echo "PASS: historical checks + Supabase CLI dry-run, no DB writes"
+      - name: Require explicit Production GO and product owner approval
+        if: inputs.operation == 'apply'
+        run: node scripts/release/v5-production-guard.mjs approve "$GITHUB_WORKSPACE/release-source"
+      - name: Apply exactly reviewed forward migrations
+        if: inputs.operation == 'apply'
+        shell: bash
+        env:
+          V5_PRODUCTION_DB_URL: ${{ secrets.V5_PRODUCTION_DB_URL }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/v5-reviewed-package"
+          # No migration repair, reset, data delete, seed or roles push.
+          if ! supabase db push --db-url "$V5_PRODUCTION_DB_URL" --yes > "$RUNNER_TEMP/v5-apply.log" 2>&1; then
+            echo "::error::Migration failed or partly applied. STOP; inspect history before retry/merge."
+            exit 1
+          fi
+          echo "CLI success; independently verify exact 62 versions next"
+      - name: Independently verify Production 62 migrations after apply
+        if: inputs.operation == 'apply'
+        shell: bash
+        env:
+          V5_PRODUCTION_DB_URL: ${{ secrets.V5_PRODUCTION_DB_URL }}
+          PGCONNECT_TIMEOUT: '10'
+          PGOPTIONS: '-c default_transaction_read_only=on'
+        run: |
+          set -euo pipefail
+          psql "$V5_PRODUCTION_DB_URL" -X -A -t -F $'\t' -v ON_ERROR_STOP=1 \
+            -c "select version,name,md5(btrim(statements[1], E' \r\n\t')) from supabase_migrations.schema_migrations order by version" \
+            > "$RUNNER_TEMP/v5-history-after.tsv"
+          node scripts/release/v5-production-guard.mjs history "$GITHUB_WORKSPACE/release-source" after "$RUNNER_TEMP/v5-history-after.tsv"
+          echo "PASS: Production history 43 original + 19 forward versions"
+      - name: Remove temporary SQL and metadata
+        if: always()
+        shell: bash
+        run: |
+          rm -rf "$RUNNER_TEMP/v5-reviewed-package"
+          rm -f "$RUNNER_TEMP/v5-history-before.tsv" "$RUNNER_TEMP/v5-history-after.tsv"
+          rm -f "$RUNNER_TEMP/v5-dry-run.log" "$RUNNER_TEMP/v5-apply.log"
