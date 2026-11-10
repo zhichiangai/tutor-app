@@ -135,3 +135,16 @@ test('QA-PREVIEW-01 permits only visual Team navigation and retains write interc
  assert.match(app,/ev\.preventDefault\(\);ev\.stopImmediatePropagation\(\);/);
  assert.doesNotMatch(app.slice(app.indexOf('function renderPreviewReadOnlyShell'),app.indexOf('function canDismissAccountModal')),/client\.from\(|client\.rpc\(|auth\.signIn/);
 });
+
+test('no-data Preview prices are absent from shared HTML and created only by the guarded renderer',()=>{
+ assert.doesNotMatch(html,/NT\\\$99|NT\\\$399/,'student and unauthenticated DOM must not contain subscription prices');
+ assert.match(html,/id="preview-plans" class="preview-plans"/);
+ const source=app.slice(app.indexOf('function renderPreviewReadOnlyShell(){'),
+  app.indexOf('function selectPreviewShellMode(',app.indexOf('function renderPreviewReadOnlyShell(){')));
+ assert.match(source,/if\(!previewBackendUnavailable\(\)\|\|!document\.body\.classList\.contains\("preview-readonly"\)\)return/);
+ assert.match(source,/const showPlan=!team&&state\.view==="settings"/);
+ assert.match(source,/planRoot\.replaceChildren\(\)/);
+ assert.match(source,/if\(showPlan\)\{/);
+ assert.match(source,/NT\$99／月/);
+ assert.match(source,/NT\$399／月/);
+});
