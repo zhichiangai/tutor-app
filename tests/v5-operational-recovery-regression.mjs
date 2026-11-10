@@ -38,10 +38,9 @@ test('synthetic restore preserves and compares schema ACL/RLS metadata and row f
   assert.match(restore, /awk 'NF/);
   assert.match(restore, /rows_after/);
   assert.doesNotMatch(restore, /pg_restore[^\n]*--no-privileges/);
-  assert.doesNotMatch(restore, /pg_dump --format=custom --no-owner/);
-  assert.match(restore, /owner_grants/);
-  assert.match(restore, /owner_revokes/);
-  assert.match(restore, /REVOKE %I FROM postgres/);
+  assert.match(restore, /pg_dump --format=custom --no-owner/);
+  assert.match(restore, /pg_restore --exit-on-error --no-owner/);
+  assert.match(restore, /BLOCKED: Supabase reserved-role protection prevents exact synthetic owner\/ACL restoration/);
   assert.match(restore, /DEFAULT ACL TOC entries/);
   assert.match(restore, /v5_synthetic_acl_fingerprint\.sql/);
   assert.match(restore, /ACL fingerprint category differs/);

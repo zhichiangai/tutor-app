@@ -131,8 +131,9 @@
 
 ### 5.4 合成 backup→restore 驗收範圍
 
-- 更新後的 `tests/local/v5-disposable-backup-restore-smoke.sh` 僅在 disposable CI 使用，為還原暫時授予 `postgres` 所需的既有 object-owner role membership，還原完成即撤回（失敗時由 trap 撤回），以保留原物件 owner 與 object ACL；ACL fingerprint 同時涵蓋 schema、relation、function owner 及 grants。僅略過 Supabase 受保護角色的 platform `DEFAULT ACL` TOC entries，避免重建平台預設權限。
+- 更新後的 `tests/local/v5-disposable-backup-restore-smoke.sh` 僅在 disposable CI 使用。CI 的 `postgres` 不可授予受保護 `supabase_admin` owner membership（Supabase 明確拒絕）；因此隔離 restore 使用 `--no-owner`，能測試 schema、RLS、函式、row count/hash，但會正規化 object owner。ACL 指紋仍比較 schema、relation、function owner 與 grants，這項差異會使整體還原關卡維持 BLOCKED，不能降級成 PASS。僅略過 platform `DEFAULT ACL` TOC entries。
 - 還原前後比對選定 schema 的 schema-only dump SHA-256（public、tutor_private、auth、supabase_migrations 及其 `extensions` 相依物件；包含表、RLS policies、functions）。CHECK 約束因 PostgreSQL dump/replay 會改變多餘括號呈現，改以 `pg_constraint.conbin` 解析樹指紋比對。另以獨立 ACL fingerprint 對照 schema、relations、functions 的 owner 與 object-level grants，並比對每表 row count + row hash，以及主要 migration/Auth/V4/V5 ledger 數量。只輸出雜湊與摘要，不輸出合成 row 或憑證。
+- 最新隔離實測：schema/check 約束與合成 row/count restore 通過，但 object-owner/ACL fingerprint 不符；嘗試 membership 時遭 Supabase reserved-role guard 拒絕。故 full schema+security restore = **BLOCKED**，Production backup/restore = **NOT TESTED**。解除 BLOCKED 需取得 Supabase 支援的保留 owner/平台 ACL 還原路徑，不能用提高權限或忽略差異替代。
 - 此證據只涵蓋指定 schema、object-level ACL/RLS 定義和合成資料一致；platform `DEFAULT ACL`、Realtime、Storage platform object/content 不在此 restore assertion 範圍。RLS/JWT 實際授權仍由獨立 GoTrue/JWT/PostgREST E2E 驗證。Production 備份及正式還原仍 NOT TESTED。
 
 ### 5.5 正式 GO / NO-GO 清單
