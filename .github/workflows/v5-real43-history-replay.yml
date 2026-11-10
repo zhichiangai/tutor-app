@@ -8,6 +8,7 @@ on:
       - 'supabase/candidates/**'
       - 'tests/a1r3/**'
       - 'tests/local/v5-real43-history-*.mjs'
+      - 'tests/local/v5-clean-bootstrap-gate.mjs'
       - 'docs/v5/catalog/PRODUCTION_V4_43_HISTORY_SOURCE_MAP_20261110.json'
       - 'docs/v5/catalog/V5_A1_NINETEEN_MIGRATION_SOURCE_LOCK_20261110.json'
       - '.github/workflows/v5-real43-history-replay.yml'
