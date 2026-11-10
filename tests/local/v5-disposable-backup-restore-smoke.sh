@@ -105,6 +105,12 @@ if [ "$schema_before_hashes" != "$schema_after_hashes" ]; then
     after_hash="$(printf '%s\n' "$schema_after_hashes" | awk -F: -v name="$schema" '$1==name {print $2}')"
     if [ "$before_hash" != "$after_hash" ]; then
       echo "::error::Synthetic schema fingerprint differs for $schema"
+      diff -u \
+        "${RUNNER_TEMP}/v5_synthetic_schema_before_${schema}.sql" \
+        "${RUNNER_TEMP}/v5_synthetic_schema_after_${schema}.sql" |
+        grep -E '^[+-](CREATE|ALTER|DROP|COMMENT|GRANT|REVOKE)' |
+        sed -E 's/^([+-])((CREATE|ALTER|DROP)[[:space:]]+(OR REPLACE[[:space:]]+)?(FUNCTION|TABLE|SEQUENCE|VIEW|TYPE|SCHEMA|EXTENSION|INDEX|TRIGGER|POLICY|MATERIALIZED VIEW)[[:space:]]+(ONLY[[:space:]]+)?[^[:space:](;]+).*/\1\2/; s/^([+-])((COMMENT ON|GRANT|REVOKE)[[:space:]]+[A-Z ]+[[:space:]]+[^[:space:](;]+).*/\1\2/' |
+        head -n 20 || true
     fi
   done
   echo "::error::Synthetic restore schema/RLS/function fingerprint mismatch"
