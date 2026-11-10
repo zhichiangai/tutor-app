@@ -14,7 +14,7 @@
 </head>
 <body class="auth-pending">
   <div class="auth-loading-screen" role="status" aria-live="polite"><div class="auth-loading-content"><span class="auth-loading-symbol" aria-hidden="true">✳</span><strong>正在確認登入身分</strong><p>正在為你準備課程與學習紀錄。</p></div></div>
-  <div id="preview-readonly-banner" class="preview-readonly-banner" role="status" hidden>僅供畫面預覽：尚未連接獨立測試資料庫，所有資料操作已停用。重新整理可回到登入提示。</div>
+  <div id="preview-readonly-banner" class="preview-readonly-banner" role="status" hidden><span>僅供無資料畫面預覽：未連接隔離測試資料庫，資料讀取與所有寫入均已停用。</span><div class="preview-mode-switches" aria-label="預覽介面切換"><button type="button" id="preview-personal-shell" aria-pressed="true">個人介面</button><button type="button" id="preview-team-shell" aria-pressed="false">Team 介面</button></div></div>
   <div class="app-shell">
     <aside class="sidebar" aria-label="主要導覽">
       <a class="brand" href="./index.html"><span class="brand-symbol" aria-hidden="true">✳</span><span class="brand-copy"><strong>好好上課</strong><small>Lesson, made simple.</small></span></a>
@@ -159,6 +159,8 @@
         </section>
         <section id="view-settings" class="page-view hidden">
           <div class="section-row page-head"><div><p class="eyebrow" id="settings-page-eyebrow">SETTINGS · 個人偏好</p><h2 id="settings-page-title">設定</h2><p class="section-sub" id="settings-page-description">帳號、家教空間及啟用的角色模式都放在這裡。</p></div></div>
+          <article id="preview-plan-panel" class="card preview-shell-only hidden" aria-label="會員方案靜態預覽"><h3>會員方案 · 靜態介紹</h3><p class="section-sub">未登入；以下並非使用者的目前方案或名額。</p><div class="preview-plans"><div><strong>Free</strong><span>免費</span><small>累計學生 3 人 · 老師 1 位</small></div><div><strong>Plus</strong><span>NT$99／月</span><small>累計學生 30 人 · 老師 1 位</small></div><div><strong>Team</strong><span>NT$399／月</span><small>累計學生 100 人 · 老師 10 位</small></div></div><p class="helper-note">尚未提供線上購買，功能授權須由資料庫確認。</p></article>
+          <article id="preview-team-panel" class="card preview-shell-only hidden" aria-label="Team 無資料預覽"><h3 id="preview-team-title">Team 團隊與專案</h3><p class="section-sub">未登入的靜態導覽，不代表已擁有 Team 權限。</p><div class="empty">沒有讀取 Team、專案、學生、時薪、付款、抵扣或退款資料；實際功能需等待隔離 V5 後端驗收。</div></article>
           <button type="button" class="secondary-button hidden" id="settings-back-student" data-view="student">← 返回我的學習</button>
           <div class="settings-grid">
             <article class="card settings-card workspace-mode-card hidden" id="workspace-mode-card">

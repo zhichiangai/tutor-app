@@ -560,7 +560,7 @@ function previewBackendUnavailable(){
 }
 // Read-only Preview enables navigation for visual QA, never simulated authorization.
 // All data operations stay blocked by the missing validated backend.
-const PREVIEW_SAFE_BUTTONS='[data-view], #prev-month, #next-month, #billing-prev, #billing-next, #jump-today, #show-full-month, [data-calendar-mode]';
+const PREVIEW_SAFE_BUTTONS='[data-view], [data-team-section], #prev-month, #next-month, #billing-prev, #billing-next, #jump-today, #show-full-month, [data-calendar-mode]';
 function isPreviewSafeControl(el){
  return Boolean(el?.matches?.(PREVIEW_SAFE_BUTTONS));
 }
@@ -582,11 +582,76 @@ function applyPreviewReadOnlyControls(){
   el.setAttribute("aria-disabled","true");
  }
 }
+let previewShellMode="personal";
+function renderPreviewReadOnlyShell(){
+ if(!previewBackendUnavailable()||!document.body.classList.contains("preview-readonly"))return;
+ const team=previewShellMode==="team";
+ document.body.classList.toggle("preview-team-shell",team);
+ $("#preview-personal-shell").setAttribute("aria-pressed",String(!team));
+ $("#preview-team-shell").setAttribute("aria-pressed",String(team));
+ $("#connection-status").textContent="無資料唯讀預覽";
+ $("#greeting-title").textContent=team?"Team 介面預覽":"個人家教介面預覽";
+ $("#greeting-copy").textContent="未登入，沒有讀取學生、課程或帳務資料；禁止所有資料寫入。";
+ $("#preview-plan-panel").classList.toggle("hidden",team||state.view!=="settings");
+ $("#preview-team-panel").classList.toggle("hidden",!team);
+ if(team){
+  const section=TEAM_SECTIONS.has(state.teamSection)?state.teamSection:"projects";
+  const titles={projects:"Team 團隊與專案",learning:"Team 學生與課表",billing:"Team 帳務",settings:"Team 設定與切換"};
+  $("#settings-page-title").textContent=titles[section];
+  $("#settings-page-eyebrow").textContent="TEAM · 無資料預覽";
+  $("#settings-page-description").textContent="只展示導航與結構，並未取得任何 Team 權限或資料。";
+  $("#preview-team-title").textContent=titles[section];
+  document.querySelectorAll("[data-team-section]").forEach(button=>{
+   const selected=button.dataset.teamSection===section;
+   button.classList.toggle("active",selected);
+   button.setAttribute("aria-current",selected?"page":"false");
+  });
+ }else{
+  $("#home-focus").textContent="尚無課程資料，僅供檢查版面與導覽。";
+  $("#next-lesson").textContent="尚未連接隔離測試資料庫";
+  $("#recent-lessons").textContent="沒有可預覽的課程";
+  $("#mini-month").textContent="無資料預覽";
+  $("#mini-calendar").textContent="請至課程月曆查看月份切換";
+  $("#metrics").textContent="課程時數與金額需要登入驗證才能顯示。";
+  $("#money-reminder").textContent="未讀取帳務資料";
+  const year=state.month.getFullYear(),month=state.month.getMonth();
+  const label=new Intl.DateTimeFormat("zh-TW",{year:"numeric",month:"long"}).format(state.month);
+  $("#calendar-month").textContent=label;
+  $("#billing-month").textContent=label;
+  $("#month-overview").textContent="無資料預覽 · 未讀取任何課程";
+  $("#agenda-list").textContent="尚未載入課程";
+  $("#month-lesson-preview").textContent="沒有可預覽的課程";
+  const offset=(new Date(year,month,1).getDay()+6)%7;
+  const days=new Date(year,month+1,0).getDate();
+  $("#calendar-grid").innerHTML=Array.from({length:offset+days},(_,i)=>
+   i<offset?'<div class="calendar-cell outside" aria-hidden="true"></div>':
+   '<div class="calendar-cell"><span class="day-number">'+(i-offset+1)+'</span></div>').join("");
+  $("#billing-summary").textContent="尚未讀取任何金額，此處並非零元帳務。";
+  $("#billing-student-summary").textContent="未登入，無學生帳務";
+  $("#payment-batch-history").textContent="未登入，無付款紀錄";
+  $("#billing-list").textContent="未登入，無課程及付款明細";
+  $("#requests-list").textContent="尚無可預覽的申請";
+  $("#student-grid").textContent="未登入，無學生資料";
+ }
+ applyPreviewReadOnlyControls();
+}
+function selectPreviewShellMode(mode){
+ if(!previewBackendUnavailable()||!document.body.classList.contains("preview-readonly")||
+   !["personal","team"].includes(mode))return;
+ previewShellMode=mode;
+ state.view=mode==="team"?"settings":"home";
+ state.teamSection="projects";
+ render();
+}
 function enterPreviewReadOnly(){
  if(!previewBackendUnavailable())return;
+ // No simulated identity: clear cached rows and DOM before showing the preview.
+ clearUserSessionState();
+ activeUser=null;
+ previewShellMode="personal";
  document.body.classList.add("preview-readonly");
  $("#preview-readonly-banner").hidden=false;
- applyPreviewReadOnlyControls();
+ render();
 }
 function canDismissAccountModal(){
  return (authPhase==="ready"&&!!activeUser)||
@@ -670,7 +735,7 @@ function render(){
  v56FamilyUI.render();
  // The login gate is not a dashboard mode. Never rebuild payment summaries,
  // student records or lesson content when there is no verified active account.
- if(!identified)return;
+ if(!identified){renderPreviewReadOnlyShell();return}
  // Role preference checkboxes are on the separate settings page.
  if(student){
   if(state.view==="settings"){
@@ -3035,7 +3100,14 @@ function bindEvents(){
   const modeChoice=ev.target.closest("[data-workspace-mode]");
   if(modeChoice){setWorkspaceMode(modeChoice.dataset.workspaceMode);return}
   const teamNav=ev.target.closest("[data-team-section]");
-  if(teamNav){setTeamSection(teamNav.dataset.teamSection);return}
+  if(teamNav){
+   if(document.body.classList.contains("preview-readonly")&&previewBackendUnavailable()){
+    if(TEAM_SECTIONS.has(teamNav.dataset.teamSection)){
+     previewShellMode="team";state.teamSection=teamNav.dataset.teamSection;state.view="settings";render();
+    }
+   }else setTeamSection(teamNav.dataset.teamSection);
+   return;
+  }
   const nav=ev.target.closest("[data-view]");if(nav){setView(nav.dataset.view);if(nav.dataset.date){state.selected=nav.dataset.date;state.month=parseDate(state.selected);render()}return}
   const close=ev.target.closest("[data-close]");if(close){closeModal(close.dataset.close);return}
   const recentToggle=ev.target.closest("[data-recent-changes-toggle]");
@@ -3213,6 +3285,8 @@ function bindEvents(){
  $("#google-login").onclick=googleLogin;
  $("#login-retry").onclick=initializeLive;
  $("#login-preview-dismiss").onclick=()=>{if(!previewBackendUnavailable())return;enterPreviewReadOnly();closeModal("account-modal")};
+ $("#preview-personal-shell").onclick=()=>selectPreviewShellMode("personal");
+ $("#preview-team-shell").onclick=()=>selectPreviewShellMode("team");
  $("#sign-out").onclick=signOut;
  $("#mode-settings-form").addEventListener("submit",saveEnabledRoles);
  $("#default-login-role").addEventListener("change",changeDefaultLoginRole);

@@ -115,3 +115,23 @@ test('payment dates are clearly reported vs bank-verified and QA is visibly dist
  assert.doesNotMatch(app,/家長實際付款：/);
  assert.doesNotMatch(app,/老師實際收款：/);
 });
+
+test('QA-PREVIEW-01 reveals only the explicit signed-out no-data shell',()=>{
+ assert.match(css,/body\.preview-readonly\.login-required \.app-shell>\.sidebar/);
+ assert.match(css,/body\.preview-readonly\.login-required \.app-shell>\.main-content/);
+ assert.match(css,/body\.preview-readonly\.login-required \.app-shell>\.mobile-nav\{visibility:visible/);
+ assert.match(app,/function enterPreviewReadOnly\(\)\{\s*if\(!previewBackendUnavailable\(\)\)return;/);
+ assert.match(app,/clearUserSessionState\(\);\s*activeUser=null;\s*previewShellMode="personal";/);
+ assert.match(app,/if\(!identified\)\{renderPreviewReadOnlyShell\(\);return\}/);
+ assert.match(app,/function renderPreviewReadOnlyShell\(\)\{\s*if\(!previewBackendUnavailable\(\)\|\|!document\.body\.classList\.contains\("preview-readonly"\)\)return;/);
+ assert.match(html,/id="preview-plan-panel"/);
+ assert.match(html,/id="preview-team-panel"/);
+});
+test('QA-PREVIEW-01 permits only visual Team navigation and retains write interception',()=>{
+ assert.match(app,/const PREVIEW_SAFE_BUTTONS='\[data-view\], \[data-team-section\]/);
+ assert.match(css,/preview-readonly\.preview-team-shell \.side-nav \.nav-team\{display:flex!important\}/);
+ assert.match(css,/preview-readonly\.preview-team-shell #view-settings \.settings-grid\{display:none!important\}/);
+ assert.match(app,/if\(document\.body\.classList\.contains\("preview-readonly"\)\&\&previewBackendUnavailable\(\)\)/);
+ assert.match(app,/ev\.preventDefault\(\);ev\.stopImmediatePropagation\(\);/);
+ assert.doesNotMatch(app.slice(app.indexOf('function renderPreviewReadOnlyShell'),app.indexOf('function canDismissAccountModal')),/client\.from\(|client\.rpc\(|auth\.signIn/);
+});
