@@ -18,14 +18,13 @@ echo "Disposable-only restore guard PASS"
 container="supabase_db_tutor_v4_isolated"
 restored_db="tutor_v5_synthetic_restore"
 backup="${RUNNER_TEMP}/v5_synthetic_full_db.dump"
-schema_before="${RUNNER_TEMP}/v5_synthetic_schema_before.sql"
-schema_after="${RUNNER_TEMP}/v5_synthetic_schema_after.sql"
 restore_list="${RUNNER_TEMP}/v5_synthetic_restore.list"
 restore_list_filtered="${RUNNER_TEMP}/v5_synthetic_restore.filtered.list"
 # The only permitted operations are Docker's disposable CI PostgreSQL container.
 docker inspect "$container" --format '{{.State.Running}}' | grep -qx true
 cleanup() {
-  rm -f "$backup" "$schema_before" "$schema_after" "$restore_list" "$restore_list_filtered"
+  rm -f "$backup" "$restore_list" "$restore_list_filtered" \
+    "$RUNNER_TEMP"/v5_synthetic_schema_*.sql
   docker exec "$container" rm -f /tmp/v5_synthetic_restore.filtered.list >/dev/null 2>&1 || true
   docker exec "$container" dropdb -U postgres --if-exists "$restored_db" >/dev/null 2>&1 || true
 }
@@ -47,15 +46,22 @@ test -n "$before"
 # A schema-only dump includes table definitions, RLS policies and functions.
 # Object-level ACLs are fingerprinted separately; pg_dump's platform default
 # ACLs cannot be replayed under Supabase's restricted CI roles.
-docker exec "$container" pg_dump --schema-only --no-owner --no-privileges \
-  --schema=public --schema=tutor_private --schema=auth \
-  --schema=supabase_migrations -U postgres -d postgres > "$schema_before"
-schema_before_hash="$(grep -v '^-- ' "$schema_before" | sha256sum | cut -d' ' -f1)"
+schema_fingerprints() {
+  local db="$1" phase="$2" schema file hash
+  for schema in public tutor_private auth supabase_migrations; do
+    file="${RUNNER_TEMP}/v5_synthetic_schema_${phase}_${schema}.sql"
+    docker exec "$container" pg_dump --schema-only --no-owner --no-privileges \
+      --schema="$schema" -U postgres -d "$db" > "$file"
+    hash="$(grep -v '^-- ' "$file" | sha256sum | cut -d' ' -f1)"
+    printf '%s:%s\n' "$schema" "$hash"
+  done
+}
+schema_before_hashes="$(schema_fingerprints postgres before)"
 rows_before="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
   -U postgres -d postgres < tests/sql/v5_synthetic_row_fingerprint.sql)"
 acl_before="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
   -U postgres -d postgres < tests/sql/v5_synthetic_acl_fingerprint.sql)"
-test -n "$schema_before_hash"
+test -n "$schema_before_hashes"
 test -n "$rows_before"
 test -n "$acl_before"
 
@@ -85,15 +91,19 @@ if [ "$before" != "$after" ]; then
   echo "::error::Synthetic backup/restore count reconciliation failed (values suppressed)"
   exit 1
 fi
-docker exec "$container" pg_dump --schema-only --no-owner --no-privileges \
-  --schema=public --schema=tutor_private --schema=auth \
-  --schema=supabase_migrations -U postgres -d "$restored_db" > "$schema_after"
-schema_after_hash="$(grep -v '^-- ' "$schema_after" | sha256sum | cut -d' ' -f1)"
+schema_after_hashes="$(schema_fingerprints "$restored_db" after)"
 rows_after="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
   -U postgres -d "$restored_db" < tests/sql/v5_synthetic_row_fingerprint.sql)"
 acl_after="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
   -U postgres -d "$restored_db" < tests/sql/v5_synthetic_acl_fingerprint.sql)"
-if [ "$schema_before_hash" != "$schema_after_hash" ]; then
+if [ "$schema_before_hashes" != "$schema_after_hashes" ]; then
+  for schema in public tutor_private auth supabase_migrations; do
+    before_hash="$(printf '%s\n' "$schema_before_hashes" | awk -F: -v name="$schema" '$1==name {print $2}')"
+    after_hash="$(printf '%s\n' "$schema_after_hashes" | awk -F: -v name="$schema" '$1==name {print $2}')"
+    if [ "$before_hash" != "$after_hash" ]; then
+      echo "::error::Synthetic schema fingerprint differs for $schema"
+    fi
+  done
   echo "::error::Synthetic restore schema/RLS/function fingerprint mismatch"
   exit 1
 fi
