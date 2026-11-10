@@ -131,6 +131,60 @@ for(const signature of sensitiveRpcs.slice(0,2)){
  assert.equal(allowed,'false','Admin-only RPC exposed to authenticated role: '+signature);
 }
 
+// Enumerate the *entire* V5 HTTP RPC surface from the actual PostgreSQL
+// catalog, not only the hand-reviewed list above. A newly added V5.8 RPC
+// must not silently inherit executable privileges from PUBLIC / anon.
+// These assertions operate solely in disposable local CI with no real users.
+const v5RpcSurface=JSON.parse(db(`
+ select coalesce(jsonb_agg(jsonb_build_object(
+  'name',p.proname,
+  'signature',n.nspname||'.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')',
+  'security_definer',p.prosecdef,
+  'anon_execute',has_function_privilege('anon',p.oid,'EXECUTE'),
+  'authenticated_execute',has_function_privilege('authenticated',p.oid,'EXECUTE'),
+  'pinned_search_path',exists(
+   select 1 from unnest(coalesce(p.proconfig,ARRAY[]::text[])) cfg
+   where cfg like 'search_path=%'
+  )
+ ) order by n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)),
+ '[]'::jsonb)::text
+ from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+ where n.nspname='public' and p.proname ~ '^(v5_|v56_)'
+`));
+assert.ok(v5RpcSurface.length>=25,
+ 'Unexpectedly small public V5 RPC surface; audit may have skipped functions');
+assert.deepEqual(
+ v5RpcSurface.filter(r=>r.anon_execute).map(r=>r.signature),
+ [],
+ 'V5 public RPC unexpectedly executable by anon/PUBLIC'
+);
+assert.deepEqual(
+ v5RpcSurface.filter(r=>r.security_definer&&!r.pinned_search_path)
+  .map(r=>r.signature),
+ [],
+ 'V5 SECURITY DEFINER RPC missing fixed search_path'
+);
+// Admin-only endpoints must stay service-only, regardless of later changes.
+assert.deepEqual(
+ v5RpcSurface.filter(r=>/^v5_admin_/.test(r.name)&&r.authenticated_execute)
+  .map(r=>r.signature),
+ [],
+ 'V5 admin-only RPC became callable by authenticated users'
+);
+// PostgreSQL views can bypass underlying RLS. Any V5 API view granted to an
+// authenticated user must use security_invoker; don't conflate RLS and GRANT.
+const unsafeV5Views=lines(
+ "select n.nspname||'.'||c.relname from pg_class c "+
+ "join pg_namespace n on n.oid=c.relnamespace "+
+ "where n.nspname='public' and c.relkind='v' "+
+ "and c.relname ~ '^(v5_|v56_)' "+
+ "and has_table_privilege('authenticated',c.oid,'SELECT') "+
+ "and not coalesce('security_invoker=true'=any(c.reloptions),false) "+
+ "order by c.relname"
+);
+assert.deepEqual(unsafeV5Views,[],
+ 'Authenticated V5 public view bypasses RLS without security_invoker');
+
 // V5.6 correction/void/refund records are private and deliberately not
 // matched by the historical v5_ prefix inventory.
 const v56Private=[
@@ -180,6 +234,10 @@ console.log(JSON.stringify({
  v5_rls_tables:expectedV5.size,
  v4_core_rls_tables:core.length,
  anon_exposures:exposed.length,
+ v5_public_rpcs_audited:v5RpcSurface.length,
+ v5_public_rpc_anon_exposures:0,
+ v5_security_definer_unpinned_paths:0,
+ v5_unsafe_auth_views:0,
  zero_row_business_tables:cleanTables.length,
  production_writes:0
 }));
