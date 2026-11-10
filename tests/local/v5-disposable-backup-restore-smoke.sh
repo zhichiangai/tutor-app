@@ -71,11 +71,14 @@ checks_before="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
   -U postgres -d postgres < tests/sql/v5_synthetic_check_constraint_fingerprint.sql)"
 app_acl_before="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
   -U postgres -d postgres < tests/sql/v5_synthetic_app_acl_fingerprint.sql)"
+app_owner_before="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
+  -U postgres -d postgres < tests/sql/v5_synthetic_app_owner_fingerprint.sql)"
 test -n "$schema_before_hashes"
 test -n "$rows_before"
 test -n "$acl_before"
 test -n "$checks_before"
 test -n "$app_acl_before"
+test -n "$app_owner_before"
 
 # Keep the full synthetic dump in a private, short-lived runner file.
 docker exec "$container" pg_dump --format=custom --no-owner \
@@ -129,6 +132,8 @@ checks_after="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
   -U postgres -d "$restored_db" < tests/sql/v5_synthetic_check_constraint_fingerprint.sql)"
 app_acl_after="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
   -U postgres -d "$restored_db" < tests/sql/v5_synthetic_app_acl_fingerprint.sql)"
+app_owner_after="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
+  -U postgres -d "$restored_db" < tests/sql/v5_synthetic_app_owner_fingerprint.sql)"
 if [ "$schema_before_hashes" != "$schema_after_hashes" ]; then
   for schema in public tutor_private auth supabase_migrations extensions; do
     before_hash="$(printf '%s\n' "$schema_before_hashes" | awk -F: -v name="$schema" '$1==name {print $2}')"
@@ -168,7 +173,21 @@ fi
 # functions; unlike Supabase's internal platform-managed schemas they must be
 # perfectly restorable with the restricted, --no-owner logical restore route.
 if [ "$app_acl_before" != "$app_acl_after" ]; then
+  python3 - "$app_acl_before" "$app_acl_after" <<'PY'
+import json
+import sys
+before, after = (json.loads(value) for value in sys.argv[1:3])
+for category in sorted(set(before) | set(after)):
+    if before.get(category) != after.get(category):
+        print(f"Application ACL category differs: {category}; "
+              f"before_count={before.get(category, {}).get('count', 'missing')}; "
+              f"after_count={after.get(category, {}).get('count', 'missing')}")
+PY
   echo "::error::Application-owned public/tutor_private owner or ACL fingerprint differs after restore"
+  exit 1
+fi
+if [ "$app_owner_before" != "$app_owner_after" ]; then
+  echo "::error::Application-owned public/tutor_private owner fingerprint differs after restore (including SECURITY DEFINER)"
   exit 1
 fi
 # Independent full-catalog diagnostic: do not falsely assert exact platform
