@@ -592,7 +592,28 @@ function renderPreviewReadOnlyShell(){
  $("#connection-status").textContent="無資料唯讀預覽";
  $("#greeting-title").textContent=team?"Team 介面預覽":"個人家教介面預覽";
  $("#greeting-copy").textContent="未登入，沒有讀取學生、課程或帳務資料；禁止所有資料寫入。";
- $("#preview-plan-panel").classList.toggle("hidden",team||state.view!=="settings");
+ const showPlan=!team&&state.view==="settings";
+ $("#preview-plan-panel").classList.toggle("hidden",!showPlan);
+ // Subscription prices belong to the explicitly selected no-data Preview only.
+ // Never ship plan amounts as static markup in the signed-out/student DOM.
+ const planRoot=$("#preview-plans");
+ planRoot.replaceChildren();
+ if(showPlan){
+  const previewPlans=[
+   ["Free","免費","累計學生 3 人 · 老師 1 位"],
+   ["Plus","NT$99／月","累計學生 30 人 · 老師 1 位"],
+   ["Team","NT$399／月","累計學生 100 人 · 老師 10 位"]
+  ];
+  for(const [name,price,seats] of previewPlans){
+   const card=document.createElement("div");
+   for(const [tag,value] of [["strong",name],["span",price],["small",seats]]){
+    const label=document.createElement(tag);
+    label.textContent=value;
+    card.append(label);
+   }
+   planRoot.append(card);
+  }
+ }
  $("#preview-team-panel").classList.toggle("hidden",!team);
  if(team){
   const section=TEAM_SECTIONS.has(state.teamSection)?state.teamSection:"projects";
