@@ -1,0 +1,143 @@
+name: V5 A1-R3 real 43-history isolated replay
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/candidates/**'
+      - 'tests/a1r3/**'
+      - 'tests/local/v5-real43-history-*.mjs'
+      - 'docs/v5/catalog/PRODUCTION_V4_43_HISTORY_SOURCE_MAP_20261110.json'
+      - 'docs/v5/catalog/V5_A1_NINETEEN_MIGRATION_SOURCE_LOCK_20261110.json'
+      - '.github/workflows/v5-real43-history-replay.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v5-a1r3-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  historical-replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CI: 'true'
+      V4_E2E_LOCAL: '1'
+      SUPABASE_TELEMETRY_DISABLED: '1'
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io
+      V4_E2E_FIXTURE_FILE: /tmp/v4-e2e-fixture.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.107.0
+      - name: Guard disposable local project and validate scripts
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = "true"
+          test "$CI" = "true"
+          test "$V4_E2E_LOCAL" = "1"
+          grep -q '^project_id = "tutor_v4_isolated"$' supabase/config.toml
+          test ! -f supabase/.temp/project-ref
+          test ! -f supabase/.branches/_current_branch
+          node --check tests/local/v5-real43-history-builder.mjs
+          node --check tests/local/v5-real43-history-gate.mjs
+      - name: Stage all 43 real historical SQL sources without Production rows
+        run: node tests/local/v5-real43-history-builder.mjs baseline
+      - name: Start disposable Supabase with authentic 43-history migration chain
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/a1r3-start.log"
+          trap 'rm -f "$log"' EXIT
+          if ! supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor >"$log" 2>&1; then
+            echo "::error::43-history isolated startup failed"
+            grep -Ei 'applying migration|error:|failed to apply|sqlstate|^fatal:' "$log" |
+              sed -E 's/eyJ[A-Za-z0-9_.-]+/[JWT_REDACTED]/g; s/sb_(publishable|secret)_[A-Za-z0-9_-]+/[KEY_REDACTED]/g; s/[A-Za-z0-9_+\/=:-]{80,}/[REDACTED]/g' |
+              tail -n 15 | cut -c 1-220 || true
+            exit 1
+          fi
+      - name: Replay original 43-version schema in disposable local database
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/a1r3-43-reset.log"
+          trap 'rm -f "$log"' EXIT
+          if ! supabase db reset --local --no-seed >"$log" 2>&1; then
+            echo "::error::43-history isolated migration reset failed"
+            grep -Ei 'applying migration|error:|failed to apply|sqlstate' "$log" |
+              sed -E 's/eyJ[A-Za-z0-9_.-]+/[JWT_REDACTED]/g; s/[A-Za-z0-9_+\/=:-]{80,}/[REDACTED]/g' |
+              tail -n 15 | cut -c 1-220 || true
+            exit 1
+          fi
+      - name: Assert 43 applied versions, business RLS and zero Production rows
+        run: node tests/local/v5-real43-history-gate.mjs baseline
+      - name: Diagnose Production 43-history metadata parity
+        id: baseline_metadata
+        continue-on-error: true
+        run: V5_SCHEMA_DRIFT_STRICT=1 node tests/local/v5-production-schema-fingerprint-compare.mjs
+      - name: Stage all nineteen immutable V5 migration files
+        run: node tests/local/v5-real43-history-builder.mjs append-v5
+      - name: Apply V5 forward SQL to existing isolated 43-history schema
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/a1r3-v5-upgrade.log"
+          trap 'rm -f "$log"' EXIT
+          supabase migration up --help | grep -q -- '--local'
+          if ! supabase migration up --local >"$log" 2>&1; then
+            echo "::error::Historical 43-to-62 V5 upgrade failed"
+            grep -Ei 'applying migration|error:|failed to apply|sqlstate' "$log" |
+              sed -E 's/eyJ[A-Za-z0-9_.-]+/[JWT_REDACTED]/g; s/[A-Za-z0-9_+\/=:-]{80,}/[REDACTED]/g' |
+              tail -n 15 | cut -c 1-220 || true
+            exit 1
+          fi
+      - name: Validate exact 62 migrations, V4/V5 RLS and RPC privileges
+        run: |
+          set -euo pipefail
+          node tests/local/v5-real43-history-gate.mjs forward
+          node tests/local/v5-clean-bootstrap-gate.mjs
+      - name: Synthetic GoTrue JWT and PostgREST V4 finance/RLS regression
+        env:
+          V359_LOCAL_RLS_TEST: '1'
+          V359_RLS_PREAPPLIED: '1'
+          V40_LOCAL_CORRECTION_TEST: '1'
+          V4_QA_LOCAL_JWT_TEST: '1'
+        run: |
+          set -euo pipefail
+          node tests/local/v359-parent-payment-rest.mjs
+          node tests/local/v40-payment-correction-rest.mjs
+          node tests/local/v4-qa-classification-rest.mjs
+      - name: Install pinned Chromium tests
+        run: |
+          npm install --no-save --no-package-lock @playwright/test@1.64.1 @supabase/supabase-js@2.76.1
+          npx playwright install --with-deps chromium
+      - name: Seed synthetic three-role users and lessons only
+        run: node tests/e2e/seed-v4-local.mjs
+      - name: Run real three-role Chromium compatibility regression
+        run: npx playwright test --config tests/e2e/playwright.config.mjs
+      - name: Report independent baseline metadata status
+        if: always()
+        run: |
+          if [ '${{ steps.baseline_metadata.outcome }}' = 'success' ]; then
+            echo 'PASS: Production 43-history baseline fingerprint'
+          else
+            echo '::warning::PARTIAL: 43-history metadata fingerprint requires independent drift review'
+          fi
+      - name: Remove ephemeral credentials
+        if: always()
+        run: rm -f "$V4_E2E_FIXTURE_FILE"
+      - name: Upload sanitized failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a1r3-real43-isolated-failure-artifacts
+          path: |
+            tests/e2e/test-results/v4-e2e-report/
+            tests/e2e/test-results/v4-e2e-artifacts/
+          retention-days: 7
+          if-no-files-found: ignore
