@@ -46,6 +46,15 @@ jobs:
           node --check scripts/release/v5-production-guard.mjs
           node --test tests/v5-production-gate-contract.mjs
 
+      - name: Check out actual V5 release source for offline package smoke
+        uses: actions/checkout@v4
+        with:
+          ref: release/v5-20261111
+          path: release-source
+          persist-credentials: false
+      - name: Validate authentic 43+19 locked SQL files and blocked approval
+        run: node scripts/release/v5-production-guard.mjs source "$GITHUB_WORKSPACE/release-source"
+
   protected-migration:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     needs: verify-code
