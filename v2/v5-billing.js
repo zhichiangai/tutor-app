@@ -112,14 +112,22 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   const same=!!summary&&ops?.team_id===summary.teamId&&
    ops?.month===summary.month&&ops?.currency==='TWD'&&
    ops?.financial_authority==='manager_only'&&
+   ops?.ledger_basis==='net_after_immutable_reversals'&&
    ops?.cash_verified_by_bank===false;
   const validProjects=same&&Array.isArray(ops.projects)&&
    ops.projects.every(p=>p.project_id&&typeof p.name==='string'&&
     ['active','archived'].includes(p.status)&&[
      p.assigned_teacher_count,p.enrolled_student_count,p.scheduled_lessons,
      p.completed_lessons,p.cancelled_lessons,p.unconfirmed_completed_lessons,
-     p.confirmed_receivable_cents,p.outstanding_cents
-    ].every(number));
+     p.confirmed_receivable_cents,p.direct_net_cents,p.advance_net_cents,
+     p.outstanding_cents
+    ].every(number)&&
+    p.confirmed_receivable_cents===p.direct_net_cents+p.advance_net_cents+p.outstanding_cents);
+  const sameNetTotals=validProjects&&
+   ops.projects.reduce((n,p)=>n+p.confirmed_receivable_cents,0)===
+    overview.confirmed_total_cents&&
+   ops.projects.reduce((n,p)=>n+p.outstanding_cents,0)===
+    summary.outstandingCents;
   const validTeachers=same&&Array.isArray(ops.teacher_workload)&&
    ops.teacher_workload.every(t=>typeof t.teacher_user_id==='string'&&
     [t.assigned_project_count,t.scheduled_lessons,t.completed_lessons]
@@ -130,10 +138,10 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
     &&typeof e.occurred_at==='string');
   if(note)note.textContent=!summary?'':!same?
    '完整專案營運報表尚無有效資料；上述待辦僅供參考。':
-   !(validProjects&&validTeachers&&validHistory)?
+   !(validProjects&&sameNetTotals&&validTeachers&&validHistory)?
    '專案營運資料需要重新核對，請重新整理。':
-   '以下報表由現任 Team 管理者授權 RPC 提供，並非銀行入帳、退款或法定會計報表。';
-  if(!validProjects||!validTeachers||!validHistory)return;
+   '以下專案以退款反向分錄計算淨應收；並非銀行入帳、退款或法定會計報表。';
+  if(!validProjects||!sameNetTotals||!validTeachers||!validHistory)return;
   if(!ops.projects.length)projectList?.append(
    item('p','尚無 Team 專案。','section-sub'));
   for(const p of ops.projects){
@@ -146,6 +154,8 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
     ' 堂 · 取消 '+p.cancelled_lessons+' 堂','section-sub'));
    row.append(item('span','待確認費用 '+p.unconfirmed_completed_lessons+
     ' 堂 · 已確認應收 '+money(p.confirmed_receivable_cents)+
+    ' · 直接付款淨額 '+money(p.direct_net_cents)+
+    ' · 預收抵扣淨額 '+money(p.advance_net_cents)+
     ' · 未結清 '+money(p.outstanding_cents),'section-sub'));
    projectList?.append(row);
   }
