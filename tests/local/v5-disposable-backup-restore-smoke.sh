@@ -24,6 +24,8 @@ schema_after="${RUNNER_TEMP}/v5_synthetic_schema_after.sql"
 docker inspect "$container" --format '{{.State.Running}}' | grep -qx true
 cleanup() {
   rm -f "$backup" "$schema_before" "$schema_after"
+  docker exec "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres \
+    -c 'REVOKE supabase_auth_admin FROM postgres;' >/dev/null 2>&1 || true
   docker exec "$container" dropdb -U postgres --if-exists "$restored_db" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -64,8 +66,15 @@ docker exec "$container" createdb -U postgres "$restored_db"
 docker exec "$container" psql -X -v ON_ERROR_STOP=1 \
   -U postgres -d "$restored_db" -c 'DROP SCHEMA public CASCADE;' >/dev/null
 # Restore into a distinct disposable database in the SAME LOCAL CI Postgres container.
+# PostgreSQL requires membership in the source role to restore its default ACLs.
+# This temporary grant is limited to the disposable CI cluster and is revoked
+# immediately after restore (and again by cleanup on failure).
+docker exec "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres \
+  -c 'GRANT supabase_auth_admin TO postgres;' >/dev/null
 docker exec -i "$container" pg_restore --exit-on-error --no-owner \
   -U postgres -d "$restored_db" < "$backup" > /dev/null
+docker exec "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres \
+  -c 'REVOKE supabase_auth_admin FROM postgres;' >/dev/null
 
 after="$(docker exec "$container" psql -X -At -v ON_ERROR_STOP=1 \
   -U postgres -d "$restored_db" -c "$count_query")"
