@@ -6,6 +6,7 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf
 const atomicity = read('tests/local/v5-migration-atomicity-smoke.sh');
 const restore = read('tests/local/v5-disposable-backup-restore-smoke.sh');
 const fingerprint = read('tests/sql/v5_synthetic_row_fingerprint.sql');
+const checkFingerprint = read('tests/sql/v5_synthetic_check_constraint_fingerprint.sql');
 const browserWorkflow = read('.github/workflows/v4-browser-e2e.yml');
 
 test('migration fault injection is CI-only, local-only, and refuses to overwrite migration files', () => {
@@ -39,6 +40,10 @@ test('synthetic restore preserves and compares schema ACL/RLS metadata and row f
   assert.doesNotMatch(restore, /pg_restore[^\n]*--no-privileges/);
   assert.match(restore, /DEFAULT ACL TOC entries/);
   assert.match(restore, /v5_synthetic_acl_fingerprint\.sql/);
+  assert.match(restore, /v5_synthetic_check_constraint_fingerprint\.sql/);
+  assert.match(restore, /checks_before.*checks_after/s);
+  assert.match(checkFingerprint, /con\.conbin::text/);
+  assert.match(checkFingerprint, /convalidated/);
   assert.match(restore, /--use-list/);
   assert.match(restore, /table definitions, RLS policies and functions/);
   assert.match(fingerprint, /pg_class/);

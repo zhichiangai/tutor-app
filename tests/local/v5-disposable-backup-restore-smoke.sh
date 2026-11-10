@@ -54,7 +54,10 @@ schema_fingerprints() {
       --schema="$schema" -U postgres -d "$db" > "$file"
     # PostgreSQL 17 adds a random psql \restrict token to each text dump.
     # Ignore dump comments and per-dump guard tokens before hashing.
-    hash="$(grep -v -E '^--|^\\(restrict|unrestrict) ' "$file" |
+    # CHECK expression pretty-printing may gain or lose redundant parentheses
+    # across pg_dump/pg_restore. Compare those expressions using PostgreSQL's
+    # parsed constraint tree below, while retaining all other DDL text here.
+    hash="$(grep -v -E '^--|^\\(restrict|unrestrict) |^[[:space:]]*CONSTRAINT .* CHECK \(' "$file" |
       awk 'NF { sub(/[[:space:]]+$/, ""); print }' | sha256sum | cut -d' ' -f1)"
     printf '%s:%s\n' "$schema" "$hash"
   done
@@ -64,9 +67,12 @@ rows_before="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
   -U postgres -d postgres < tests/sql/v5_synthetic_row_fingerprint.sql)"
 acl_before="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
   -U postgres -d postgres < tests/sql/v5_synthetic_acl_fingerprint.sql)"
+checks_before="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
+  -U postgres -d postgres < tests/sql/v5_synthetic_check_constraint_fingerprint.sql)"
 test -n "$schema_before_hashes"
 test -n "$rows_before"
 test -n "$acl_before"
+test -n "$checks_before"
 
 # Keep the full synthetic dump in a private, short-lived runner file.
 docker exec "$container" pg_dump --format=custom --no-owner \
@@ -100,6 +106,8 @@ rows_after="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
   -U postgres -d "$restored_db" < tests/sql/v5_synthetic_row_fingerprint.sql)"
 acl_after="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
   -U postgres -d "$restored_db" < tests/sql/v5_synthetic_acl_fingerprint.sql)"
+checks_after="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
+  -U postgres -d "$restored_db" < tests/sql/v5_synthetic_check_constraint_fingerprint.sql)"
 if [ "$schema_before_hashes" != "$schema_after_hashes" ]; then
   for schema in public tutor_private auth supabase_migrations extensions; do
     before_hash="$(printf '%s\n' "$schema_before_hashes" | awk -F: -v name="$schema" '$1==name {print $2}')"
@@ -138,8 +146,12 @@ if [ "$acl_before" != "$acl_after" ]; then
   echo "::error::Synthetic restore object-level ACL fingerprint mismatch"
   exit 1
 fi
+if [ "$checks_before" != "$checks_after" ]; then
+  echo "::error::Synthetic restore parsed CHECK-constraint fingerprint mismatch"
+  exit 1
+fi
 echo "SYNTHETIC SELECTED-SCHEMA RESTORE PASS: pg_dump/pg_restore succeeded in disposable localhost CI"
-echo "Validated synthetic schema/RLS/functions, object-level ACLs, migration/auth/V4/V5 row hashes and counts; removed backup on exit."
+echo "Validated synthetic schema/RLS/functions, parsed CHECK constraints, object-level ACLs, migration/auth/V4/V5 row hashes and counts; removed backup on exit."
 echo "Platform DEFAULT ACL entries were excluded because the disposable Supabase roles cannot restore them."
 echo "Scope: public, tutor_private, auth, supabase_migrations and extensions. Realtime/Storage platform objects excluded."
 echo "NOT a Production backup; NOT evidence of Production data recovery or exact 43-migration restore."
