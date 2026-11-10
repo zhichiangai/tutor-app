@@ -28,3 +28,27 @@ test('unknown gate modes, missing signed records and malformed history are denie
   assert.throws(()=>run('approve',[dir],{V5_APPROVED_RELEASE_SHA:'0'.repeat(40)}));
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
+
+test('RLS metadata preflight requires 8 V4 core protected tables and zero V5 before release',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'tutor-v5-metadata-'));
+ try{
+  const target=join(dir,'metadata.json');
+  writeFileSync(target,JSON.stringify({v4_core_rls:8,v5_tables:0,v5_rls:0,
+   anon_v5_select:0,anon_v5_rpc:0}));
+  assert.match(run('metadata',[dir,'before',target]),/"status":"PASS"/);
+  const after={v4_core_rls:8,v5_tables:27,v5_rls:27,
+   anon_v5_select:0,anon_v5_rpc:0};
+  writeFileSync(target,JSON.stringify(after));
+  assert.match(run('metadata',[dir,'after',target]),/"status":"PASS"/);
+  writeFileSync(target,JSON.stringify({...after,anon_v5_rpc:1}));
+  assert.throws(()=>run('metadata',[dir,'after',target]));
+  writeFileSync(target,JSON.stringify({...after,v5_rls:26}));
+  assert.throws(()=>run('metadata',[dir,'after',target]));
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
+test('the production SQL metadata inspector is SELECT-only',()=>{
+ const sql=readFileSync(new URL('../scripts/release/v5-production-metadata-readonly.sql',import.meta.url),'utf8');
+ assert.match(sql,/select jsonb_build_object\(/i);
+ const code=sql.replace(/--[^\n]*/g,'');
+ assert.doesNotMatch(code,/\b(?:create|alter|drop|insert|update|delete|grant|revoke|truncate|copy)\b/i);
+});
