@@ -144,3 +144,16 @@
 - 已確認付款的直接分配更正/退款、預收已抵扣退款、跨帳務月份/科目金額守恆、家長逐學生付款/更正/退款歷史與跨 Team RLS 均有負向和正向測試；原始 append-only 帳本保留。
 - 真實 43-history A1-R3 相容性與 19-step 遞進證據可追溯；剩餘正式 DB backup/recovery、外部副作用、正式 Codex GUI 及發布授權須各自列明，不能用乾淨 bootstrap 或 PR checks 取代。
 - Production V5 Migration、RLS/Auth、Main merge、Vercel Production deploy、外部通知與銀行退款均須獨立授權。本 PR 目前 Draft，這份作業書不是發布授權。
+
+### 5.5 2026-11-10｜應用資料還原與平台受保護 Owner 的分離驗收
+
+本次新增的 `tests/sql/v5_synthetic_app_acl_fingerprint.sql` 只涵蓋本專案應用管理的 `public`、`tutor_private` 兩個 schema。隔離 CI 的 selected-schema `pg_dump` / `pg_restore --no-owner` 測試必須同時符合：
+
+1. **嚴格阻斷**：兩個應用 schema 的物件 Owner、非 Owner ACL GRANT、角色、授權選項指紋完全相同，包含 `SECURITY DEFINER` 函式；如有差異，CI 判定 FAIL。
+2. **嚴格阻斷**：五個測試範圍 schema 的 DDL、RLS、函式定義、PostgreSQL CHECK 解析樹、合成資料列 hash、筆數及 Migration history 全部相同；如有差異，CI 判定 FAIL。
+3. **獨立揭露**：`auth`、`supabase_migrations`、`extensions` 的平台管理 Owner／ACL 若因 `--no-owner` 不一致，記錄摘要並標示 **FULL PLATFORM OWNER/ACL RESTORE BLOCKED**，不得在任何發布報告中宣告完整備份還原 PASS。平台 `DEFAULT ACL` TOC 仍排除，Realtime／Storage 及外部回呼也不在測試範圍。
+4. **正式發布 NO-GO**：應用範圍 CI 通過，只能證明在 GitHub Actions 一次性 Supabase 本機容器中，合成資料和本專案自管物件可以還原。正式帳號、正式 Schema、平台完整 ACL、真實備份與還原、第三方通知均未驗證；正式 Migration／Main 合併／Production 部署仍需獨立授權。
+
+此分拆遵循 Supabase 官方手動還原文件對 `supabase_admin` owner 權限錯誤的特殊處理方式，未嘗試提升或繞過受保護角色權限。官方參考：<https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore>；PostgreSQL `pg_restore --no-owner` 語義：<https://www.postgresql.org/docs/17/app-pgrestore.html>。
+
+本節是**測試規格**，不代表該段程式已在最新 HEAD CI 通過。須使用最新 Actions run 的真實結果更新 PASS／FAIL。
