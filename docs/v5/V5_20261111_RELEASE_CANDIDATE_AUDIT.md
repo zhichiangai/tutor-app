@@ -7,6 +7,7 @@
 - Release Branch: `release/v5-20261111`; Release PR: #69，base `main`。
 - 原始整合：PR #68，SHA `b6be697647cd51d23140f423e1dda9debe1bc49f`，包含 V5 Free/Plus/Team、Team 課程與管理、人工付款、預收、退款反向分錄、淨額報表，以及 QA-PREVIEW-01 修正。
 - Source-Lock: `docs/v5/catalog/V5_A1_NINETEEN_MIGRATION_SOURCE_LOCK_20261110.json`，共 **19** 個 forward SQL，仍註明 `approved_release: NO_GO`。
+- 離線打包／校驗器：`scripts/release/package-v5-43-plus-19.mjs`，僅複製 43＋19 已審查 SQL，不連線資料庫，不執行 Migration；`node scripts/release/package-v5-43-plus-19.mjs check` 僅查驗來源 SHA。
 - Production Supabase project ref: `vctisuglfoxyuwlvyjee`，正式 Migration 43 筆，最後 `20261103212647`；正式 V5 物件尚未安裝。
 - `main` 連動 Vercel 專案 `tutor-app-v2` 的 Production。**不能先 merge 再假設 Vercel 會等待**。
 
