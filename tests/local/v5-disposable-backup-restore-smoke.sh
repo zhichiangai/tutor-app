@@ -75,7 +75,7 @@ test -n "$acl_before"
 test -n "$checks_before"
 
 # Keep the full synthetic dump in a private, short-lived runner file.
-docker exec "$container" pg_dump --format=custom --no-owner \
+docker exec "$container" pg_dump --format=custom \
   --schema=public --schema=tutor_private --schema=auth \
   --schema=supabase_migrations --schema=extensions \
   -U postgres -d postgres > "$backup"
@@ -91,7 +91,7 @@ docker exec "$container" createdb -U postgres "$restored_db"
 docker exec "$container" psql -X -v ON_ERROR_STOP=1 \
   -U postgres -d "$restored_db" -c 'DROP SCHEMA public CASCADE;' >/dev/null
 # Restore into a distinct disposable database in the SAME LOCAL CI Postgres container.
-docker exec -i "$container" pg_restore --exit-on-error --no-owner \
+docker exec -i "$container" pg_restore --exit-on-error \
   --use-list /tmp/v5_synthetic_restore.filtered.list \
   -U postgres -d "$restored_db" < "$backup" > /dev/null
 

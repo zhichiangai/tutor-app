@@ -5,16 +5,18 @@ SELECT jsonb_build_object(
     SELECT jsonb_build_object(
       'count', count(*),
       'md5', md5(coalesce(string_agg(
-        format('%s:%s:%s:%s', acl.object_name, acl.grantee_name, acl.privilege_type, acl.is_grantable),
+        format('%s:%s:%s:%s:%s', acl.object_name, acl.owner_name, acl.grantee_name, acl.privilege_type, acl.is_grantable),
         E'\n' ORDER BY acl.object_name, acl.grantee_name, acl.privilege_type, acl.is_grantable
       ), ''))
     )
     FROM (
       SELECT n.nspname AS object_name,
+        owner.rolname AS owner_name,
         coalesce(grantee.rolname, 'PUBLIC') AS grantee_name,
         exploded.privilege_type, exploded.is_grantable
       FROM pg_namespace n
       CROSS JOIN LATERAL aclexplode(coalesce(n.nspacl, acldefault('n'::"char", n.nspowner))) exploded
+      JOIN pg_roles owner ON owner.oid = n.nspowner
       LEFT JOIN pg_roles grantee ON grantee.oid = exploded.grantee
       WHERE n.nspname IN ('public', 'tutor_private', 'auth', 'supabase_migrations', 'extensions')
         AND exploded.grantee <> n.nspowner
@@ -24,12 +26,13 @@ SELECT jsonb_build_object(
     SELECT jsonb_build_object(
       'count', count(*),
       'md5', md5(coalesce(string_agg(
-        format('%s:%s:%s:%s', acl.object_name, acl.grantee_name, acl.privilege_type, acl.is_grantable),
+        format('%s:%s:%s:%s:%s', acl.object_name, acl.owner_name, acl.grantee_name, acl.privilege_type, acl.is_grantable),
         E'\n' ORDER BY acl.object_name, acl.grantee_name, acl.privilege_type, acl.is_grantable
       ), ''))
     )
     FROM (
       SELECT n.nspname || '.' || c.relname AS object_name,
+        owner.rolname AS owner_name,
         coalesce(grantee.rolname, 'PUBLIC') AS grantee_name,
         exploded.privilege_type, exploded.is_grantable
       FROM pg_class c
@@ -37,6 +40,7 @@ SELECT jsonb_build_object(
       CROSS JOIN LATERAL aclexplode(coalesce(c.relacl, acldefault(
         CASE WHEN c.relkind = 'S' THEN 'S'::"char" ELSE 'r'::"char" END, c.relowner
       ))) exploded
+      JOIN pg_roles owner ON owner.oid = c.relowner
       LEFT JOIN pg_roles grantee ON grantee.oid = exploded.grantee
       WHERE n.nspname IN ('public', 'tutor_private', 'auth', 'supabase_migrations', 'extensions')
         AND c.relkind IN ('r', 'p', 'S', 'v', 'm', 'f')
@@ -47,17 +51,19 @@ SELECT jsonb_build_object(
     SELECT jsonb_build_object(
       'count', count(*),
       'md5', md5(coalesce(string_agg(
-        format('%s:%s:%s:%s', acl.object_name, acl.grantee_name, acl.privilege_type, acl.is_grantable),
+        format('%s:%s:%s:%s:%s', acl.object_name, acl.owner_name, acl.grantee_name, acl.privilege_type, acl.is_grantable),
         E'\n' ORDER BY acl.object_name, acl.grantee_name, acl.privilege_type, acl.is_grantable
       ), ''))
     )
     FROM (
       SELECT n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')' AS object_name,
+        owner.rolname AS owner_name,
         coalesce(grantee.rolname, 'PUBLIC') AS grantee_name,
         exploded.privilege_type, exploded.is_grantable
       FROM pg_proc p
       JOIN pg_namespace n ON n.oid = p.pronamespace
       CROSS JOIN LATERAL aclexplode(coalesce(p.proacl, acldefault('f'::"char", p.proowner))) exploded
+      JOIN pg_roles owner ON owner.oid = p.proowner
       LEFT JOIN pg_roles grantee ON grantee.oid = exploded.grantee
       WHERE n.nspname IN ('public', 'tutor_private', 'auth', 'supabase_migrations', 'extensions')
         AND exploded.grantee <> p.proowner
