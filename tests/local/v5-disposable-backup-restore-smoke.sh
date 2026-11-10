@@ -94,7 +94,7 @@ rows_after="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
 acl_after="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
   -U postgres -d "$restored_db" < tests/sql/v5_synthetic_acl_fingerprint.sql)"
 if [ "$schema_before_hash" != "$schema_after_hash" ]; then
-  echo "::error::Synthetic restore schema/RLS/function/ACL fingerprint mismatch"
+  echo "::error::Synthetic restore schema/RLS/function fingerprint mismatch"
   exit 1
 fi
 if [ "$rows_before" != "$rows_after" ]; then

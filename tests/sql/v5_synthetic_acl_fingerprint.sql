@@ -1,40 +1,66 @@
--- TEST ONLY: hash effective object ACLs; do not emit grants or role data.
+-- TEST ONLY: hash effective non-owner object ACLs; do not emit grants or role data.
 -- Platform DEFAULT ACL entries are intentionally excluded from this rehearsal.
 SELECT jsonb_build_object(
   'schemas', (
     SELECT jsonb_build_object(
       'count', count(*),
       'md5', md5(coalesce(string_agg(
-        n.nspname || ':' || coalesce(n.nspacl::text, 'NULL'),
-        E'\n' ORDER BY n.nspname
+        format('%s:%s:%s:%s', acl.object_name, acl.grantee_name, acl.privilege_type, acl.is_grantable),
+        E'\n' ORDER BY acl.object_name, acl.grantee_name, acl.privilege_type, acl.is_grantable
       ), ''))
     )
-    FROM pg_namespace n
-    WHERE n.nspname IN ('public', 'tutor_private', 'auth', 'supabase_migrations')
+    FROM (
+      SELECT n.nspname AS object_name,
+        coalesce(grantee.rolname, 'PUBLIC') AS grantee_name,
+        exploded.privilege_type, exploded.is_grantable
+      FROM pg_namespace n
+      CROSS JOIN LATERAL aclexplode(coalesce(n.nspacl, acldefault('n', n.nspowner))) exploded
+      LEFT JOIN pg_roles grantee ON grantee.oid = exploded.grantee
+      WHERE n.nspname IN ('public', 'tutor_private', 'auth', 'supabase_migrations')
+        AND exploded.grantee <> n.nspowner
+    ) acl
   ),
   'relations', (
     SELECT jsonb_build_object(
       'count', count(*),
       'md5', md5(coalesce(string_agg(
-        n.nspname || '.' || c.relname || ':' || coalesce(c.relacl::text, 'NULL'),
-        E'\n' ORDER BY n.nspname, c.relname
+        format('%s:%s:%s:%s', acl.object_name, acl.grantee_name, acl.privilege_type, acl.is_grantable),
+        E'\n' ORDER BY acl.object_name, acl.grantee_name, acl.privilege_type, acl.is_grantable
       ), ''))
     )
-    FROM pg_class c
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname IN ('public', 'tutor_private', 'auth', 'supabase_migrations')
-      AND c.relkind IN ('r', 'p', 'S', 'v', 'm', 'f')
+    FROM (
+      SELECT n.nspname || '.' || c.relname AS object_name,
+        coalesce(grantee.rolname, 'PUBLIC') AS grantee_name,
+        exploded.privilege_type, exploded.is_grantable
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      CROSS JOIN LATERAL aclexplode(coalesce(c.relacl, acldefault(
+        CASE WHEN c.relkind = 'S' THEN 'S' ELSE 'r' END, c.relowner
+      ))) exploded
+      LEFT JOIN pg_roles grantee ON grantee.oid = exploded.grantee
+      WHERE n.nspname IN ('public', 'tutor_private', 'auth', 'supabase_migrations')
+        AND c.relkind IN ('r', 'p', 'S', 'v', 'm', 'f')
+        AND exploded.grantee <> c.relowner
+    ) acl
   ),
   'functions', (
     SELECT jsonb_build_object(
       'count', count(*),
       'md5', md5(coalesce(string_agg(
-        n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || '):' || coalesce(p.proacl::text, 'NULL'),
-        E'\n' ORDER BY n.nspname, p.proname, pg_get_function_identity_arguments(p.oid)
+        format('%s:%s:%s:%s', acl.object_name, acl.grantee_name, acl.privilege_type, acl.is_grantable),
+        E'\n' ORDER BY acl.object_name, acl.grantee_name, acl.privilege_type, acl.is_grantable
       ), ''))
     )
-    FROM pg_proc p
-    JOIN pg_namespace n ON n.oid = p.pronamespace
-    WHERE n.nspname IN ('public', 'tutor_private', 'auth', 'supabase_migrations')
+    FROM (
+      SELECT n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')' AS object_name,
+        coalesce(grantee.rolname, 'PUBLIC') AS grantee_name,
+        exploded.privilege_type, exploded.is_grantable
+      FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+      CROSS JOIN LATERAL aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) exploded
+      LEFT JOIN pg_roles grantee ON grantee.oid = exploded.grantee
+      WHERE n.nspname IN ('public', 'tutor_private', 'auth', 'supabase_migrations')
+        AND exploded.grantee <> p.proowner
+    ) acl
   )
 )::text;
