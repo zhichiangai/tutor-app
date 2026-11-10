@@ -2633,6 +2633,10 @@ test('V5.6 manager GUI enables append-only pending void and displays audited ref
  // Synthetic pending payment was received in October; its event history is
  // added in November after the manager's UI action.
  await page.locator('#v5-billing-prev').click();
+ // Operations screen must reconcile source-ledger refunds before showing
+ // any project money; a stale gross RPC must fail closed.
+ await expect(page.locator('#v5-ops-report-message')).toContainText('退款反向分錄');
+ await expect(page.locator('#v5-ops-projects .v5-billing-row').first()).toContainText('未結清');
  await expect(page.locator('#v56-adjustments-panel')).toBeVisible();
  await expect(page.locator('#v56-adjustments-message')).toContainText('現任 Team 管理者');
  const pending=page.locator('#v56-adjustments-payments [data-v56-action="void"][data-id="'+payment+'"]');
