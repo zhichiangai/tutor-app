@@ -132,7 +132,7 @@
 ### 5.4 合成 backup→restore 驗收範圍
 
 - 更新後的 `tests/local/v5-disposable-backup-restore-smoke.sh` 僅在 disposable CI 使用，ownership 正規化為 restore user；pg_restore 保留 object ACL，但略過 Supabase 受保護角色的 platform `DEFAULT ACL` TOC entries，避免用有限權限角色重建平台預設權限。
-- 還原前後比對選定 schema 的 schema-only dump SHA-256（表、RLS policies、functions），另以獨立 ACL fingerprint 對照 schema、relations、functions 的 object-level grants，並比對 public/tutor_private/auth/supabase_migrations 每表 row count + row hash，以及主要 migration/Auth/V4/V5 ledger 數量。只輸出雜湊與摘要，不輸出合成 row 或憑證。
+- 還原前後比對選定 schema 的 schema-only dump SHA-256（public、tutor_private、auth、supabase_migrations 及其 `extensions` 相依物件；包含表、RLS policies、functions），另以獨立 ACL fingerprint 對照 schema、relations、functions 的 object-level grants，並比對每表 row count + row hash，以及主要 migration/Auth/V4/V5 ledger 數量。只輸出雜湊與摘要，不輸出合成 row 或憑證。
 - 此證據只涵蓋指定 schema、object-level ACL/RLS 定義和合成資料一致；platform `DEFAULT ACL`、Realtime、Storage platform object/content 不在此 restore assertion 範圍。RLS/JWT 實際授權仍由獨立 GoTrue/JWT/PostgREST E2E 驗證。Production 備份及正式還原仍 NOT TESTED。
 
 ### 5.5 正式 GO / NO-GO 清單

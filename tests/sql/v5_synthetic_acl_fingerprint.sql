@@ -16,7 +16,7 @@ SELECT jsonb_build_object(
       FROM pg_namespace n
       CROSS JOIN LATERAL aclexplode(coalesce(n.nspacl, acldefault('n'::"char", n.nspowner))) exploded
       LEFT JOIN pg_roles grantee ON grantee.oid = exploded.grantee
-      WHERE n.nspname IN ('public', 'tutor_private', 'auth', 'supabase_migrations')
+      WHERE n.nspname IN ('public', 'tutor_private', 'auth', 'supabase_migrations', 'extensions')
         AND exploded.grantee <> n.nspowner
     ) acl
   ),
@@ -38,7 +38,7 @@ SELECT jsonb_build_object(
         CASE WHEN c.relkind = 'S' THEN 'S'::"char" ELSE 'r'::"char" END, c.relowner
       ))) exploded
       LEFT JOIN pg_roles grantee ON grantee.oid = exploded.grantee
-      WHERE n.nspname IN ('public', 'tutor_private', 'auth', 'supabase_migrations')
+      WHERE n.nspname IN ('public', 'tutor_private', 'auth', 'supabase_migrations', 'extensions')
         AND c.relkind IN ('r', 'p', 'S', 'v', 'm', 'f')
         AND exploded.grantee <> c.relowner
     ) acl
@@ -59,7 +59,7 @@ SELECT jsonb_build_object(
       JOIN pg_namespace n ON n.oid = p.pronamespace
       CROSS JOIN LATERAL aclexplode(coalesce(p.proacl, acldefault('f'::"char", p.proowner))) exploded
       LEFT JOIN pg_roles grantee ON grantee.oid = exploded.grantee
-      WHERE n.nspname IN ('public', 'tutor_private', 'auth', 'supabase_migrations')
+      WHERE n.nspname IN ('public', 'tutor_private', 'auth', 'supabase_migrations', 'extensions')
         AND exploded.grantee <> p.proowner
     ) acl
   )

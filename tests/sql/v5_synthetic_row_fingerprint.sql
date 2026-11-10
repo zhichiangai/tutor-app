@@ -17,7 +17,7 @@ BEGIN
     SELECT n.nspname, c.relname
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname IN ('public', 'tutor_private', 'auth', 'supabase_migrations')
+    WHERE n.nspname IN ('public', 'tutor_private', 'auth', 'supabase_migrations', 'extensions')
       AND c.relkind IN ('r', 'p')
     ORDER BY n.nspname, c.relname
   LOOP

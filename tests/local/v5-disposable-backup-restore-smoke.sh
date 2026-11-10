@@ -48,7 +48,7 @@ test -n "$before"
 # ACLs cannot be replayed under Supabase's restricted CI roles.
 schema_fingerprints() {
   local db="$1" phase="$2" schema file hash
-  for schema in public tutor_private auth supabase_migrations; do
+  for schema in public tutor_private auth supabase_migrations extensions; do
     file="${RUNNER_TEMP}/v5_synthetic_schema_${phase}_${schema}.sql"
     docker exec "$container" pg_dump --schema-only --no-owner --no-privileges \
       --schema="$schema" -U postgres -d "$db" > "$file"
@@ -70,7 +70,8 @@ test -n "$acl_before"
 # Keep the full synthetic dump in a private, short-lived runner file.
 docker exec "$container" pg_dump --format=custom --no-owner \
   --schema=public --schema=tutor_private --schema=auth \
-  --schema=supabase_migrations -U postgres -d postgres > "$backup"
+  --schema=supabase_migrations --schema=extensions \
+  -U postgres -d postgres > "$backup"
 test -s "$backup"
 docker exec -i "$container" pg_restore --list < "$backup" > "$restore_list"
 # Exclude only platform-managed DEFAULT ACL TOC entries; retain object ACLs.
@@ -99,7 +100,7 @@ rows_after="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
 acl_after="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
   -U postgres -d "$restored_db" < tests/sql/v5_synthetic_acl_fingerprint.sql)"
 if [ "$schema_before_hashes" != "$schema_after_hashes" ]; then
-  for schema in public tutor_private auth supabase_migrations; do
+  for schema in public tutor_private auth supabase_migrations extensions; do
     before_hash="$(printf '%s\n' "$schema_before_hashes" | awk -F: -v name="$schema" '$1==name {print $2}')"
     after_hash="$(printf '%s\n' "$schema_after_hashes" | awk -F: -v name="$schema" '$1==name {print $2}')"
     if [ "$before_hash" != "$after_hash" ]; then
@@ -120,5 +121,5 @@ fi
 echo "SYNTHETIC SELECTED-SCHEMA RESTORE PASS: pg_dump/pg_restore succeeded in disposable localhost CI"
 echo "Validated synthetic schema/RLS/functions, object-level ACLs, migration/auth/V4/V5 row hashes and counts; removed backup on exit."
 echo "Platform DEFAULT ACL entries were excluded because the disposable Supabase roles cannot restore them."
-echo "Scope: public, tutor_private, auth and supabase_migrations. Realtime/Storage platform objects excluded."
+echo "Scope: public, tutor_private, auth, supabase_migrations and extensions. Realtime/Storage platform objects excluded."
 echo "NOT a Production backup; NOT evidence of Production data recovery or exact 43-migration restore."
