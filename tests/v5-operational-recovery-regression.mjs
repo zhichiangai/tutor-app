@@ -63,8 +63,13 @@ test('synthetic restore preserves and compares schema ACL/RLS metadata and row f
   assert.match(restore, /before_count=.*after_count=/s);
   assert.match(restore, /v5_synthetic_check_constraint_fingerprint\.sql/);
   assert.match(restore, /checks_before.*checks_after/s);
-  assert.match(checkFingerprint, /con\.conbin::text/);
+  assert.match(checkFingerprint, /pg_get_expr\(con\.conbin, con\.conrelid, true\)/);
+  assert.doesNotMatch(checkFingerprint, /con\.conbin::text/);
   assert.match(checkFingerprint, /convalidated/);
+  assert.match(checkFingerprint, /connoinherit/);
+  assert.match(checkFingerprint, /conislocal/);
+  assert.match(checkFingerprint, /jsonb_object_agg/);
+  assert.match(restore, /differing_object_names/);
   assert.match(restore, /--use-list/);
   assert.match(restore, /table definitions, RLS policies and functions/);
   assert.match(fingerprint, /pg_class/);
