@@ -35,7 +35,7 @@ SELECT jsonb_build_object(
       FROM pg_class c
       JOIN pg_namespace n ON n.oid = c.relnamespace
       CROSS JOIN LATERAL aclexplode(coalesce(c.relacl, acldefault(
-        CASE WHEN c.relkind = 'S' THEN 'S' ELSE 'r' END, c.relowner
+        CASE WHEN c.relkind = 'S' THEN 'S'::"char" ELSE 'r'::"char" END, c.relowner
       ))) exploded
       LEFT JOIN pg_roles grantee ON grantee.oid = exploded.grantee
       WHERE n.nspname IN ('public', 'tutor_private', 'auth', 'supabase_migrations')
