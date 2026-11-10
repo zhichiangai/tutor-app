@@ -131,7 +131,7 @@
 
 ### 5.4 合成 backup→restore 驗收範圍
 
-- 更新後的 `tests/local/v5-disposable-backup-restore-smoke.sh` 僅在 disposable CI 使用，保留物件原 owner 與 object ACL；ACL fingerprint 同時涵蓋 schema、relation、function owner 及 grants。僅略過 Supabase 受保護角色的 platform `DEFAULT ACL` TOC entries，避免用有限權限角色重建平台預設權限。
+- 更新後的 `tests/local/v5-disposable-backup-restore-smoke.sh` 僅在 disposable CI 使用，為還原暫時授予 `postgres` 所需的既有 object-owner role membership，還原完成即撤回（失敗時由 trap 撤回），以保留原物件 owner 與 object ACL；ACL fingerprint 同時涵蓋 schema、relation、function owner 及 grants。僅略過 Supabase 受保護角色的 platform `DEFAULT ACL` TOC entries，避免重建平台預設權限。
 - 還原前後比對選定 schema 的 schema-only dump SHA-256（public、tutor_private、auth、supabase_migrations 及其 `extensions` 相依物件；包含表、RLS policies、functions）。CHECK 約束因 PostgreSQL dump/replay 會改變多餘括號呈現，改以 `pg_constraint.conbin` 解析樹指紋比對。另以獨立 ACL fingerprint 對照 schema、relations、functions 的 owner 與 object-level grants，並比對每表 row count + row hash，以及主要 migration/Auth/V4/V5 ledger 數量。只輸出雜湊與摘要，不輸出合成 row 或憑證。
 - 此證據只涵蓋指定 schema、object-level ACL/RLS 定義和合成資料一致；platform `DEFAULT ACL`、Realtime、Storage platform object/content 不在此 restore assertion 範圍。RLS/JWT 實際授權仍由獨立 GoTrue/JWT/PostgREST E2E 驗證。Production 備份及正式還原仍 NOT TESTED。
 

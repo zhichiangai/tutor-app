@@ -20,10 +20,16 @@ restored_db="tutor_v5_synthetic_restore"
 backup="${RUNNER_TEMP}/v5_synthetic_full_db.dump"
 restore_list="${RUNNER_TEMP}/v5_synthetic_restore.list"
 restore_list_filtered="${RUNNER_TEMP}/v5_synthetic_restore.filtered.list"
+owner_grants="${RUNNER_TEMP}/v5_synthetic_owner_grants.sql"
+owner_revokes="${RUNNER_TEMP}/v5_synthetic_owner_revokes.sql"
 # The only permitted operations are Docker's disposable CI PostgreSQL container.
 docker inspect "$container" --format '{{.State.Running}}' | grep -qx true
 cleanup() {
-  rm -f "$backup" "$restore_list" "$restore_list_filtered" \
+  if [ -s "$owner_revokes" ]; then
+    docker exec -i "$container" psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres \
+      < "$owner_revokes" >/dev/null 2>&1 || true
+  fi
+  rm -f "$backup" "$restore_list" "$restore_list_filtered" "$owner_grants" "$owner_revokes" \
     "$RUNNER_TEMP"/v5_synthetic_schema_*.sql
   docker exec "$container" rm -f /tmp/v5_synthetic_restore.filtered.list >/dev/null 2>&1 || true
   docker exec "$container" dropdb -U postgres --if-exists "$restored_db" >/dev/null 2>&1 || true
@@ -90,10 +96,35 @@ docker exec "$container" createdb -U postgres "$restored_db"
 # includes CREATE SCHEMA public, so remove ONLY the empty target database copy.
 docker exec "$container" psql -X -v ON_ERROR_STOP=1 \
   -U postgres -d "$restored_db" -c 'DROP SCHEMA public CASCADE;' >/dev/null
+# The disposable Supabase postgres role is not a member of protected platform
+# owner roles. Temporarily grant only the missing memberships needed to restore
+# source ownership, then revoke them immediately after pg_restore. The trap also
+# revokes them if restore or later assertions fail.
+owner_roles_query="SELECT DISTINCT r.rolname
+FROM pg_roles r
+WHERE r.oid IN (
+  SELECT n.nspowner FROM pg_namespace n WHERE n.nspname IN ('public','tutor_private','auth','supabase_migrations','extensions')
+  UNION SELECT c.relowner FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('public','tutor_private','auth','supabase_migrations','extensions')
+  UNION SELECT p.proowner FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname IN ('public','tutor_private','auth','supabase_migrations','extensions')
+) AND r.rolname <> 'postgres' AND NOT pg_has_role('postgres', r.oid, 'MEMBER')
+ORDER BY r.rolname"
+docker exec "$container" psql -X -At -v ON_ERROR_STOP=1 -U postgres -d postgres \
+  -c "SELECT format('GRANT %I TO postgres;', rolname) FROM (${owner_roles_query}) owners" > "$owner_grants"
+docker exec "$container" psql -X -At -v ON_ERROR_STOP=1 -U postgres -d postgres \
+  -c "SELECT format('REVOKE %I FROM postgres;', rolname) FROM (${owner_roles_query}) owners" > "$owner_revokes"
+if [ -s "$owner_grants" ]; then
+  docker exec -i "$container" psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres \
+    < "$owner_grants" >/dev/null
+fi
 # Restore into a distinct disposable database in the SAME LOCAL CI Postgres container.
 docker exec -i "$container" pg_restore --exit-on-error \
   --use-list /tmp/v5_synthetic_restore.filtered.list \
   -U postgres -d "$restored_db" < "$backup" > /dev/null
+if [ -s "$owner_revokes" ]; then
+  docker exec -i "$container" psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres \
+    < "$owner_revokes" >/dev/null
+  rm -f "$owner_revokes"
+fi
 
 after="$(docker exec "$container" psql -X -At -v ON_ERROR_STOP=1 \
   -U postgres -d "$restored_db" -c "$count_query")"
