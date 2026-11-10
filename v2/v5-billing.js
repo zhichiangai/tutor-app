@@ -140,7 +140,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    '完整專案營運報表尚無有效資料；上述待辦僅供參考。':
    !(validProjects&&sameNetTotals&&validTeachers&&validHistory)?
    '專案營運資料需要重新核對，請重新整理。':
-   '以下專案以退款反向分錄計算淨應收；並非銀行入帳、退款或法定會計報表。';
+   '以下專案由現任 Team 管理者授權 RPC 提供，以退款反向分錄計算淨應收；並非銀行入帳、退款或法定會計報表。';
   if(!validProjects||!sameNetTotals||!validTeachers||!validHistory)return;
   if(!ops.projects.length)projectList?.append(
    item('p','尚無 Team 專案。','section-sub'));
