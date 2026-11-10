@@ -33,3 +33,7 @@
 Node 靜態契約驗證新版 SQL 不再使用原始 gross 聚合、檢查管理者權限／淨額來源標記及 19 份 Git blob SHA。隔離 E2E 使用合成 GoTrue JWT、PostgREST 測試在核准直接付款退款及已抵扣預收款退款之後，將各專案金額與 Team 月度帳務比較，並確認前任管理者、學生無法閱讀。
 
 **所有結果仍以最新 HEAD 的 CI 執行證據為準。** 存在歷史 V4 Production 43 筆 migrations 與 Repository fresh bootstrap 的差異，正式 A1-R3 真實 43-history schema-only replay 尚未完成，正式 V5 發布維持 **NO-GO**。Codex 正式站 GUI 未在此開發階段驗收。
+
+### 2026-11-10 後續 A1-R3 狀態更正
+
+前段測試狀態是文件建立時的快照。PR #68 Head `b3fbfcc980f6551ea490a83c9b140a9e36558fda` 的 GitHub Actions run `42750048637` 後續已用隔離 CI 重播 Production 來源的 43 個歷史版本，並在同一 disposable database 套用 19 個 V5 migrations，62/62 PASS。因此 **A1-R3 隔離歷史相容性已 PASS**；這不代表 Production 已變更，也不代表正式備份／還原或正式 GUI 已驗收。Production V5 仍為 **NO-GO**。

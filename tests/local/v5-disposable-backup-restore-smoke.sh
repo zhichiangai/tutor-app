@@ -18,10 +18,12 @@ echo "Disposable-only restore guard PASS"
 container="supabase_db_tutor_v4_isolated"
 restored_db="tutor_v5_synthetic_restore"
 backup="${RUNNER_TEMP}/v5_synthetic_full_db.dump"
+schema_before="${RUNNER_TEMP}/v5_synthetic_schema_before.sql"
+schema_after="${RUNNER_TEMP}/v5_synthetic_schema_after.sql"
 # The only permitted operations are Docker's disposable CI PostgreSQL container.
 docker inspect "$container" --format '{{.State.Running}}' | grep -qx true
 cleanup() {
-  rm -f "$backup"
+  rm -f "$backup" "$schema_before" "$schema_after"
   docker exec "$container" dropdb -U postgres --if-exists "$restored_db" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -39,8 +41,19 @@ count_query="SELECT jsonb_build_object(
 before="$(docker exec "$container" psql -X -At -v ON_ERROR_STOP=1 -U postgres -d postgres -c "$count_query")"
 test -n "$before"
 
+# A schema-only dump includes table definitions, RLS policies, functions and
+# grants. Ownership is normalized, but ACLs are deliberately retained.
+docker exec "$container" pg_dump --schema-only --no-owner \
+  --schema=public --schema=tutor_private --schema=auth \
+  --schema=supabase_migrations -U postgres -d postgres > "$schema_before"
+schema_before_hash="$(grep -v '^-- ' "$schema_before" | sha256sum | cut -d' ' -f1)"
+rows_before="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
+  -U postgres -d postgres < tests/sql/v5_synthetic_row_fingerprint.sql)"
+test -n "$schema_before_hash"
+test -n "$rows_before"
+
 # Keep the full synthetic dump in a private, short-lived runner file.
-docker exec "$container" pg_dump --format=custom --no-owner --no-privileges \
+docker exec "$container" pg_dump --format=custom --no-owner \
   --schema=public --schema=tutor_private --schema=auth \
   --schema=supabase_migrations -U postgres -d postgres > "$backup"
 test -s "$backup"
@@ -51,7 +64,7 @@ docker exec "$container" createdb -U postgres "$restored_db"
 docker exec "$container" psql -X -v ON_ERROR_STOP=1 \
   -U postgres -d "$restored_db" -c 'DROP SCHEMA public CASCADE;' >/dev/null
 # Restore into a distinct disposable database in the SAME LOCAL CI Postgres container.
-docker exec -i "$container" pg_restore --exit-on-error --no-owner --no-privileges \
+docker exec -i "$container" pg_restore --exit-on-error --no-owner \
   -U postgres -d "$restored_db" < "$backup" > /dev/null
 
 after="$(docker exec "$container" psql -X -At -v ON_ERROR_STOP=1 \
@@ -60,7 +73,21 @@ if [ "$before" != "$after" ]; then
   echo "::error::Synthetic backup/restore count reconciliation failed (values suppressed)"
   exit 1
 fi
+docker exec "$container" pg_dump --schema-only --no-owner \
+  --schema=public --schema=tutor_private --schema=auth \
+  --schema=supabase_migrations -U postgres -d "$restored_db" > "$schema_after"
+schema_after_hash="$(grep -v '^-- ' "$schema_after" | sha256sum | cut -d' ' -f1)"
+rows_after="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
+  -U postgres -d "$restored_db" < tests/sql/v5_synthetic_row_fingerprint.sql)"
+if [ "$schema_before_hash" != "$schema_after_hash" ]; then
+  echo "::error::Synthetic restore schema/RLS/function/ACL fingerprint mismatch"
+  exit 1
+fi
+if [ "$rows_before" != "$rows_after" ]; then
+  echo "::error::Synthetic restore row fingerprint mismatch (values suppressed)"
+  exit 1
+fi
 echo "SYNTHETIC SELECTED-SCHEMA RESTORE PASS: pg_dump/pg_restore succeeded in disposable localhost CI"
-echo "Validated synthetic migration/auth/V4/V5 ledger row counts and removed backup on exit."
+echo "Validated synthetic schema/RLS/grants/functions, migration/auth/V4/V5 row hashes and counts; removed backup on exit."
 echo "Scope: public, tutor_private, auth and supabase_migrations. Realtime/Storage platform objects excluded."
 echo "NOT a Production backup; NOT evidence of Production data recovery or exact 43-migration restore."

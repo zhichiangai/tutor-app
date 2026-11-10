@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 
 const root=new URL('../',import.meta.url);
 const ui=readFileSync(new URL('v2/v56-adjustments.js',root),'utf8');
@@ -11,7 +12,7 @@ const app=readFileSync(new URL('v2/app.js',root),'utf8');
 
 test('V5.6 browser module and connected Team billing module parse cleanly',()=>{
  for(const name of ['v2/v56-adjustments.js','v2/v5-billing.js'])
-  execFileSync(process.execPath,['--check',new URL(name,root).pathname],{
+  execFileSync(process.execPath,['--check',fileURLToPath(new URL(name,root))],{
    timeout:10000,stdio:'pipe'
   });
 });

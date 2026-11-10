@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 const root=new URL('../',import.meta.url);
 const file=p=>readFileSync(new URL(p,root),'utf8');
 const s14=file('supabase/migrations/20261110050000_v5_6_net_settlement_reconciliation.sql');
@@ -89,7 +90,7 @@ test('P1 manual payout is a unique immutable declaration, never a bank transfer'
 });
 test('P1 parent and manager JS modules parse, fail closed and revoke stale finance',()=>{
  for(const name of ['v2/v56-adjustments.js','v2/v56-family.js','v2/v5-billing.js','v2/app.js'])
-  execFileSync(process.execPath,['--check',new URL(name,root).pathname],{timeout:10000});
+  execFileSync(process.execPath,['--check',fileURLToPath(new URL(name,root))],{timeout:10000});
  has(family,'v56_my_team_family_proposals','v56_team_parent_finance_overview',
   'v56_respond_team_family_proposal','clear()',"'parent'");
  has(billing,'v56_team_conservation_overview','conservation_passed===true',

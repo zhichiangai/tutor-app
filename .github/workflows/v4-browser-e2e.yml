@@ -231,6 +231,8 @@ jobs:
         run: node tests/e2e/seed-v4-local.mjs
       - name: Verify real Chromium teacher-parent-student flows
         run: npx playwright test --config tests/e2e/playwright.config.mjs
+      - name: Verify failed migration rollback, retry and idempotency
+        run: bash tests/local/v5-migration-atomicity-smoke.sh
       - name: Rehearse synthetic-only private selected-schema backup and restore
         id: v5_restore_probe
         continue-on-error: true

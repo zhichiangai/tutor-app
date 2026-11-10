@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,readdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 const root=new URL('../',import.meta.url);
 const read=p=>readFileSync(new URL(p,root),'utf8');
 const old=JSON.parse(read('docs/v5/catalog/V5_A1_EIGHTEEN_MIGRATION_SOURCE_LOCK_20261110.json'));
@@ -54,5 +55,5 @@ test('Manager P1 UI rejects gross RPC output and requires project/Team net balan
   'p.advance_net_cents',
   'cash_verified_by_bank===false'
  ])assert.ok(ui.includes(token),'Missing fail-closed UI guard: '+token);
- execFileSync(process.execPath,['--check',new URL('v2/v5-billing.js',root).pathname],{timeout:10000});
+ execFileSync(process.execPath,['--check',fileURLToPath(new URL('v2/v5-billing.js',root))],{timeout:10000});
 });
