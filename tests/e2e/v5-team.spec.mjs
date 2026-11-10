@@ -2435,6 +2435,25 @@ test('V5.6 P0-C/D/E real JWT validates net applied-credit reversal, refund holds
   'Refunded applied credit must be held, not become available for another offset');
  assert.equal(after.data.confirmed_cash_book_cents,before.data.confirmed_cash_book_cents);
  assert.equal(after.data.bank_verified,false);
+ // Applied-credit reversals must also flow through V5.7 per-project balances.
+ const appliedMonth={p_team_id:team,p_month:'2026-10-01'};
+ const [projectAfterAdvance,monthlyAfterAdvance]=await Promise.all([
+  rest(manager,'POST','rpc/v5_team_operations_overview',appliedMonth),
+  rest(manager,'POST','rpc/v5_team_payment_overview',appliedMonth)
+ ]);
+ assert.equal(projectAfterAdvance.status,200,JSON.stringify(projectAfterAdvance.data));
+ assert.equal(monthlyAfterAdvance.status,200,JSON.stringify(monthlyAfterAdvance.data));
+ assert.equal(projectAfterAdvance.data.ledger_basis,'net_after_immutable_reversals');
+ assert.equal(projectAfterAdvance.data.cash_verified_by_bank,false);
+ const projectsAfterAdvance=projectAfterAdvance.data.projects;
+ assert.equal(projectsAfterAdvance.reduce((sum,p)=>sum+p.outstanding_cents,0),
+  monthlyAfterAdvance.data.outstanding_cents);
+ assert.equal(projectsAfterAdvance.reduce((sum,p)=>sum+p.advance_net_cents,0),
+  monthlyAfterAdvance.data.advance_applied_cents);
+ assert.equal(projectsAfterAdvance.reduce((sum,p)=>sum+p.direct_net_cents,0),
+  monthlyAfterAdvance.data.direct_allocated_cents);
+ assert.ok(projectsAfterAdvance.every(p=>p.confirmed_receivable_cents===
+  p.direct_net_cents+p.advance_net_cents+p.outstanding_cents));
  assert.notEqual((await rows(studentActor,'v56_team_advance_application_reversals')).status,200);
  assert.notEqual((await rows(former,'v56_team_applied_credit_decisions')).status,200);
  const late={...args,p_idempotency_key:'V56-APPLIED-EXCESS-001',
