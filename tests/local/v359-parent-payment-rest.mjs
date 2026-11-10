@@ -18,7 +18,9 @@ if (standaloneHotfix) {
 }
 const rlsScriptPath = standaloneHotfix
   ? '../../supabase/hotfixes/20261028_parent_payment_active_link_select.sql'
-  : '../../supabase/migrations/20261023163138_v359_parent_payment_link_rls.sql';
+  : process.env.V5_A1R3_HISTORICAL_REPLAY === '1'
+    ? '../../supabase/migrations/20261103212351_v359_parent_payment_active_link_rls.sql'
+    : '../../supabase/migrations/20261023163138_v359_parent_payment_link_rls.sql';
 const migration = readFileSync(new URL(rlsScriptPath, import.meta.url), 'utf8');
 const container = 'supabase_db_tutor_v4_isolated';
 function sql(query) {
