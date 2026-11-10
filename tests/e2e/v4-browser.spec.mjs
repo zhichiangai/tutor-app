@@ -538,7 +538,7 @@ test('missing Preview config opens safe no-data shell in Chromium, without OAuth
  await page.locator('.side-nav [data-view="billing"]').click();
  await expect(page.locator('#view-billing')).toBeVisible();
  await expect(page.locator('#billing-summary')).toContainText('尚未讀取任何金額');
- await page.locator('.side-nav [data-view="settings"]').click();
+ await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
  await expect(page.locator('#preview-plan-panel')).toBeVisible();
  await expect(page.locator('#preview-plans')).toContainText('NT$99／月');
  await expect(page.locator('#preview-plans')).toContainText('NT$399／月');
