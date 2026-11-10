@@ -2194,6 +2194,28 @@ test('V5.6 append-only pending void, metadata correction and unused-credit refun
  assert.equal(netAfterDirect.data.all_time_confirmed_receipts_cents,
   netBeforeDirect.data.all_time_confirmed_receipts_cents,'No cash leaves on approval');
  assert.equal(netAfterDirect.data.physical_bank_refund_verified,false);
+ // V5.7 project operations must use the same NET financial basis as V5.6.
+ const projectOperations=await rest(manager,'POST','rpc/v5_team_operations_overview',netArgs);
+ const netPaymentOverview=await rest(manager,'POST','rpc/v5_team_payment_overview',netArgs);
+ assert.equal(projectOperations.status,200,JSON.stringify(projectOperations.data));
+ assert.equal(netPaymentOverview.status,200,JSON.stringify(netPaymentOverview.data));
+ assert.equal(projectOperations.data.ledger_basis,'net_after_immutable_reversals');
+ assert.equal(projectOperations.data.cash_verified_by_bank,false);
+ const projectRows=projectOperations.data.projects;
+ assert.ok(projectRows.length>0);
+ assert.equal(projectRows.reduce((n,p)=>n+p.outstanding_cents,0),
+  netPaymentOverview.data.outstanding_cents,
+  'V5.7 per-project outstanding must equal the net V5.6 Team balance');
+ assert.equal(projectRows.reduce((n,p)=>n+p.direct_net_cents,0),
+  netPaymentOverview.data.direct_allocated_cents);
+ assert.equal(projectRows.reduce((n,p)=>n+p.advance_net_cents,0),
+  netPaymentOverview.data.advance_applied_cents);
+ for(const row of projectRows)
+  assert.equal(row.confirmed_receivable_cents,
+   row.direct_net_cents+row.advance_net_cents+row.outstanding_cents,
+   'Each project must conserve its financial balance after direct refunds');
+ assert.equal((await rest(former,'POST','rpc/v5_team_operations_overview',netArgs)).status,403);
+ assert.equal((await rest(studentActor,'POST','rpc/v5_team_operations_overview',netArgs)).status,403);
  // A rejected request never inserts a reversal.
  const rejectRequest={...directRequest,p_idempotency_key:'V56-DIRECT-REJECT-001',
   p_allocations:[{lesson_id:lesson,amount_cents:100}]};
