@@ -35,9 +35,10 @@ test('synthetic restore preserves and compares schema ACL/RLS metadata and row f
   assert.match(restore, /schema_after_hash/);
   assert.match(restore, /rows_after/);
   assert.doesNotMatch(restore, /pg_restore[^\n]*--no-privileges/);
-  assert.match(restore, /GRANT supabase_auth_admin TO postgres/);
-  assert.match(restore, /REVOKE supabase_auth_admin FROM postgres/);
-  assert.match(restore, /table definitions, RLS policies, functions and\n# grants/);
+  assert.match(restore, /DEFAULT ACL TOC entries/);
+  assert.match(restore, /v5_synthetic_acl_fingerprint\.sql/);
+  assert.match(restore, /--use-list/);
+  assert.match(restore, /table definitions, RLS policies and functions/);
   assert.match(fingerprint, /pg_class/);
   assert.match(fingerprint, /row_md5/);
   assert.doesNotMatch(fingerprint, /SELECT \*|COPY .* TO/);

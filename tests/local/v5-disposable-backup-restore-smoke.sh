@@ -20,12 +20,13 @@ restored_db="tutor_v5_synthetic_restore"
 backup="${RUNNER_TEMP}/v5_synthetic_full_db.dump"
 schema_before="${RUNNER_TEMP}/v5_synthetic_schema_before.sql"
 schema_after="${RUNNER_TEMP}/v5_synthetic_schema_after.sql"
+restore_list="${RUNNER_TEMP}/v5_synthetic_restore.list"
+restore_list_filtered="${RUNNER_TEMP}/v5_synthetic_restore.filtered.list"
 # The only permitted operations are Docker's disposable CI PostgreSQL container.
 docker inspect "$container" --format '{{.State.Running}}' | grep -qx true
 cleanup() {
-  rm -f "$backup" "$schema_before" "$schema_after"
-  docker exec "$container" psql -X -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
-    -c 'REVOKE supabase_auth_admin FROM postgres;' >/dev/null 2>&1 || true
+  rm -f "$backup" "$schema_before" "$schema_after" "$restore_list" "$restore_list_filtered"
+  docker exec "$container" rm -f /tmp/v5_synthetic_restore.filtered.list >/dev/null 2>&1 || true
   docker exec "$container" dropdb -U postgres --if-exists "$restored_db" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -43,38 +44,40 @@ count_query="SELECT jsonb_build_object(
 before="$(docker exec "$container" psql -X -At -v ON_ERROR_STOP=1 -U postgres -d postgres -c "$count_query")"
 test -n "$before"
 
-# A schema-only dump includes table definitions, RLS policies, functions and
-# grants. Ownership is normalized, but ACLs are deliberately retained.
-docker exec "$container" pg_dump --schema-only --no-owner \
+# A schema-only dump includes table definitions, RLS policies and functions.
+# Object-level ACLs are fingerprinted separately; pg_dump's platform default
+# ACLs cannot be replayed under Supabase's restricted CI roles.
+docker exec "$container" pg_dump --schema-only --no-owner --no-privileges \
   --schema=public --schema=tutor_private --schema=auth \
   --schema=supabase_migrations -U postgres -d postgres > "$schema_before"
 schema_before_hash="$(grep -v '^-- ' "$schema_before" | sha256sum | cut -d' ' -f1)"
 rows_before="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
   -U postgres -d postgres < tests/sql/v5_synthetic_row_fingerprint.sql)"
+acl_before="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
+  -U postgres -d postgres < tests/sql/v5_synthetic_acl_fingerprint.sql)"
 test -n "$schema_before_hash"
 test -n "$rows_before"
+test -n "$acl_before"
 
 # Keep the full synthetic dump in a private, short-lived runner file.
 docker exec "$container" pg_dump --format=custom --no-owner \
   --schema=public --schema=tutor_private --schema=auth \
   --schema=supabase_migrations -U postgres -d postgres > "$backup"
 test -s "$backup"
-docker exec -i "$container" pg_restore --list < "$backup" > /dev/null
+docker exec -i "$container" pg_restore --list < "$backup" > "$restore_list"
+# Exclude only platform-managed DEFAULT ACL TOC entries; retain object ACLs.
+sed -E '/^[0-9]+; .*DEFAULT ACL /s/^/; /' "$restore_list" > "$restore_list_filtered"
+docker exec -i "$container" sh -c 'cat > /tmp/v5_synthetic_restore.filtered.list' \
+  < "$restore_list_filtered"
 docker exec "$container" createdb -U postgres "$restored_db"
 # A fresh PostgreSQL database already has an empty "public" schema. pg_dump
 # includes CREATE SCHEMA public, so remove ONLY the empty target database copy.
 docker exec "$container" psql -X -v ON_ERROR_STOP=1 \
   -U postgres -d "$restored_db" -c 'DROP SCHEMA public CASCADE;' >/dev/null
 # Restore into a distinct disposable database in the SAME LOCAL CI Postgres container.
-# PostgreSQL requires membership in the source role to restore its default ACLs.
-# This temporary grant is limited to the disposable CI cluster and is revoked
-# immediately after restore (and again by cleanup on failure).
-docker exec "$container" psql -X -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
-  -c 'GRANT supabase_auth_admin TO postgres;' >/dev/null
 docker exec -i "$container" pg_restore --exit-on-error --no-owner \
+  --use-list /tmp/v5_synthetic_restore.filtered.list \
   -U postgres -d "$restored_db" < "$backup" > /dev/null
-docker exec "$container" psql -X -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
-  -c 'REVOKE supabase_auth_admin FROM postgres;' >/dev/null
 
 after="$(docker exec "$container" psql -X -At -v ON_ERROR_STOP=1 \
   -U postgres -d "$restored_db" -c "$count_query")"
@@ -82,12 +85,14 @@ if [ "$before" != "$after" ]; then
   echo "::error::Synthetic backup/restore count reconciliation failed (values suppressed)"
   exit 1
 fi
-docker exec "$container" pg_dump --schema-only --no-owner \
+docker exec "$container" pg_dump --schema-only --no-owner --no-privileges \
   --schema=public --schema=tutor_private --schema=auth \
   --schema=supabase_migrations -U postgres -d "$restored_db" > "$schema_after"
 schema_after_hash="$(grep -v '^-- ' "$schema_after" | sha256sum | cut -d' ' -f1)"
 rows_after="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
   -U postgres -d "$restored_db" < tests/sql/v5_synthetic_row_fingerprint.sql)"
+acl_after="$(docker exec -i "$container" psql -X -qAt -v ON_ERROR_STOP=1 \
+  -U postgres -d "$restored_db" < tests/sql/v5_synthetic_acl_fingerprint.sql)"
 if [ "$schema_before_hash" != "$schema_after_hash" ]; then
   echo "::error::Synthetic restore schema/RLS/function/ACL fingerprint mismatch"
   exit 1
@@ -96,7 +101,12 @@ if [ "$rows_before" != "$rows_after" ]; then
   echo "::error::Synthetic restore row fingerprint mismatch (values suppressed)"
   exit 1
 fi
+if [ "$acl_before" != "$acl_after" ]; then
+  echo "::error::Synthetic restore object-level ACL fingerprint mismatch"
+  exit 1
+fi
 echo "SYNTHETIC SELECTED-SCHEMA RESTORE PASS: pg_dump/pg_restore succeeded in disposable localhost CI"
-echo "Validated synthetic schema/RLS/grants/functions, migration/auth/V4/V5 row hashes and counts; removed backup on exit."
+echo "Validated synthetic schema/RLS/functions, object-level ACLs, migration/auth/V4/V5 row hashes and counts; removed backup on exit."
+echo "Platform DEFAULT ACL entries were excluded because the disposable Supabase roles cannot restore them."
 echo "Scope: public, tutor_private, auth and supabase_migrations. Realtime/Storage platform objects excluded."
 echo "NOT a Production backup; NOT evidence of Production data recovery or exact 43-migration restore."
