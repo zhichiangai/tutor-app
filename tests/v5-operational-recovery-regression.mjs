@@ -8,6 +8,7 @@ const restore = read('tests/local/v5-disposable-backup-restore-smoke.sh');
 const fingerprint = read('tests/sql/v5_synthetic_row_fingerprint.sql');
 const checkFingerprint = read('tests/sql/v5_synthetic_check_constraint_fingerprint.sql');
 const appAclFingerprint = read('tests/sql/v5_synthetic_app_acl_fingerprint.sql');
+const appOwnerFingerprint = read('tests/sql/v5_synthetic_app_owner_fingerprint.sql');
 const browserWorkflow = read('.github/workflows/v4-browser-e2e.yml');
 
 test('migration fault injection is CI-only, local-only, and refuses to overwrite migration files', () => {
@@ -43,10 +44,17 @@ test('synthetic restore preserves and compares schema ACL/RLS metadata and row f
   assert.match(restore, /pg_restore --exit-on-error --no-owner/);
   assert.match(restore, /FULL PLATFORM OWNER\/ACL RESTORE BLOCKED/);
   assert.match(restore, /app_acl_before.*app_acl_after/s);
+  assert.match(restore, /app_owner_before.*app_owner_after/s);
+  assert.match(restore, /native_public_owner/);
+  assert.match(restore, /pg_database_owner/);
+  assert.doesNotMatch(restore, /DROP SCHEMA public CASCADE/);
   assert.match(restore, /Application-owned public\/tutor_private owner or ACL fingerprint differs/);
   assert.match(restore, /SYNTHETIC APPLICATION-SCOPE RESTORE PASS/);
   assert.match(restore, /NOT a full system recovery PASS/);
   assert.match(appAclFingerprint, /owner\.rolname AS owner_name/);
+  assert.match(appOwnerFingerprint, /pg_get_userbyid/);
+  assert.match(appOwnerFingerprint, /p\.prosecdef/);
+  assert.match(appOwnerFingerprint, /pg_type/);
   assert.match(appAclFingerprint, /tutor_private/);
   assert.doesNotMatch(appAclFingerprint, /'auth'|'supabase_migrations'|'extensions'/);
   assert.match(restore, /DEFAULT ACL TOC entries/);
