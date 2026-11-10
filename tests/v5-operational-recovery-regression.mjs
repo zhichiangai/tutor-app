@@ -40,6 +40,8 @@ test('synthetic restore preserves and compares schema ACL/RLS metadata and row f
   assert.doesNotMatch(restore, /pg_restore[^\n]*--no-privileges/);
   assert.match(restore, /DEFAULT ACL TOC entries/);
   assert.match(restore, /v5_synthetic_acl_fingerprint\.sql/);
+  assert.match(restore, /ACL fingerprint category differs/);
+  assert.match(restore, /before_count=.*after_count=/s);
   assert.match(restore, /v5_synthetic_check_constraint_fingerprint\.sql/);
   assert.match(restore, /checks_before.*checks_after/s);
   assert.match(checkFingerprint, /con\.conbin::text/);

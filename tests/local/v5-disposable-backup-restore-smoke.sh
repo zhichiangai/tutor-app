@@ -143,6 +143,20 @@ if [ "$rows_before" != "$rows_after" ]; then
   exit 1
 fi
 if [ "$acl_before" != "$acl_after" ]; then
+  python3 - "$acl_before" "$acl_after" <<'PY'
+import json
+import sys
+
+before, after = (json.loads(value) for value in sys.argv[1:3])
+for category in sorted(set(before) | set(after)):
+    if before.get(category) != after.get(category):
+        left, right = before.get(category, {}), after.get(category, {})
+        print(
+            f"ACL fingerprint category differs: {category}; "
+            f"before_count={left.get('count', 'missing')}; "
+            f"after_count={right.get('count', 'missing')}"
+        )
+PY
   echo "::error::Synthetic restore object-level ACL fingerprint mismatch"
   exit 1
 fi
