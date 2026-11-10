@@ -147,10 +147,12 @@
 
 ### 5.5 2026-11-10｜應用資料還原與平台受保護 Owner 的分離驗收
 
+> 最新測試使用 PostgreSQL 原生 `pg_database_owner` 保留新資料庫自帶 `public` schema，不再將它刪除後由 `postgres` 重建。並以獨立 owner 指紋覆蓋所有應用表／函式／型別，即使物件沒有額外 GRANT 也會檢查。先前 5.4 段落的 `conbin::text` 僅是歷史版本，因跨資料庫可能包含不同物件 OID，已改用 `pg_get_expr` 的 canonical expression；差異只輸出 CHECK 物件名稱，不輸出 SQL。
+
 本次新增的 `tests/sql/v5_synthetic_app_acl_fingerprint.sql` 只涵蓋本專案應用管理的 `public`、`tutor_private` 兩個 schema。隔離 CI 的 selected-schema `pg_dump` / `pg_restore --no-owner` 測試必須同時符合：
 
 1. **嚴格阻斷**：兩個應用 schema 的物件 Owner、非 Owner ACL GRANT、角色、授權選項指紋完全相同，包含 `SECURITY DEFINER` 函式；如有差異，CI 判定 FAIL。
-2. **嚴格阻斷**：五個測試範圍 schema 的 DDL、RLS、函式定義、PostgreSQL CHECK 解析樹、合成資料列 hash、筆數及 Migration history 全部相同；如有差異，CI 判定 FAIL。
+2. **嚴格阻斷**：五個測試範圍 schema 的 DDL、RLS、函式定義、由 PostgreSQL `pg_get_expr` 重新輸出的 CHECK 表達式（避免跨資料庫 OID 差異）、合成資料列 hash、筆數及 Migration history 全部相同；如有差異，CI 判定 FAIL。
 3. **獨立揭露**：`auth`、`supabase_migrations`、`extensions` 的平台管理 Owner／ACL 若因 `--no-owner` 不一致，記錄摘要並標示 **FULL PLATFORM OWNER/ACL RESTORE BLOCKED**，不得在任何發布報告中宣告完整備份還原 PASS。平台 `DEFAULT ACL` TOC 仍排除，Realtime／Storage 及外部回呼也不在測試範圍。
 4. **正式發布 NO-GO**：應用範圍 CI 通過，只能證明在 GitHub Actions 一次性 Supabase 本機容器中，合成資料和本專案自管物件可以還原。正式帳號、正式 Schema、平台完整 ACL、真實備份與還原、第三方通知均未驗證；正式 Migration／Main 合併／Production 部署仍需獨立授權。
 
