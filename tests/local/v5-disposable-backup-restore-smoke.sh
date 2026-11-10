@@ -113,15 +113,15 @@ if [ "$schema_before_hashes" != "$schema_after_hashes" ]; then
         sed -E 's/^([+-])((CREATE|ALTER|DROP)[[:space:]]+(OR REPLACE[[:space:]]+)?(FUNCTION|TABLE|SEQUENCE|VIEW|TYPE|SCHEMA|EXTENSION|INDEX|TRIGGER|POLICY|MATERIALIZED VIEW)[[:space:]]+(ONLY[[:space:]]+)?[^[:space:](;]+).*/\1\2/; s/^([+-])((COMMENT ON|GRANT|REVOKE)[[:space:]]+[A-Z ]+[[:space:]]+[^[:space:](;]+).*/\1\2/' |
         head -n 20 || true
       echo "Sanitized schema dump delta categories for $schema (schema-only; values omitted):"
-      diff -u \
+      { diff -u \
         "${RUNNER_TEMP}/v5_synthetic_schema_before_${schema}.sql" \
-        "${RUNNER_TEMP}/v5_synthetic_schema_after_${schema}.sql" |
+        "${RUNNER_TEMP}/v5_synthetic_schema_after_${schema}.sql" || true; } |
         grep -E '^[+-][^+-]' |
         sed -E 's#https?://[^[:space:]\047]+#[URL]#g; s#postgres(ql)?://[^[:space:]\047]+#[DB_URI]#g; s/(password|secret|token|key)[^,;)]*/\1=[REDACTED]/Ig; s/[A-Za-z0-9_+\/=-]{48,}/[LONG_VALUE]/g' |
-        awk 'substr($0,1,1)=="+" {plus++} substr($0,1,1)=="-" {minus++} END {printf "added_lines=%d removed_lines=%d\\n", plus, minus}'
-      diff -u \
+        awk 'substr($0,1,1)=="+" {plus++} substr($0,1,1)=="-" {minus++} END {printf "added_lines=%d removed_lines=%d\n", plus, minus}'
+      { diff -u \
         "${RUNNER_TEMP}/v5_synthetic_schema_before_${schema}.sql" \
-        "${RUNNER_TEMP}/v5_synthetic_schema_after_${schema}.sql" |
+        "${RUNNER_TEMP}/v5_synthetic_schema_after_${schema}.sql" || true; } |
         grep -E '^[+-][^+-]' |
         sed -E 's#https?://[^[:space:]\047]+#[URL]#g; s#postgres(ql)?://[^[:space:]\047]+#[DB_URI]#g; s/(password|secret|token|key)[^,;)]*/\1=[REDACTED]/Ig; s/[A-Za-z0-9_+\/=-]{48,}/[LONG_VALUE]/g' |
         head -n 32 | cut -c 1-260 || true
