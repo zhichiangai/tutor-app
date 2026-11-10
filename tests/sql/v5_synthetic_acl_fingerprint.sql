@@ -14,7 +14,7 @@ SELECT jsonb_build_object(
         coalesce(grantee.rolname, 'PUBLIC') AS grantee_name,
         exploded.privilege_type, exploded.is_grantable
       FROM pg_namespace n
-      CROSS JOIN LATERAL aclexplode(coalesce(n.nspacl, acldefault('n', n.nspowner))) exploded
+      CROSS JOIN LATERAL aclexplode(coalesce(n.nspacl, acldefault('n'::"char", n.nspowner))) exploded
       LEFT JOIN pg_roles grantee ON grantee.oid = exploded.grantee
       WHERE n.nspname IN ('public', 'tutor_private', 'auth', 'supabase_migrations')
         AND exploded.grantee <> n.nspowner
@@ -57,7 +57,7 @@ SELECT jsonb_build_object(
         exploded.privilege_type, exploded.is_grantable
       FROM pg_proc p
       JOIN pg_namespace n ON n.oid = p.pronamespace
-      CROSS JOIN LATERAL aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) exploded
+      CROSS JOIN LATERAL aclexplode(coalesce(p.proacl, acldefault('f'::"char", p.proowner))) exploded
       LEFT JOIN pg_roles grantee ON grantee.oid = exploded.grantee
       WHERE n.nspname IN ('public', 'tutor_private', 'auth', 'supabase_migrations')
         AND exploded.grantee <> p.proowner
