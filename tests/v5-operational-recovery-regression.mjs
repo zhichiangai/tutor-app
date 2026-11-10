@@ -34,6 +34,7 @@ test('synthetic restore preserves and compares schema ACL/RLS metadata and row f
   assert.match(restore, /rows_before/);
   assert.match(restore, /schema_after_hash/);
   assert.match(restore, /restrict\|unrestrict/);
+  assert.match(restore, /awk 'NF/);
   assert.match(restore, /rows_after/);
   assert.doesNotMatch(restore, /pg_restore[^\n]*--no-privileges/);
   assert.match(restore, /DEFAULT ACL TOC entries/);
