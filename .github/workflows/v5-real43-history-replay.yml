@@ -101,12 +101,18 @@ jobs:
           set -euo pipefail
           node tests/local/v5-real43-history-gate.mjs forward
           node tests/local/v5-clean-bootstrap-gate.mjs
+      - name: Explain local service_role ACL defaults, overlay only 27 approved V4 grants, and enforce metadata parity
+        run: |
+          set -euo pipefail
+          node tests/local/v5-v4-service-role-grant-parity.mjs
+          V5_SCHEMA_DRIFT_STRICT=1 node tests/local/v5-production-schema-fingerprint-compare.mjs
       - name: Synthetic GoTrue JWT and PostgREST V4 finance/RLS regression
         env:
           V359_LOCAL_RLS_TEST: '1'
           V359_RLS_PREAPPLIED: '1'
           V40_LOCAL_CORRECTION_TEST: '1'
           V4_QA_LOCAL_JWT_TEST: '1'
+          V5_A1R3_HISTORICAL_REPLAY: '1'
         run: |
           set -euo pipefail
           node tests/local/v359-parent-payment-rest.mjs
@@ -126,7 +132,7 @@ jobs:
           if [ '${{ steps.baseline_metadata.outcome }}' = 'success' ]; then
             echo 'PASS: Production 43-history baseline fingerprint'
           else
-            echo '::warning::PARTIAL: 43-history metadata fingerprint requires independent drift review'
+            echo '::notice::Local Supabase role default grants differ from Production; isolated 27-function grant overlay gate checks the final baseline parity'
           fi
       - name: Remove ephemeral credentials
         if: always()
