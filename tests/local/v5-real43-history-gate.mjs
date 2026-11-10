@@ -37,7 +37,7 @@ const core=[
 ];
 for(const table of core){
  const actual=db("select relrowsecurity::text from pg_class where oid=to_regclass('"+table+"')");
- assert.equal(actual,'t','Missing V4 core RLS '+table);
+ assert.equal(actual,'true','Missing V4 core RLS '+table);
 }
 for(const table of ['auth.users','public.students','public.lesson_records','public.payment_batches']){
  assert.equal(Number(db('select count(*) from '+table)),0,'Historical replay leaked data into '+table);
