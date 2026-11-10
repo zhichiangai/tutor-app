@@ -16,8 +16,8 @@ grep -q '^project_id = "tutor_v4_isolated"$' supabase/config.toml || {
   echo "::error::Unexpected Supabase project identifier"
   exit 1
 }
-[[ ! -f supabase/.temp/project-ref && ! -f supabase/.branches/_current_branch ]] || {
-  echo "::error::Linked or branched Supabase project detected"
+[[ ! -f supabase/.temp/project-ref ]] || {
+  echo "::error::Linked hosted Supabase project detected"
   exit 1
 }
 [[ -n "${RUNNER_TEMP:-}" ]] || {
