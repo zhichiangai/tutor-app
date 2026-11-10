@@ -233,11 +233,11 @@ jobs:
         run: npx playwright test --config tests/e2e/playwright.config.mjs
       - name: Verify failed migration rollback, retry and idempotency
         run: bash tests/local/v5-migration-atomicity-smoke.sh
-      - name: Rehearse synthetic-only private selected-schema backup and restore
+      - name: Rehearse strict app-owned ACL restore with platform owner limitations disclosed
         id: v5_restore_probe
         continue-on-error: true
         run: bash tests/local/v5-disposable-backup-restore-smoke.sh
-      - name: Enforce both independent V5 compatibility probes
+      - name: Enforce V5 schema catalog and application-scope restore probes
         if: always()
         run: |
           test "${{ steps.v5_catalog_probe.outcome }}" = "success" || {
@@ -245,7 +245,7 @@ jobs:
             exit 1
           }
           test "${{ steps.v5_restore_probe.outcome }}" = "success" || {
-            echo "::error::Synthetic selected-schema restore failed or was skipped"
+            echo "::error::Synthetic application-owned schema/ACL restore failed or was skipped"
             exit 1
           }
       - name: Remove ephemeral auth fixture
