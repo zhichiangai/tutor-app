@@ -214,11 +214,22 @@ else
   echo "Full object ACL fingerprint also matches the original disposable database"
 fi
 if [ "$checks_before" != "$checks_after" ]; then
-  echo "::error::Synthetic restore parsed CHECK-constraint fingerprint mismatch"
+  python3 - "$checks_before" "$checks_after" <<'PY'
+import json
+import sys
+before, after = (json.loads(value) for value in sys.argv[1:3])
+left, right = before.get('objects', {}), after.get('objects', {})
+changed = sorted(name for name in left.keys() | right.keys()
+                 if left.get(name) != right.get(name))
+print(f"CHECK mismatch: before_count={before.get('count', 'missing')}; "
+      f"after_count={after.get('count', 'missing')}; "
+      f"differing_object_names={changed[:15]}; more_omitted={max(0, len(changed)-15)}")
+PY
+  echo "::error::Synthetic restore canonical CHECK expression/inheritance/validation fingerprint mismatch"
   exit 1
 fi
 echo "SYNTHETIC APPLICATION-SCOPE RESTORE PASS: disposable localhost pg_dump/pg_restore, app-owned public/tutor_private owner and ACL exact parity"
-echo "Validated selected schema/RLS/functions, parsed CHECK trees, migration/auth/V4/V5 row hashes and counts; removed backup on exit."
+echo "Validated selected schema/RLS/functions, canonical CHECK expressions, migration/auth/V4/V5 row hashes and counts; removed backup on exit."
 echo "Platform auth/supabase_migrations/extensions owner/ACL exact restoration remains BLOCKED where owner differs; platform DEFAULT ACL entries excluded."
 echo "Scope: public and tutor_private security strict; auth, supabase_migrations and extensions schema/data strict, platform owner/ACL advisory only. Realtime/Storage excluded."
 echo "NOT a full system recovery PASS, not a Production backup and not proof of restored Production roles or services."
