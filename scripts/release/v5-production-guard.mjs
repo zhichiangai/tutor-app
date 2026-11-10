@@ -65,6 +65,23 @@ function history(phase,file){
  console.log(JSON.stringify({status:'PASS',phase,versions:rows.length,original:43,
   forward:phase==='after'?19:0,pii_printed:0}));
 }
+function metadata(phase,file){
+ assert.ok(['before','after'].includes(phase));
+ const row=JSON.parse(readFileSync(file,'utf8').trim());
+ for(const k of ['v4_core_rls','v5_tables','v5_rls','anon_v5_select','anon_v5_rpc']){
+  assert.ok(Number.isSafeInteger(row[k])&&row[k]>=0,'Invalid metadata field: '+k);
+ }
+ assert.equal(row.v4_core_rls,8,'V4 core RLS mismatch');
+ assert.equal(row.anon_v5_select,0,'Anonymous direct V5 table grants detected');
+ assert.equal(row.anon_v5_rpc,0,'Anonymous V5 RPC execute grant detected');
+ if(phase==='before')assert.equal(row.v5_tables,0,'V5 objects exist before release');
+ else{
+  assert.ok(row.v5_tables>=27,'V5 schema unexpectedly incomplete');
+  assert.equal(row.v5_rls,row.v5_tables,'Every V5 table must have RLS enabled');
+ }
+ console.log(JSON.stringify({status:'PASS',phase,core_rls:row.v4_core_rls,
+  v5_tables:row.v5_tables,v5_rls:row.v5_rls,anonymous_exposure:0}));
+}
 function approve(){
  const {a}=sources();
  assert.equal(a.status,'GO','V5 approval record is BLOCKED');
@@ -98,5 +115,6 @@ if(cmd==='source'){
   approval:a.status,remote_writes:0}));
 }else if(cmd==='target')target();
 else if(cmd==='history')history(process.argv[4],process.argv[5]);
+else if(cmd==='metadata')metadata(process.argv[4],process.argv[5]);
 else if(cmd==='approve')approve();
 else throw Error('Usage: source|target|history|approve');
