@@ -52,7 +52,9 @@ schema_fingerprints() {
     file="${RUNNER_TEMP}/v5_synthetic_schema_${phase}_${schema}.sql"
     docker exec "$container" pg_dump --schema-only --no-owner --no-privileges \
       --schema="$schema" -U postgres -d "$db" > "$file"
-    hash="$(grep -v '^-- ' "$file" | sha256sum | cut -d' ' -f1)"
+    # PostgreSQL 17 adds a random psql \restrict token to each text dump.
+    # Ignore only dump comments and these per-dump guard tokens before hashing.
+    hash="$(grep -v -E '^-- |^\\(restrict|unrestrict) ' "$file" | sha256sum | cut -d' ' -f1)"
     printf '%s:%s\n' "$schema" "$hash"
   done
 }
