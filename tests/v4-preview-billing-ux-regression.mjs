@@ -137,7 +137,7 @@ test('QA-PREVIEW-01 permits only visual Team navigation and retains write interc
 });
 
 test('no-data Preview prices are absent from shared HTML and created only by the guarded renderer',()=>{
- assert.doesNotMatch(html,/NT\\\$99|NT\\\$399/,'student and unauthenticated DOM must not contain subscription prices');
+ assert.doesNotMatch(html,/NT\$99|NT\$399/,'student and unauthenticated DOM must not contain subscription prices');
  assert.match(html,/id="preview-plans" class="preview-plans"/);
  const source=app.slice(app.indexOf('function renderPreviewReadOnlyShell(){'),
   app.indexOf('function selectPreviewShellMode(',app.indexOf('function renderPreviewReadOnlyShell(){')));
