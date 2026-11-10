@@ -127,6 +127,42 @@ jobs:
         run: node tests/e2e/seed-v4-local.mjs
       - name: Run real three-role Chromium compatibility regression
         run: npx playwright test --config tests/e2e/playwright.config.mjs
+      # Run a second local-only 43-to-62 upgrade with legacy rows already populated.
+      - name: Restore authentic 43-history SQL for populated upgrade rehearsal
+        run: |
+          set -euo pipefail
+          node tests/local/v5-real43-history-builder.mjs restore-baseline
+          log="$RUNNER_TEMP/a1r3-populated-reset.log"
+          trap 'rm -f "$log"' EXIT
+          if ! supabase db reset --local --no-seed >"$log" 2>&1; then
+            echo "::error::Disposable populated 43-history reset failed"
+            grep -Ei 'applying migration|error:|sqlstate|^fatal:' "$log" |
+              sed -E 's/eyJ[A-Za-z0-9_.-]+/[JWT_REDACTED]/g; s/sb_(publishable|secret)_[A-Za-z0-9_-]+/[KEY_REDACTED]/g' |
+              tail -n 10 | cut -c 1-180 || true
+            exit 1
+          fi
+      - name: Seed existing V4 actors lessons and pending payment
+        run: |
+          node tests/e2e/seed-v4-local.mjs
+          node tests/local/v5-real43-populated-upgrade.mjs before
+      - name: Apply frozen V5 migrations to populated V4 schema
+        run: |
+          set -euo pipefail
+          node tests/local/v5-real43-history-builder.mjs append-v5
+          log="$RUNNER_TEMP/a1r3-populated-upgrade.log"
+          trap 'rm -f "$log"' EXIT
+          if ! supabase migration up --local >"$log" 2>&1; then
+            echo "::error::V5 failed against populated synthetic 43-history"
+            grep -Ei 'applying migration|error:|sqlstate|^fatal:' "$log" |
+              sed -E 's/eyJ[A-Za-z0-9_.-]+/[JWT_REDACTED]/g; s/sb_(publishable|secret)_[A-Za-z0-9_-]+/[KEY_REDACTED]/g' |
+              tail -n 10 | cut -c 1-180 || true
+            exit 1
+          fi
+      - name: Assert legacy V4 data untouched and V5 entitlements backfilled
+        run: node tests/local/v5-real43-populated-upgrade.mjs after
+      - name: Remove populated upgrade synthetic fixtures
+        if: always()
+        run: rm -f "$V4_E2E_FIXTURE_FILE" "$RUNNER_TEMP/v5-populated-upgrade-before.json"
       - name: Report independent baseline metadata status
         if: always()
         run: |

@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
 
 const root=fileURLToPath(new URL('../../',import.meta.url));
 const phase=process.argv[2];
-assert.ok(['baseline','append-v5'].includes(phase),'Only reviewed isolated replay phases allowed');
+assert.ok(['baseline','append-v5','restore-baseline'].includes(phase),'Only reviewed isolated replay phases allowed');
 assert.equal(process.env.CI,'true');
 assert.equal(process.env.GITHUB_ACTIONS,'true');
 assert.equal(process.env.V4_E2E_LOCAL,'1');
@@ -54,12 +54,19 @@ function assertForwardSource(directory) {
   assert.equal(hash,row.git_blob_sha1,'V5 source-lock drift: '+row.version);
  }
 }
-if(phase==='baseline'){
- assert.equal(existsSync(backup),false,'CI backup already exists');
- const originals=list(migrations);
- assert.equal(originals.length,56,'Expected frozen V4/V5 56-migration checkout');
- assertForwardSource(migrations);
- cpSync(migrations,backup,{recursive:true,errorOnExist:true,force:false});
+if(phase==='baseline'||phase==='restore-baseline'){
+ if(phase==='baseline'){
+  assert.equal(existsSync(backup),false,'CI backup already exists');
+  const originals=list(migrations);
+  assert.equal(originals.length,56,'Expected frozen V4/V5 56-migration checkout');
+  assertForwardSource(migrations);
+  cpSync(migrations,backup,{recursive:true,errorOnExist:true,force:false});
+ }else{
+  assert.equal(existsSync(backup),true,'Missing CI-only original sources');
+  assert.deepEqual(list(migrations),[...historicalNames,...forwards].sort(),
+   'Unexpected migration set before local 43-history reset');
+  assertForwardSource(backup);
+ }
  const stage=join(root,'supabase/.a1r3-history-build');
  assert.equal(existsSync(stage),false);
  mkdirSync(stage,{recursive:true});
