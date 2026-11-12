@@ -67,3 +67,50 @@ test('the production SQL metadata inspector is SELECT-only',()=>{
  const code=sql.replace(/--[^\n]*/g,'');
  assert.doesNotMatch(code,/\b(?:create|alter|drop|insert|update|delete|grant|revoke|truncate|copy)\b/i);
 });
+
+
+test('Alpha gate cannot reclassify unfinished commercial checks as PASS',()=>{
+ const a=JSON.parse(readFileSync(new URL(
+  '../docs/v5/V5_PRODUCTION_ALPHA_APPROVAL_20261112.json',import.meta.url),'utf8'));
+ assert.equal(a.status,'ALPHA_GO');
+ assert.equal(a.scope,'INTERNAL_PRODUCTION_ALPHA_NO_PLATFORM_CHARGES');
+ assert.equal(a.original_commercial_approval,'BLOCKED');
+ assert.equal(a.source_lock_approved_release,'NO_GO');
+ assert.equal(a.production_project_ref,'vctisuglfoxyuwlvyjee');
+ assert.equal(a.release_sha,'97ed121f68d3ffed40770d2c7141ec1c15b6f574');
+ assert.equal(a.base_migrations,43);
+ assert.equal(a.forward_migrations,19);
+ assert.equal(a.expected_migrations,62);
+ for(const enabled of Object.values(a.restrictions)) assert.equal(enabled,true);
+ for(const key of [
+  'release_ci','production_43_history_and_cli_preflight',
+  'current_v4_rls_anonymous_baseline','production_vercel_project_sha',
+  'internal_accounting_code_and_jwt_tests',
+  'repository_sql_no_external_payment_or_mail_calls'
+ ]) assert.equal(a.evidence[key],'PASS');
+ assert.equal(a.evidence.independent_gas_and_provider_operations,'PARTIAL');
+ assert.equal(a.evidence.full_production_database_restore,'NOT_TESTED');
+ assert.equal(a.evidence.production_three_role_team_gui,'NOT_TESTED');
+ assert.equal(a.evidence.commercial_bank_reconciliation,'NOT_APPLICABLE');
+ assert.equal(a.authorization.authorized_by,'product_owner');
+});
+
+test('Alpha apply keeps commercial GO independent and requires protected environment',()=>{
+ const workflow=readFileSync(new URL(
+  '../.github/workflows/v5-production-migration.yml',import.meta.url),'utf8');
+ const guardSource=readFileSync(guard,'utf8');
+ assert.match(workflow,/options: \[preflight, apply, alpha-apply\]/);
+ assert.match(workflow,/environment: v5-production-db/);
+ assert.match(workflow,/github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main'/);
+ assert.match(workflow,/alpha-approve/);
+ assert.match(workflow,/if: inputs\.operation == 'apply' \|\| inputs\.operation == 'alpha-apply'/g);
+ assert.match(workflow,/V5_WRITE_ENABLED: 'GO'/);
+ assert.match(guardSource,/function approveAlpha\(\)/);
+ assert.match(guardSource,/alpha\.status,'ALPHA_GO'/);
+ assert.match(guardSource,/a\.status,'BLOCKED'/);
+ assert.match(guardSource,/process\.env\.V5_OPERATION,'alpha-apply'/);
+ assert.match(guardSource,/process\.env\.V5_WRITE_ENABLED,'GO'/);
+ assert.match(guardSource,/ALPHA_APPLY_V5_19_/);
+ assert.match(guardSource,/else if\(cmd==='approve'\)approve\(\)/);
+ assert.match(guardSource,/else if\(cmd==='alpha-approve'\)approveAlpha\(\)/);
+});
