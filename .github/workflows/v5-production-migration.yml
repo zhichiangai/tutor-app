@@ -14,12 +14,12 @@ on:
         required: true
         type: string
       operation:
-        description: 'preflight is read-only; apply requires Production GO'
+        description: 'preflight is read-only; apply is commercial GO; alpha-apply is internal no-charge Alpha GO'
         required: true
         type: choice
-        options: [preflight, apply]
+        options: [preflight, apply, alpha-apply]
       confirmation:
-        description: 'For apply: APPLY_V5_19_<release SHA>'
+        description: 'apply: APPLY_V5_19_<SHA>; alpha-apply: ALPHA_APPLY_V5_19_<SHA>'
         required: false
         type: string
 
@@ -66,6 +66,26 @@ jobs:
           persist-credentials: false
       - name: Validate authentic 43+19 locked SQL files and blocked approval
         run: node scripts/release/v5-production-guard.mjs source "$GITHUB_WORKSPACE/release-source"
+      - name: Validate separate Alpha approval (offline only, synthetic flags, no DB credentials)
+        shell: bash
+        env:
+          V5_RELEASE_SHA: '97ed121f68d3ffed40770d2c7141ec1c15b6f574'
+          V5_APPROVED_RELEASE_SHA: '97ed121f68d3ffed40770d2c7141ec1c15b6f574'
+          V5_OPERATION: 'alpha-apply'
+          V5_WRITE_ENABLED: 'GO'
+          V5_CONFIRMATION: 'ALPHA_APPLY_V5_19_97ed121f68d3ffed40770d2c7141ec1c15b6f574'
+        run: |
+          set -euo pipefail
+          # CI performs only local JSON checks. There is no protected DB URL in this job.
+          node scripts/release/v5-production-guard.mjs alpha-approve "$GITHUB_WORKSPACE/release-source"
+          if V5_WRITE_ENABLED=NO node scripts/release/v5-production-guard.mjs alpha-approve "$GITHUB_WORKSPACE/release-source" >/dev/null 2>&1; then
+            echo "::error::Alpha approval must fail closed when protected write switch is NO"
+            exit 1
+          fi
+          if V5_CONFIRMATION=WRONG node scripts/release/v5-production-guard.mjs alpha-approve "$GITHUB_WORKSPACE/release-source" >/dev/null 2>&1; then
+            echo "::error::Alpha approval must fail closed without exact confirmation"
+            exit 1
+          fi
 
   protected-migration:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
@@ -168,10 +188,17 @@ jobs:
           fi
           echo "PASS: historical checks + Supabase CLI dry-run, no DB writes"
       - name: Require explicit Production GO and product owner approval
-        if: inputs.operation == 'apply'
-        run: node scripts/release/v5-production-guard.mjs approve "$GITHUB_WORKSPACE/release-source"
+        if: inputs.operation == 'apply' || inputs.operation == 'alpha-apply'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$V5_OPERATION" == "alpha-apply" ]]; then
+            node scripts/release/v5-production-guard.mjs alpha-approve "$GITHUB_WORKSPACE/release-source"
+          else
+            node scripts/release/v5-production-guard.mjs approve "$GITHUB_WORKSPACE/release-source"
+          fi
       - name: Apply exactly reviewed forward migrations
-        if: inputs.operation == 'apply'
+        if: inputs.operation == 'apply' || inputs.operation == 'alpha-apply'
         shell: bash
         env:
           V5_PRODUCTION_DB_URL: ${{ secrets.V5_PRODUCTION_DB_URL }}
@@ -185,7 +212,7 @@ jobs:
           fi
           echo "CLI success; independently verify exact 62 versions next"
       - name: Independently verify Production 62 migrations after apply
-        if: inputs.operation == 'apply'
+        if: inputs.operation == 'apply' || inputs.operation == 'alpha-apply'
         shell: bash
         env:
           V5_PRODUCTION_DB_URL: ${{ secrets.V5_PRODUCTION_DB_URL }}
@@ -199,7 +226,7 @@ jobs:
           node scripts/release/v5-production-guard.mjs history "$GITHUB_WORKSPACE/release-source" after "$RUNNER_TEMP/v5-history-after.tsv"
           echo "PASS: Production history 43 original + 19 forward versions"
       - name: Verify post-migration RLS and anonymous access (read-only)
-        if: inputs.operation == 'apply'
+        if: inputs.operation == 'apply' || inputs.operation == 'alpha-apply'
         shell: bash
         env:
           V5_PRODUCTION_DB_URL: ${{ secrets.V5_PRODUCTION_DB_URL }}
