@@ -46,7 +46,7 @@ function harness(href="https://tutor.rapid4grad.com/v2/index.html"){
   };
   loadSharedCourseHistory=async()=>{};
   loadTeacherPreferences=async()=>{};
-  return {state,oauthRedirectUrl,captureOAuthCallbackError,initializeLive,googleLogin,renderAuthUI,
+  return {state,oauthRedirectUrl,captureOAuthCallbackError,scrubOAuthCallback,initializeLive,googleLogin,renderAuthUI,
    setClient(x){client=x},setFail(x){failData=x},
    user(){return activeUser},phase(){return authPhase},issue(){return oauthCallbackIssue}};
 `;
@@ -97,6 +97,51 @@ test("Google button uses canonical redirect without corrupting invitation deep l
  assert.equal(captured.provider,"google");
  assert.equal(captured.options.redirectTo,"https://tutor.rapid4grad.com/v2/index.html?v4invite="+token);
 });
+test("Production uses PKCE instead of putting reusable bearer tokens in OAuth callback URLs",()=>{
+ assert.match(appCode,/detectSessionInUrl:true,flowType:"pkce"/);
+ assert.match(appCode,/signInWithOAuth\(\{provider:"google",options:\{redirectTo:oauthRedirectUrl\(\)\}\}\)/);
+ assert.ok(appCode.indexOf("scrubOAuthCallback();",appCode.indexOf("const {data,error}=await client.auth.getSession();"))<
+  appCode.indexOf("await ensureMyProfile();"),"URL must be scrubbed before private data reads");
+});
+
+test("successful PKCE code callback is cleaned before even a failed private data refresh",async()=>{
+ const h=harness("https://tutor.rapid4grad.com/v2/index.html?code=synthetic-one-use-code&v4invite="+token+
+  "#access_token=synthetic-old-token&refresh_token=synthetic-old-refresh");
+ h.api.setClient({auth:{getSession:async()=>({
+  data:{session:{user:{id:"qa-teacher",email:"qa@example.invalid"}}},error:null
+ })}});
+ h.api.setFail(true);
+ await h.api.initializeLive();
+ assert.equal(h.api.phase(),"error","Failed data load should remain safely retryable");
+ assert.equal(h.api.user()?.id,"qa-teacher");
+ assert.equal(h.location.search,"?v4invite="+token);
+ assert.equal(h.location.hash,"");
+ assert.ok(!h.replaced.join(" ").includes("synthetic-one-use-code"));
+ assert.ok(!h.replaced.join(" ").includes("synthetic-old-token"));
+ assert.ok(!h.replaced.join(" ").includes("synthetic-old-refresh"));
+});
+
+test("callback code is removed after a failed session exchange",async()=>{
+ const h=harness("https://tutor.rapid4grad.com/v2/index.html?code=synthetic-failed-code");
+ h.api.setClient({auth:{getSession:async()=>({data:{session:null},error:new Error("Synthetic exchange failed")})}});
+ await h.api.initializeLive();
+ assert.equal(h.api.phase(),"error");
+ assert.equal(h.location.search,"");
+ assert.deepEqual(h.replaced,["/v2/index.html"]);
+});
+
+test("scrubber drops credentials regardless of fragment order without clearing unrelated fragments",()=>{
+ const h=harness("https://tutor.rapid4grad.com/v2/index.html?code=one-use-placeholder&v4invite="+token+
+  "#page=calendar&provider_refresh_token=synthetic&access_token=synthetic");
+ h.api.scrubOAuthCallback();
+ assert.equal(h.location.search,"?v4invite="+token);
+ assert.equal(h.location.hash,"#page=calendar");
+ assert.deepEqual(h.replaced,["/v2/index.html?v4invite="+token+"#page=calendar"]);
+ const other=harness("https://tutor.rapid4grad.com/v2/index.html?code=synthetic#help");
+ other.api.scrubOAuthCallback();
+ assert.equal(other.location.hash,"#help");
+});
+
 test("data refresh failure retains verified Google identity and permits session-only retry",async()=>{
  const h=harness();
  let googleAuthorizations=0, sessionReads=0;

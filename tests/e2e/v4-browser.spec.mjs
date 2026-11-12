@@ -67,6 +67,46 @@ async function submitAmount(page,amount,lessonDay=f.day){
  await page.locator('#period-submit').click();
  await expect(page.locator('#period-modal')).not.toBeVisible();
 }
+test('PKCE generates a code challenge without visiting Google or exchanging tokens',async ({page})=>{
+ // This is a browser-level PKCE construction check with synthetic local values.
+ // Do not follow OAuth redirects or record the URL; no Google or Production call.
+ await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
+   route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
+    contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+ await page.addInitScript(({apiUrl,anonKey})=>{
+  window.V4_LOCAL_BACKEND={
+   environment:'local',isolated:true,projectRef:'local',
+   url:apiUrl,publishableKey:anonKey
+  };
+ },{apiUrl:f.apiUrl,anonKey:f.anonKey});
+ await page.goto('/v2/index.html');
+ const details=await page.evaluate(async ({apiUrl,anonKey})=>{
+  const client=window.supabase.createClient(apiUrl,anonKey,{
+   auth:{flowType:'pkce',detectSessionInUrl:true,
+    persistSession:false,autoRefreshToken:false,storageKey:'qa-pkce-browser-check'}
+  });
+  const {data,error}=await client.auth.signInWithOAuth({
+   provider:'google',
+   options:{redirectTo:'http://127.0.0.1:3000/v2/index.html',skipBrowserRedirect:true}
+  });
+  if(error)throw Error('Synthetic PKCE redirect construction failed');
+  const url=new URL(data.url);
+  return {
+   host:url.host,
+   provider:url.searchParams.get('provider'),
+   hasChallenge:/^[A-Za-z0-9_-]{40,}$/.test(url.searchParams.get('code_challenge')||''),
+   challengeMethod:url.searchParams.get('code_challenge_method'),
+   containsBearer:url.searchParams.has('access_token')||url.searchParams.has('refresh_token'),
+   browserStayedLocal:window.location.host==='127.0.0.1:3000'
+  };
+ },{apiUrl:f.apiUrl,anonKey:f.anonKey});
+ expect(details.host).toBe('127.0.0.1:54321');
+ expect(details.provider).toBe('google');
+ expect(details.hasChallenge).toBe(true);
+ expect(details.challengeMethod).toBe('s256');
+ expect(details.containsBearer).toBe(false);
+ expect(details.browserStayedLocal).toBe(true);
+});
 test('teacher ledger excludes QA lesson from official summary',async ({page})=>{
  await login(page,'teacher');
  await navigate(page,'billing');
