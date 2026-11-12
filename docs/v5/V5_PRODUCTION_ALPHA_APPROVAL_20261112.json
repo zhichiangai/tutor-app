@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "release": "V5.7",
+  "status": "ALPHA_GO",
+  "scope": "INTERNAL_PRODUCTION_ALPHA_NO_PLATFORM_CHARGES",
+  "reviewed_at": "2026-11-12",
+  "production_project_ref": "vctisuglfoxyuwlvyjee",
+  "release_sha": "97ed121f68d3ffed40770d2c7141ec1c15b6f574",
+  "base_migrations": 43,
+  "forward_migrations": 19,
+  "expected_migrations": 62,
+  "original_commercial_approval": "BLOCKED",
+  "source_lock_approved_release": "NO_GO",
+  "restrictions": {
+    "no_paid_platform_subscriptions": true,
+    "no_automatic_bank_transfers_or_refunds": true,
+    "manual_lesson_accounting_is_not_bank_verification": true,
+    "internal_test_accounts_only": true,
+    "no_real_customers_before_post_release_acceptance": true,
+    "stop_if_migration_or_rls_postflight_fails": true,
+    "protected_environment_review_required": true,
+    "preserve_v4_history_and_existing_rows": true
+  },
+  "evidence": {
+    "release_ci": "PASS",
+    "production_43_history_and_cli_preflight": "PASS",
+    "current_v4_rls_anonymous_baseline": "PASS",
+    "production_vercel_project_sha": "PASS",
+    "internal_accounting_code_and_jwt_tests": "PASS",
+    "repository_sql_no_external_payment_or_mail_calls": "PASS",
+    "independent_gas_and_provider_operations": "PARTIAL",
+    "full_production_database_restore": "NOT_TESTED",
+    "production_three_role_team_gui": "NOT_TESTED",
+    "commercial_bank_reconciliation": "NOT_APPLICABLE"
+  },
+  "authorization": {
+    "authorized_by": "product_owner",
+    "decision": "Launch Production Alpha to test full tutor-app user journeys before paid subscriptions. Commercial payments, bank automation and billing reconciliation remain disabled/not released.",
+    "risk_acceptance": "Existing 43-migration Production includes disposable internal test data. No destructive resets allowed; halt on any failure, preserve audit history, and prefer reviewed forward fixes. A Vercel rollback does not reverse a Supabase migration."
+  },
+  "evidence_references": [
+    "https://github.com/zhichiangai/tutor-app/actions/runs/43161413725",
+    "https://github.com/zhichiangai/tutor-app/pull/69",
+    "https://github.com/zhichiangai/tutor-app/pull/70",
+    "https://github.com/zhichiangai/tutor-app/settings/rules/27092979"
+  ]
+}

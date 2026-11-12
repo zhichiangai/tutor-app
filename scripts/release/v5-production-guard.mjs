@@ -109,6 +109,63 @@ function approve(){
  assert.equal(process.env.V5_CONFIRMATION,'APPLY_V5_19_'+sha,'Confirmation phrase mismatch');
  console.log(JSON.stringify({status:'GO_GATE_PASS',project,release_sha:sha}));
 }
+// Separately scoped Product Alpha gate. Never reinterpret the commercial release
+// approval as PASS: existing Source-Lock NO_GO and commercial BLOCKED remain intact.
+// The approval record is loaded from trusted Main (workflow checkout working dir),
+// not from the unmerged V5 release branch.
+function approveAlpha(){
+ const {a,l}=sources();
+ const alpha=JSON.parse(readFileSync(join(process.cwd(),
+  'docs/v5/V5_PRODUCTION_ALPHA_APPROVAL_20261112.json'),'utf8'));
+ assert.equal(a.status,'BLOCKED','Commercial approval cannot be upgraded implicitly');
+ assert.equal(l.approved_release,'NO_GO','Frozen source-lock must remain NO_GO');
+ assert.equal(alpha.schema,1);
+ assert.equal(alpha.status,'ALPHA_GO');
+ assert.equal(alpha.scope,'INTERNAL_PRODUCTION_ALPHA_NO_PLATFORM_CHARGES');
+ assert.equal(alpha.production_project_ref,project);
+ assert.equal(alpha.original_commercial_approval,'BLOCKED');
+ assert.equal(alpha.source_lock_approved_release,'NO_GO');
+ assert.equal(alpha.base_migrations,43);
+ assert.equal(alpha.forward_migrations,19);
+ assert.equal(alpha.expected_migrations,62);
+ const restrictions=[
+  'no_paid_platform_subscriptions',
+  'no_automatic_bank_transfers_or_refunds',
+  'manual_lesson_accounting_is_not_bank_verification',
+  'internal_test_accounts_only',
+  'no_real_customers_before_post_release_acceptance',
+  'stop_if_migration_or_rls_postflight_fails',
+  'protected_environment_review_required',
+  'preserve_v4_history_and_existing_rows'
+ ];
+ for(const field of restrictions)assert.equal(alpha.restrictions?.[field],true,
+  'Alpha restriction missing: '+field);
+ for(const key of [
+  'release_ci','production_43_history_and_cli_preflight',
+  'current_v4_rls_anonymous_baseline','production_vercel_project_sha',
+  'internal_accounting_code_and_jwt_tests',
+  'repository_sql_no_external_payment_or_mail_calls'
+ ])assert.equal(alpha.evidence?.[key],'PASS','Alpha evidence missing: '+key);
+ assert.equal(alpha.evidence?.independent_gas_and_provider_operations,'PARTIAL');
+ assert.equal(alpha.evidence?.full_production_database_restore,'NOT_TESTED');
+ assert.equal(alpha.evidence?.production_three_role_team_gui,'NOT_TESTED');
+ assert.equal(alpha.evidence?.commercial_bank_reconciliation,'NOT_APPLICABLE');
+ assert.equal(alpha.authorization?.authorized_by,'product_owner');
+ assert.ok(typeof alpha.authorization?.decision==='string'&&
+  alpha.authorization.decision.length>=80);
+ assert.ok(typeof alpha.authorization?.risk_acceptance==='string'&&
+  alpha.authorization.risk_acceptance.length>=100);
+ const sha=process.env.V5_RELEASE_SHA;
+ assert.match(sha||'',/^[0-9a-f]{40}$/);
+ assert.equal(alpha.release_sha,sha,'Alpha approval release SHA mismatch');
+ assert.equal(process.env.V5_APPROVED_RELEASE_SHA,sha,'Protected Environment SHA mismatch');
+ assert.equal(process.env.V5_OPERATION,'alpha-apply','Alpha-only operation required');
+ assert.equal(process.env.V5_WRITE_ENABLED,'GO','Production write switch disabled');
+ assert.equal(process.env.V5_CONFIRMATION,'ALPHA_APPLY_V5_19_'+sha,
+  'Explicit Alpha confirmation mismatch');
+ console.log(JSON.stringify({status:'ALPHA_GO_GATE_PASS',project,release_sha:sha,
+  scope:alpha.scope,commercial_release:'BLOCKED'}));
+}
 if(cmd==='source'){
  const {a}=sources();
  const pkg=join(root,'scripts/release/package-v5-43-plus-19.mjs');
@@ -123,4 +180,5 @@ if(cmd==='source'){
 else if(cmd==='history')history(process.argv[4],process.argv[5]);
 else if(cmd==='metadata')metadata(process.argv[4],process.argv[5]);
 else if(cmd==='approve')approve();
-else throw Error('Usage: source|target|history|approve');
+else if(cmd==='alpha-approve')approveAlpha();
+else throw Error('Usage: source|target|history|approve|alpha-approve');
