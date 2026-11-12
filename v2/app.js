@@ -2736,11 +2736,12 @@ function scrubOAuthCallback(){
  // Preserve unrelated non-OAuth fragments, never preserve known credential keys.
  if(hash.startsWith("#")&&hash.includes("=")){
   const fragment=new URLSearchParams(hash.slice(1));
+  let hashChanged=false;
   for(const k of ["code","access_token","refresh_token","token_type","expires_in",
    "expires_at","provider_token","provider_refresh_token"]){
-   if(fragment.has(k)){fragment.delete(k);changed=true}
+   if(fragment.has(k)){fragment.delete(k);hashChanged=true;changed=true}
   }
-  if(changed)safeHash=fragment.toString()?"#"+fragment.toString():"";
+  if(hashChanged)safeHash=fragment.toString()?"#"+fragment.toString():"";
  }
  if(changed)window.history.replaceState(null,"",(loc.pathname||"/v2/index.html")+
   (p.toString()?"?"+p.toString():"")+safeHash);
