@@ -14,6 +14,7 @@ import { createV5PlanUI } from "./v5-plans.js";
 import { createV5TeamUI } from "./v5-team.js";
 import { createV5LearningUI } from "./v5-learning.js";
 import { createV5BillingUI } from "./v5-billing.js";
+import { createV56FamilyUI } from "./v56-family.js";
 // Backend settings are resolved before the first Auth request. Production is
 // delivered only by the hostname- and Vercel-environment-guarded config API.
 const V4_PRODUCTION_HOST="tutor.rapid4grad.com";
@@ -124,6 +125,11 @@ const v5LearningUI=typeof createV5LearningUI==="function"?createV5LearningUI({
  notify:message=>toast(message)
 }):{render(){},refresh(){},clear(){},handleSubmit(){return false},handleClick(){return false}};
 const v5BillingUI=typeof createV5BillingUI==="function"?createV5BillingUI({
+ getClient:()=>client,getUser:()=>activeUser,getRole:()=>state.role,
+ isReady:()=>authPhase==="ready"&&state.mode==="live",
+ notify:message=>toast(message)
+ }):{render(){},refresh(){},clear(){},handleClick(){return false}};
+const v56FamilyUI=typeof createV56FamilyUI==="function"?createV56FamilyUI({
  getClient:()=>client,getUser:()=>activeUser,getRole:()=>state.role,
  isReady:()=>authPhase==="ready"&&state.mode==="live",
  notify:message=>toast(message)
@@ -266,7 +272,7 @@ function setWorkspaceMode(next){
  localStorage.setItem(WORKSPACE_MODE_STORAGE+"_"+activeUser.id,next);
  // A UI preference is not an entitlement. Clear earlier Team finance/roster
  // state before showing another workspace, even for the same Google user.
- v5TeamUI.clear();v5LearningUI.clear();v5BillingUI.clear();
+ v5TeamUI.clear();v5LearningUI.clear();v5BillingUI.clear();v56FamilyUI.clear();
  state.receiptBatch=null;state.activeLesson=null;
  setView("settings");
  toast(next==="team"?"已切換至 Team 團隊工作空間":"已切換至個人家教工作空間");
@@ -340,6 +346,7 @@ function setView(view){
  // V4 personal views do not request Team records, and Team mode refreshes
  // only the currently selected, database-authorised section.
  refreshWorkspacePanels();
+ if(state.view==="billing"&&state.role==="parent")void v56FamilyUI.refresh();
 }
 const VALID_ROLES=["teacher","parent","student"];
 const ROLE_SUFFIX={teacher:"老師",parent:"家長",student:"同學"};
@@ -553,7 +560,7 @@ function previewBackendUnavailable(){
 }
 // Read-only Preview enables navigation for visual QA, never simulated authorization.
 // All data operations stay blocked by the missing validated backend.
-const PREVIEW_SAFE_BUTTONS='[data-view], #prev-month, #next-month, #billing-prev, #billing-next, #jump-today, #show-full-month, [data-calendar-mode]';
+const PREVIEW_SAFE_BUTTONS='[data-view], [data-team-section], #prev-month, #next-month, #billing-prev, #billing-next, #jump-today, #show-full-month, [data-calendar-mode]';
 function isPreviewSafeControl(el){
  return Boolean(el?.matches?.(PREVIEW_SAFE_BUTTONS));
 }
@@ -575,11 +582,97 @@ function applyPreviewReadOnlyControls(){
   el.setAttribute("aria-disabled","true");
  }
 }
+let previewShellMode="personal";
+function renderPreviewReadOnlyShell(){
+ if(!previewBackendUnavailable()||!document.body.classList.contains("preview-readonly"))return;
+ const team=previewShellMode==="team";
+ document.body.classList.toggle("preview-team-shell",team);
+ $("#preview-personal-shell").setAttribute("aria-pressed",String(!team));
+ $("#preview-team-shell").setAttribute("aria-pressed",String(team));
+ $("#connection-status").textContent="無資料唯讀預覽";
+ $("#greeting-title").textContent=team?"Team 介面預覽":"個人家教介面預覽";
+ $("#greeting-copy").textContent="未登入，沒有讀取學生、課程或帳務資料；禁止所有資料寫入。";
+ const showPlan=!team&&state.view==="settings";
+ $("#preview-plan-panel").classList.toggle("hidden",!showPlan);
+ // Subscription prices belong to the explicitly selected no-data Preview only.
+ // Never ship plan amounts as static markup in the signed-out/student DOM.
+ const planRoot=$("#preview-plans");
+ planRoot.replaceChildren();
+ if(showPlan){
+  const previewPlans=[
+   ["Free","免費","累計學生 3 人 · 老師 1 位"],
+   ["Plus","NT$99／月","累計學生 30 人 · 老師 1 位"],
+   ["Team","NT$399／月","累計學生 100 人 · 老師 10 位"]
+  ];
+  for(const [name,price,seats] of previewPlans){
+   const card=document.createElement("div");
+   for(const [tag,value] of [["strong",name],["span",price],["small",seats]]){
+    const label=document.createElement(tag);
+    label.textContent=value;
+    card.append(label);
+   }
+   planRoot.append(card);
+  }
+ }
+ $("#preview-team-panel").classList.toggle("hidden",!team);
+ if(team){
+  const section=TEAM_SECTIONS.has(state.teamSection)?state.teamSection:"projects";
+  const titles={projects:"Team 團隊與專案",learning:"Team 學生與課表",billing:"Team 帳務",settings:"Team 設定與切換"};
+  $("#settings-page-title").textContent=titles[section];
+  $("#settings-page-eyebrow").textContent="TEAM · 無資料預覽";
+  $("#settings-page-description").textContent="只展示導航與結構，並未取得任何 Team 權限或資料。";
+  $("#preview-team-title").textContent=titles[section];
+  document.querySelectorAll("[data-team-section]").forEach(button=>{
+   const selected=button.dataset.teamSection===section;
+   button.classList.toggle("active",selected);
+   button.setAttribute("aria-current",selected?"page":"false");
+  });
+ }else{
+  $("#home-focus").textContent="尚無課程資料，僅供檢查版面與導覽。";
+  $("#next-lesson").textContent="尚未連接隔離測試資料庫";
+  $("#recent-lessons").textContent="沒有可預覽的課程";
+  $("#mini-month").textContent="無資料預覽";
+  $("#mini-calendar").textContent="請至課程月曆查看月份切換";
+  $("#metrics").textContent="課程時數與金額需要登入驗證才能顯示。";
+  $("#money-reminder").textContent="未讀取帳務資料";
+  const year=state.month.getFullYear(),month=state.month.getMonth();
+  const label=new Intl.DateTimeFormat("zh-TW",{year:"numeric",month:"long"}).format(state.month);
+  $("#calendar-month").textContent=label;
+  $("#billing-month").textContent=label;
+  $("#month-overview").textContent="無資料預覽 · 未讀取任何課程";
+  $("#agenda-list").textContent="尚未載入課程";
+  $("#month-lesson-preview").textContent="沒有可預覽的課程";
+  const offset=(new Date(year,month,1).getDay()+6)%7;
+  const days=new Date(year,month+1,0).getDate();
+  $("#calendar-grid").innerHTML=Array.from({length:offset+days},(_,i)=>
+   i<offset?'<div class="calendar-cell outside" aria-hidden="true"></div>':
+   '<div class="calendar-cell"><span class="day-number">'+(i-offset+1)+'</span></div>').join("");
+  $("#billing-summary").textContent="尚未讀取任何金額，此處並非零元帳務。";
+  $("#billing-student-summary").textContent="未登入，無學生帳務";
+  $("#payment-batch-history").textContent="未登入，無付款紀錄";
+  $("#billing-list").textContent="未登入，無課程及付款明細";
+  $("#requests-list").textContent="尚無可預覽的申請";
+  $("#student-grid").textContent="未登入，無學生資料";
+ }
+ applyPreviewReadOnlyControls();
+}
+function selectPreviewShellMode(mode){
+ if(!previewBackendUnavailable()||!document.body.classList.contains("preview-readonly")||
+   !["personal","team"].includes(mode))return;
+ previewShellMode=mode;
+ state.view=mode==="team"?"settings":"home";
+ state.teamSection="projects";
+ render();
+}
 function enterPreviewReadOnly(){
  if(!previewBackendUnavailable())return;
+ // No simulated identity: clear cached rows and DOM before showing the preview.
+ clearUserSessionState();
+ activeUser=null;
+ previewShellMode="personal";
  document.body.classList.add("preview-readonly");
  $("#preview-readonly-banner").hidden=false;
- applyPreviewReadOnlyControls();
+ render();
 }
 function canDismissAccountModal(){
  return (authPhase==="ready"&&!!activeUser)||
@@ -660,9 +753,10 @@ function render(){
  v5TeamUI.render();
  v5LearningUI.render();
  v5BillingUI.render();
+ v56FamilyUI.render();
  // The login gate is not a dashboard mode. Never rebuild payment summaries,
  // student records or lesson content when there is no verified active account.
- if(!identified)return;
+ if(!identified){renderPreviewReadOnlyShell();return}
  // Role preference checkboxes are on the separate settings page.
  if(student){
   if(state.view==="settings"){
@@ -2692,7 +2786,7 @@ function clearUserSessionState(){
  v4ConnectionUI.clear();
  v4ContactsUI.clear();
  v5PlanUI.clear();
- v5TeamUI.clear();v5LearningUI.clear();v5BillingUI.clear();
+ v5TeamUI.clear();v5LearningUI.clear();v5BillingUI.clear();v56FamilyUI.clear();
  for(const field of LIVE_FIELDS)state[field]=[];
  state.qaTags={qaBatchIds:[],qaLessonIds:[],qaLegacyReceiptLessonIds:[]};
  state.qaClassificationReady=false;
@@ -3005,7 +3099,8 @@ function bindEvents(){
   if(ev.target.closest("[data-v4-action]")){await v4ConnectionUI.handleClick(ev.target);return}
   if(ev.target.closest("[data-v5-team-action]")){await v5TeamUI.handleClick(ev.target);return}
   if(ev.target.closest("[data-v5-learning-action]")){await v5LearningUI.handleClick(ev.target);return}
-  if(ev.target.closest("[data-v5-billing-action]")){await v5BillingUI.handleClick(ev.target);return}
+  if(ev.target.closest("[data-v56-family-action]")){await v56FamilyUI.handleClick(ev.target);return}
+  if(ev.target.closest("[data-v5-billing-action], [data-v56-action]")){await v5BillingUI.handleClick(ev.target);return}
   if(ev.target.closest("[data-contact-action]")){await v4ContactsUI.handleClick(ev.target);return}
   const correctionPreview=ev.target.closest('[data-action="preview-correction"]');
   if(correctionPreview){await previewConfirmedBatchCorrection(correctionPreview.dataset.id);return}
@@ -3026,7 +3121,14 @@ function bindEvents(){
   const modeChoice=ev.target.closest("[data-workspace-mode]");
   if(modeChoice){setWorkspaceMode(modeChoice.dataset.workspaceMode);return}
   const teamNav=ev.target.closest("[data-team-section]");
-  if(teamNav){setTeamSection(teamNav.dataset.teamSection);return}
+  if(teamNav){
+   if(document.body.classList.contains("preview-readonly")&&previewBackendUnavailable()){
+    if(TEAM_SECTIONS.has(teamNav.dataset.teamSection)){
+     previewShellMode="team";state.teamSection=teamNav.dataset.teamSection;state.view="settings";render();
+    }
+   }else setTeamSection(teamNav.dataset.teamSection);
+   return;
+  }
   const nav=ev.target.closest("[data-view]");if(nav){setView(nav.dataset.view);if(nav.dataset.date){state.selected=nav.dataset.date;state.month=parseDate(state.selected);render()}return}
   const close=ev.target.closest("[data-close]");if(close){closeModal(close.dataset.close);return}
   const recentToggle=ev.target.closest("[data-recent-changes-toggle]");
@@ -3193,7 +3295,7 @@ function bindEvents(){
   ["shared-course-weekdays","shared-weekday-hint","shared-course-date"]
  ])$("#"+group).addEventListener("change",()=>syncRecurringWeekdays(date,group,hint));
  $("#request-form").addEventListener("submit",submitRequest);
- document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e);if(e.target.id==="student-invite-form")saveStudentInvite(e);if(e.target.id==="v4-parent-request-form")void v4ConnectionUI.handleSubmit(e);if(e.target.id==="v4-account-contact-form")void v4ContactsUI.handleSubmit(e);if(["v5-team-project-form","v5-team-invite-form","v5-team-assign-form","v5-team-transfer-form"].includes(e.target.id))void v5TeamUI.handleSubmit(e);if(["v5-learning-student-form","v5-learning-enroll-form","v5-learning-lesson-form"].includes(e.target.id)||e.target?.dataset?.v5LearningEditStudent||e.target?.dataset?.v5LearningEditLesson)void v5LearningUI.handleSubmit(e);if(["v5-payment-report-form","v5-advance-report-form"].includes(e.target.id))void v5BillingUI.handleSubmit(e)});
+ document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e);if(e.target.id==="student-invite-form")saveStudentInvite(e);if(e.target.id==="v4-parent-request-form")void v4ConnectionUI.handleSubmit(e);if(e.target.id==="v4-account-contact-form")void v4ContactsUI.handleSubmit(e);if(["v5-team-project-form","v5-team-invite-form","v5-team-assign-form","v5-team-transfer-form"].includes(e.target.id))void v5TeamUI.handleSubmit(e);if(["v5-learning-student-form","v5-learning-enroll-form","v5-learning-lesson-form"].includes(e.target.id)||e.target?.dataset?.v5LearningEditStudent||e.target?.dataset?.v5LearningEditLesson)void v5LearningUI.handleSubmit(e);if(["v5-payment-report-form","v5-advance-report-form","v56-family-bridge-form"].includes(e.target.id))void v5BillingUI.handleSubmit(e)});
  $("#invite-edit-form").addEventListener("submit",submitInviteEdit);
  $("#workspace-start").onclick=()=>setView("settings");
  $("#workspace-create").onclick=()=>saveMyWorkspace(false);
@@ -3204,6 +3306,8 @@ function bindEvents(){
  $("#google-login").onclick=googleLogin;
  $("#login-retry").onclick=initializeLive;
  $("#login-preview-dismiss").onclick=()=>{if(!previewBackendUnavailable())return;enterPreviewReadOnly();closeModal("account-modal")};
+ $("#preview-personal-shell").onclick=()=>selectPreviewShellMode("personal");
+ $("#preview-team-shell").onclick=()=>selectPreviewShellMode("team");
  $("#sign-out").onclick=signOut;
  $("#mode-settings-form").addEventListener("submit",saveEnabledRoles);
  $("#default-login-role").addEventListener("change",changeDefaultLoginRole);

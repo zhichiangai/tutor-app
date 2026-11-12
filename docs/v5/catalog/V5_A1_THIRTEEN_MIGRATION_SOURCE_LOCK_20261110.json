@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "project": "tutor-app",
+  "approved_release": "NO_GO",
+  "captured_at": "2026-11-10",
+  "source_commit_sha": "a68e620e31e23c0a5a49399684f6794a2f478895",
+  "supersedes_release_candidate": "docs/v5/catalog/V5_A1_TWELVE_MIGRATION_SOURCE_LOCK_20261110.json",
+  "verification": "git_blob_sha1_exact_bytes",
+  "purpose": "13 reviewed V5 forward migrations; manager decision + append-only direct allocation reversal and separate net read model, no physical bank payout, NO-GO Production.",
+  "gate": {
+    "real_43_history_schema_replay_verified": false,
+    "isolated_twelve_migration_compatibility_verified": false,
+    "allocated_direct_refund_approval_reversal_verified": false,
+    "net_settlement_conservation_verified": false,
+    "parent_specific_refund_history_verified": false,
+    "production_migration_authorized": false,
+    "legacy_gross_read_model_integrated": false
+  },
+  "migration_files": [
+    {
+      "path": "supabase/migrations/20261104131300_v5_1_entitlements_student_seats.sql",
+      "version": "20261104131300",
+      "bytes": 11188,
+      "git_blob_sha1": "e2bc5e94c40cbc9b2f551d682d51b6b9a4900475"
+    },
+    {
+      "path": "supabase/migrations/20261105171000_v5_1_admin_qa_release.sql",
+      "version": "20261105171000",
+      "bytes": 8279,
+      "git_blob_sha1": "e411a1c244f71f1a9d4c4a96eb36240d5acebf51"
+    },
+    {
+      "path": "supabase/migrations/20261105181500_v5_2_team_projects_invitations.sql",
+      "version": "20261105181500",
+      "bytes": 15334,
+      "git_blob_sha1": "31eaf3e0c43910f6828cdf80db4f81cfb1629f3b"
+    },
+    {
+      "path": "supabase/migrations/20261105192000_v5_2_team_governance_transfer.sql",
+      "version": "20261105192000",
+      "bytes": 29504,
+      "git_blob_sha1": "ebd9cdb3d15dcaadfcde5cba3dd3f00faa5b355c"
+    },
+    {
+      "path": "supabase/migrations/20261105201500_v5_3_team_data_boundaries.sql",
+      "version": "20261105201500",
+      "bytes": 15324,
+      "git_blob_sha1": "ddbe69c9d7e3f289ffc616a13e7a736fc8d9eaa1"
+    },
+    {
+      "path": "supabase/migrations/20261106031000_v5_3_team_billing_foundation.sql",
+      "version": "20261106031000",
+      "bytes": 9915,
+      "git_blob_sha1": "2a1c7cbb203630f5bf022acf3c15900dbdcfa6cc"
+    },
+    {
+      "path": "supabase/migrations/20261106034000_v5_3_partial_payment_allocation.sql",
+      "version": "20261106034000",
+      "bytes": 14856,
+      "git_blob_sha1": "4ad547e434982824f170d6036eb8924d696d19f4"
+    },
+    {
+      "path": "supabase/migrations/20261106043000_v5_4_team_advance_credit.sql",
+      "version": "20261106043000",
+      "bytes": 25110,
+      "git_blob_sha1": "6548f72efa61b799a3369a5fb7b243bd17ef7a3d"
+    },
+    {
+      "path": "supabase/migrations/20261106050000_v5_4_team_monthly_reconciliation.sql",
+      "version": "20261106050000",
+      "bytes": 9331,
+      "git_blob_sha1": "756a961b0654b8248b5eaef61e0c9b1220f98b14"
+    },
+    {
+      "path": "supabase/migrations/20261108230000_v57_team_operations_overview.sql",
+      "version": "20261108230000",
+      "bytes": 6385,
+      "git_blob_sha1": "dc2233dc53f82eee031e9009b34756d27a05d4d1"
+    },
+    {
+      "path": "supabase/migrations/20261109163000_v5_6_team_refund_correction_ledger.sql",
+      "version": "20261109163000",
+      "bytes": 57957,
+      "git_blob_sha1": "420e6b536370bad45ab904bd089f161517cef3df"
+    },
+    {
+      "path": "supabase/migrations/20261110032000_v5_6_team_allocated_refund_intake.sql",
+      "version": "20261110032000",
+      "bytes": 8178,
+      "git_blob_sha1": "aaa03bd4e5308f83a0d8687ecaee90385159f528"
+    },
+    {
+      "path": "supabase/migrations/20261110040000_v5_6_team_direct_refund_approval_reversal.sql",
+      "version": "20261110040000",
+      "bytes": 13200,
+      "git_blob_sha1": "3b05f5c84701247c2c98230ad7946e3fc73eeb21"
+    }
+  ]
+}

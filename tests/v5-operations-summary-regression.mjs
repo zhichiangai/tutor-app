@@ -103,3 +103,32 @@ test('V5.7 project, teacher and audit sections remain guarded by manager RPC and
  assert.match(frontend,/cash_verified_by_bank===false/);
  assert.match(frontend,/projectList\?\.append/);
 });
+
+
+test('V5.6 voided pending payments are excluded from pending count but retained for audit',()=>{
+ const {billing,payments}=snapshots();
+ payments.payments[1].status='void';
+ const result=deriveV5ManagerOperations(billing,payments);
+ assert.ok(result,'Voided payment is a documented valid accounting status');
+ assert.equal(result.needsReconciliation,false);
+ assert.equal(result.pendingPaymentCount,0);
+ assert.equal(result.voidedPaymentCount,1);
+ assert.equal(result.unpaidLessonCount,1);
+ assert.equal(result.issues.length,0);
+ assert.equal(payments.payments[1].status,'void','Original read model is immutable');
+});
+
+
+test('release: manager cash summary explicitly distinguishes gross receipts from net settlement and bank proof',()=>{
+ const html=readFileSync(new URL('../v2/index.html',import.meta.url),'utf8');
+ const frontend=readFileSync(new URL('../v2/v5-billing.js',import.meta.url),'utf8');
+ const netSql=readFileSync(new URL('../supabase/migrations/20261110050000_v5_6_net_settlement_reconciliation.sql',import.meta.url),'utf8');
+ const projectSql=readFileSync(new URL('../supabase/migrations/20261110100000_v5_7_team_operations_net_reconciliation.sql',import.meta.url),'utf8');
+ assert.match(html,/本月已確認人工付款（退款前）/);
+ assert.match(html,/不能當作銀行已核實的實際入帳金額/);
+ assert.match(frontend,/ops\?\.ledger_basis==='net_after_immutable_reversals'/);
+ assert.match(netSql,/tutor_private\.v56_direct_net_for_lesson\(f\.lesson_id\)/);
+ assert.match(netSql,/tutor_private\.v56_advance_net_for_lesson\(f\.lesson_id\)/);
+ assert.match(projectSql,/'ledger_basis','net_after_immutable_reversals'/);
+ assert.match(projectSql,/'cash_verified_by_bank',false/);
+});

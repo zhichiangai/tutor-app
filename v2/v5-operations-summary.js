@@ -21,7 +21,7 @@ export function deriveV5ManagerOperations(billing,payments){
  ].every(cents))return null;
  if(confirmed.some(x=>!cents(x.amount_cents))||
     reports.some(x=>!cents(x.amount_cents)||!cents(x.advance_credit_cents)||
-      !['pending','confirmed'].includes(x.status))||
+      !['pending','confirmed','void'].includes(x.status))||
     fees.some(x=>![
       x.amount_cents,x.direct_allocated_cents,x.advance_applied_cents,
       x.allocated_cents,x.outstanding_cents
@@ -57,7 +57,8 @@ export function deriveV5ManagerOperations(billing,payments){
  return {
   teamId:billing.team_id,month:billing.month,
   unconfirmedLessonCount:pending.length,
-  pendingPaymentCount:reports.length-confirmedReports.length,
+  pendingPaymentCount:reports.filter(x=>x.status==='pending').length,
+  voidedPaymentCount:reports.filter(x=>x.status==='void').length,
   unpaidLessonCount:unpaid.length,
   unpaidStudentCount:new Set(unpaid.map(x=>x.student_id)).size,
   outstandingCents:payments.outstanding_cents,

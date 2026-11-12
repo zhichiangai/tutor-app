@@ -1,0 +1,314 @@
+{
+  "schema": 1,
+  "date_taipei": "2026-11-10",
+  "purpose": "PII-free provenance and checksum map for local isolated schema-only replay of real Production 43 migration SQL followed by reviewed V5 migration source lock; no production SQL execution",
+  "project_id_hint": "vctisuglfoxyuwlvyjee",
+  "repo": "zhichiangai/tutor-app",
+  "expected_history_count": 43,
+  "production_last_version": "20261103212647",
+  "original_history_md5_basis": "Postgres md5(btrim(statements[1], E' \\r\\n\\t')); Node crypto md5(source.trim())",
+  "privacy": "Only SQL DDL, SQL function definitions, public repo candidates and non-sensitive policy snapshot; no production auth, student, lesson, payment rows; never commit credentials",
+  "entries": [
+    {
+      "version": "20261019090405",
+      "name": "create_secure_tutor_lesson_records",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261019090405_create_secure_tutor_lesson_records.sql",
+      "canonical_md5": "4cd68407ed7c647db65fb325e31d4b4a"
+    },
+    {
+      "version": "20261019091930",
+      "name": "v2_students_guardians_requests_access",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261019091930_v2_students_guardians_requests_access.sql",
+      "canonical_md5": "bd5186ab04d3772c3af1f3a7143c9cb5"
+    },
+    {
+      "version": "20261019093329",
+      "name": "v2_integrity_constraints",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261019093329_v2_integrity_constraints.sql",
+      "canonical_md5": "20ccb349e00964b837abaed9a9b5a4a6"
+    },
+    {
+      "version": "20261019093428",
+      "name": "v2_atomic_review_family_request",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261019093428_v2_atomic_review_family_request.sql",
+      "canonical_md5": "3189c1cddea070da0ca2b0d41bc0bdec"
+    },
+    {
+      "version": "20261019152058",
+      "name": "v21_recurring_schedules_exceptions",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261019152058_v21_recurring_schedules_exceptions.sql",
+      "canonical_md5": "1a5de9bccf425352f513ccde807d1349"
+    },
+    {
+      "version": "20261019152210",
+      "name": "v21_review_virtual_lessons_and_split_rules",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261019152210_v21_review_virtual_lessons_and_split_rules.sql",
+      "canonical_md5": "b96ab69a5106ff62dd4596d5ff7e83d1"
+    },
+    {
+      "version": "20261019162650",
+      "name": "v23_secure_date_range_payment_batches",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261019162650_v23_secure_date_range_payment_batches.sql",
+      "canonical_md5": "c8241b4a723e36eecf87991331c1636b"
+    },
+    {
+      "version": "20261019163424",
+      "name": "v23_prevent_allocated_lesson_overwrites",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261019163424_v23_prevent_allocated_lesson_overwrites.sql",
+      "canonical_md5": "8d5f2377058b09400860971ac1b9abc4"
+    },
+    {
+      "version": "20261019163504",
+      "name": "v23_taipei_payment_dates",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261019163504_v23_taipei_payment_dates.sql",
+      "canonical_md5": "aba2fd581404f1ec865345d1a402be86"
+    },
+    {
+      "version": "20261019183328",
+      "name": "v26_close_cross_user_rls_and_validate_requests",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261019183328_v26_close_cross_user_rls_and_validate_requests.sql",
+      "canonical_md5": "12de463b2f1be9ceecd76fab20869aa2"
+    },
+    {
+      "version": "20261019183511",
+      "name": "v25_actual_lesson_schema_reconciliation",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261020023000_v25_actual_lesson_baseline.sql",
+      "canonical_md5": "6a37f723c74eee7ad46cf585dd6bf6ad"
+    },
+    {
+      "version": "20261019183632",
+      "name": "v26_optimize_rls_policies_and_foreign_key_indexes",
+      "kind": "historical_policy_snapshot",
+      "path": "tests/a1r3/v26-production-history-sql.json",
+      "canonical_md5": "4709d3f59322822ce2205187b882a50a"
+    },
+    {
+      "version": "20261019183708",
+      "name": "v26_cache_jwt_claim_in_rls_policy",
+      "kind": "historical_policy_snapshot",
+      "path": "tests/a1r3/v26-production-history-sql.json",
+      "canonical_md5": "590eed682901b24bd758a78b6698ac71"
+    },
+    {
+      "version": "20261019183944",
+      "name": "v26_restrict_dangerous_table_grants_and_request_updates",
+      "kind": "historical_policy_snapshot",
+      "path": "tests/a1r3/v26-production-history-sql.json",
+      "canonical_md5": "c029dd0a16b58ff254b45e035f6acab6"
+    },
+    {
+      "version": "20261019184235",
+      "name": "v26_protect_paid_lesson_delete",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261020023300_v26_guard_paid_lesson_deletion.sql",
+      "canonical_md5": "6f73bb55b6323b9c1fb634ab985af3eb"
+    },
+    {
+      "version": "20261019193426",
+      "name": "v27_personal_workspaces_and_scoped_records",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261020030000_v27_personal_workspaces.sql",
+      "canonical_md5": "e1ae2019f23a3e85068f52b934dd90a9"
+    },
+    {
+      "version": "20261019194414",
+      "name": "v27_index_workspace_composite_foreign_keys",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261020031000_v27_workspace_fk_indexes.sql",
+      "canonical_md5": "a14cec752c2e8b11b76318477095f61b"
+    },
+    {
+      "version": "20261019201357",
+      "name": "v3_teacher_preferences",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261020040000_v3_teacher_preferences.sql",
+      "canonical_md5": "221e2baefd10682e2e8bea128c4896e3"
+    },
+    {
+      "version": "20261020101239",
+      "name": "v31_cancel_recurrence_and_invite_edit",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261020051000_v31_cancel_recurrence_and_invite_edit.sql",
+      "canonical_md5": "9c5d88cc0242f8d3ce8c6393abc964f7"
+    },
+    {
+      "version": "20261020104006",
+      "name": "v32_student_portal_identity",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261020104006_v32_student_portal_identity.sql",
+      "canonical_md5": "31bbce7a1134d25de2b1617df2af975c"
+    },
+    {
+      "version": "20261020135424",
+      "name": "v32_student_portal",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261020220000_v32_student_portal.sql",
+      "canonical_md5": "58722aa229fd8c652242bbcea042bcad"
+    },
+    {
+      "version": "20261021033215",
+      "name": "v33_shared_course_management",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261021030000_v33_shared_course_management.sql",
+      "canonical_md5": "dae2e354b0b015453fc8b376c1f198e1"
+    },
+    {
+      "version": "20261021033435",
+      "name": "v33_student_invitation_compat",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261021031000_v33_student_invitation_compat.sql",
+      "canonical_md5": "85b64a13013d23a1766c9465bdb1eb91"
+    },
+    {
+      "version": "20261021065558",
+      "name": "v33_restrict_legacy_student_snapshot",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261021153000_v33_restrict_legacy_student_snapshot.sql",
+      "canonical_md5": "f93704dea4a40144d65b0f70f9969024"
+    },
+    {
+      "version": "20261021074320",
+      "name": "v34_shared_integrity",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261021170000_v34_shared_integrity.sql",
+      "canonical_md5": "329ff1b370f5c2e413e89b1d11b1da2b"
+    },
+    {
+      "version": "20261021103622",
+      "name": "v35_roles_lesson_learning",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261021181000_v35_roles_lesson_learning.sql",
+      "canonical_md5": "cae7c6ca99494c671f589de2db09ac29"
+    },
+    {
+      "version": "20261021105622",
+      "name": "v351_authenticated_settings_write_grants",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261021190000_v351_authenticated_settings_write_grants.sql",
+      "canonical_md5": "b2de2a79326fba996a75f98c751dd26a"
+    },
+    {
+      "version": "20261021185157",
+      "name": "v352_legacy_receipt_status_guard",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261022021000_v352_legacy_receipt_status_guard.sql",
+      "canonical_md5": "b2e5051828791a0b5a8d10eb3f995672"
+    },
+    {
+      "version": "20261022110047",
+      "name": "v354_student_account_disconnect",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261022113000_v354_student_account_disconnect.sql",
+      "canonical_md5": "75995334d60cc12487efbecb3063ab63"
+    },
+    {
+      "version": "20261103212327",
+      "name": "v4_bidirectional_invites_gas",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261023090000_v4_bidirectional_invites_gas.sql",
+      "canonical_md5": "c79ff08200077336cec6e0c5742eb707"
+    },
+    {
+      "version": "20261103212351",
+      "name": "v359_parent_payment_active_link_rls",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261023163138_v359_parent_payment_link_rls.sql",
+      "canonical_md5": "e0a77d916aedcd995a8ad9278ec7e190"
+    },
+    {
+      "version": "20261103212423",
+      "name": "v4_qa_and_time_metadata",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261023190847_v4_qa_and_time_metadata.sql",
+      "canonical_md5": "2c0653f4df05ec4417a23375672b3233"
+    },
+    {
+      "version": "20261103212429",
+      "name": "v4_account_contacts",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261024033000_v4_account_contacts.sql",
+      "canonical_md5": "de69b1f5e2ce6737848706b399213cfd"
+    },
+    {
+      "version": "20261103212435",
+      "name": "v4_contact_privacy_hardening",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261024035831_v4_contact_privacy_hardening.sql",
+      "canonical_md5": "4dd7588d5561a49d8215e1ba66dea608"
+    },
+    {
+      "version": "20261103212441",
+      "name": "v4_payment_correction_foundation",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261024043000_v40_payment_correction_foundation.sql",
+      "canonical_md5": "afa98a90a029edfba9f98c52cdd23e1f"
+    },
+    {
+      "version": "20261103212519",
+      "name": "v4_apply_payment_corrections",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261024050000_v40_apply_payment_corrections.sql",
+      "canonical_md5": "cccced41f9e8eb0975aa735f3c9c7264"
+    },
+    {
+      "version": "20261103212526",
+      "name": "v4_contact_outgoing_tracking",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261024053000_v4_contact_outgoing_tracking.sql",
+      "canonical_md5": "d6c8a4092efe805c7223f7c500915933"
+    },
+    {
+      "version": "20261103212531",
+      "name": "v4_payment_date_taipei",
+      "kind": "repo_sql",
+      "path": "supabase/migrations/20261029024000_v4_payment_date_taipei.sql",
+      "canonical_md5": "e104d096444a4ecb1f61fbc1a761d68b"
+    },
+    {
+      "version": "20261103212609",
+      "name": "v4_qa_payment_batch_classification",
+      "kind": "existing_candidate",
+      "path": "supabase/candidates/20261028_v4_payment_batch_qa_classification.sql",
+      "canonical_md5": "9cf3b12212ee3522623aad7673841c56"
+    },
+    {
+      "version": "20261103212615",
+      "name": "v4_qa_lesson_and_legacy_receipt",
+      "kind": "existing_candidate",
+      "path": "supabase/candidates/20261029_v4_qa_lesson_and_legacy_receipt.sql",
+      "canonical_md5": "c5bd6af1d2cfc658e9c81b16b50ea756"
+    },
+    {
+      "version": "20261103212620",
+      "name": "v4_accounting_qa_snapshot_rpc",
+      "kind": "existing_candidate",
+      "path": "supabase/candidates/20261029_v4_accounting_qa_snapshot_rpc.sql",
+      "canonical_md5": "da4c66c857226f1aeb6e9e393de299e0"
+    },
+    {
+      "version": "20261103212641",
+      "name": "v4_qa_real_payment_rpc_reconciliation",
+      "kind": "existing_candidate",
+      "path": "supabase/candidates/20261029_v4_qa_real_payment_rpc_reconciliation.sql",
+      "canonical_md5": "0b506ee7d9a7f891252ff5cd5c40d947"
+    },
+    {
+      "version": "20261103212647",
+      "name": "v4_qa_reclassification_guard",
+      "kind": "existing_candidate",
+      "path": "supabase/candidates/20261029_v4_qa_reclassification_guard.sql",
+      "canonical_md5": "b5893e26e3d06cb373d782c3227af123"
+    }
+  ]
+}

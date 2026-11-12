@@ -495,3 +495,70 @@ test('QA-AUTH-01: parent/student signout blocks browser back and reload',async (
   await expect(page.locator('.main-content')).toHaveCSS('visibility','hidden');
  }
 });
+
+test('missing Preview config opens safe no-data shell in Chromium, without OAuth or backend writes',async ({page})=>{
+ const host='https://qa-preview.vercel.app';
+ const pageErrors=[],writes=[];
+ page.on('pageerror',error=>pageErrors.push(error.message));
+ page.on('request',request=>{
+  if(['POST','PUT','PATCH','DELETE'].includes(request.method())&&
+    /\/(?:rest\/v1|auth\/v1|api\/v4-config)/.test(request.url()))writes.push(request.url().split('?')[0]);
+ });
+ await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
+  route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
+   contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+ await page.route('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
+  route=>route.fulfill({status:200,contentType:'text/javascript',body:''}));
+ await page.route(host+'/**',async route=>{
+  const url=new URL(route.request().url());
+  if(url.pathname==='/api/v4-config'){
+   await route.fulfill({status:503,contentType:'application/json',body:'{}'});
+   return;
+  }
+  const response=await fetch('http://127.0.0.1:3000'+url.pathname+url.search);
+  await route.fulfill({status:response.status,body:Buffer.from(await response.arrayBuffer()),
+   headers:{'content-type':response.headers.get('content-type')||'text/plain'}});
+ });
+ await page.goto(host+'/v2/index.html');
+ await expect(page.locator('#login-preview-dismiss')).toBeVisible();
+ await expect(page.locator('.app-shell>.main-content')).toBeHidden();
+ await page.locator('#login-preview-dismiss').click();
+ await expect(page.locator('body')).toHaveClass(/preview-readonly/);
+ await expect(page.locator('#preview-readonly-banner')).toBeVisible();
+ await expect(page.locator('.app-shell>.sidebar')).toBeVisible();
+ await expect(page.locator('.app-shell>.main-content')).toBeVisible();
+ await expect(page.locator('#view-home')).toBeVisible();
+ await expect(page.locator('#connection-status')).toContainText('唯讀預覽');
+ await page.locator('.side-nav [data-view="calendar"]').click();
+ await expect(page.locator('#view-calendar')).toBeVisible();
+ await expect(page.locator('#calendar-grid .calendar-cell')).not.toHaveCount(0);
+ const prev=await page.locator('#calendar-month').textContent();
+ await page.locator('#next-month').click();
+ await expect(page.locator('#calendar-month')).not.toHaveText(prev);
+ await page.locator('.side-nav [data-view="billing"]').click();
+ await expect(page.locator('#view-billing')).toBeVisible();
+ await expect(page.locator('#billing-summary')).toContainText('尚未讀取任何金額');
+ await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
+ await expect(page.locator('#preview-plan-panel')).toBeVisible();
+ await expect(page.locator('#preview-plans')).toContainText('NT$99／月');
+ await expect(page.locator('#preview-plans')).toContainText('NT$399／月');
+ await expect(page.locator('#workspace-create')).toBeDisabled();
+ await page.locator('#preview-team-shell').click();
+ await expect(page.locator('#preview-team-panel')).toBeVisible();
+ await expect(page.locator('.side-nav [data-team-section="projects"]')).toBeVisible();
+ await expect(page.locator('#preview-plans')).toBeEmpty();
+ await page.locator('.side-nav [data-team-section="billing"]').click();
+ await expect(page.locator('#preview-team-title')).toContainText('Team 帳務');
+ for(const width of [320,375,390,430]){
+  await page.setViewportSize({width,height:844});
+  await expect(page.locator('.app-shell>.main-content')).toBeVisible();
+  await expect(page.locator('.mobile-nav .nav-team[data-team-section="billing"]')).toBeVisible();
+  const dimensions=await page.evaluate(()=>({
+   width:document.documentElement.clientWidth,
+   scroll:document.documentElement.scrollWidth
+  }));
+  expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.width);
+ }
+ expect(writes).toEqual([]);
+ expect(pageErrors).toEqual([]);
+});

@@ -94,7 +94,27 @@ const sensitiveRpcs=[
  'public.v5_team_billing_overview(uuid,date)',
  'public.v5_team_payment_overview(uuid,date)',
  'public.v5_apply_team_advance_credit(uuid,jsonb,text)',
- 'public.v5_team_operations_overview(uuid,date)'
+ 'public.v5_team_operations_overview(uuid,date)',
+ 'public.v56_void_team_pending_payment(uuid,text,text)',
+ 'public.v56_correct_team_payment_metadata(uuid,text,text,text,text)',
+ 'public.v56_request_team_credit_refund(uuid,bigint,text,text)',
+ 'public.v56_decide_team_credit_refund(uuid,boolean,text)',
+ 'public.v56_record_team_refund_manual_paid(uuid,text,date,text)',
+ 'public.v56_team_adjustment_overview(uuid,date)',
+ 'public.v56_request_team_direct_refund(uuid,jsonb,text,text)',
+ 'public.v56_team_direct_refund_intake_overview(uuid,date)',
+ 'public.v56_decide_team_direct_refund(uuid,boolean,text)',
+ 'public.v56_team_direct_refund_net_overview(uuid,date)',
+ 'public.v56_request_team_applied_credit_adjustment(uuid,jsonb,text,text,text)',
+ 'public.v56_decide_team_applied_credit_adjustment(uuid,boolean,text)',
+ 'public.v56_team_applied_credit_adjustment_overview(uuid,date)',
+ 'public.v56_team_conservation_overview(uuid)',
+ 'public.v56_propose_team_family_bridge(uuid,uuid,text)',
+ 'public.v56_my_team_family_proposals()',
+ 'public.v56_respond_team_family_proposal(uuid,boolean)',
+ 'public.v56_team_parent_finance_overview(uuid,uuid,date)',
+ 'public.v56_team_refundable_allocations(uuid,uuid)',
+ 'public.v56_record_allocated_refund_manual_paid(text,uuid,text,date,text)'
 ];
 for(const signature of sensitiveRpcs){
  const escaped=signature.replaceAll("'","''");
@@ -111,6 +131,84 @@ for(const signature of sensitiveRpcs.slice(0,2)){
  assert.equal(allowed,'false','Admin-only RPC exposed to authenticated role: '+signature);
 }
 
+// Enumerate the *entire* V5 HTTP RPC surface from the actual PostgreSQL
+// catalog, not only the hand-reviewed list above. A newly added V5.8 RPC
+// must not silently inherit executable privileges from PUBLIC / anon.
+// These assertions operate solely in disposable local CI with no real users.
+const v5RpcSurface=JSON.parse(db(`
+ select coalesce(jsonb_agg(jsonb_build_object(
+  'name',p.proname,
+  'signature',n.nspname||'.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')',
+  'security_definer',p.prosecdef,
+  'anon_execute',has_function_privilege('anon',p.oid,'EXECUTE'),
+  'authenticated_execute',has_function_privilege('authenticated',p.oid,'EXECUTE'),
+  'pinned_search_path',exists(
+   select 1 from unnest(coalesce(p.proconfig,ARRAY[]::text[])) cfg
+   where cfg like 'search_path=%'
+  )
+ ) order by n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)),
+ '[]'::jsonb)::text
+ from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+ where n.nspname='public' and p.proname ~ '^(v5_|v56_)'
+`));
+assert.ok(v5RpcSurface.length>=25,
+ 'Unexpectedly small public V5 RPC surface; audit may have skipped functions');
+assert.deepEqual(
+ v5RpcSurface.filter(r=>r.anon_execute).map(r=>r.signature),
+ [],
+ 'V5 public RPC unexpectedly executable by anon/PUBLIC'
+);
+assert.deepEqual(
+ v5RpcSurface.filter(r=>r.security_definer&&!r.pinned_search_path)
+  .map(r=>r.signature),
+ [],
+ 'V5 SECURITY DEFINER RPC missing fixed search_path'
+);
+// Admin-only endpoints must stay service-only, regardless of later changes.
+assert.deepEqual(
+ v5RpcSurface.filter(r=>/^v5_admin_/.test(r.name)&&r.authenticated_execute)
+  .map(r=>r.signature),
+ [],
+ 'V5 admin-only RPC became callable by authenticated users'
+);
+// PostgreSQL views can bypass underlying RLS. Any V5 API view granted to an
+// authenticated user must use security_invoker; don't conflate RLS and GRANT.
+const unsafeV5Views=lines(
+ "select n.nspname||'.'||c.relname from pg_class c "+
+ "join pg_namespace n on n.oid=c.relnamespace "+
+ "where n.nspname='public' and c.relkind='v' "+
+ "and c.relname ~ '^(v5_|v56_)' "+
+ "and has_table_privilege('authenticated',c.oid,'SELECT') "+
+ "and not coalesce('security_invoker=true'=any(c.reloptions),false) "+
+ "order by c.relname"
+);
+assert.deepEqual(unsafeV5Views,[],
+ 'Authenticated V5 public view bypasses RLS without security_invoker');
+
+// V5.6 correction/void/refund records are private and deliberately not
+// matched by the historical v5_ prefix inventory.
+const v56Private=[
+ 'tutor_private.v56_team_pending_payment_voids',
+ 'tutor_private.v56_team_payment_corrections',
+ 'tutor_private.v56_team_credit_refund_requests',
+ 'tutor_private.v56_team_credit_refund_events',
+ 'tutor_private.v56_team_direct_refund_intake',
+ 'tutor_private.v56_team_direct_refund_decisions',
+ 'tutor_private.v56_team_direct_refund_reversals',
+ 'tutor_private.v56_team_applied_credit_requests',
+ 'tutor_private.v56_team_applied_credit_decisions',
+ 'tutor_private.v56_team_advance_application_reversals',
+ 'tutor_private.v56_team_family_bridge_proposals',
+ 'tutor_private.v56_team_family_bridge_acceptances',
+ 'tutor_private.v56_team_family_bridge_revocations',
+ 'tutor_private.v56_team_allocated_refund_manual_payouts'
+];
+for(const name of v56Private){
+ assert.equal(rls.get(name),'true','V5.6 private table missing RLS: '+name);
+ const denied=db("select (not has_table_privilege('authenticated','"+name+
+   "','SELECT,INSERT,UPDATE,DELETE'))::text");
+ assert.equal(denied,'true','Browser should never directly read V5.6 private ledger: '+name);
+}
 // No test accounts, family/student links, lessons, or payments should be
 // imported into the fresh baseline. A later explicit synthetic seed is allowed.
 const cleanTables=[
@@ -136,6 +234,10 @@ console.log(JSON.stringify({
  v5_rls_tables:expectedV5.size,
  v4_core_rls_tables:core.length,
  anon_exposures:exposed.length,
+ v5_public_rpcs_audited:v5RpcSurface.length,
+ v5_public_rpc_anon_exposures:0,
+ v5_security_definer_unpinned_paths:0,
+ v5_unsafe_auth_views:0,
  zero_row_business_tables:cleanTables.length,
  production_writes:0
 }));

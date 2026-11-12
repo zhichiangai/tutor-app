@@ -33,7 +33,9 @@ test('only authenticated accounts can close the login gate',()=>{
 });
 
 test('private dashboards are hidden and never rerendered during logout',()=>{
- assert.match(app,/if\(!identified\)return;\s*\/\/ Role preference checkboxes/);
+ assert.match(app,/if\(!identified\)\{renderPreviewReadOnlyShell\(\);return\}\s*\/\/ Role preference checkboxes/);
+ assert.match(app,/function renderPreviewReadOnlyShell\(\)\{\s*if\(!previewBackendUnavailable\(\)\|\|!document\.body\.classList\.contains\("preview-readonly"\)\)return;/);
+ assert.match(app,/function enterPreviewReadOnly\(\)\{\s*if\(!previewBackendUnavailable\(\)\)return;/);
  for(const id of ['home-focus','metrics','money-reminder','student-today-content','student-calendar-grid','billing-summary']){
   assert.ok(app.includes('"'+id+'"'),'logout clears '+id);
  }

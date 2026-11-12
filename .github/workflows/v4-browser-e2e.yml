@@ -51,13 +51,19 @@ jobs:
           trap 'rm -f "$start_log" "$reset_log"' EXIT
           start_ok=0
           for attempt in 1 2 3; do
+            # Previous failed startup can leave this *disposable* local project's
+            # containers holding 54322/54324. Stop only the named localhost
+            # project before retry; never operate a linked/hosted Supabase.
+            if [ "$attempt" -gt 1 ]; then
+              supabase stop --no-backup >/dev/null 2>&1 || true
+            fi
             if supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor >"$start_log" 2>&1; then
               start_ok=1
               break
             fi
-            if grep -qiE '(toomanyrequests|too many requests|rate limit|429)' "$start_log" && [ "$attempt" -lt 3 ]; then
-              echo "::notice::Container registry rate limit on attempt $attempt, retrying isolated startup"
-              sleep $((attempt * 30))
+            if grep -qiE '(toomanyrequests|too many requests|rate limit|429|address already in use|failed to bind host port)' "$start_log" && [ "$attempt" -lt 3 ]; then
+              echo "::notice::Disposable Supabase startup retry (registry throttling or local port collision), attempt $attempt"
+              sleep $((attempt * 20))
             else
               break
             fi
@@ -77,6 +83,19 @@ jobs:
             grep -iE '(error|failed|invalid|unknown|panic|docker|cannot|timeout)' "$start_log" |
               sed -E 's/eyJ[A-Za-z0-9_.-]+/[JWT_REDACTED]/g; s/sb_(publishable|secret)_[A-Za-z0-9_-]+/[KEY_REDACTED]/g; s#postgres(ql)?://[^ ]+#[DB_URI_REDACTED]#g; s#https?://[^ ]+#[URL_REDACTED]#g; s/[A-Za-z0-9_+\/=-]{80,}/[LONG_TOKEN_REDACTED]/g' |
               head -n 5 || true
+            # Only emit narrowly filtered migration/SQL failure diagnostics.
+            # Never dump the full log (which may contain local test keys).
+            echo "::notice::Sanitized migration/SQL startup diagnostics:"
+            grep -Ei 'applying migration|migration .*\.sql|^error:|^failed |^fatal:|^panic:|sqlstate|^\s*error:' "$start_log" |
+              sed -E 's/eyJ[A-Za-z0-9_.-]+/[JWT_REDACTED]/g; s/sb_(publishable|secret)_[A-Za-z0-9_-]+/[KEY_REDACTED]/g; s#postgres(ql)?://[^ ]+#[DB_URI_REDACTED]#g; s#https?://[^ ]+#[URL_REDACTED]#g; s/[A-Za-z0-9_+\/=:-]{80,}/[LONG_TOKEN_REDACTED]/g' |
+              tail -n 12 || true
+            # Startup/migration failures can omit the words 'error' and
+            # 'failed'. Provide only sanitized, short terminal context.
+            echo "::notice::Sanitized final migration context (no keys/URLs):"
+            tail -n 24 "$start_log" |
+              sed -E 's/eyJ[A-Za-z0-9_.-]+/[JWT_REDACTED]/g; s/sb_(publishable|secret)_[A-Za-z0-9_-]+/[KEY_REDACTED]/g; s#postgres(ql)?://[^ ]+#[DB_URI_REDACTED]#g; s#https?://[^ ]+#[URL_REDACTED]#g; s/[A-Za-z0-9_+\/=:-]{60,}/[LONG_TOKEN_REDACTED]/g' |
+              grep -viE 'service_role key|anon key|access_token|refresh_token|jwt secret|database password|supabase_service_role|supabase_anon_key|^ *apikey' |
+              tail -n 12 | cut -c 1-300 || true
             docker ps -a --filter name=tutor_v4_isolated --format 'container={{.Names}} state={{.Status}}' || true
             exit 1
           fi
@@ -212,11 +231,13 @@ jobs:
         run: node tests/e2e/seed-v4-local.mjs
       - name: Verify real Chromium teacher-parent-student flows
         run: npx playwright test --config tests/e2e/playwright.config.mjs
-      - name: Rehearse synthetic-only private selected-schema backup and restore
+      - name: Verify failed migration rollback, retry and idempotency
+        run: bash tests/local/v5-migration-atomicity-smoke.sh
+      - name: Rehearse strict app-owned ACL restore with platform owner limitations disclosed
         id: v5_restore_probe
         continue-on-error: true
         run: bash tests/local/v5-disposable-backup-restore-smoke.sh
-      - name: Enforce both independent V5 compatibility probes
+      - name: Enforce V5 schema catalog and application-scope restore probes
         if: always()
         run: |
           test "${{ steps.v5_catalog_probe.outcome }}" = "success" || {
@@ -224,7 +245,7 @@ jobs:
             exit 1
           }
           test "${{ steps.v5_restore_probe.outcome }}" = "success" || {
-            echo "::error::Synthetic selected-schema restore failed or was skipped"
+            echo "::error::Synthetic application-owned schema/ACL restore failed or was skipped"
             exit 1
           }
       - name: Remove ephemeral auth fixture

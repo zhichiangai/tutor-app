@@ -1,4 +1,5 @@
 import {deriveV5ManagerOperations} from './v5-operations-summary.js';
+import {createV56AdjustmentsUI} from './v56-adjustments.js';
 // V5.3 Team receivables: manager-only, immutable course fee confirmations.
 // This module has no payment collection or V4 accounting API access.
 export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
@@ -16,18 +17,36 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    minimumFractionDigits:0,maximumFractionDigits:2}).format(amount/100);
  };
  let generation=0,attached=false,ready=false,loading=false,writing=false,error='';
- let availableTeams=[],teamId='',overview=null,paymentOverview=null,operationsOverview=null;
- let advanceStudents=[],advanceStudentId='',advanceOverview=null;
+ let availableTeams=[],teamId='',overview=null,paymentOverview=null,operationsOverview=null,adjustmentsOverview=null;
+ let directRequests=null,appliedAdjustments=null,refundable=null,conservation=null;
+ let advanceStudents=[],advanceStudentId='',advanceOverview=null,legacyStudents=[];
  let advanceReference='manual-advance-'+crypto.randomUUID();
  const retryAdvanceOperations=new Map();
  let paymentReference='manual-'+crypto.randomUUID();
  const today=new Date();
  let month=new Date(today.getFullYear(),today.getMonth(),1);
  const valid=()=>!!(isReady()&&getRole()==='teacher'&&getUser()?.id&&getClient());
+ const adjustments=createV56AdjustmentsUI({getClient,notify,refresh});
+ const renderAdjustments=allowed=>{
+  const summary=allowed&&overview&&paymentOverview?
+   deriveV5ManagerOperations(overview,paymentOverview):null;
+  adjustments.render({
+   allowed:!!allowed,teamId,
+   safetyPassed:!!summary&&!summary.needsReconciliation&&
+    conservation?.team_id===teamId&&conservation?.conservation_passed===true&&
+    directRequests?.team_id===teamId&&appliedAdjustments?.team_id===teamId&&
+    refundable?.team_id===teamId&&refundable?.student_id===advanceStudentId,
+   directRequests,appliedAdjustments,refundable,conservation,
+   month:[month.getFullYear(),String(month.getMonth()+1).padStart(2,'0'),'01'].join('-'),
+   paymentOverview,advanceOverview,adjustments:adjustmentsOverview
+  });
+ };
  function reset(){
   generation++;ready=false;loading=false;writing=false;error='';
-  availableTeams=[];teamId='';overview=null;paymentOverview=null;operationsOverview=null;
-  advanceStudents=[];advanceStudentId='';advanceOverview=null;
+  availableTeams=[];teamId='';overview=null;paymentOverview=null;operationsOverview=null;adjustmentsOverview=null;
+  directRequests=null;appliedAdjustments=null;refundable=null;conservation=null;
+  adjustments.reset();
+  advanceStudents=[];advanceStudentId='';advanceOverview=null;legacyStudents=[];
   advanceReference='manual-advance-'+crypto.randomUUID();
   retryAdvanceOperations.clear();
   $('v5-operations-card')?.classList.add('hidden');
@@ -93,14 +112,22 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   const same=!!summary&&ops?.team_id===summary.teamId&&
    ops?.month===summary.month&&ops?.currency==='TWD'&&
    ops?.financial_authority==='manager_only'&&
+   ops?.ledger_basis==='net_after_immutable_reversals'&&
    ops?.cash_verified_by_bank===false;
   const validProjects=same&&Array.isArray(ops.projects)&&
    ops.projects.every(p=>p.project_id&&typeof p.name==='string'&&
     ['active','archived'].includes(p.status)&&[
      p.assigned_teacher_count,p.enrolled_student_count,p.scheduled_lessons,
      p.completed_lessons,p.cancelled_lessons,p.unconfirmed_completed_lessons,
-     p.confirmed_receivable_cents,p.outstanding_cents
-    ].every(number));
+     p.confirmed_receivable_cents,p.direct_net_cents,p.advance_net_cents,
+     p.outstanding_cents
+    ].every(number)&&
+    p.confirmed_receivable_cents===p.direct_net_cents+p.advance_net_cents+p.outstanding_cents);
+  const sameNetTotals=validProjects&&
+   ops.projects.reduce((n,p)=>n+p.confirmed_receivable_cents,0)===
+    overview.confirmed_total_cents&&
+   ops.projects.reduce((n,p)=>n+p.outstanding_cents,0)===
+    summary.outstandingCents;
   const validTeachers=same&&Array.isArray(ops.teacher_workload)&&
    ops.teacher_workload.every(t=>typeof t.teacher_user_id==='string'&&
     [t.assigned_project_count,t.scheduled_lessons,t.completed_lessons]
@@ -111,10 +138,10 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
     &&typeof e.occurred_at==='string');
   if(note)note.textContent=!summary?'':!same?
    '完整專案營運報表尚無有效資料；上述待辦僅供參考。':
-   !(validProjects&&validTeachers&&validHistory)?
+   !(validProjects&&sameNetTotals&&validTeachers&&validHistory)?
    '專案營運資料需要重新核對，請重新整理。':
-   '以下報表由現任 Team 管理者授權 RPC 提供，並非銀行入帳、退款或法定會計報表。';
-  if(!validProjects||!validTeachers||!validHistory)return;
+   '以下專案由現任 Team 管理者授權 RPC 提供，以退款反向分錄計算淨應收；並非銀行入帳、退款或法定會計報表。';
+  if(!validProjects||!sameNetTotals||!validTeachers||!validHistory)return;
   if(!ops.projects.length)projectList?.append(
    item('p','尚無 Team 專案。','section-sub'));
   for(const p of ops.projects){
@@ -127,6 +154,8 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
     ' 堂 · 取消 '+p.cancelled_lessons+' 堂','section-sub'));
    row.append(item('span','待確認費用 '+p.unconfirmed_completed_lessons+
     ' 堂 · 已確認應收 '+money(p.confirmed_receivable_cents)+
+    ' · 直接付款淨額 '+money(p.direct_net_cents)+
+    ' · 預收抵扣淨額 '+money(p.advance_net_cents)+
     ' · 未結清 '+money(p.outstanding_cents),'section-sub'));
    projectList?.append(row);
   }
@@ -160,12 +189,12 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   const card=$('v5-billing-card');
   if(!card)return;
   if(!valid()||(!ready&&!loading&&!error)){
-   card.classList.add('hidden');renderOperations();return;
+   card.classList.add('hidden');renderOperations();renderAdjustments(false);return;
   }
   // Never display any amount to users without a current successful manager RPC.
   const shown=availableTeams.length>0;
   card.classList.toggle('hidden',!shown);
-  if(!shown){renderOperations();return;}
+  if(!shown){renderOperations();renderAdjustments(false);return;}
   $('v5-billing-message').textContent=loading?'正在檢查 Team 帳務權限…':
    error||'僅記錄應收費用，不代表家長已付款。確認後不能直接修改金額。';
   const select=$('v5-billing-team-select');
@@ -181,6 +210,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    money(overview.confirmed_total_cents):'尚無可用資料';
   if(!overview){
    renderOperations();
+   renderAdjustments(false);
    for(const id of ['v5-payment-pending-reports','v5-payment-confirmed-reports']){
     $(id).replaceChildren();
    }
@@ -226,9 +256,22 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
     'section-sub'));
    confirmed.append(wrap);
   }
+  const teamStudentSelect=$('v56-family-team-student');
+  const v4StudentSelect=$('v56-family-v4-student');
+  if(teamStudentSelect&&v4StudentSelect){
+   options(teamStudentSelect,advanceStudents.map(x=>({
+    value:x.id,label:x.display_name+' · '+x.id.slice(-6)
+   })));
+   options(v4StudentSelect,legacyStudents.map(x=>({
+    value:x.id,label:x.name+' · '+x.id.slice(-6)
+   })));
+   const submit=$('v56-family-bridge-submit');
+   if(submit)submit.disabled=writing||!advanceStudents.length||!legacyStudents.length;
+  }
   renderPayments();
   renderAdvance();
   renderOperations();
+  renderAdjustments(true);
  }
  function taipeiDate(){
   const fields=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',
@@ -454,6 +497,33 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   return true;
  }
  async function handleSubmit(e){
+  if(e.target?.id==='v56-family-bridge-form'){
+   e.preventDefault();
+   if(!ready||!valid()||writing||!teamId)return true;
+   const teamStudent=$('v56-family-team-student')?.value;
+   const v4Student=$('v56-family-v4-student')?.value;
+   if(!advanceStudents.some(x=>x.id===teamStudent)||
+    !legacyStudents.some(x=>x.id===v4Student)){
+    notify('請選擇有權限的 Team 學生與自己的 V4 學生。');return true;
+   }
+   const reason=window.prompt('請輸入對應原因（8 至 250 字）；家長仍須主動確認。');
+   if(reason===null)return true;
+   if(reason.trim().length<8||reason.length>250){
+    notify('對應原因至少 8 字，最多 250 字。');return true;
+   }
+   if(!window.confirm('只建立家長帳務對應提案；必須由有 V4 有效連結的家長親自同意。確定？'))return true;
+   writing=true;
+   try{
+    const {data,error:failure}=await getClient().rpc('v56_propose_team_family_bridge',{
+     p_team_student_id:teamStudent,p_v4_student_id:v4Student,p_reason:reason.trim()
+    });
+    if(failure||data?.status!=='proposed_waiting_guardian_acceptance')
+     throw failure||new Error('Not proposed');
+    notify('已建立對應提案；家長同意且連結有效後才可讀取 Team 帳務。');
+   }catch{notify('無法建立對應。請確認 V4 學生歸屬與 Team 管理權。')}
+   finally{writing=false;render()}
+   return true;
+  }
   if(e.target?.id==='v5-advance-report-form'){
    e.preventDefault();return submitAdvanceReport();
   }
@@ -515,7 +585,8 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   attach();
   const stamp=++generation,userId=getUser().id;
   loading=true;error='';overview=null;paymentOverview=null;
-  operationsOverview=null;advanceOverview=null;
+  operationsOverview=null;advanceOverview=null;adjustmentsOverview=null;
+  directRequests=null;appliedAdjustments=null;refundable=null;conservation=null;
   $('v5-advance-panel')?.classList.add('hidden');
   for(const id of ['v5-advance-message','v5-advance-pending-payments',
    'v5-advance-available','v5-advance-credit-rows'])
@@ -534,7 +605,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    if(!availableTeams.some(t=>t.id===teamId))teamId=availableTeams[0]?.id||'';
    if(teamId){
     const first=[month.getFullYear(),String(month.getMonth()+1).padStart(2,'0'),'01'].join('-');
-    const [result,payments,students,operations]=await Promise.all([
+    const [result,payments,students,operations,adj,direct,applied,integrity,v4Students]=await Promise.all([
      client.rpc('v5_team_billing_overview',{
       p_team_id:teamId,p_month:first
      }),
@@ -545,34 +616,60 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
       .eq('team_id',teamId),
      client.rpc('v5_team_operations_overview',{
       p_team_id:teamId,p_month:first
-     })
+     }),
+     client.rpc('v56_team_adjustment_overview',{
+      p_team_id:teamId,p_month:first
+     }),
+     client.rpc('v56_team_direct_refund_intake_overview',{
+      p_team_id:teamId,p_month:first
+     }),
+     client.rpc('v56_team_applied_credit_adjustment_overview',{
+      p_team_id:teamId,p_month:first
+     }),
+     client.rpc('v56_team_conservation_overview',{
+      p_team_id:teamId
+     }),
+     client.from('students').select('id,name').eq('teacher_id',userId)
     ]);
     if(stamp!==generation||!valid()||getUser()?.id!==userId)return;
     if(result.error||payments.error||students.error)
      throw result.error||payments.error||students.error;
     overview=result.data;paymentOverview=payments.data;
     operationsOverview=operations.error?null:operations.data;
+    adjustmentsOverview=adj.error?null:adj.data;
+    directRequests=direct.error?null:direct.data;
+    appliedAdjustments=applied.error?null:applied.data;
+    conservation=integrity.error?null:integrity.data;
     advanceStudents=students.data||[];
+    legacyStudents=v4Students.error?[]:(v4Students.data||[]);
     if(!advanceStudents.some(s=>s.id===advanceStudentId))
      advanceStudentId=advanceStudents[0]?.id||'';
     advanceOverview=null;
     if(advanceStudentId){
-     const credit=await client.rpc('v5_team_advance_overview',{
-      p_team_id:teamId,p_student_id:advanceStudentId
-     });
+     const [credit,sources]=await Promise.all([
+      client.rpc('v5_team_advance_overview',{
+       p_team_id:teamId,p_student_id:advanceStudentId
+      }),
+      client.rpc('v56_team_refundable_allocations',{
+       p_team_id:teamId,p_student_id:advanceStudentId
+      })
+     ]);
      if(stamp!==generation||!valid()||getUser()?.id!==userId)return;
      if(credit.error)throw credit.error;
      advanceOverview=credit.data;
+     refundable=sources.error?null:sources.data;
     }
    }else{
-    overview=null;paymentOverview=null;operationsOverview=null;
-    advanceStudents=[];advanceStudentId='';advanceOverview=null;
+    overview=null;paymentOverview=null;operationsOverview=null;adjustmentsOverview=null;
+    directRequests=null;appliedAdjustments=null;refundable=null;conservation=null;
+    advanceStudents=[];advanceStudentId='';advanceOverview=null;legacyStudents=[];
    }
    ready=true;
   }catch{
    if(stamp!==generation||!valid()||getUser()?.id!==userId)return;
-   overview=null;paymentOverview=null;operationsOverview=null;advanceOverview=null;
-   advanceStudents=[];advanceStudentId='';
+   overview=null;paymentOverview=null;operationsOverview=null;advanceOverview=null;adjustmentsOverview=null;
+   directRequests=null;appliedAdjustments=null;refundable=null;conservation=null;
+   advanceStudents=[];advanceStudentId='';legacyStudents=[];
    error='Team 帳務暫時無法讀取，請重新進入設定頁。';
   }finally{
    if(stamp===generation&&valid()&&getUser()?.id===userId){
@@ -581,6 +678,7 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
   }
  }
  async function handleClick(target){
+  if(await adjustments.handleClick(target))return true;
   const btn=target?.closest?.('[data-v5-billing-action]');
   if(!btn)return false;
   if(!valid()||!ready||writing||!overview)return true;

@@ -10,10 +10,14 @@ const files=readdirSync(migrationDir).filter(s=>/^[0-9]{14}_.+\.sql$/.test(s));
 const versions=files.map(s=>s.slice(0,14));
 
 test('fresh release includes all 46 V4+V5 migration files without duplicate versions',()=>{
- assert.equal(files.length,47,'V5.5 frozen 46-file history plus one V5.7 additive migration');
+ assert.equal(files.length,56,'Frozen V5.5 46-file baseline plus reviewed append-only V5.6/V5.7 migrations');
  assert.ok(files.includes('20261108230000_v57_team_operations_overview.sql'));
  assert.equal(new Set(versions).size,versions.length);
- assert.equal(files.filter(f=>f.includes('_v5_')).length,9);
+ assert.ok(files.includes('20261109163000_v5_6_team_refund_correction_ledger.sql'));
+ assert.ok(files.includes('20261110032000_v5_6_team_allocated_refund_intake.sql'));
+ assert.ok(files.includes('20261110040000_v5_6_team_direct_refund_approval_reversal.sql'));
+ assert.ok(files.includes('20261110100000_v5_7_team_operations_net_reconciliation.sql'));
+ assert.equal(files.filter(f=>f.includes('_v5_')).length,18);
 });
 
 test('fresh bootstrap is fenced to disposable local CI and checks RLS and no old rows',()=>{

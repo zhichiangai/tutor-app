@@ -2005,3 +2005,654 @@ test('V5.3 billing management follows accepted Team governance transfer, not V4 
  assert.equal(db("select count(*) from tutor_private.v5_team_billing_audit "+
   "where team_id='"+team+"'"),auditBefore,'Transfer does not modify audit or fees');
 });
+
+
+test('V5.6 append-only pending void, metadata correction and unused-credit refund are manager-only',async()=>{
+ // This test intentionally follows the governance-transfer case above.
+ // It uses only disposable synthetic Team B, no Production or real payments.
+ const manager=await signIn('teacher');
+ const former=await signIn('parent');
+ const stranger=await signIn('stranger');
+ const studentActor=await signIn('student');
+ const fromId=f.actors.parent.id,toId=f.actors.teacher.id;
+ const ws=db("select id from public.workspaces where owner_id='"+fromId+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ assert.equal(db("select manager_user_id from public.v5_team_governance "+
+   "where workspace_id='"+ws+"'"),toId,'Team B manager transferred in previous test');
+ const credit=db("select c.id from tutor_private.v5_team_advance_credits c "+
+  "join tutor_private.v5_team_payment_reports p on p.id=c.payment_id "+
+  "where p.team_id='"+team+"' and p.reference='TRANSFER-ADVANCE-ISOLATION'");
+ const pending=db("select id from tutor_private.v5_team_payment_reports "+
+  "where team_id='"+team+"' and reference='PENDING-TRANSFER-ISOLATED'");
+ const confirmed=db("select id from tutor_private.v5_team_payment_reports "+
+  "where team_id='"+team+"' and reference='TRANSFER-CONFIRMED-ISOLATED'");
+ const lesson=db("select f.lesson_id from tutor_private.v5_team_lesson_fees f "+
+  "join public.v5_team_lessons l on l.id=f.lesson_id "+
+  "where f.team_id='"+team+"' and l.subject='Transfer Payment Isolation'");
+ assert.match(credit,/^[a-f0-9-]{36}$/i);
+ assert.match(pending,/^[a-f0-9-]{36}$/i);
+ assert.match(confirmed,/^[a-f0-9-]{36}$/i);
+ assert.match(lesson,/^[a-f0-9-]{36}$/i);
+ const beforeV4=db("select count(*) from public.payment_batches");
+ const initialCredit=db("select amount_cents from tutor_private.v5_team_advance_credits where id='"+credit+"'");
+ assert.equal(initialCredit,'100');
+ // Metadata does not prove tenant authority: every RPC rechecks manager.
+ const voidArgs={p_payment_id:pending,
+  p_idempotency_key:'V56-PENDING-VOID-001',
+  p_reason:'Synthetic pending void test, not a real transfer'};
+ assert.equal((await rest(former,'POST','rpc/v56_void_team_pending_payment',voidArgs)).status,403);
+ assert.equal((await rest(stranger,'POST','rpc/v56_void_team_pending_payment',voidArgs)).status,403);
+ let r=await rest(manager,'POST','rpc/v56_void_team_pending_payment',voidArgs);
+ assert.equal(r.status,200);
+ assert.equal(r.data.status,'void');
+ assert.equal(r.data.idempotent,false);
+ r=await rest(manager,'POST','rpc/v56_void_team_pending_payment',voidArgs);
+ assert.equal(r.status,200);
+ assert.equal(r.data.idempotent,true);
+ assert.notEqual((await rest(manager,'POST','rpc/v56_void_team_pending_payment',{
+  ...voidArgs,p_idempotency_key:'V56-CONFLICT-VOID-001'
+ })).status,200);
+ assert.notEqual((await rest(manager,'POST','rpc/v5_confirm_team_payment_allocation',{
+  p_payment_id:pending,p_allocations:[{lesson_id:lesson,amount_cents:100}]
+ })).status,200,'Voided pending payment must not confirm');
+ assert.equal(db("select status from tutor_private.v5_team_payment_reports "+
+  "where id='"+pending+"'"),'pending','Original reported row remains immutable');
+ let month=await rest(manager,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal(month.status,200);
+ assert.equal(month.data.payments.find(p=>p.payment_id===pending).status,'void');
+ const originalNote=db("select note from tutor_private.v5_team_payment_reports "+
+  "where id='"+confirmed+"'");
+ const correction={p_payment_id:confirmed,p_field:'note',
+  p_new_value:'Synthetic corrected note, historical original retained',
+  p_reason:'V5.6 synthetic operator correction audit',
+  p_idempotency_key:'V56-METADATA-FIX-001'};
+ assert.equal((await rest(former,'POST','rpc/v56_correct_team_payment_metadata',
+  correction)).status,403);
+ r=await rest(manager,'POST','rpc/v56_correct_team_payment_metadata',correction);
+ assert.equal(r.status,200);
+ assert.equal(r.data.idempotent,false);
+ const correctionId=r.data.correction_id;
+ r=await rest(manager,'POST','rpc/v56_correct_team_payment_metadata',correction);
+ assert.equal(r.status,200);
+ assert.equal(r.data.correction_id,correctionId);
+ assert.equal(r.data.idempotent,true);
+ assert.equal(db("select note from tutor_private.v5_team_payment_reports "+
+  "where id='"+confirmed+"'"),originalNote,'Original confirmed payment untouched');
+ assert.notEqual((await rest(manager,'POST','rpc/v56_correct_team_payment_metadata',{
+  ...correction,p_new_value:'Different text'
+ })).status,200,'Same idempotency key cannot change correction payload');
+ // V5.6 P0 first tranche: request a reversal of an already confirmed
+ // direct allocation. Intake must NOT change settlement before approval.
+ const beforeDirect=await rest(manager,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal(beforeDirect.status,200);
+ const directRequest={
+  p_payment_id:confirmed,
+  p_allocations:[{lesson_id:lesson,amount_cents:5000}],
+  p_idempotency_key:'V56-DIRECT-INTAKE-001',
+  p_reason:'Synthetic refund intake pending financial approval'
+ };
+ assert.equal((await rest(former,'POST','rpc/v56_request_team_direct_refund',
+  directRequest)).status,403,'Former Team manager cannot request direct refund');
+ assert.equal((await rest(stranger,'POST','rpc/v56_request_team_direct_refund',
+  directRequest)).status,403,'Other tenant cannot request direct refund');
+ assert.equal((await rest(studentActor,'POST','rpc/v56_request_team_direct_refund',
+  directRequest)).status,403,'Student cannot request direct refund');
+ let direct=await rest(manager,'POST','rpc/v56_request_team_direct_refund',
+  directRequest);
+ assert.equal(direct.status,200);
+ assert.equal(direct.data.status,'requested_no_settlement');
+ assert.equal(direct.data.amount_cents,5000);
+ assert.equal(direct.data.settlement_changed,false);
+ assert.equal(direct.data.bank_verified,false);
+ const directId=direct.data.request_id;
+ direct=await rest(manager,'POST','rpc/v56_request_team_direct_refund',directRequest);
+ assert.equal(direct.status,200);
+ assert.equal(direct.data.request_id,directId);
+ assert.equal(direct.data.idempotent,true);
+ assert.notEqual((await rest(manager,'POST','rpc/v56_request_team_direct_refund',{
+  ...directRequest,p_allocations:[{lesson_id:lesson,amount_cents:4500}]
+ })).status,200,'Request idempotency cannot be reused with changed amount');
+ assert.notEqual((await rest(manager,'POST','rpc/v56_request_team_direct_refund',{
+  ...directRequest,p_idempotency_key:'V56-DIRECT-EXCESS-001',
+  p_allocations:[{lesson_id:lesson,amount_cents:20001}]
+ })).status,200,'Cannot request more than the original direct allocation');
+ assert.notEqual((await rest(manager,'POST','rpc/v56_request_team_direct_refund',{
+  ...directRequest,p_idempotency_key:'V56-DIRECT-DUPLICATE-001',
+  p_allocations:[{lesson_id:lesson,amount_cents:500},
+   {lesson_id:lesson,amount_cents:500}]
+ })).status,200,'Duplicate course allocation cannot be requested');
+ assert.equal(db("select amount_cents from tutor_private.v5_team_payment_allocations "+
+  "where payment_id='"+confirmed+"' and lesson_id='"+lesson+"'"),'20000',
+  'Immutable direct allocation remains intact');
+ assert.equal(db("select status from tutor_private.v5_team_payment_reports "+
+  "where id='"+confirmed+"'"),'confirmed','Confirmed payment remains immutable');
+ const afterDirect=await rest(manager,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal(afterDirect.status,200);
+ for(const k of ['outstanding_cents','confirmed_payments_cents',
+  'direct_allocated_cents','net_cash_movement_cents'])
+  assert.equal(afterDirect.data[k],beforeDirect.data[k],
+   'Request-only intake must not change financial settlement '+k);
+ const requestMonth=db("select to_char(now() at time zone 'Asia/Taipei','YYYY-MM-01')");
+ const directOverview=await rest(manager,'POST',
+  'rpc/v56_team_direct_refund_intake_overview',{
+   p_team_id:team,p_month:requestMonth
+  });
+ assert.equal(directOverview.status,200);
+ assert.ok(directOverview.data.requests.some(x=>
+  x.request_id===directId && x.status==='requested_no_settlement'));
+ assert.equal((await rest(former,'POST',
+  'rpc/v56_team_direct_refund_intake_overview',{
+   p_team_id:team,p_month:requestMonth
+  })).status,403,'Former manager cannot view refund requests');
+ assert.notEqual((await rows(studentActor,'v56_team_direct_refund_intake')).status,200,
+  'Private intake table must never be exposed directly');
+
+ // Approved allocated refunds reopen NET receivables; never mark a bank payout.
+ const netArgs={p_team_id:team,p_month:'2026-10-01'};
+ const netBeforeDirect=await rest(manager,'POST','rpc/v56_team_direct_refund_net_overview',netArgs);
+ assert.equal(netBeforeDirect.status,200,JSON.stringify(netBeforeDirect.data));
+ const decisionReason='Synthetic direct refund approval with no bank payout';
+ const decision={p_request_id:directId,p_approve:true,p_reason:decisionReason};
+ assert.equal((await rest(former,'POST','rpc/v56_decide_team_direct_refund',decision)).status,403);
+ assert.equal((await rest(studentActor,'POST','rpc/v56_decide_team_direct_refund',decision)).status,403);
+ assert.equal((await rest(stranger,'POST','rpc/v56_decide_team_direct_refund',decision)).status,403);
+ assert.equal((await rest(former,'POST','rpc/v56_team_direct_refund_net_overview',netArgs)).status,403);
+ assert.equal((await rest(studentActor,'POST','rpc/v56_team_direct_refund_net_overview',netArgs)).status,403);
+ let decided=await rest(manager,'POST','rpc/v56_decide_team_direct_refund',decision);
+ assert.equal(decided.status,200,JSON.stringify(decided.data));
+ assert.equal(decided.data.status,'approved_reversed_pending_manual_payout');
+ assert.equal(decided.data.settlement_changed,true);
+ assert.equal(decided.data.bank_verified,false);
+ assert.equal(decided.data.manual_paid,false);
+ decided=await rest(manager,'POST','rpc/v56_decide_team_direct_refund',decision);
+ assert.equal(decided.status,200);
+ assert.equal(decided.data.idempotent,true);
+ assert.notEqual((await rest(manager,'POST','rpc/v56_decide_team_direct_refund',{
+  ...decision,p_approve:false
+ })).status,200,'Cannot change decision after approval');
+ assert.notEqual((await rest(manager,'POST','rpc/v56_decide_team_direct_refund',{
+  ...decision,p_reason:'Changed decision reasons are not allowed'
+ })).status,200,'Cannot rewrite immutable decision reason');
+ assert.equal(db("select amount_cents from tutor_private.v5_team_payment_allocations "+
+  "where payment_id='"+confirmed+"' and lesson_id='"+lesson+"'"),'20000');
+ assert.equal(db("select coalesce(sum(amount_cents),0) from tutor_private.v56_team_direct_refund_reversals "+
+  "where payment_id='"+confirmed+"'"),'5000');
+ const netAfterDirect=await rest(manager,'POST','rpc/v56_team_direct_refund_net_overview',netArgs);
+ assert.equal(netAfterDirect.status,200);
+ assert.equal(netAfterDirect.data.outstanding_cents,
+  netBeforeDirect.data.outstanding_cents+5000,'Refund reversal reopens course receivable');
+ assert.equal(netAfterDirect.data.direct_net_allocated_cents,
+  netBeforeDirect.data.direct_net_allocated_cents-5000);
+ assert.equal(netAfterDirect.data.all_time_direct_refund_liability_cents,
+  netBeforeDirect.data.all_time_direct_refund_liability_cents+5000);
+ assert.equal(netAfterDirect.data.all_time_confirmed_receipts_cents,
+  netBeforeDirect.data.all_time_confirmed_receipts_cents,'No cash leaves on approval');
+ assert.equal(netAfterDirect.data.physical_bank_refund_verified,false);
+ // V5.7 project operations must use the same NET financial basis as V5.6.
+ const projectOperations=await rest(manager,'POST','rpc/v5_team_operations_overview',netArgs);
+ const netPaymentOverview=await rest(manager,'POST','rpc/v5_team_payment_overview',netArgs);
+ assert.equal(projectOperations.status,200,JSON.stringify(projectOperations.data));
+ assert.equal(netPaymentOverview.status,200,JSON.stringify(netPaymentOverview.data));
+ assert.equal(projectOperations.data.ledger_basis,'net_after_immutable_reversals');
+ assert.equal(projectOperations.data.cash_verified_by_bank,false);
+ const projectRows=projectOperations.data.projects;
+ assert.ok(projectRows.length>0);
+ assert.equal(projectRows.reduce((n,p)=>n+p.outstanding_cents,0),
+  netPaymentOverview.data.outstanding_cents,
+  'V5.7 per-project outstanding must equal the net V5.6 Team balance');
+ assert.equal(projectRows.reduce((n,p)=>n+p.direct_net_cents,0),
+  netPaymentOverview.data.direct_allocated_cents);
+ assert.equal(projectRows.reduce((n,p)=>n+p.advance_net_cents,0),
+  netPaymentOverview.data.advance_applied_cents);
+ for(const row of projectRows)
+  assert.equal(row.confirmed_receivable_cents,
+   row.direct_net_cents+row.advance_net_cents+row.outstanding_cents,
+   'Each project must conserve its financial balance after direct refunds');
+ assert.equal((await rest(former,'POST','rpc/v5_team_operations_overview',netArgs)).status,403);
+ assert.equal((await rest(studentActor,'POST','rpc/v5_team_operations_overview',netArgs)).status,403);
+ // A rejected request never inserts a reversal.
+ const rejectRequest={...directRequest,p_idempotency_key:'V56-DIRECT-REJECT-001',
+  p_allocations:[{lesson_id:lesson,amount_cents:100}]};
+ const rejection=await rest(manager,'POST','rpc/v56_request_team_direct_refund',rejectRequest);
+ assert.equal(rejection.status,200);
+ decided=await rest(manager,'POST','rpc/v56_decide_team_direct_refund',{
+  p_request_id:rejection.data.request_id,p_approve:false,
+  p_reason:'Synthetic manager rejects this duplicate adjustment'
+ });
+ assert.equal(decided.status,200);
+ assert.equal(decided.data.status,'rejected');
+ assert.equal(decided.data.settlement_changed,false);
+ assert.equal(db("select count(*) from tutor_private.v56_team_direct_refund_reversals "+
+  "where request_id='"+rejection.data.request_id+"'"),'0');
+ // Two valid refund requests race for the same remaining 15000 cents.
+ // The common anchor lock must permit exactly one decision.
+ const requests=await Promise.all(['A','B'].map(k=>rest(manager,'POST',
+  'rpc/v56_request_team_direct_refund',{
+   ...directRequest,p_idempotency_key:'V56-DIRECT-RACE-'+k+'-001',
+   p_allocations:[{lesson_id:lesson,amount_cents:15000}]
+  })));
+ assert.deepEqual(requests.map(x=>x.status),[200,200]);
+ const competing=await Promise.all(requests.map(x=>rest(manager,'POST',
+  'rpc/v56_decide_team_direct_refund',{
+   p_request_id:x.data.request_id,p_approve:true,
+   p_reason:'Synthetic concurrent approved reversal under anchor lock'
+  })));
+ assert.equal(competing.filter(x=>x.status===200).length,1,
+  'Only one racing request may consume the remaining refund capacity');
+ assert.equal(db("select coalesce(sum(amount_cents),0) from tutor_private.v56_team_direct_refund_reversals "+
+  "where payment_id='"+confirmed+"'"),'20000','Reversals cannot exceed gross allocation');
+ assert.equal(db("select count(*) from tutor_private.v56_team_direct_refund_decisions "+
+  "where payment_id='"+confirmed+"' and approved"),'2',
+  'Failed conflicting approval must not leave partial decision');
+ assert.notEqual((await rows(studentActor,'v56_team_direct_refund_decisions')).status,200);
+ assert.notEqual((await rows(former,'v56_team_direct_refund_reversals')).status,200);
+
+
+ // Approving an unapplied-credit refund reserves the balance under
+ // the same workspace lock held by every existing V5.4 credit offset.
+ const refund={p_credit_id:credit,p_amount_cents:60,
+  p_idempotency_key:'V56-CREDIT-REFUND-001',
+  p_reason:'Synthetic refund from unused advance credit'};
+ assert.equal((await rest(studentActor,'POST','rpc/v56_request_team_credit_refund',
+  refund)).status,403);
+ r=await rest(manager,'POST','rpc/v56_request_team_credit_refund',refund);
+ assert.equal(r.status,200);
+ const request=r.data.request_id;
+ assert.equal(r.data.status,'requested');
+ r=await rest(manager,'POST','rpc/v56_request_team_credit_refund',refund);
+ assert.equal(r.status,200);
+ assert.equal(r.data.request_id,request);
+ assert.equal(r.data.idempotent,true);
+ assert.notEqual((await rest(manager,'POST','rpc/v56_record_team_refund_manual_paid',{
+  p_request_id:request,p_reference:'SYNTHETIC-NO-BANK-TRANSFER',
+  p_paid_on:'2026-10-26',p_reason:'Synthetic premature completion denial'
+ })).status,200,'Cannot mark paid before refund approved');
+ assert.equal((await rest(former,'POST','rpc/v56_decide_team_credit_refund',{
+  p_request_id:request,p_approve:true,p_reason:'Former manager denied'
+ })).status,403);
+ r=await rest(manager,'POST','rpc/v56_decide_team_credit_refund',{
+  p_request_id:request,p_approve:true,p_reason:'Approved synthetic credit refund'
+ });
+ assert.equal(r.status,200);
+ assert.equal(r.data.status,'approved');
+ r=await rest(manager,'POST','rpc/v56_decide_team_credit_refund',{
+  p_request_id:request,p_approve:true,p_reason:'Approved synthetic credit refund'
+ });
+ assert.equal(r.status,200);
+ assert.equal(r.data.idempotent,true);
+ assert.notEqual((await rest(manager,'POST','rpc/v56_decide_team_credit_refund',{
+  p_request_id:request,p_approve:false,p_reason:'Try to reverse decision'
+ })).status,200,'Decision is immutable');
+ let overview=await rest(manager,'POST','rpc/v5_team_advance_overview',{
+  p_team_id:team,p_student_id:db("select student_id from "+
+   "tutor_private.v5_team_advance_credits where id='"+credit+"'")
+ });
+ assert.equal(overview.status,200);
+ const creditRow=overview.data.credits.find(x=>x.credit_id===credit);
+ assert.equal(creditRow.refund_reserved_cents,60);
+ assert.equal(creditRow.available_cents,40);
+ assert.notEqual((await rest(manager,'POST','rpc/v5_apply_team_advance_credit',{
+  p_credit_id:credit,p_allocations:[{lesson_id:lesson,amount_cents:41}],
+  p_idempotency_key:'V56-OVERSPEND-BLOCKED-001'
+ })).status,200,'Approved refund reserve prevents credit overspend');
+ r=await rest(manager,'POST','rpc/v5_apply_team_advance_credit',{
+  p_credit_id:credit,p_allocations:[{lesson_id:lesson,amount_cents:40}],
+  p_idempotency_key:'V56-REMAINING-OFFSET-001'
+ });
+ assert.equal(r.status,200,'Remaining unused credit can offset a receivable');
+ assert.equal(r.data.applied_cents,40);
+ overview=await rest(manager,'POST','rpc/v5_team_advance_overview',{
+  p_team_id:team,p_student_id:db("select student_id from "+
+   "tutor_private.v5_team_advance_credits where id='"+credit+"'")
+ });
+ assert.equal(overview.data.credits.find(x=>x.credit_id===credit).available_cents,0);
+ assert.notEqual((await rest(manager,'POST','rpc/v56_request_team_credit_refund',{
+  p_credit_id:credit,p_amount_cents:1,
+  p_idempotency_key:'V56-EXHAUSTED-REFUND-001',
+  p_reason:'Cannot refund already reserved or applied credit'
+ })).status,200);
+ r=await rest(manager,'POST','rpc/v56_record_team_refund_manual_paid',{
+  p_request_id:request,p_reference:'SYNTHETIC-NO-BANK-TRANSFER',
+  p_paid_on:'2026-10-26',p_reason:'Manual synthetic payout recorded, no external bank'
+ });
+ assert.equal(r.status,200);
+ assert.equal(r.data.status,'manual_paid');
+ assert.equal(r.data.bank_verified,false);
+ r=await rest(manager,'POST','rpc/v56_record_team_refund_manual_paid',{
+  p_request_id:request,p_reference:'SYNTHETIC-NO-BANK-TRANSFER',
+  p_paid_on:'2026-10-26',p_reason:'Manual synthetic payout recorded, no external bank'
+ });
+ assert.equal(r.status,200);
+ assert.equal(r.data.idempotent,true);
+ const adjustments=await rest(manager,'POST','rpc/v56_team_adjustment_overview',{
+  p_team_id:team,p_month:'2026-11-01'
+ });
+ assert.equal(adjustments.status,200);
+ assert.ok(adjustments.data.pending_voids.some(x=>x.payment_id===pending));
+ assert.ok(adjustments.data.corrections.some(x=>x.payment_id===confirmed));
+ assert.ok(adjustments.data.refunds.some(x=>x.request_id===request&&x.status==='manual_paid'));
+ assert.equal(adjustments.data.refunds_bank_verified,false);
+ assert.equal((await rest(former,'POST','rpc/v56_team_adjustment_overview',{
+  p_team_id:team,p_month:'2026-11-01'
+ })).status,403);
+ assert.equal((await rest(studentActor,'POST','rpc/v56_team_adjustment_overview',{
+  p_team_id:team,p_month:'2026-11-01'
+ })).status,403);
+ const denied=await rows(studentActor,'v56_team_credit_refund_requests');
+ assert.notEqual(denied.status,200,'No direct student access to private credit refunds');
+ month=await rest(manager,'POST','rpc/v5_team_payment_overview',{
+  p_team_id:team,p_month:'2026-10-01'
+ });
+ assert.equal(month.status,200);
+ assert.ok(month.data.refund_reserved_cents>=60);
+ assert.equal(db("select amount_cents from tutor_private.v5_team_advance_credits "+
+  "where id='"+credit+"'"),initialCredit,'Original credit amount never edited');
+ assert.equal(db("select count(*) from public.payment_batches"),beforeV4,
+  'All V4 personal billing data remains untouched');
+});
+
+
+
+test('V5.6 P0-C/D/E real JWT validates net applied-credit reversal, refund holds, conservation and family denial',async()=>{
+ const manager=await signIn('teacher'),former=await signIn('parent');
+ const studentActor=await signIn('student'),stranger=await signIn('stranger');
+ const oldOwner=f.actors.parent.id;
+ const ws=db("select id from public.workspaces where owner_id='"+oldOwner+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+ws+"'");
+ const credit=db("select c.id from tutor_private.v5_team_advance_credits c "+
+  "join tutor_private.v5_team_payment_reports p on p.id=c.payment_id "+
+  "where p.team_id='"+team+"' and p.reference='TRANSFER-ADVANCE-ISOLATION'");
+ const op=db("select id from tutor_private.v5_team_advance_operations "+
+  "where credit_id='"+credit+"' and idempotency_key='V56-REMAINING-OFFSET-001'");
+ const lesson=db("select lesson_id from tutor_private.v5_team_advance_applications "+
+  "where operation_id='"+op+"'");
+ const student=db("select student_id from tutor_private.v5_team_advance_credits where id='"+credit+"'");
+ for(const v of [ws,team,credit,op,lesson,student])assert.match(v,/^[a-f0-9-]{36}$/i);
+ const net=()=>rest(manager,'POST','rpc/v56_team_conservation_overview',{p_team_id:team});
+ const before=await net();
+ assert.equal(before.status,200,JSON.stringify(before.data));
+ assert.equal(before.data.conservation_passed,true);
+ assert.equal(before.data.bank_verified,false);
+ const scope={p_team_id:team,p_student_id:student};
+ assert.equal((await rest(former,'POST','rpc/v56_team_refundable_allocations',scope)).status,403);
+ assert.equal((await rest(studentActor,'POST','rpc/v56_team_refundable_allocations',scope)).status,403);
+ assert.equal((await rest(stranger,'POST','rpc/v56_team_conservation_overview',{p_team_id:team})).status,403);
+ assert.equal((await rest(studentActor,'POST','rpc/v56_team_conservation_overview',{p_team_id:team})).status,403);
+ assert.equal((await rest(former,'POST','rpc/v56_team_conservation_overview',{p_team_id:team})).status,403);
+ let source=await rest(manager,'POST','rpc/v56_team_refundable_allocations',scope);
+ assert.equal(source.status,200,JSON.stringify(source.data));
+ const entry=source.data.advance_applications.find(x=>x.credit_id===credit&&x.operation_id===op&&x.lesson_id===lesson);
+ assert.equal(entry.remaining_cents,40);
+ const args={p_credit_id:credit,p_entries:[{operation_id:op,lesson_id:lesson,amount_cents:30}],
+  p_mode:'refund_reserved',p_idempotency_key:'V56-APPLIED-REFUND-001',
+  p_reason:'Synthetic request to refund previously applied credit'};
+ assert.equal((await rest(former,'POST','rpc/v56_request_team_applied_credit_adjustment',args)).status,403);
+ let requested=await rest(manager,'POST','rpc/v56_request_team_applied_credit_adjustment',args);
+ assert.equal(requested.status,200,JSON.stringify(requested.data));
+ assert.equal(requested.data.status,'requested_no_settlement');
+ const id=requested.data.request_id;
+ requested=await rest(manager,'POST','rpc/v56_request_team_applied_credit_adjustment',args);
+ assert.equal(requested.status,200);
+ assert.equal(requested.data.idempotent,true);
+ assert.notEqual((await rest(manager,'POST','rpc/v56_request_team_applied_credit_adjustment',{
+  ...args,p_entries:[{operation_id:op,lesson_id:lesson,amount_cents:29}]
+ })).status,200,'Idempotency payload cannot be rewritten');
+ assert.equal((await rest(studentActor,'POST','rpc/v56_decide_team_applied_credit_adjustment',{
+  p_request_id:id,p_approve:true,p_reason:'Student is not the manager'
+ })).status,403);
+ const beforeApproval=await net();
+ assert.equal(beforeApproval.status,200);
+ assert.equal(beforeApproval.data.advance_net_cents,before.data.advance_net_cents);
+ let decided=await rest(manager,'POST','rpc/v56_decide_team_applied_credit_adjustment',{
+  p_request_id:id,p_approve:true,p_reason:'Synthetic manager approves applied-credit refund reservation'
+ });
+ assert.equal(decided.status,200,JSON.stringify(decided.data));
+ assert.equal(decided.data.status,'approved_refund_reserved');
+ assert.equal(decided.data.manual_paid,false);
+ assert.equal(decided.data.bank_verified,false);
+ decided=await rest(manager,'POST','rpc/v56_decide_team_applied_credit_adjustment',{
+  p_request_id:id,p_approve:true,p_reason:'Synthetic manager approves applied-credit refund reservation'
+ });
+ assert.equal(decided.status,200);
+ assert.equal(decided.data.idempotent,true);
+ assert.notEqual((await rest(manager,'POST','rpc/v56_decide_team_applied_credit_adjustment',{
+  p_request_id:id,p_approve:false,p_reason:'Conflicting decision must not succeed'
+ })).status,200);
+ const after=await net();
+ assert.equal(after.status,200,JSON.stringify(after.data));
+ assert.equal(after.data.conservation_passed,true);
+ assert.equal(after.data.advance_net_cents,before.data.advance_net_cents-30);
+ assert.equal(after.data.outstanding_cents,before.data.outstanding_cents+30);
+ assert.equal(after.data.applied_credit_refund_liability_cents,
+  before.data.applied_credit_refund_liability_cents+30);
+ assert.equal(after.data.advance_available_cents,before.data.advance_available_cents,
+  'Refunded applied credit must be held, not become available for another offset');
+ assert.equal(after.data.confirmed_cash_book_cents,before.data.confirmed_cash_book_cents);
+ assert.equal(after.data.bank_verified,false);
+ // Applied-credit reversals must also flow through V5.7 per-project balances.
+ const appliedMonth={p_team_id:team,p_month:'2026-10-01'};
+ const [projectAfterAdvance,monthlyAfterAdvance]=await Promise.all([
+  rest(manager,'POST','rpc/v5_team_operations_overview',appliedMonth),
+  rest(manager,'POST','rpc/v5_team_payment_overview',appliedMonth)
+ ]);
+ assert.equal(projectAfterAdvance.status,200,JSON.stringify(projectAfterAdvance.data));
+ assert.equal(monthlyAfterAdvance.status,200,JSON.stringify(monthlyAfterAdvance.data));
+ assert.equal(projectAfterAdvance.data.ledger_basis,'net_after_immutable_reversals');
+ assert.equal(projectAfterAdvance.data.cash_verified_by_bank,false);
+ const projectsAfterAdvance=projectAfterAdvance.data.projects;
+ assert.equal(projectsAfterAdvance.reduce((sum,p)=>sum+p.outstanding_cents,0),
+  monthlyAfterAdvance.data.outstanding_cents);
+ assert.equal(projectsAfterAdvance.reduce((sum,p)=>sum+p.advance_net_cents,0),
+  monthlyAfterAdvance.data.advance_applied_cents);
+ assert.equal(projectsAfterAdvance.reduce((sum,p)=>sum+p.direct_net_cents,0),
+  monthlyAfterAdvance.data.direct_allocated_cents);
+ assert.ok(projectsAfterAdvance.every(p=>p.confirmed_receivable_cents===
+  p.direct_net_cents+p.advance_net_cents+p.outstanding_cents));
+ assert.notEqual((await rows(studentActor,'v56_team_advance_application_reversals')).status,200);
+ assert.notEqual((await rows(former,'v56_team_applied_credit_decisions')).status,200);
+ const late={...args,p_idempotency_key:'V56-APPLIED-EXCESS-001',
+  p_entries:[{operation_id:op,lesson_id:lesson,amount_cents:11}]};
+ const reqLate=await rest(manager,'POST','rpc/v56_request_team_applied_credit_adjustment',late);
+ assert.equal(reqLate.status,200);
+ assert.notEqual((await rest(manager,'POST','rpc/v56_decide_team_applied_credit_adjustment',{
+  p_request_id:reqLate.data.request_id,p_approve:true,
+  p_reason:'Refund over original allocation must not be approved'
+ })).status,200,'Cannot approve more than remaining 10 cents');
+
+ // No valid explicit family bridge means NO parent/student Team ledger,
+ // even if the caller used to be the Team manager with a valid JWT.
+ const today=new Date();
+ const month=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),'01'].join('-');
+ const query={p_team_id:team,p_team_student_id:student,p_month:month};
+ assert.equal((await rest(former,'POST','rpc/v56_team_parent_finance_overview',query)).status,403);
+ assert.equal((await rest(studentActor,'POST','rpc/v56_team_parent_finance_overview',query)).status,403);
+ assert.equal((await rest(stranger,'POST','rpc/v56_team_parent_finance_overview',query)).status,403);
+ const listings=await rest(studentActor,'POST','rpc/v56_my_team_family_proposals',{});
+ assert.equal(listings.status,200);
+ assert.deepEqual(listings.data.proposals,[]);
+ // A refund manual payment is only a manager declaration, not bank verification.
+ const paidArgs={p_source:'applied_credit',p_request_id:id,
+  p_reference:'V56-SYNTHETIC-MANUAL-NO-BANK',p_paid_on:'2026-10-26',
+  p_reason:'Synthetic manual payout declaration for isolated QA only'};
+ assert.equal((await rest(former,'POST','rpc/v56_record_allocated_refund_manual_paid',paidArgs)).status,403);
+ let manual=await rest(manager,'POST','rpc/v56_record_allocated_refund_manual_paid',paidArgs);
+ assert.equal(manual.status,200,JSON.stringify(manual.data));
+ assert.equal(manual.data.bank_verified,false);
+ manual=await rest(manager,'POST','rpc/v56_record_allocated_refund_manual_paid',paidArgs);
+ assert.equal(manual.status,200);
+ assert.equal(manual.data.idempotent,true);
+ const final=await net();
+ assert.equal(final.status,200);
+ assert.equal(final.data.allocated_manual_paid_refunds_cents,30);
+ assert.equal(final.data.bank_verified,false);
+ assert.equal(db("select count(*) from tutor_private.v56_team_applied_credit_decisions "+
+  "where request_id='"+id+"' and approved"),'1');
+});
+
+
+test('V5.6 P0-E live V4 guardian consent allows only mapped Team student and revokes old JWT on unlink',async()=>{
+ const manager=await signIn('teacher'),parent=await signIn('parent'),child=await signIn('student');
+ const managerId=f.actors.teacher.id,parentId=f.actors.parent.id;
+ const personalWs=db("select id from public.workspaces where owner_id='"+managerId+"' limit 1");
+ const teamWs=db("select id from public.workspaces where owner_id='"+parentId+"' limit 1");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+teamWs+"'");
+ const teamStudent=db("select student_id from tutor_private.v5_team_advance_credits "+
+  "where team_id='"+team+"' limit 1");
+ for(const v of [personalWs,teamWs,team,teamStudent])assert.match(v,/^[a-f0-9-]{36}$/i);
+ // Only disposable GitHub SQL fixture: make one synthetic personal student
+ // and accepted guardian link with its own distinct, non-Team UUID.
+ const v4Student=db("insert into public.students(teacher_id,name,subject,hourly_rate,workspace_id) "+
+  "values('"+managerId+"','V56 Synthetic Family Link','數學',500,'"+personalWs+"') returning id").split('\n')[0];
+ assert.match(v4Student,/^[a-f0-9-]{36}$/i);
+ assert.notEqual(v4Student,teamStudent,'Team student IDs are not V4 student IDs');
+ const email=f.actors.parent.email.replaceAll("'","''");
+ const invite=db("insert into public.guardian_invites(teacher_id,student_id,email,workspace_id) "+
+  "values('"+managerId+"','"+v4Student+"','"+email+"','"+personalWs+"') returning id").split('\n')[0];
+ db("insert into public.student_guardians(teacher_id,student_id,guardian_id,invite_id,workspace_id) "+
+  "values('"+managerId+"','"+v4Student+"','"+parentId+"','"+invite+"','"+personalWs+"')");
+ assert.notEqual((await rest(manager,'POST','rpc/v56_propose_team_family_bridge',{
+  p_team_student_id:teamStudent,p_v4_student_id:'00000000-0000-0000-0000-000000000001',
+  p_reason:'Must never invent a V4 student relationship'
+ })).status,200);
+ let proposed=await rest(manager,'POST','rpc/v56_propose_team_family_bridge',{
+  p_team_student_id:teamStudent,p_v4_student_id:v4Student,
+  p_reason:'Synthetic V4 guardian-to-Team explicit consent QA'
+ });
+ assert.equal(proposed.status,200,JSON.stringify(proposed.data));
+ assert.equal(proposed.data.status,'proposed_waiting_guardian_acceptance');
+ const proposal=proposed.data.proposal_id;
+ const query={p_team_id:team,p_team_student_id:teamStudent,p_month:'2026-10-01'};
+ assert.equal((await rest(parent,'POST','rpc/v56_team_parent_finance_overview',query)).status,403,
+  'A proposed mapping is not a parent finance grant');
+ assert.equal((await rest(child,'POST','rpc/v56_team_parent_finance_overview',query)).status,403);
+ const list=await rest(parent,'POST','rpc/v56_my_team_family_proposals',{});
+ assert.equal(list.status,200);
+ assert.ok(list.data.proposals.some(x=>x.proposal_id===proposal&&x.status==='pending'));
+ assert.equal((await rest(child,'POST','rpc/v56_respond_team_family_proposal',{
+  p_proposal_id:proposal,p_accept:true
+ })).status,403);
+ let response=await rest(parent,'POST','rpc/v56_respond_team_family_proposal',{
+  p_proposal_id:proposal,p_accept:true
+ });
+ assert.equal(response.status,200,JSON.stringify(response.data));
+ assert.equal(response.data.status,'accepted');
+ let view=await rest(parent,'POST','rpc/v56_team_parent_finance_overview',query);
+ assert.equal(view.status,200,JSON.stringify(view.data));
+ assert.equal(view.data.team_id,team);
+ assert.equal(view.data.student_id,teamStudent);
+ assert.equal(view.data.currency,'TWD');
+ assert.equal(view.data.bank_verified,false);
+ assert.ok(Array.isArray(view.data.receivables));
+ assert.ok(Array.isArray(view.data.correction_refund_history));
+ assert.equal(JSON.stringify(view.data).includes('hourly_rate_cents'),false);
+ assert.equal(JSON.stringify(view.data).includes('teacher_user_id'),false);
+ assert.equal((await rest(parent,'POST','rpc/v56_team_parent_finance_overview',{
+  ...query,p_team_student_id:'00000000-0000-0000-0000-000000000002'
+ })).status,403,'Mapped parent cannot read a different Team student');
+ response=await rest(parent,'POST','rpc/v56_respond_team_family_proposal',{
+  p_proposal_id:proposal,p_accept:false
+ });
+ assert.equal(response.status,200);
+ assert.equal(response.data.status,'revoked');
+ assert.equal((await rest(parent,'POST','rpc/v56_team_parent_finance_overview',query)).status,403);
+ assert.notEqual((await rest(parent,'POST','rpc/v56_respond_team_family_proposal',{
+  p_proposal_id:proposal,p_accept:true
+ })).status,200,'Revocation is immutable and requires new proposal');
+ // New explicit approval; then the live V4 guardian invite disappears.
+ proposed=await rest(manager,'POST','rpc/v56_propose_team_family_bridge',{
+  p_team_student_id:teamStudent,p_v4_student_id:v4Student,
+  p_reason:'Second synthetic mapping to prove unlink revokes old JWT'
+ });
+ assert.equal(proposed.status,200);
+ const newProposal=proposed.data.proposal_id;
+ response=await rest(parent,'POST','rpc/v56_respond_team_family_proposal',{
+  p_proposal_id:newProposal,p_accept:true
+ });
+ assert.equal(response.status,200);
+ assert.equal((await rest(parent,'POST','rpc/v56_team_parent_finance_overview',query)).status,200);
+ db("delete from public.guardian_invites where id='"+invite+"'");
+ assert.equal(db("select count(*) from public.student_guardians where student_id='"+v4Student+"'"),'0',
+  'V4 invitation removal immediately revokes parent connection');
+ assert.equal((await rest(parent,'POST','rpc/v56_team_parent_finance_overview',query)).status,403,
+  'Old still-valid parent JWT cannot read after live guardian unlink');
+ const afterUnlink=await rest(parent,'POST','rpc/v56_my_team_family_proposals',{});
+ assert.equal(afterUnlink.status,200);
+ assert.deepEqual(afterUnlink.data.proposals,[]);
+ assert.notEqual((await rows(parent,'v56_team_family_bridge_acceptances')).status,200,
+  'Private consent audit must not be readable via Data API');
+});
+
+test('V5.6 manager GUI enables append-only pending void and displays audited refund history',async({page})=>{
+ // Isolated synthetic actor and Team B from the previous manager transfer
+ // and V5.6 backend tests; no real bank, family, course, or production writes.
+ const owner=f.actors.parent.id,manager=f.actors.teacher;
+ const teamWs=db("select id from public.workspaces where owner_id='"+owner+"'");
+ const team=db("select id from public.v5_teams where anchor_workspace_id='"+teamWs+"'");
+ const student=db("select c.student_id from tutor_private.v5_team_advance_credits c "+
+  "join tutor_private.v5_team_payment_reports p on p.id=c.payment_id "+
+  "where c.team_id='"+team+"' and p.reference='TRANSFER-ADVANCE-ISOLATION'");
+ assert.match(student,/^[0-9a-f-]{36}$/i);
+ const jwt=await signIn('teacher');
+ let submitted=await rest(jwt,'POST','rpc/v5_report_team_payment',{
+  p_team_id:team,p_student_id:student,p_amount_cents:100,
+  p_received_on:'2026-10-26',p_method:'cash',
+  p_reference:'V56-UI-PENDING-001',
+  p_note:'Synthetic UI pending item, never a bank transfer'
+ });
+ assert.equal(submitted.status,200);
+ const payment=submitted.data.payment_id;
+ await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
+  route=>route.fulfill({path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
+   contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+ await page.addInitScript(({url,key})=>{
+  window.V4_LOCAL_BACKEND={
+   environment:'local',isolated:true,projectRef:'local',url,publishableKey:key
+  };
+ },{url:f.apiUrl,key:f.anonKey});
+ await page.goto('/v2/index.html');
+ await page.waitForFunction(()=>!!window.supabase?.createClient,{timeout:20_000});
+ await page.evaluate(async({url,key,email,password})=>{
+  const supa=window.supabase.createClient(url,key,{
+   auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+  });
+  const {error}=await supa.auth.signInWithPassword({email,password});
+  if(error)throw Error('Isolated V5.6 Team manager login failed');
+  supa.auth.stopAutoRefresh?.();
+ },{url:f.apiUrl,key:f.anonKey,email:manager.email,password:manager.password});
+ await page.reload();
+ await expect(page.locator('body')).not.toHaveClass(/login-required/);
+ await openTeamSection(page,'billing');
+ await expect(page.locator('#v5-billing-card')).toBeVisible();
+ await page.locator('#v5-billing-team-select').selectOption(team);
+ // Synthetic pending payment was received in October; its event history is
+ // added in November after the manager's UI action.
+ await page.locator('#v5-billing-prev').click();
+ // Operations screen must reconcile source-ledger refunds before showing
+ // any project money; a stale gross RPC must fail closed.
+ await expect(page.locator('#v5-ops-report-message')).toContainText('退款反向分錄');
+ await expect(page.locator('#v5-ops-projects .v5-billing-row').first()).toContainText('未結清');
+ await expect(page.locator('#v56-adjustments-panel')).toBeVisible();
+ await expect(page.locator('#v56-adjustments-message')).toContainText('現任 Team 管理者');
+ const pending=page.locator('#v56-adjustments-payments [data-v56-action="void"][data-id="'+payment+'"]');
+ await expect(pending).toBeVisible();
+ page.on('dialog',dialog=>dialog.type()==='prompt'?
+  dialog.accept('Synthetic GUI pending void approved for testing'):dialog.accept());
+ await pending.click();
+ await expect.poll(()=>db("select count(*) from tutor_private.v56_team_pending_payment_voids "+
+  "where payment_id='"+payment+"'"),{timeout:15000}).toBe('1');
+ await expect(page.locator('#v56-adjustments-payments')).toContainText('已沖銷');
+ await page.locator('#v5-billing-next').click();
+ await expect(page.locator('#v56-adjustments-panel')).toBeVisible();
+ await expect(page.locator('#v56-adjustments-history')).toContainText('付款更正');
+ await expect(page.locator('#v56-adjustments-history')).toContainText('預收款退款');
+ await expect(page.locator('#v56-adjustments-history')).toContainText('管理者登記已付款');
+ await expect(page.locator('#v56-adjustments-history')).toContainText('待確認付款沖銷');
+ assert.equal(db("select status from tutor_private.v5_team_payment_reports where id='"+
+  payment+"'"),'pending','GUI void preserves original unconfirmed ledger row');
+});

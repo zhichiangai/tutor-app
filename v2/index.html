@@ -14,7 +14,7 @@
 </head>
 <body class="auth-pending">
   <div class="auth-loading-screen" role="status" aria-live="polite"><div class="auth-loading-content"><span class="auth-loading-symbol" aria-hidden="true">✳</span><strong>正在確認登入身分</strong><p>正在為你準備課程與學習紀錄。</p></div></div>
-  <div id="preview-readonly-banner" class="preview-readonly-banner" role="status" hidden>僅供畫面預覽：尚未連接獨立測試資料庫，所有資料操作已停用。重新整理可回到登入提示。</div>
+  <div id="preview-readonly-banner" class="preview-readonly-banner" role="status" hidden><span>僅供無資料畫面預覽：未連接隔離測試資料庫，資料讀取與所有寫入均已停用。</span><div class="preview-mode-switches" aria-label="預覽介面切換"><button type="button" id="preview-personal-shell" aria-pressed="true">個人介面</button><button type="button" id="preview-team-shell" aria-pressed="false">Team 介面</button></div></div>
   <div class="app-shell">
     <aside class="sidebar" aria-label="主要導覽">
       <a class="brand" href="./index.html"><span class="brand-symbol" aria-hidden="true">✳</span><span class="brand-copy"><strong>好好上課</strong><small>Lesson, made simple.</small></span></a>
@@ -128,7 +128,16 @@
         <section id="view-billing" class="page-view hidden">
           <div class="section-row page-head"><div><h2 id="billing-title">收付款整理</h2><p class="section-sub">清楚對帳，不再一筆一筆慢慢算</p></div><div class="month-controls"><button id="billing-prev" aria-label="上個月">‹</button><strong id="billing-month"></strong><button id="billing-next" aria-label="下個月">›</button></div></div>
           <label id="qa-accounting-control" class="section-sub hidden"><input id="qa-accounting-toggle" type="checkbox"> 在帳務中顯示已標記的 QA 測試資料（正式總計預設排除）</label>
-          <div class="billing-summary" id="billing-summary"></div><article class="card" id="billing-student-card"><div class="section-row"><div><h2>每位學生的本月收款</h2><p class="section-sub">依科目與學生彙總，點開查看每堂課；已確認與家長回報分開計算</p></div></div><div id="billing-student-summary"></div></article>
+          <div class="billing-summary" id="billing-summary"></div>
+          <article class="card hidden" id="v56-parent-family-panel" aria-label="Team 家長專屬帳務">
+            <div class="section-row"><div><h2>Team 孩子的帳務與更正紀錄</h2>
+              <p class="section-sub">需由 Team 管理者對應 V4 學生，家長親自同意且維持有效連結才可查看；學生看不到金額。</p></div></div>
+            <div class="month-controls"><button type="button" aria-label="Team 上個月" data-v56-family-action="month-prev">‹</button>
+              <strong id="v56-parent-family-month"></strong>
+              <button type="button" aria-label="Team 下個月" data-v56-family-action="month-next">›</button></div>
+            <div id="v56-parent-family-content" role="status" aria-live="polite"></div>
+          </article>
+          <article class="card" id="billing-student-card"><div class="section-row"><div><h2>每位學生的本月收款</h2><p class="section-sub">依科目與學生彙總，點開查看每堂課；已確認與家長回報分開計算</p></div></div><div id="billing-student-summary"></div></article>
           <article class="card period-records-card"><div class="section-row"><div><h2>期間付款／收款紀錄</h2><p class="section-sub">依所選月份的課程期間顯示，保留付款與收款日期</p><p class="helper-note" id="payment-history-scope" aria-live="polite"></p></div></div><div id="payment-batch-history"></div></article>
           <article class="card"><div class="section-row"><div><h2>課程與付款明細</h2><p class="section-sub">家長回報與老師收款分開紀錄</p></div><button class="secondary-button" id="batch-action" type="button">選擇付款期間</button></div><div id="billing-list"></div></article>
           <article class="card requests-card"><div class="section-row"><h2>請假與付款申請</h2><span class="muted-small">待確認會優先顯示</span></div><div id="requests-list"></div></article>
@@ -150,6 +159,8 @@
         </section>
         <section id="view-settings" class="page-view hidden">
           <div class="section-row page-head"><div><p class="eyebrow" id="settings-page-eyebrow">SETTINGS · 個人偏好</p><h2 id="settings-page-title">設定</h2><p class="section-sub" id="settings-page-description">帳號、家教空間及啟用的角色模式都放在這裡。</p></div></div>
+           <article id="preview-plan-panel" class="card preview-shell-only hidden" aria-label="會員方案靜態預覽"><h3>會員方案 · 靜態介紹</h3><p class="section-sub">未登入；以下並非使用者的目前方案或名額。</p><div id="preview-plans" class="preview-plans"></div><p class="helper-note">尚未提供線上購買，功能授權須由資料庫確認。</p></article>
+          <article id="preview-team-panel" class="card preview-shell-only hidden" aria-label="Team 無資料預覽"><h3 id="preview-team-title">Team 團隊與專案</h3><p class="section-sub">未登入的靜態導覽，不代表已擁有 Team 權限。</p><div class="empty">沒有讀取 Team、專案、學生、時薪、付款、抵扣或退款資料；實際功能需等待隔離 V5 後端驗收。</div></article>
           <button type="button" class="secondary-button hidden" id="settings-back-student" data-view="student">← 返回我的學習</button>
           <div class="settings-grid">
             <article class="card settings-card workspace-mode-card hidden" id="workspace-mode-card">
@@ -380,13 +391,13 @@
                   <button class="secondary-button" type="submit" id="v5-payment-report-submit">登錄待分配付款</button>
                 </form>
                 <div class="v5-payment-totals">
-                  <span>本月已確認人工付款 <strong id="v5-payment-confirmed-total"></strong></span>
+                  <span>本月已確認人工付款（退款前） <strong id="v5-payment-confirmed-total"></strong></span>
                   <span>本月課程未結清（已扣預收） <strong id="v5-payment-outstanding-total"></strong></span>
                   <span>本月確認付款內含預收 <strong id="v5-payment-advance-created-total"></strong></span>
                   <span>本月課程已使用預收抵扣 <strong id="v5-payment-advance-applied-total"></strong></span>
                   <span>Team 目前可用預收款（跨月） <strong id="v5-payment-advance-available-total"></strong></span>
                 </div>
-                <p class="helper-note">預收款是已確認付款中的未分配部分；抵扣只減少尚未結清金額，不代表再收到一次款項。這些數字由資料庫依現任管理者權限計算。</p>
+                <p class="helper-note">「已確認人工付款」是原始付款總額，未扣退款；已申請、核准及人工登錄退款，應另外查看更正／退款紀錄及 Team 淨額對帳，不能當作銀行已核實的實際入帳金額。預收款是已確認付款中的未分配部分；抵扣只減少尚未結清金額，不代表再收到一次款項。這些數字由資料庫依現任管理者權限計算。</p>
                 <h4>待分配的款項</h4>
                 <div id="v5-payment-pending-reports" aria-live="polite"></div>
                 <h4>已確認的分配紀錄</h4>
@@ -429,6 +440,25 @@
                 <div id="v5-advance-available"></div>
                 <div id="v5-advance-credit-rows"></div>
               </div>
+              <section class="v5-team-panel hidden" id="v56-adjustments-panel" aria-labelledby="v56-adjustments-title">
+                <h4 id="v56-adjustments-title">Team 付款更正、沖銷與預收退款（管理者）</h4>
+                <p class="helper-note">所有操作均追加稽核紀錄，不直接覆寫已確認的原始付款。可申請已分配付款退款、已抵扣預收款撤銷及退款；核准只調整帳本或保留額度，不代表銀行已退款。</p>
+                <p id="v56-adjustments-message" class="section-sub" role="status" aria-live="polite"></p>
+                <h4>本月人工付款</h4>
+                <div id="v56-adjustments-payments"></div>
+                <h4>選取學生的預收退款</h4>
+                <div id="v56-adjustments-credits"></div>
+                <h4>本月更正與退款歷史</h4>
+                <div id="v56-adjustments-history" aria-live="polite"></div>
+                <h4>Team 學生與 V4 家長帳號安全對應</h4>
+                <p class="helper-note">僅能選擇你現有的 V4 學生及此 Team 學生。家長必須主動同意，系統每次查帳都會重新檢查 V4 的有效家長連結。</p>
+                <form id="v56-family-bridge-form" class="v5-payment-report-form">
+                  <label>Team 學生<select id="v56-family-team-student" required></select></label>
+                  <label>我的 V4 學生<select id="v56-family-v4-student" required></select></label>
+                  <button class="secondary-button" id="v56-family-bridge-submit" type="submit">提出家長帳務對應</button>
+                </form>
+                <p class="helper-note">「登記人工退款已完成」必須在銀行／現金退款實際完成後操作；系統沒有直接驗證銀行轉帳。</p>
+              </section>
             </article>
             <article class="card settings-card"><h3>登入與安全</h3><p class="section-sub">使用 Google 管理登入，不會在網站儲存你的 Google 密碼。</p>
               <button class="secondary-button wide" id="sign-out" type="button">登出 Google 帳號</button>

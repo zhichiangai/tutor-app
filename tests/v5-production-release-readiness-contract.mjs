@@ -29,11 +29,20 @@ test('Repository Migration inventory matches frozen read-only release snapshot',
  assert.deepEqual(files.slice(0,snap.repo_migration_count),snap.repository_migration_files,
   'Existing V4+V5.5 baseline must remain immutable');
  assert.deepEqual(files.slice(snap.repo_migration_count),[
-  '20261108230000_v57_team_operations_overview.sql'
- ],'New V5.7 forward migration must be reviewed separately from the frozen release');
- assert.equal(files.length,snap.repo_migration_count+1);
+  '20261108230000_v57_team_operations_overview.sql',
+  '20261109163000_v5_6_team_refund_correction_ledger.sql',
+  '20261110032000_v5_6_team_allocated_refund_intake.sql',
+  '20261110040000_v5_6_team_direct_refund_approval_reversal.sql',
+  '20261110050000_v5_6_net_settlement_reconciliation.sql',
+  '20261110060000_v5_6_applied_credit_reverse_conservation.sql',
+  '20261110070000_v5_6_parent_finance_verified_bridge.sql',
+  '20261110080000_v5_6_manager_adjustment_sources.sql',
+  '20261110090000_v5_6_allocated_manual_payout_history.sql',
+  '20261110100000_v5_7_team_operations_net_reconciliation.sql'
+ ],'New V5.7 and V5.6 forward migrations require separately frozen source review');
+ assert.equal(files.length,snap.repo_migration_count+10);
  assert.equal(files.filter(x=>/_v5_/.test(x)).length,
-  snap.v5_repo_migration_count);
+  snap.v5_repo_migration_count+9);
  assert.deepEqual(files.filter(x=>/_v5_/.test(x)),[
   '20261104131300_v5_1_entitlements_student_seats.sql',
   '20261105171000_v5_1_admin_qa_release.sql',
@@ -43,7 +52,16 @@ test('Repository Migration inventory matches frozen read-only release snapshot',
   '20261106031000_v5_3_team_billing_foundation.sql',
   '20261106034000_v5_3_partial_payment_allocation.sql',
   '20261106043000_v5_4_team_advance_credit.sql',
-  '20261106050000_v5_4_team_monthly_reconciliation.sql'
+  '20261106050000_v5_4_team_monthly_reconciliation.sql',
+  '20261109163000_v5_6_team_refund_correction_ledger.sql',
+  '20261110032000_v5_6_team_allocated_refund_intake.sql',
+  '20261110040000_v5_6_team_direct_refund_approval_reversal.sql',
+  '20261110050000_v5_6_net_settlement_reconciliation.sql',
+  '20261110060000_v5_6_applied_credit_reverse_conservation.sql',
+  '20261110070000_v5_6_parent_finance_verified_bridge.sql',
+  '20261110080000_v5_6_manager_adjustment_sources.sql',
+  '20261110090000_v5_6_allocated_manual_payout_history.sql',
+  '20261110100000_v5_7_team_operations_net_reconciliation.sql'
  ]);
 });
 

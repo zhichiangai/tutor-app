@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "release": "V5.7",
+  "project_ref": "vctisuglfoxyuwlvyjee",
+  "source_lock": "docs/v5/catalog/V5_A1_NINETEEN_MIGRATION_SOURCE_LOCK_20261110.json",
+  "base_migration_count": 43,
+  "forward_migration_count": 19,
+  "total_expected": 62,
+  "status": "BLOCKED",
+  "reviewed_at": "2026-11-11",
+  "evidence": {
+    "CI_real_43_history_62_replay": "PASS",
+    "CI_populated_V4_migration": "PASS",
+    "CI_role_and_finance_isolation": "PASS",
+    "live_V4_source_hashes": "PASS",
+    "live_V4_schema_catalog": "PASS",
+    "financial_gross_net_presentation": "PARTIAL",
+    "Production_19_migration_CLI_dry_run": "NOT_TESTED",
+    "Vercel_production_project_target_rollback": "BLOCKED",
+    "external_notification_bank_oauth_side_effects": "PARTIAL",
+    "Production_three_role_Codex_GUI": "NOT_TESTED"
+  },
+  "reason": "Until a protected GitHub Environment is configured, production CLI dry-run and Vercel target are verified, and release finance/external effects are approved, no production writes or main merge.",
+  "approval_decision": null
+}

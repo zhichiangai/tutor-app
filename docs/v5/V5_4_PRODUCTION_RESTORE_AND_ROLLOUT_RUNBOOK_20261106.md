@@ -88,3 +88,74 @@
 | G6 正式發布 | **NO-GO** | 上述證據 + 使用者分別核准 |
 
 參考：[Supabase Database Backups](https://supabase.com/docs/guides/platform/backups)、[CLI Backup & Restore](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore)、[Supabase Branching](https://supabase.com/docs/guides/deployment/branching)。不允許把「branch 建立成功」或「程式測試成功」寫成「正式資料已備份／已還原」。
+## 5. 2026-11-10 V5.6 故障回復與最新相容性更新
+
+本節是本作業書的較新狀態補充；前述 V5.4/九份 SQL 與 PR #51–#56 均為歷史快照，不能當作目前 V5 Migration 清單。
+
+### 5.1 已重新核對的證據
+
+- PR #68 最新 Head：`b3fbfcc980f6551ea490a83c9b140a9e36558fda`，仍 Open/Draft。該 SHA 的 5 個 GitHub Actions workflow 均 success，其中 A1-R3 專用工作流以正式來源的 43 歷史版本在一次性 Supabase CI 中重播，接著於同一隔離 DB 套用 19 份 V5 forward SQL，62/62 PASS；V4/V5 RLS、RPC grants、合成 GoTrue/JWT/PostgREST 與 Chromium 工作亦通過。
+- Production 只做 metadata 唯讀核對：Supabase 專案為 ACTIVE_HEALTHY，migration history 43 筆，最新 `20261103212647`，public schema 中 `team_`／`v5_` 命名 table 為 0。沒有 Production SQL、Auth、RLS、資料寫入或 migration。
+- A1-R3 43-history schema 相容重播目前 PASS；這不代表正式備份還原、失敗回復、Production UI、外部副作用或正式發布已通過。Production V5 維持 NO-GO。
+
+### 5.2 PR #68 的 V5 forward 順序
+
+下列順序固定以 timestamp 遞增及該 Head 的 source-lock 為準；不可手動重排、改寫已鎖定 SQL 或只挑選較方便的檔案：
+
+1. `20261104131300_v5_1_entitlements_student_seats.sql`
+2. `20261105171000_v5_1_admin_qa_release.sql`
+3. `20261105181500_v5_2_team_projects_invitations.sql`
+4. `20261105192000_v5_2_team_governance_transfer.sql`
+5. `20261105201500_v5_3_team_data_boundaries.sql`
+6. `20261106031000_v5_3_team_billing_foundation.sql`
+7. `20261106034000_v5_3_partial_payment_allocation.sql`
+8. `20261106043000_v5_4_team_advance_credit.sql`
+9. `20261106050000_v5_4_team_monthly_reconciliation.sql`
+10. `20261108230000_v57_team_operations_overview.sql`
+11. `20261109163000_v5_6_team_refund_correction_ledger.sql`
+12. `20261110032000_v5_6_team_allocated_refund_intake.sql`
+13. `20261110040000_v5_6_team_direct_refund_approval_reversal.sql`
+14. `20261110050000_v5_6_net_settlement_reconciliation.sql`
+15. `20261110060000_v5_6_applied_credit_reverse_conservation.sql`
+16. `20261110070000_v5_6_parent_finance_verified_bridge.sql`
+17. `20261110080000_v5_6_manager_adjustment_sources.sql`
+18. `20261110090000_v5_6_allocated_manual_payout_history.sql`
+19. `20261110100000_v5_7_team_operations_net_reconciliation.sql`
+
+### 5.3 故障停損與重試規則
+
+- 新增 CI-only `tests/local/v5-migration-atomicity-smoke.sh`：只接受 GitHub Actions、`CI=true`、`V4_E2E_LOCAL=1`、未連結 hosted project 的 `tutor_v4_isolated`；建立短暫故意失敗的合成 Migration，驗證 DDL/DML、history row、V4/V5/Auth 合成資料 fingerprint 均回滾，再以修正後同版號重試並重複 `migration up`，確認只落一筆。失敗檔、測試 table 及測試 history row 由 trap 清理。這項結果僅在 PR #68 新 SHA 的工作流成功後才標 PASS。
+- 任何真實 Migration 發生意外 SQLSTATE、history 與預期不一致、schema/catalog 指紋 drift、資料守恆失敗或權限矩陣失敗，立即停止後續 Migration 及前端發布；不可跳過版本、手工改正式 history、猜測 down SQL 或直接重跑整批。
+- **正式環境沒有自動 rollback 保證**。先凍結 V5 寫入／關閉功能入口，保留錯誤與稽核證據，唯讀盤點實際 history/schema；由 ChatGPT 在隔離環境重現並提出 forward-fix。原始 append-only 帳務分錄不得刪除或覆寫。需要正式還原時須另經使用者授權及確認還原點、資料遺失窗口與對帳計畫。
+- CI 合成錯誤注入不代表正式 Postgres 交易行為、正式備份可用或正式資料恢復已證明；不得把 CI 測試檔拿去 Production 執行。
+
+### 5.4 合成 backup→restore 驗收範圍
+
+- 更新後的 `tests/local/v5-disposable-backup-restore-smoke.sh` 僅在 disposable CI 使用。CI 的 `postgres` 不可授予受保護 `supabase_admin` owner membership（Supabase 明確拒絕）；因此隔離 restore 使用 `--no-owner`，能測試 schema、RLS、函式、row count/hash，但會正規化 object owner。ACL 指紋仍比較 schema、relation、function owner 與 grants，這項差異會使整體還原關卡維持 BLOCKED，不能降級成 PASS。僅略過 platform `DEFAULT ACL` TOC entries。
+- 還原前後比對選定 schema 的 schema-only dump SHA-256（public、tutor_private、auth、supabase_migrations 及其 `extensions` 相依物件；包含表、RLS policies、functions）。CHECK 約束因 PostgreSQL dump/replay 會改變多餘括號呈現，改以 `pg_constraint.conbin` 解析樹指紋比對。另以獨立 ACL fingerprint 對照 schema、relations、functions 的 owner 與 object-level grants，並比對每表 row count + row hash，以及主要 migration/Auth/V4/V5 ledger 數量。只輸出雜湊與摘要，不輸出合成 row 或憑證。
+- 最新隔離實測：schema/check 約束與合成 row/count restore 通過，但 object-owner/ACL fingerprint 不符；嘗試 membership 時遭 Supabase reserved-role guard 拒絕。故 full schema+security restore = **BLOCKED**，Production backup/restore = **NOT TESTED**。解除 BLOCKED 需取得 Supabase 支援的保留 owner/平台 ACL 還原路徑，不能用提高權限或忽略差異替代。
+- 此證據只涵蓋指定 schema、object-level ACL/RLS 定義和合成資料一致；platform `DEFAULT ACL`、Realtime、Storage platform object/content 不在此 restore assertion 範圍。RLS/JWT 實際授權仍由獨立 GoTrue/JWT/PostgREST E2E 驗證。Production 備份及正式還原仍 NOT TESTED。
+
+### 5.5 正式 GO / NO-GO 清單
+
+**保持 NO-GO，直到下列項目全部以同一鎖定 SHA 證明：**
+
+- PR #68 最新 Node、isolated PostgreSQL、GoTrue/JWT、Chromium、A1-R3 及新增故障/還原 CI 全部成功；source-lock 完整且未改寫歷史 migration。
+- 已確認付款的直接分配更正/退款、預收已抵扣退款、跨帳務月份/科目金額守恆、家長逐學生付款/更正/退款歷史與跨 Team RLS 均有負向和正向測試；原始 append-only 帳本保留。
+- 真實 43-history A1-R3 相容性與 19-step 遞進證據可追溯；剩餘正式 DB backup/recovery、外部副作用、正式 Codex GUI 及發布授權須各自列明，不能用乾淨 bootstrap 或 PR checks 取代。
+- Production V5 Migration、RLS/Auth、Main merge、Vercel Production deploy、外部通知與銀行退款均須獨立授權。本 PR 目前 Draft，這份作業書不是發布授權。
+
+### 5.5 2026-11-10｜應用資料還原與平台受保護 Owner 的分離驗收
+
+> 最新測試使用 PostgreSQL 原生 `pg_database_owner` 保留新資料庫自帶 `public` schema，不再將它刪除後由 `postgres` 重建。並以獨立 owner 指紋覆蓋所有應用表／函式／型別，即使物件沒有額外 GRANT 也會檢查。先前 5.4 段落的 `conbin::text` 僅是歷史版本，因跨資料庫可能包含不同物件 OID，已改用 `pg_get_expr` 的 canonical expression；差異只輸出 CHECK 物件名稱，不輸出 SQL。
+
+本次新增的 `tests/sql/v5_synthetic_app_acl_fingerprint.sql` 只涵蓋本專案應用管理的 `public`、`tutor_private` 兩個 schema。隔離 CI 的 selected-schema `pg_dump` / `pg_restore --no-owner` 測試必須同時符合：
+
+1. **嚴格阻斷**：兩個應用 schema 的物件 Owner、非 Owner ACL GRANT、角色、授權選項指紋完全相同，包含 `SECURITY DEFINER` 函式；如有差異，CI 判定 FAIL。
+2. **嚴格阻斷**：五個測試範圍 schema 的 DDL、RLS、函式定義、由 PostgreSQL `pg_get_expr` 重新輸出的 CHECK 表達式（避免跨資料庫 OID 差異）、合成資料列 hash、筆數及 Migration history 全部相同；如有差異，CI 判定 FAIL。
+3. **獨立揭露**：`auth`、`supabase_migrations`、`extensions` 的平台管理 Owner／ACL 若因 `--no-owner` 不一致，記錄摘要並標示 **FULL PLATFORM OWNER/ACL RESTORE BLOCKED**，不得在任何發布報告中宣告完整備份還原 PASS。平台 `DEFAULT ACL` TOC 仍排除，Realtime／Storage 及外部回呼也不在測試範圍。
+4. **正式發布 NO-GO**：應用範圍 CI 通過，只能證明在 GitHub Actions 一次性 Supabase 本機容器中，合成資料和本專案自管物件可以還原。正式帳號、正式 Schema、平台完整 ACL、真實備份與還原、第三方通知均未驗證；正式 Migration／Main 合併／Production 部署仍需獨立授權。
+
+此分拆遵循 Supabase 官方手動還原文件對 `supabase_admin` owner 權限錯誤的特殊處理方式，未嘗試提升或繞過受保護角色權限。官方參考：<https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore>；PostgreSQL `pg_restore --no-owner` 語義：<https://www.postgresql.org/docs/17/app-pgrestore.html>。
+
+本節是**測試規格**，不代表該段程式已在最新 HEAD CI 通過。須使用最新 Actions run 的真實結果更新 PASS／FAIL。
