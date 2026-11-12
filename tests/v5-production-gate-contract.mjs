@@ -13,6 +13,21 @@ test('production URL guard refuses other project, transaction pooler, missing TL
  assert.throws(()=>run('target',['.'],{V5_PRODUCTION_DB_URL:'postgresql://postgres.vctisuglfoxyuwlvyjee:synthetic@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres?sslmode=require'}));
  assert.throws(()=>run('target',['.'],{V5_PRODUCTION_DB_URL:'postgresql://postgres:synthetic@db.vctisuglfoxyuwlvyjee.supabase.co:5432/postgres?sslmode=disable'}));
 });
+test('malformed protected URL diagnostics never print secret bytes',()=>{
+ const marker='PRODUCTION_SECRET_MARKER_DO_NOT_LOG';
+ const invalid='postgresql://postgres:'+marker+'@[';
+ let failure;
+ try {
+  run('target',['.'],{V5_PRODUCTION_DB_URL:invalid});
+ } catch (error) {
+  failure=error;
+ }
+ assert.ok(failure,'Malformed URL must fail closed');
+ const output=String(failure.stderr||'')+'\n'+String(failure.stdout||'')+'\n'+String(failure.message||'');
+ assert.doesNotMatch(output,/PRODUCTION_SECRET_MARKER_DO_NOT_LOG/);
+ assert.match(output,/Protected database URL is invalid/);
+});
+
 test('production URL guard accepts only intended direct or session pooler with TLS',()=>{
  const direct='postgresql://postgres:synthetic@db.vctisuglfoxyuwlvyjee.supabase.co:5432/postgres?sslmode=require';
  assert.match(run('target',['.'],{V5_PRODUCTION_DB_URL:direct}),/target_project/);
