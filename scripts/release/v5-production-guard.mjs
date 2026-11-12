@@ -29,7 +29,13 @@ function sources(){
 function target(){
  const value=process.env.V5_PRODUCTION_DB_URL;
  assert.ok(value,'Protected environment DB URL missing');
- const u=new URL(value);
+ let u;
+ try {
+  u=new URL(value);
+ } catch {
+  // Never let Node's ERR_INVALID_URL diagnostics include the secret connection URL.
+  throw new Error('Protected database URL is invalid');
+ }
  assert.ok(['postgres:','postgresql:'].includes(u.protocol),'Database protocol denied');
  const username=decodeURIComponent(u.username);
  const direct=u.hostname==='db.'+project+'.supabase.co'&&username==='postgres';
