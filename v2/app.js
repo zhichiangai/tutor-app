@@ -2731,10 +2731,19 @@ function scrubOAuthCallback(){
   if(p.has(k)){p.delete(k);changed=true}
  }
  const hash=String(loc.hash||"");
- const oauthHash=/^#(?:access_token|refresh_token|token_type|expires_in)=/.test(hash);
- if(oauthHash)changed=true;
+ let safeHash=hash;
+ // The previous implicit flow could put bearer credentials in any hash position.
+ // Preserve unrelated non-OAuth fragments, never preserve known credential keys.
+ if(hash.startsWith("#")&&hash.includes("=")){
+  const fragment=new URLSearchParams(hash.slice(1));
+  for(const k of ["code","access_token","refresh_token","token_type","expires_in",
+   "expires_at","provider_token","provider_refresh_token"]){
+   if(fragment.has(k)){fragment.delete(k);changed=true}
+  }
+  if(changed)safeHash=fragment.toString()?"#"+fragment.toString():"";
+ }
  if(changed)window.history.replaceState(null,"",(loc.pathname||"/v2/index.html")+
-  (p.toString()?"?"+p.toString():"")+(oauthHash?"":hash));
+  (p.toString()?"?"+p.toString():"")+safeHash);
 }
 function showLogoutGate(){
  authPhase="signedOut";activeUser=null;signOutRequested=false;
@@ -2881,7 +2890,9 @@ async function ensureClient(){
  const createClient=window.supabase?.createClient;
  if(!V4_CONFIG_VALID||!SUPABASE_URL)throw Error(window.V4_CONFIG_ERROR||"資料庫環境尚未通過驗證，已停止登入。");
  if(!createClient)throw Error("登入元件載入失敗，請重新整理頁面後再試");
- client=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+ // PKCE keeps reusable Supabase access/refresh tokens out of OAuth return URLs.
+ // Auth code still appears briefly in the query; never collect raw callback URLs in QA tools.
+ client=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:"pkce"}});
  client.auth.onAuthStateChange((event,session)=>{
   if(logoutLocked()){showLogoutGate();return}
   if(signOutRequested&&event!=="SIGNED_OUT")return;
@@ -2919,6 +2930,9 @@ async function initializeLive(){
  try{
   await ensureClient();
   const {data,error}=await client.auth.getSession();
+  // Supabase has now processed the PKCE code. Remove callback credentials before
+  // any profile/lesson RPC or retry path can delay URL sanitization.
+  scrubOAuthCallback();
   if(signOutRequested||bootGeneration!==authDataGeneration)return;
   if(logoutLocked()){showLogoutGate();return}
   if(error)throw error;
