@@ -248,6 +248,14 @@ jobs:
             echo "::error::Synthetic application-owned schema/ACL restore failed or was skipped"
             exit 1
           }
+      - name: Upload synthetic-only V5 Alpha multi-role RWD evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v5-alpha-synthetic-rwd
+          path: tests/e2e/test-results/v4-e2e-artifacts/v5-alpha-rwd-*.png
+          retention-days: 7
+          if-no-files-found: error
       - name: Remove ephemeral auth fixture
         if: always()
         run: rm -f "$V4_E2E_FIXTURE_FILE"
