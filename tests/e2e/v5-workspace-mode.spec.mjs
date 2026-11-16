@@ -356,7 +356,7 @@ test('V5.8 student management keeps guardian links behind separate disclosure at
    await expect(page.locator('#managed-guardian-invite-form')).toBeVisible();
    await sections.nth(2).locator('summary').click();
    await expect(page.locator('#managed-guardian-invite-form')).toBeHidden();
-   await page.locator('#student-management-modal [data-close="student-management-modal"]').click();
+   await page.locator('#student-management-modal [data-close="student-management-modal"]').first().click();
    await expect(page.locator('#student-management-modal')).not.toBeVisible();
   }finally{await page.close()}
  }
