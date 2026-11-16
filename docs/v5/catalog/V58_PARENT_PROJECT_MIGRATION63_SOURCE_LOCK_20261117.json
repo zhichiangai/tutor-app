@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "project": "tutor-app",
+  "release_candidate": "V5.8 parent scoped receivables",
+  "approved_release": "NO_GO",
+  "production_sql_authorized": false,
+  "main_merge_authorized": false,
+  "tested_ancestor_pr": 81,
+  "tested_ancestor_sha": "4ed38043ff9bd4698991a8f2a117cd45c59c7c92",
+  "prior_integrated_head": "5b015aa36dcfabcb4da86c73ad0522532e20cbcf",
+  "verification": "exact UTF-8 bytes + git blob SHA-1",
+  "target": {
+    "supabase_ref": "vctisuglfoxyuwlvyjee",
+    "required_migration_count": 62,
+    "required_latest_version": "20261110100000",
+    "required_parent_rpc_body_md5": "3569963e9d47af5d5e2acc728ccc8f17",
+    "new_migration_count": 63
+  },
+  "migration": {
+    "version": "20261117010000",
+    "name": "v58_parent_project_scoped_receivables",
+    "staged_path": "supabase/release-candidates/20261117010000_v58_parent_project_scoped_receivables.sql",
+    "canonical_path_after_separate_release_authorization": "supabase/migrations/20261117010000_v58_parent_project_scoped_receivables.sql",
+    "bytes": 6080,
+    "git_blob_sha1": "572dcbcaa0e2b6d1e7f1cb6fe0e078b93853846f",
+    "candidate_path": "supabase/candidates/20261116100000_v5_8_parent_project_scoped_receivables.sql",
+    "candidate_git_blob_sha1": "572dcbcaa0e2b6d1e7f1cb6fe0e078b93853846f"
+  },
+  "verified_ci_prior": {
+    "source_pr": 81,
+    "migration_replay_run": 43897135193,
+    "chromium_full_run": 43897134901
+  },
+  "constraints": [
+    "NO Production SQL without separate explicit authorization",
+    "NO Main merge without separate explicit authorization",
+    "DO NOT use supabase db push due to divergent historical V4 version IDs",
+    "Only one additive JSON-output SECURITY DEFINER RPC replace plus revocation/regrant",
+    "No production data operations; backup and restore evidence outstanding"
+  ],
+  "release_gate": "NO_GO"
+}
