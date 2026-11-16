@@ -6,6 +6,7 @@ on:
       - 'supabase/candidates/20261116100000_v5_8_parent_project_scoped_receivables.sql'
       - 'supabase/migrations/**'
       - 'supabase/release-candidates/**'
+      - 'supabase/diagnostics/v58_parent_project_migration63_preflight_readonly.sql'
       - 'docs/v5/catalog/V58_PARENT_PROJECT_MIGRATION63_SOURCE_LOCK_20261117.json'
       - 'tests/v58-migration63-fixed-release-source.mjs'
       - 'tests/local/v58-parent-project-63-gate.mjs'
@@ -85,7 +86,13 @@ jobs:
           node tests/local/v5-real43-history-gate.mjs forward
           node tests/local/v5-clean-bootstrap-gate.mjs
       - name: Assert exact 62-version baseline and immutable financial contract
-        run: node tests/local/v58-parent-project-63-gate.mjs before
+        run: |
+          set -euo pipefail
+          node tests/local/v58-parent-project-63-gate.mjs before
+          # Source-controlled SELECT-only probe. No hosted connection credentials.
+          report="$(docker exec -i supabase_db_tutor_v4_isolated psql -X -A -t -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/diagnostics/v58_parent_project_migration63_preflight_readonly.sql)"
+          RELEASE_PREFLIGHT_JSON="$report" node -e 'const x=JSON.parse(process.env.RELEASE_PREFLIGHT_JSON);if(x.status!=="PASS"){process.stderr.write("Local 62-history release preflight NO_GO\\n");process.exit(1)}'
+          echo "PASS: disposable-only 62-history read-only release preflight"
       - name: Use pinned Supabase CLI to create exactly one local forward migration
         run: |
           set -euo pipefail
