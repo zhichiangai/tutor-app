@@ -2556,6 +2556,9 @@ test('V5.6 P0-E live V4 guardian consent allows only mapped Team student and rev
  assert.equal(view.data.currency,'TWD');
  assert.equal(view.data.bank_verified,false);
  assert.ok(Array.isArray(view.data.receivables));
+ assert.ok(view.data.receivables.every(x=>typeof x.project_id==='string'&&
+  typeof x.project_name==='string'&&x.project_name.length>0),
+  'Authorised receivable rows must include own scoped project labels');
  assert.ok(Array.isArray(view.data.correction_refund_history));
  assert.equal(JSON.stringify(view.data).includes('hourly_rate_cents'),false);
  assert.equal(JSON.stringify(view.data).includes('teacher_user_id'),false);
