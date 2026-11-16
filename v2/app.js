@@ -2480,13 +2480,16 @@ function renderScheduleRules(){
  $("#schedule-rules-list").innerHTML=st.length?'<div class="schedule-rules-title">目前固定課表（'+st.length+' 組）</div>'+st.map(r=>
   '<div class="schedule-rule-row"><div><strong>'+esc(scheduleRuleLabel(r))+'</strong><small>'+esc(r.starts_on)+' 起'+(r.ends_on?' · 至 '+esc(r.ends_on):' · 長期')+(r.cancelled_from?' · '+esc(r.cancelled_from)+' 起已停止':'')+'</small></div><button type="button" class="mini-action" data-action="edit-rule" data-id="'+esc(r.id)+'">編輯</button><button type="button" class="mini-action" data-action="stop-rule" data-id="'+esc(r.id)+'">'+(r.cancelled_from?'已停止':'停止')+'</button></div>').join(""):'<div class="helper-note">目前沒有固定課表。選擇學生與日期，設定一次即可。</div>';
 }
-function openSchedule(rule=null){
+function openSchedule(rule=null,showList=false){
  if(state.role!=="teacher"){toast("請先切換老師模式");return}
  const st=visibleStudents();if(!st.length){toast("請先建立學生資料");showModal("student-modal");return}
  closeModal("day-modal");
+ const managing=showList===true&&!rule;
  state.editingSchedule=rule?.id||null;
- $("#schedule-form-title").textContent=rule?"調整固定課表":"新增固定課表";
- $("#schedule-rules-list").classList.toggle("hidden",!!rule);
+ $("#schedule-form-title").textContent=managing?"管理固定課表":rule?"調整固定課表":"新增固定課表";
+ $("#schedule-dialog-description").textContent=managing?"先選擇一組課表進行調整，或新增一組固定時段。":rule?"選擇要變更的時段與生效範圍；歷史課程與已付款紀錄會保留。":"只設定一次，就能自動出現在未來月曆。";
+ $("#schedule-manage-view").classList.toggle("hidden",!managing);
+ $("#schedule-editor-fields").classList.toggle("hidden",managing);
  $("#schedule-scope").classList.toggle("hidden",!rule);
  $("#schedule-student").innerHTML=st.map(o=>'<option value="'+esc(o.id)+'">'+esc(o.name)+'</option>').join("");
  $("#schedule-student").value=rule?.student_id||
@@ -3246,9 +3249,11 @@ function bindEvents(){
  $("#top-add").onclick=()=>openRecord();
  $("#agenda-add").onclick=()=>openRecord();
  $("#show-full-month").onclick=()=>changeCalendarMode("list");
- $("#manage-schedules").onclick=()=>openSchedule();
+ $("#manage-schedules").onclick=()=>openSchedule(null,true);
  $("#day-add-lesson").onclick=()=>{closeModal("day-modal");openRecord()};
  $("#day-add-rule").onclick=()=>openSchedule();
+ $("#schedule-create-new").onclick=()=>openSchedule();
+ $("#schedule-back-to-list").onclick=()=>openSchedule(null,true);
  $("#schedule-form").addEventListener("submit",submitSchedule);
  $("#change-form").addEventListener("submit",submitChange);
  $("#cancel-form").addEventListener("submit",submitCancel);
