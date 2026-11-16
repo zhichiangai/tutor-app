@@ -1599,6 +1599,9 @@ function renderStudentManagerDetail(){
 function openStudentManager(studentId){
  if(state.role!=="teacher"||!activeUser||!visibleStudents().some(s=>s.id===studentId))return;
  state.managedStudentId=studentId;
+ for(const id of ["managed-student-disclosure","managed-guardian-disclosure"]){
+  const detail=$("#"+id);if(detail)detail.open=false;
+ }
  $("#managed-student-email").value="";
  $("#managed-guardian-email").value="";
  renderStudentManagerDetail();
@@ -2344,6 +2347,25 @@ async function saveOnlyLessonLearning(){
  })));
  if(ok){closeModal("lesson-modal");toast("課後紀錄已更新；原有收款、時數及金額不變")}
 }
+function setLessonEditorMode(editing){
+ const lesson=resolveLesson(state.activeLesson);
+ if(!lesson||state.role!=="teacher")return;
+ const inactive=lesson.type==="leave"||lesson.type==="moved";
+ $("#lesson-teacher-readonly").classList.toggle("hidden",editing);
+ $("#lesson-time-editor").classList.toggle("hidden",!editing||inactive);
+ $("#lesson-learning-editor").classList.toggle("hidden",!editing||inactive);
+ $("#lesson-teacher-actions").classList.toggle("hidden",!editing);
+ if(!editing){
+  const d=actualDefaults(lesson);
+  $("#lesson-readonly-actual").textContent=lesson.type==="lesson"?
+   "實際上課："+d.actualStart+"–"+d.actualEnd+"；計費時數 "+d.actualHours+" 小時":
+   "課程狀態："+statusLabel(lesson)+"；目前僅供查看。";
+  $("#lesson-readonly-learning").textContent=lesson.lesson_content?
+   "上課內容："+lesson.lesson_content:"上課內容：尚未記錄";
+  $("#lesson-readonly-remarks").textContent=lesson.remarks?
+   "課後備註："+lesson.remarks:"課後備註：尚未記錄";
+ }
+}
 function openLessonPopup(id){
  const lesson=resolveLesson(id);
  if(!lesson){toast("找不到這堂課，請重新整理月曆");return}
@@ -2384,6 +2406,8 @@ function openLessonPopup(id){
  $("#lesson-parent-correct").classList.toggle("hidden",inactive||locked||lesson.type!=="lesson"||isVirtualOccurrence(lesson));
  $("#lesson-parent-leave").classList.toggle("hidden",inactive||locked);
  ["lesson-actual-start","lesson-actual-end","lesson-actual-hours"].forEach(id=>$("#"+id).disabled=inactive||locked);
+ $("#lesson-teacher-readonly").classList.add("hidden");
+ if(teacher)setLessonEditorMode(false);
  showModal("lesson-modal");
 }
 function lessonFormValues(){
@@ -3230,6 +3254,7 @@ function bindEvents(){
   $("#correction-confirmation").textContent="";
  });
  $("#lesson-learning-save").addEventListener("click",saveOnlyLessonLearning);
+ $("#lesson-open-editor").addEventListener("click",()=>setLessonEditorMode(true));
  ["lesson-content","lesson-feedback"].forEach(id=>
   $("#"+id).addEventListener("input",refreshLessonLearningCopyWarning));
  $("#shared-course-form").addEventListener("submit",submitSharedCourse);
