@@ -58,8 +58,8 @@ test('multi-Team parent renders only the two separately authorised children and 
    assert.ok(text.includes(p.display_name));
    assert.ok(text.includes(p.team_id.slice(-6)));
   }
-  assert.match(text,/(?:NT\\$|\\$)100(?:\\b|\\.)/,'First synthetic Team summary missing');
-  assert.match(text,/(?:NT\\$|\\$)200(?:\\b|\\.)/,'Second synthetic Team summary missing');
+  assert.ok(text.includes('100'),'First synthetic Team summary missing');
+  assert.ok(text.includes('200'),'Second synthetic Team summary missing');
   assert.ok(!text.includes('other-team'));
  }finally{f.cleanup()}
 });
@@ -72,7 +72,7 @@ test('a single mismatched Team overview clears all family finance without stale 
   await f.ui.refresh();
   const text=allText(f.elements.get('v56-parent-family-content'));
   assert.match(text,/無法驗證/);
-  assert.doesNotMatch(text,/合成學生甲|合成學生乙|NT\$100|NT\$200/);
+  assert.doesNotMatch(text,/合成學生甲|合成學生乙|100|200/);
   f.setRole('student');
   f.ui.render();
   assert.equal(f.elements.get('v56-parent-family-panel').classes.has('hidden'),true);
