@@ -334,28 +334,33 @@ test('fixed schedule management opens a list before the create/edit form at 320/
 });
 
 
-test('V5.8 teacher student management keeps invitations collapsed until selected at 320/390/768',async({browser})=>{
- for(const width of [320,390,768]){
-  const page=await browser.newPage({viewport:{width,height:844}});
-  try{
-   await signIn(page,'teacher');
-   const nav=page.locator(width<=430?
-    '.mobile-nav .nav-standard[data-view="students"]':
-    '.side-nav .nav-standard[data-view="students"]');
-   await nav.click();
-   await expect(page.locator('#teacher-student-manager')).toBeVisible();
-   await page.locator('#teacher-student-list [data-action="manage-student"]').first().click();
-   await expect(page.locator('#student-management-modal')).toBeVisible();
-   await expect(page.locator('#student-management-basics-form')).toBeVisible();
-   await expect(page.locator('#managed-student-disclosure')).not.toHaveAttribute('open','');
-   await expect(page.locator('#managed-guardian-disclosure')).not.toHaveAttribute('open','');
-   await page.locator('#managed-student-disclosure summary').click();
-   await expect(page.locator('#managed-student-disclosure')).toHaveAttribute('open','');
-   await expect(page.locator('#managed-student-invite-form')).toBeVisible();
-   await page.locator('#managed-guardian-disclosure summary').click();
-   await expect(page.locator('#managed-guardian-invite-form')).toBeVisible();
-   await page.locator('#student-management-modal [data-close="student-management-modal"]').first().click();
-   await expect(page.locator('#student-management-modal')).not.toBeVisible();
-  }finally{await page.close()}
- }
-});
+for(const width of [320,390,768]){
+ test('V5.8 student and parent account disclosures are grouped at '+width+'px',async({page})=>{
+  test.setTimeout(100_000);
+  await page.setViewportSize({width,height:844});
+  await signIn(page,'teacher');
+  const nav=page.locator(width<=430?
+   '.mobile-nav .nav-standard[data-view="students"]':
+   '.side-nav .nav-standard[data-view="students"]');
+  await expect(nav).toBeVisible();
+  await nav.click();
+  await expect(page.locator('#teacher-student-manager')).toBeVisible();
+  const manage=page.locator('#teacher-student-list [data-action="manage-student"]').first();
+  await expect(manage).toBeVisible();
+  await manage.click();
+  await expect(page.locator('#student-management-modal')).toBeVisible();
+  await expect(page.locator('#student-management-basics-form')).toBeVisible();
+  const student=page.locator('#managed-student-disclosure');
+  const guardian=page.locator('#managed-guardian-disclosure');
+  await expect(student).not.toHaveAttribute('open','');
+  await expect(guardian).not.toHaveAttribute('open','');
+  await student.locator('summary').click();
+  await expect(student).toHaveAttribute('open','');
+  await expect(page.locator('#managed-student-invite-form')).toBeVisible();
+  await guardian.locator('summary').click();
+  await expect(guardian).toHaveAttribute('open','');
+  await expect(page.locator('#managed-guardian-invite-form')).toBeVisible();
+  await page.locator('#student-management-modal [data-close="student-management-modal"]').first().click();
+  await expect(page.locator('#student-management-modal')).not.toBeVisible();
+ });
+}
