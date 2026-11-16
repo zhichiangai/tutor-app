@@ -58,8 +58,8 @@ test('multi-Team parent renders only the two separately authorised children and 
    assert.ok(text.includes(p.display_name));
    assert.ok(text.includes(p.team_id.slice(-6)));
   }
-  assert.ok(text.includes('NT$100'),'First synthetic Team summary missing');
-  assert.ok(text.includes('NT$200'),'Second synthetic Team summary missing');
+  assert.match(text,/(?:NT\\$|\\$)100(?:\\b|\\.)/,'First synthetic Team summary missing');
+  assert.match(text,/(?:NT\\$|\\$)200(?:\\b|\\.)/,'Second synthetic Team summary missing');
   assert.ok(!text.includes('other-team'));
  }finally{f.cleanup()}
 });
