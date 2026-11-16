@@ -802,6 +802,7 @@ test('V5.3 shared calendar shows two teachers; assigned teacher has no manager c
   await expect(page.locator('#v5-learning-project-select')).toHaveValue(project);
  }
  await enter('parent');
+ await expect(page.locator('#v5-team-role-scope')).toContainText('現任 Team 管理者');
  await expect(page.locator('#v5-learning-manager-controls')).toBeVisible();
  const opts=await page.locator('#v5-learning-lesson-teacher option').evaluateAll(
   els=>els.map(x=>x.value));
@@ -825,6 +826,8 @@ test('V5.3 shared calendar shows two teachers; assigned teacher has no manager c
  await signOutFromTeam(page);
  await expect(page.locator('#v5-learning-students')).toBeEmpty();
  await enter('teacher');
+ await expect(page.locator('#v5-team-role-scope')).toContainText('Team 一般老師');
+ await expect(page.locator('#v5-team-owner-controls')).toBeHidden();
  await expect(page.locator('#v5-learning-manager-controls')).toBeHidden();
  const teamChoices=await page.locator('#v5-learning-team-select option')
   .evaluateAll(els=>els.map(x=>x.value));
