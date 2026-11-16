@@ -41,7 +41,7 @@ begin
    tutor_private.v56_advance_net_for_lesson(f.lesson_id))
   order by f.lesson_start,f.lesson_id),'[]'::jsonb)
  into v_rows from tutor_private.v5_team_lesson_fees f
- join public.v5_team_projects pr on pr.id=f.project_id and pr.team_id=f.team_id
+ left join public.v5_team_projects pr on pr.id=f.project_id and pr.team_id=f.team_id
  where f.team_id=p_team_id and f.student_id=p_team_student_id
   and f.lesson_start>=p_month::timestamp at time zone 'Asia/Taipei'
   and f.lesson_start<(p_month::timestamp+interval '1 month') at time zone 'Asia/Taipei';
