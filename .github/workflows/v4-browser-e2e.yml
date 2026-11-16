@@ -227,66 +227,22 @@ jobs:
           npm install --no-save --no-package-lock \
             @playwright/test@1.64.1 @supabase/supabase-js@2.76.1
           npx playwright install --with-deps chromium
-      - name: Probe V5.8 parent project finance candidate in disposable DB only
-        if: ${{ github.event_name == 'pull_request' }}
+      - name: Probe optional V5.8 parent project finance SQL only in disposable DB
         run: |
           set -euo pipefail
-          candidate=supabase/candidates/20261116100000_v5_8_parent_project_scoped_receivables.sql
-          if [ ! -f "$candidate" ]; then
-            echo "No V5.8 optional SQL candidate; frozen 62-history baseline unchanged"
-            exit 0
-          fi
           test "$CI" = "true"
           test "$V4_E2E_LOCAL" = "1"
           grep -Fq 'project_id = "tutor_v4_isolated"' supabase/config.toml
           test ! -f supabase/.temp/project-ref
           test ! -f supabase/.branches/_current_branch
-          test -f "$candidate"
-          grep -Fq "create or replace function public.v56_team_parent_finance_overview" "$candidate"
-          docker exec -i supabase_db_tutor_v4_isolated psql -v ON_ERROR_STOP=1 -U postgres -d postgres < "$candidate" >/dev/null
-          echo "Applied optional V5.8 candidate only to disposable local Supabase"
-      - name: Seed only synthetic teachers, parents, students and lessons
-        run: node tests/e2e/seed-v4-local.mjs
-      - name: Verify real Chromium teacher-parent-student flows
-        run: npx playwright test --config tests/e2e/playwright.config.mjs
-      - name: Verify failed migration rollback, retry and idempotency
-        run: bash tests/local/v5-migration-atomicity-smoke.sh
-      - name: Rehearse strict app-owned ACL restore with platform owner limitations disclosed
-        id: v5_restore_probe
-        continue-on-error: true
-        run: bash tests/local/v5-disposable-backup-restore-smoke.sh
-      - name: Enforce V5 schema catalog and application-scope restore probes
-        if: always()
-        run: |
-          test "${{ steps.v5_catalog_probe.outcome }}" = "success" || {
-            echo "::error::V5 schema catalog mismatch or probe was skipped"
-            exit 1
-          }
-          test "${{ steps.v5_restore_probe.outcome }}" = "success" || {
-            echo "::error::Synthetic application-owned schema/ACL restore failed or was skipped"
-            exit 1
-          }
-      - name: Remove ephemeral auth fixture
-        if: always()
-        run: rm -f "$V4_E2E_FIXTURE_FILE"
-      - name: Upload sanitized failure screenshots and report
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: v4-browser-e2e-failures
-          path: |
-            tests/e2e/test-results/v4-e2e-report/
-            tests/e2e/test-results/v4-e2e-artifacts/
-          retention-days: 7
-          if-no-files-found: ignore
- supabase/config.toml
-          test ! -f supabase/.temp/project-ref
-          test ! -f supabase/.branches/_current_branch
-          test "$(docker ps --filter name=^/supabase_db_tutor_v4_isolated$ --format '{{.Names}}')" = "supabase_db_tutor_v4_isolated"
-          grep -q 'create or replace function public.v56_team_parent_finance_overview' "$candidate"
-          docker exec -i supabase_db_tutor_v4_isolated psql \
-            -v ON_ERROR_STOP=1 -U postgres -d postgres < "$candidate" >/dev/null
-          echo "V5.8 candidate applied to DISPOSABLE local DB only; hosted migration inventory unchanged"
+          candidate="supabase/candidates/20261116100000_v5_8_parent_project_scoped_receivables.sql"
+          if [ -f "$candidate" ]; then
+            test "$(docker ps --filter name=^/supabase_db_tutor_v4_isolated$ --format '{{.Names}}')" = "supabase_db_tutor_v4_isolated"
+            docker exec -i supabase_db_tutor_v4_isolated psql -v ON_ERROR_STOP=1 -U postgres -d postgres < "$candidate" >/dev/null
+            echo "Candidate applied to disposable local DB only; hosted database unchanged"
+          else
+            echo "No optional V5.8 SQL candidate; baseline unchanged"
+          fi
       - name: Seed only synthetic teachers, parents, students and lessons
         run: node tests/e2e/seed-v4-local.mjs
       - name: Verify real Chromium teacher-parent-student flows
