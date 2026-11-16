@@ -1028,3 +1028,14 @@ body.preview-readonly.preview-team-shell #view-settings .settings-grid{display:n
 .student-account-disclosure .student-management-invite-form{margin-top:14px}
 .v5-quota-next-step{margin-top:14px!important;border-left:3px solid #b47d56;padding:12px 14px;background:#fbf5ed;line-height:1.7;color:#54463b}
 @media(max-width:430px){.lesson-teacher-readonly #lesson-open-editor{width:100%}.student-account-disclosure{padding:12px}}
+
+/* Family access can span Teams; each authorised Team/student has its own scope. */
+#v56-parent-family-content .v56-family-scope{display:block;min-width:0;margin:10px 0;border:1px solid #eadfd4;border-radius:12px;padding:10px 12px}
+.v56-family-scope>summary{cursor:pointer;font-weight:700;min-height:36px;align-content:center;overflow-wrap:anywhere}
+.v56-family-scope>summary:focus-visible{outline:2px solid #b27a64;outline-offset:2px}
+.v56-family-scope[open]>:not(summary){margin-top:9px}
+
+/* V5.8 authorised family receivables grouped by project inside a Team scope. */
+.v56-family-project{display:grid;gap:6px;margin-top:12px;padding:11px 12px;border-radius:10px;background:#faf7f3;min-width:0}
+.v56-family-project>strong{font-size:13px;overflow-wrap:anywhere}
+.v56-family-project>span{display:block;overflow-wrap:anywhere}
