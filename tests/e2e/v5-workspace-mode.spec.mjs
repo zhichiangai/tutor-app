@@ -301,3 +301,34 @@ test('missing V5 Team backend shows explicit unavailable state, not empty projec
  await page.locator('.side-nav .nav-standard[data-view="calendar"]').click();
  await expect(page.locator('#view-calendar')).toBeVisible();
 });
+
+
+test('fixed schedule management opens a list before the create/edit form at 320/390/1280',async({browser})=>{
+ for(const width of [320,390,1280]){
+  const page=await browser.newPage({viewport:{width,height:844}});
+  try{
+   await signIn(page,'teacher');
+   const nav=page.locator(width<=430?
+    '.mobile-nav .nav-standard[data-view="calendar"]':
+    '.side-nav .nav-standard[data-view="calendar"]');
+   await nav.click();
+   await expect(page.locator('#view-calendar')).toBeVisible();
+   await page.locator('#manage-schedules').click();
+   await expect(page.locator('#schedule-modal')).toBeVisible();
+   await expect(page.locator('#schedule-form-title')).toHaveText('管理固定課表');
+   await expect(page.locator('#schedule-manage-view')).toBeVisible();
+   await expect(page.locator('#schedule-editor-fields')).toBeHidden();
+   await expect(page.locator('#schedule-save')).toBeHidden();
+   await page.locator('#schedule-create-new').click();
+   await expect(page.locator('#schedule-form-title')).toHaveText('新增固定課表');
+   await expect(page.locator('#schedule-manage-view')).toBeHidden();
+   await expect(page.locator('#schedule-editor-fields')).toBeVisible();
+   await expect(page.locator('#schedule-save')).toBeVisible();
+   await page.locator('#schedule-back-to-list').click();
+   await expect(page.locator('#schedule-manage-view')).toBeVisible();
+   await expect(page.locator('#schedule-editor-fields')).toBeHidden();
+   await page.locator('#schedule-modal [data-close="schedule-modal"]').first().click();
+   await expect(page.locator('#schedule-modal')).not.toBeVisible();
+  }finally{await page.close()}
+ }
+});
