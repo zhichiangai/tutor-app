@@ -80,7 +80,8 @@ test('Team family statement still fails closed and checks every live guardian li
  assert.match(family,/rec\.team_id!==accepted\[i\]\.team_id/);
  assert.match(family,/rec\.student_id!==accepted\[i\]\.team_student_id/);
  assert.match(family,/bank_verified!==false/);
- assert.match(family,/Team 末碼/);
+ assert.match(family,/Team（末碼/);
+ assert.match(family,/String\(p\.team_id\)\.slice\(-6\)/);
  assert.match(sql,/exists\(select 1 from public\.student_guardians sg/);
  assert.match(sql,/sg\.guardian_id=v_actor/);
  assert.match(sql,/p\.team_id=p_team_id and p\.team_student_id=p_team_student_id/);
