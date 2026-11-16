@@ -238,7 +238,15 @@ jobs:
           fi
           test "$CI" = "true"
           test "$V4_E2E_LOCAL" = "1"
-          grep -q '^project_id = "tutor_v4_isolated"
+          grep -Fq 'project_id = "tutor_v4_isolated"' supabase/config.toml
+          test ! -f supabase/.temp/project-ref
+          test ! -f supabase/.branches/_current_branch
+          test -f "$candidate"
+          grep -Fq "create or replace function public.v56_team_parent_finance_overview" "$candidate"
+          docker exec -i supabase_db_tutor_v4_isolated psql -v ON_ERROR_STOP=1 -U postgres -d postgres < "$candidate" >/dev/null
+          echo "Applied optional V5.8 candidate only to disposable local Supabase"
+      - name: Seed only synthetic teachers, parents, students and lessons
+        run: node tests/e2e/seed-v4-local.mjs
       - name: Verify real Chromium teacher-parent-student flows
         run: npx playwright test --config tests/e2e/playwright.config.mjs
       - name: Verify failed migration rollback, retry and idempotency
