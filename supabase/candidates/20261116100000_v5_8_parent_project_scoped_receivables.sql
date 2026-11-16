@@ -1,6 +1,6 @@
 -- V5.8: parent-safe per-project labels for authorised Team/student receivables.
 -- Forward-only additive JSON result change. No new SELECT grants on Team tables.
--- Keep the original 20261110070000 62-history RPC guards intact.
+-- Preserve the fully updated 20261110090000 parent RPC including manual payout history.
 -- Production migration requires an independently reviewed 62 -> 63 gate.
 create or replace function public.v56_team_parent_finance_overview(
  p_team_id uuid,p_team_student_id uuid,p_month date)
@@ -55,6 +55,8 @@ begin
  with history as (
   select 'direct_refund'::text kind,r.requested_at as event_at,r.amount_cents,
    case when d.request_id is null then 'requested'
+    when exists(select 1 from tutor_private.v56_team_allocated_refund_manual_payouts m
+     where m.source='direct' and m.request_id=r.id) then 'manual_paid_not_bank_verified'
     when d.approved then 'approved_reversed_pending_manual_payout' else 'rejected' end status
   from tutor_private.v56_team_direct_refund_intake r
   left join tutor_private.v56_team_direct_refund_decisions d on d.request_id=r.id
@@ -73,6 +75,8 @@ begin
   select 'applied_credit_adjustment',q.requested_at,q.amount_cents,
    case when d.request_id is null then 'requested'
     when not d.approved then 'rejected'
+    when exists(select 1 from tutor_private.v56_team_allocated_refund_manual_payouts m
+     where m.source='applied_credit' and m.request_id=q.id) then 'manual_paid_not_bank_verified'
     when q.mode='refund_reserved' then 'approved_refund_reserved'
     else 'approved_restored_credit' end
   from tutor_private.v56_team_applied_credit_requests q
