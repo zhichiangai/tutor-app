@@ -46,12 +46,16 @@ export function createV56FamilyUI({getClient,getUser,getRole,isReady,notify}){
    content.append(node('p','目前沒有待確認或已授權的 Team 家長帳務對應。','section-sub'));
    return;
   }
-  for(const p of proposals){
+  // Each authorised Team/student is its own ledger scope, even when the
+  // same guardian has children across multiple Teams and projects.
+  for(const [index,p] of proposals.entries()){
    if(!p.proposal_id||!p.team_id||!p.team_student_id)continue;
-   const wrapper=node('div',undefined,'v5-billing-row');
-   wrapper.append(node('strong',String(p.display_name||'學生')+' · '+({
-    pending:'等待家長同意',accepted:'已授權',revoked:'已撤回授權'
-   })[p.status]||'無法核對'));
+   const wrapper=node('details',undefined,'v5-billing-row v56-family-scope');
+   wrapper.open=proposals.length===1||index===0;
+   const status=({pending:'等待家長同意',accepted:'已授權',revoked:'已撤回授權'})[p.status]||'無法核對';
+   wrapper.append(node('summary','Team（末碼 '+String(p.team_id).slice(-6)+'） · '+
+    String(p.display_name||'學生')+' · '+status));
+   wrapper.append(node('p','每組 Team／學生帳務獨立顯示；課程包含此 Team 下的相關專案，不會合併其他 Team 的金額。','helper-note'));
    if(p.status==='pending')
     wrapper.append(action('同意查看這位孩子的 Team 帳務','accept',p.proposal_id));
    if(p.status==='accepted'){
@@ -87,7 +91,8 @@ export function createV56FamilyUI({getClient,getUser,getRole,isReady,notify}){
    const {data,error:failure}=await client.rpc('v56_my_team_family_proposals');
    if(ticket!==serial||!valid()||getUser()?.id!==userId)return;
    if(failure||!Array.isArray(data?.proposals))throw failure||Error('Invalid family bridge list');
-   const list=data.proposals.slice(0,20);
+   if(data.proposals.length>100)throw Error('Too many authorised Team scopes for one page');
+   const list=data.proposals;
    if(list.some(p=>!p.proposal_id||!p.team_id||!p.team_student_id||
     !['pending','accepted','revoked'].includes(p.status)))throw Error('Invalid scoped proposals');
    const accepted=list.filter(p=>p.status==='accepted');
