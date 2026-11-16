@@ -273,6 +273,10 @@ test('teacher can add edit and cancel a single planned lesson in Chromium',async
  await page.locator('#calendar-grid .calendar-event[data-id="'+lessonId+'"]').click();
  console.log('CRUD_STAGE selected_lesson_event');
  await expect(page.locator('#lesson-modal')).toBeVisible();
+ await expect(page.locator('#lesson-detail-summary')).toBeVisible();
+ await expect(page.locator('#lesson-edit-plan')).toBeHidden();
+ await page.locator('#lesson-detail-edit').click();
+ await expect(page.locator('#lesson-detail-summary')).toBeHidden();
  await expect(page.locator('#lesson-edit-plan')).toBeVisible();
  await page.locator('#lesson-edit-plan').click();
  console.log('CRUD_STAGE edit_opened');
@@ -286,6 +290,8 @@ test('teacher can add edit and cancel a single planned lesson in Chromium',async
  expect(db(`select hourly_rate::numeric(12,2) from public.lesson_records where id='${lessonId}'`)).toBe('550.00');
  await page.locator('#calendar-grid .calendar-event[data-id="'+lessonId+'"]').click();
  await expect(page.locator('#lesson-modal')).toBeVisible();
+ await expect(page.locator('#lesson-cancel')).toBeHidden();
+ await page.locator('#lesson-detail-edit').click();
  await page.locator('#lesson-cancel').click();
  console.log('CRUD_STAGE cancel_opened');
  await expect(page.locator('#cancel-modal')).toBeVisible();
