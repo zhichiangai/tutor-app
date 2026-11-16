@@ -64,11 +64,31 @@ export function createV56FamilyUI({getClient,getUser,getRole,isReady,notify}){
     if(statement&&statement.currency==='TWD'&&statement.month===monthKey()&&
      Array.isArray(statement.receivables)&&Array.isArray(statement.payments)&&
      Array.isArray(statement.correction_refund_history)){
+     const projects=new Map();
      for(const lesson of statement.receivables){
-      if(!Number.isSafeInteger(lesson.fee_cents)||!Number.isSafeInteger(lesson.outstanding_cents))continue;
-      wrapper.append(node('span',String(lesson.subject||'課程')+
-       ' · 應收 '+money(lesson.fee_cents)+' · 尚欠 '+money(lesson.outstanding_cents),'section-sub'));
+      if(!Number.isSafeInteger(lesson.fee_cents)||lesson.fee_cents<0||
+       !Number.isSafeInteger(lesson.outstanding_cents)||lesson.outstanding_cents<0)continue;
+      // After the optional V5.8 forward migration, an authorised receivable
+      // includes project_id/name. Never infer projects from unscoped APIs.
+      const projectId=typeof lesson.project_id==='string'?lesson.project_id:'';
+      const key=projectId||'undivided';
+      if(!projects.has(key))projects.set(key,{
+       label:projectId&&typeof lesson.project_name==='string'&&lesson.project_name.trim()?
+        '專案：'+lesson.project_name:'此 Team 尚未提供逐專案拆分',rows:[]
+      });
+      projects.get(key).rows.push(lesson);
      }
+     for(const group of projects.values()){
+      const section=node('section',undefined,'v56-family-project');
+      section.append(node('strong',group.label));
+      for(const lesson of group.rows){
+       section.append(node('span',String(lesson.subject||'課程')+
+        ' · 應收 '+money(lesson.fee_cents)+' · 尚欠 '+money(lesson.outstanding_cents),'section-sub'));
+      }
+      wrapper.append(section);
+     }
+     if(statement.payments.length||statement.correction_refund_history.length)
+      wrapper.append(node('strong','Team 付款及更正紀錄（未按專案個別歸屬）'));
      for(const payment of statement.payments)
       wrapper.append(node('span','付款 '+String(payment.received_on||'')+
        ' · '+money(payment.amount_cents)+' · 已人工確認','section-sub'));
