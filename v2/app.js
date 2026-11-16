@@ -2353,6 +2353,12 @@ function openLessonPopup(id){
  const teacher=state.role==="teacher",locked=lessonLocked(lesson),inactive=lesson.type==="leave"||lesson.type==="moved";
  $("#lesson-modal-heading").textContent=(studentFor(lesson)?.name||lesson.student||"學生")+" · "+(lesson.subject||"課程");
  $("#lesson-modal-date").textContent=prettyDate(lesson.lesson_date)+" · "+statusLabel(lesson);
+ $("#lesson-detail-actual").textContent=lesson.type==="lesson"?
+  "實際上課 "+d.actualStart+" – "+d.actualEnd+"（計費 "+d.actualHours+" 小時）":
+  lesson.type==="leave"?"此堂課已請假／停課":lesson.type==="moved"?"此堂課已改期":"尚未完成上課，顯示原訂時間";
+ $("#lesson-detail-learning").textContent=teacher&&lesson.lesson_content?
+  "上課內容："+lesson.lesson_content:"";
+ $("#lesson-detail-edit").classList.toggle("hidden",!teacher&&state.role!=="parent");
  $("#lesson-planned-time").textContent=d.scheduledStart+" – "+d.scheduledEnd+"（"+(durationHours(d.scheduledStart,d.scheduledEnd)||0)+" 小時）";
  $("#lesson-status-hint").textContent=lesson.type==="lesson"?"已完成上課，可查看實際紀錄":lesson.type==="leave"?"本堂已請假／停課":lesson.type==="moved"?"本堂已改期":"原本預定的課程";
  $("#lesson-actual-start").value=d.actualStart;
@@ -2384,6 +2390,9 @@ function openLessonPopup(id){
  $("#lesson-parent-correct").classList.toggle("hidden",inactive||locked||lesson.type!=="lesson"||isVirtualOccurrence(lesson));
  $("#lesson-parent-leave").classList.toggle("hidden",inactive||locked);
  ["lesson-actual-start","lesson-actual-end","lesson-actual-hours"].forEach(id=>$("#"+id).disabled=inactive||locked);
+ // Opening a lesson is always read-only. Explicit action is required before
+ // displaying writable fields, including completion and account requests.
+ $("#lesson-modal").classList.add("lesson-detail-view");
  showModal("lesson-modal");
 }
 function lessonFormValues(){
@@ -3224,6 +3233,10 @@ function bindEvents(){
   if(!canDismissAccountModal())showModal("account-modal");
  });
  $("#lesson-form").addEventListener("submit",saveLessonOutcome);
+ $("#lesson-detail-edit").onclick=()=>{
+  if(!resolveLesson(state.activeLesson)||!["teacher","parent"].includes(state.role))return;
+  $("#lesson-modal").classList.remove("lesson-detail-view");
+ };
  $("#correction-form").addEventListener("submit",submitCorrection);
  $("#correction-form").addEventListener("input",()=>{
   correctionRequest=null;$("#correction-submit").textContent="檢查更正內容";
