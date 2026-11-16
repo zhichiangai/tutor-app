@@ -1015,3 +1015,16 @@ body.preview-readonly.preview-team-shell .side-nav .nav-team{display:flex!import
 body.preview-readonly.preview-team-shell #view-settings .settings-grid{display:none!important}
 @media(max-width:900px){body.preview-readonly.preview-team-shell .mobile-nav .nav-team{display:flex!important}}
 @media(max-width:650px){body.preview-readonly .preview-plans{grid-template-columns:1fr}}
+
+/* V5.8: read-only lesson view, explicit edit action and separated account controls. */
+.lesson-teacher-readonly{display:grid;gap:10px;border:1px solid var(--border);border-radius:14px;padding:16px;background:#faf7f2}
+.lesson-teacher-readonly.hidden{display:none}
+.lesson-teacher-readonly h3{font-size:15px;margin:0}
+.lesson-teacher-readonly p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.65}
+.lesson-teacher-readonly #lesson-open-editor{justify-self:start;min-height:44px}
+.student-account-disclosure{border:1px solid var(--border);border-radius:14px;padding:15px;margin:12px 0;background:var(--white)}
+.student-account-disclosure summary{cursor:pointer;font-size:14px;font-weight:700;line-height:1.6;min-height:44px;display:list-item;align-content:center}
+.student-account-disclosure[open] summary{margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:12px}
+.student-account-disclosure .student-management-invite-form{margin-top:14px}
+.v5-quota-next-step{margin-top:14px!important;border-left:3px solid #b47d56;padding:12px 14px;background:#fbf5ed;line-height:1.7;color:#54463b}
+@media(max-width:430px){.lesson-teacher-readonly #lesson-open-editor{width:100%}.student-account-disclosure{padding:12px}}
