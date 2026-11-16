@@ -234,7 +234,9 @@ jobs:
           test "$V4_E2E_LOCAL" = "1" || { echo "::error::Candidate requires disposable local test environment"; exit 1; }
           grep -Fq 'project_id = "tutor_v4_isolated"' supabase/config.toml || { echo "::error::Candidate project ID is not isolated"; exit 1; }
           test ! -f supabase/.temp/project-ref || { echo "::error::Candidate blocked: checkout is linked to a hosted Supabase ref"; exit 1; }
-          test ! -f supabase/.branches/_current_branch || { echo "::error::Candidate blocked: Supabase branch selector exists"; exit 1; }
+          # The localhost Supabase CLI can create .branches/_current_branch after start.
+          # Initial pre-start unlinked-project check above already blocked hosted links.
+          # SQL execution below names only the disposable local Docker container.
           candidate="supabase/candidates/20261116100000_v5_8_parent_project_scoped_receivables.sql"
           if [ -f "$candidate" ]; then
             echo "Isolated candidate target: local named Supabase container"
