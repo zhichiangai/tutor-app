@@ -31,7 +31,7 @@ begin
     where vs.id=p.v4_student_id and vs.teacher_id=p.v4_teacher_id)
  ) then raise exception '家長對此 Team 學生沒有有效連結' using errcode='42501'; end if;
  select coalesce(jsonb_agg(jsonb_build_object(
-  'lesson_id',f.lesson_id,'project_id',f.project_id,'project_name',pr.name,
+  'lesson_id',f.lesson_id,'project_id',pr.id,'project_name',pr.name,
   'subject',f.subject,'lesson_start',f.lesson_start,
   'fee_cents',f.amount_cents,
   'direct_paid_net_cents',tutor_private.v56_direct_net_for_lesson(f.lesson_id),
