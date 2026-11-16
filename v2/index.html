@@ -538,6 +538,14 @@
         <strong id="lesson-planned-time">17:00 – 19:00</strong>
         <small id="lesson-status-hint">未確認上課</small>
       </div>
+      <section id="lesson-teacher-readonly" class="lesson-teacher-readonly hidden" aria-label="課程唯讀詳情">
+        <h3>本堂課程摘要</h3>
+        <p id="lesson-readonly-actual" class="section-sub"></p>
+        <p id="lesson-readonly-learning" class="section-sub"></p>
+        <p id="lesson-readonly-remarks" class="section-sub"></p>
+        <button type="button" class="secondary-button" id="lesson-open-editor">編輯上課紀錄與課程操作</button>
+        <p class="helper-note">只是檢視不會修改資料；選擇編輯後才能儲存、請假、改期或取消。</p>
+      </section>
       <div id="lesson-time-editor" class="lesson-time-editor">
         <div class="section-row"><div><h3 id="lesson-actual-heading">實際上課時間</h3>
           <p class="section-sub">沒有變動就保留預定時間；有變動可以直接修改。</p></div></div>
@@ -640,24 +648,26 @@
         <label><input id="managed-student-qa" type="checkbox"> 標記為 QA 測試學生；正式帳務總計預設排除其課程和付款</label>
         <button type="submit" class="secondary-button">儲存基本資料</button>
       </form>
-      <section class="student-management-section">
-        <h3>學生登入帳號</h3>
+      <details class="student-management-section student-account-disclosure" id="managed-student-disclosure">
+        <summary>學生登入帳號 · 查看邀請與連結</summary>
+        <p class="section-sub">此區包含邀請、撤銷邀請與解除連結；一般學生資料不受影響。</p>
         <p class="section-sub">學生接受邀請後，就能用自己的 Google 帳號查看課程與學習紀錄，不會看到付款資料。</p>
         <div id="managed-student-accounts"></div>
         <form id="managed-student-invite-form" class="student-management-invite-form">
           <label>學生 Google Email<input id="managed-student-email" type="email" maxlength="254" autocomplete="off" placeholder="student@gmail.com" required></label>
           <button type="submit" class="secondary-button">邀請學生</button>
         </form>
-      </section>
-      <section class="student-management-section">
-        <h3>家長登入帳號</h3>
+      </details>
+      <details class="student-management-section student-account-disclosure" id="managed-guardian-disclosure">
+        <summary>家長登入帳號 · 查看邀請與連結</summary>
+        <p class="section-sub">此區包含邀請、撤銷邀請與解除連結；請確認對象後再操作。</p>
         <p class="section-sub">可以邀請多位家長；已連結的家長可查看這位孩子的課程與付款。</p>
         <div id="managed-guardian-accounts"></div>
         <form id="managed-guardian-invite-form" class="student-management-invite-form">
           <label>家長 Google Email<input id="managed-guardian-email" type="email" maxlength="254" autocomplete="off" placeholder="parent@gmail.com" required></label>
           <button type="submit" class="secondary-button">邀請家長</button>
         </form>
-      </section>
+      </details>
       <div class="form-actions"><button type="button" class="secondary-button" data-close="student-management-modal">完成</button></div>
     </div>
   </dialog>
