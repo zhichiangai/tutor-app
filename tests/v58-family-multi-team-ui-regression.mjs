@@ -38,7 +38,9 @@ function fixture(){
    const amount=p.team_id===teams[0].team_id?10000:20000;
    return {data:{team_id:mismatch&&p.team_id===teams[1].team_id?'other-team':p.team_id,
     student_id:p.team_student_id,month:monthKey,currency:'TWD',bank_verified:false,
-    receivables:[{subject:'合成科目',fee_cents:amount,outstanding_cents:amount}],
+    receivables:[{project_id:p.team_id===teams[0].team_id?'project-A':'project-B',
+     project_name:p.team_id===teams[0].team_id?'合成專案甲':'合成專案乙',
+     subject:'合成科目',fee_cents:amount,outstanding_cents:amount}],
     payments:[],correction_refund_history:[]},error:null};
   }
  };
@@ -60,6 +62,10 @@ test('multi-Team parent renders only the two separately authorised children and 
   }
   assert.ok(text.includes('100'),'First synthetic Team summary missing');
   assert.ok(text.includes('200'),'Second synthetic Team summary missing');
+  assert.ok(text.includes('專案：合成專案甲'));
+  assert.ok(text.includes('專案：合成專案乙'));
+  assert.equal(text.match(/專案：合成專案甲/g)?.length,1);
+  assert.equal(text.match(/專案：合成專案乙/g)?.length,1);
   assert.ok(!text.includes('other-team'));
  }finally{f.cleanup()}
 });
