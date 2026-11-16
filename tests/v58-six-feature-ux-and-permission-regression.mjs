@@ -53,7 +53,8 @@ test('parent Team ledger lists multiple independently authorised Team/student sc
  class Node{
   constructor(tag){this.tagName=tag;this.textContent='';this.children=[];
    this.dataset={};this.className='';this.open=false;this.hiddenClass=false;
-   this.classList={toggle:(_name,v)=>{this.hiddenClass=!!v}};}
+   this.classList={toggle:(_name,v)=>{this.hiddenClass=!!v},
+    add:()=>{this.hiddenClass=true},remove:()=>{this.hiddenClass=false}};}
   append(...args){this.children.push(...args)}
   replaceChildren(...args){this.children=[...args]}
  }
