@@ -2553,6 +2553,9 @@ test('V5.6 P0-E live V4 guardian consent allows only mapped Team student and rev
  assert.equal(view.data.bank_verified,false);
  assert.ok(Array.isArray(view.data.receivables));
  assert.ok(Array.isArray(view.data.correction_refund_history));
+ assert.ok(view.data.receivables.every(x=>typeof x.project_id==='string'&&
+  typeof x.project_name==='string'&&x.project_name.length>0),
+  'Authorised Team/student receivable rows must carry only own scoped project labels');
  assert.equal(JSON.stringify(view.data).includes('hourly_rate_cents'),false);
  assert.equal(JSON.stringify(view.data).includes('teacher_user_id'),false);
  assert.equal((await rest(parent,'POST','rpc/v56_team_parent_finance_overview',{
