@@ -340,9 +340,10 @@ for(const width of [320,390,768]){
   await page.setViewportSize({width,height:844});
   await signIn(page,'teacher');
   console.log('V58_STUDENT_STAGE login width='+width);
-  const nav=page.locator(width<=430?
-   '.mobile-nav .nav-standard[data-view="students"]':
-   '.side-nav .nav-standard[data-view="students"]');
+  // The site's mobile-nav breakpoint is wider than 430px; follow actual visibility.
+  const mobileNav=page.locator('.mobile-nav .nav-standard[data-view="students"]');
+  const nav=(await mobileNav.isVisible())?mobileNav:
+   page.locator('.side-nav .nav-standard[data-view="students"]');
   await expect(nav).toBeVisible();
   await nav.click({timeout:10000});
   console.log('V58_STUDENT_STAGE nav width='+width);
