@@ -5,6 +5,9 @@ on:
     paths:
       - 'supabase/candidates/20261116100000_v5_8_parent_project_scoped_receivables.sql'
       - 'supabase/migrations/**'
+      - 'supabase/release-candidates/**'
+      - 'docs/v5/catalog/V58_PARENT_PROJECT_MIGRATION63_SOURCE_LOCK_20261117.json'
+      - 'tests/v58-migration63-fixed-release-source.mjs'
       - 'tests/local/v58-parent-project-63-gate.mjs'
       - 'tests/v58-parent-project-forward-rpc-preservation.mjs'
       - '.github/workflows/v58-parent-project-migration63-isolated.yml'
@@ -49,6 +52,7 @@ jobs:
           test ! -f supabase/.branches/_current_branch
           node --check tests/local/v58-parent-project-63-gate.mjs
           node --test tests/v58-parent-project-forward-rpc-preservation.mjs
+          node --test tests/v58-migration63-fixed-release-source.mjs
       - name: Stage authentic Production 43-history sources without user rows
         run: node tests/local/v5-real43-history-builder.mjs baseline
       - name: Start clean, disposable 43-history local Supabase
@@ -86,18 +90,30 @@ jobs:
         run: |
           set -euo pipefail
           test ! -f supabase/.temp/project-ref
-          test -f supabase/candidates/20261116100000_v5_8_parent_project_scoped_receivables.sql
+          source="supabase/release-candidates/20261117010000_v58_parent_project_scoped_receivables.sql"
+          candidate="supabase/candidates/20261116100000_v5_8_parent_project_scoped_receivables.sql"
+          pinned="supabase/migrations/20261117010000_v58_parent_project_scoped_receivables.sql"
+          test -f "$source" && test -f "$candidate"
+          cmp -s "$source" "$candidate" || {
+            echo "::error::Locked release SQL and audited candidate differ"; exit 1;
+          }
+          test ! -e "$pinned"
+          # Generate a legitimate Supabase CLI migration first. Renaming the
+          # blank local template to the reviewed fixed version pins one release
+          # artifact rather than the wall-clock timestamp of each CI runner.
           supabase migration new v58_parent_project_scoped_receivables > /dev/null
           shopt -s nullglob
           files=(supabase/migrations/*_v58_parent_project_scoped_receivables.sql)
           test "${#files[@]}" -eq 1 || { echo "::error::Expected exactly one CLI-created 63rd file"; exit 1; }
           file="${files[0]}"
           name="${file##*/}"
-          version="${name%%_*}"
-          [[ "$version" =~ ^[0-9]{14}$ && "$version" > "20261110100000" ]] || exit 1
-          cp supabase/candidates/20261116100000_v5_8_parent_project_scoped_receivables.sql "$file"
-          echo "V58_LOCAL_MIGRATION_VERSION=$version" >> "$GITHUB_ENV"
-          echo "CLI generated disposable 63rd forward migration; no hosted credentials used"
+          generated_version="${name%%_*}"
+          [[ "$generated_version" =~ ^[0-9]{14}$ && "$generated_version" > "20261110100000" ]] || exit 1
+          mv "$file" "$pinned"
+          cp "$source" "$pinned"
+          cmp -s "$source" "$pinned"
+          echo "V58_LOCAL_MIGRATION_VERSION=20261117010000" >> "$GITHUB_ENV"
+          echo "Only reviewed fixed-version local migration 20261117010000 staged; no hosted database accessed"
       - name: Upgrade disposable 62-history database by exactly one function migration
         run: |
           set -euo pipefail
