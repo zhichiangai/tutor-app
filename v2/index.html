@@ -629,6 +629,7 @@
     <div class="modal-inner">
       <div class="modal-head"><div><p class="eyebrow">學生資料與帳號</p><h2 id="student-management-heading">學生資料</h2><p class="modal-description">資料、時薪、學生帳號與家長帳號，都可以在這裡管理。</p></div>
         <button type="button" class="close-modal" data-close="student-management-modal" aria-label="關閉學生資料">×</button></div>
+      <details class="student-management-disclosure" open><summary>學生基本資料 <span>姓名、科目、未來時薪</span></summary>
       <form id="student-management-basics-form" class="student-management-section">
         <h3>基本資料</h3>
         <p class="section-sub">修改預設時薪不會改動先前已建立的課程與收款。</p>
@@ -639,7 +640,8 @@
         <label>未來課程預設時薪（NT$／小時）<input id="managed-student-rate" name="hourly_rate" type="number" min="0" max="999999" step="0.01" required></label>
         <label><input id="managed-student-qa" type="checkbox"> 標記為 QA 測試學生；正式帳務總計預設排除其課程和付款</label>
         <button type="submit" class="secondary-button">儲存基本資料</button>
-      </form>
+      </form></details>
+      <details class="student-management-disclosure"><summary>學生帳號與邀請 <span>查看連結狀態、邀請或撤銷</span></summary>
       <section class="student-management-section">
         <h3>學生登入帳號</h3>
         <p class="section-sub">學生接受邀請後，就能用自己的 Google 帳號查看課程與學習紀錄，不會看到付款資料。</p>
@@ -648,7 +650,8 @@
           <label>學生 Google Email<input id="managed-student-email" type="email" maxlength="254" autocomplete="off" placeholder="student@gmail.com" required></label>
           <button type="submit" class="secondary-button">邀請學生</button>
         </form>
-      </section>
+      </section></details>
+      <details class="student-management-disclosure"><summary>家長帳號與邀請 <span>查看連結狀態、邀請或解除連結</span></summary>
       <section class="student-management-section">
         <h3>家長登入帳號</h3>
         <p class="section-sub">可以邀請多位家長；已連結的家長可查看這位孩子的課程與付款。</p>
@@ -657,7 +660,8 @@
           <label>家長 Google Email<input id="managed-guardian-email" type="email" maxlength="254" autocomplete="off" placeholder="parent@gmail.com" required></label>
           <button type="submit" class="secondary-button">邀請家長</button>
         </form>
-      </section>
+      </section></details>
+      <p class="helper-note">解除帳號連結會立即影響資料可見範圍；請先確認對象。此視窗不會自動儲存任何更動。</p>
       <div class="form-actions"><button type="button" class="secondary-button" data-close="student-management-modal">完成</button></div>
     </div>
   </dialog>
