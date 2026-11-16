@@ -230,11 +230,11 @@ jobs:
       - name: Probe optional V5.8 parent project finance SQL only in disposable DB
         run: |
           set -euo pipefail
-          test "$CI" = "true"
-          test "$V4_E2E_LOCAL" = "1"
-          grep -Fq 'project_id = "tutor_v4_isolated"' supabase/config.toml
-          test ! -f supabase/.temp/project-ref
-          test ! -f supabase/.branches/_current_branch
+          test "$CI" = "true" || { echo "::error::Candidate must run in CI"; exit 1; }
+          test "$V4_E2E_LOCAL" = "1" || { echo "::error::Candidate requires disposable local test environment"; exit 1; }
+          grep -Fq 'project_id = "tutor_v4_isolated"' supabase/config.toml || { echo "::error::Candidate project ID is not isolated"; exit 1; }
+          test ! -f supabase/.temp/project-ref || { echo "::error::Candidate blocked: checkout is linked to a hosted Supabase ref"; exit 1; }
+          test ! -f supabase/.branches/_current_branch || { echo "::error::Candidate blocked: Supabase branch selector exists"; exit 1; }
           candidate="supabase/candidates/20261116100000_v5_8_parent_project_scoped_receivables.sql"
           if [ -f "$candidate" ]; then
             echo "Target is disposable named container supabase_db_tutor_v4_isolated; no linked Supabase project"
