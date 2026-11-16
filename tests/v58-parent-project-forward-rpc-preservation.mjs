@@ -25,7 +25,7 @@ test('project candidate extends latest V5.6 parent finance RPC by precisely two 
  assert.equal(latest.split(row).length,2);
  const expected=latest.replace(label,
   "'lesson_id',f.lesson_id,'project_id',f.project_id,'project_name',pr.name,\n  'subject',f.subject,'lesson_start',f.lesson_start,")
-  .replace(row,row+' join public.v5_team_projects pr on pr.id=f.project_id and pr.team_id=f.team_id\n');
+  .replace(row,row+' left join public.v5_team_projects pr on pr.id=f.project_id and pr.team_id=f.team_id\n');
  assert.equal(parentRpc(candidate),expected,'Candidate drifted from last authoritative parent RPC');
 });
 
@@ -39,7 +39,7 @@ test('candidate preserves both manual payout states, current guardian consent gu
   "e.plan_code='team'",
   "search_path=''",
   "'bank_verified',false",
-  "pr.id=f.project_id and pr.team_id=f.team_id",
+  "left join public.v5_team_projects pr on pr.id=f.project_id and pr.team_id=f.team_id",
   "revoke all on function public.v56_team_parent_finance_overview(uuid,uuid,date)",
   "from public,anon,authenticated;",
   "grant execute on function public.v56_team_parent_finance_overview(uuid,uuid,date)",
