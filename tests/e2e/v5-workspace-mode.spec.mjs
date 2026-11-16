@@ -339,25 +339,30 @@ for(const width of [320,390,768]){
   test.setTimeout(100_000);
   await page.setViewportSize({width,height:844});
   await signIn(page,'teacher');
+  console.log('V58_STUDENT_STAGE login width='+width);
   const nav=page.locator(width<=430?
    '.mobile-nav .nav-standard[data-view="students"]':
    '.side-nav .nav-standard[data-view="students"]');
   await expect(nav).toBeVisible();
-  await nav.click();
-  await expect(page.locator('#teacher-student-manager')).toBeVisible();
+  await nav.click({timeout:10000});
+  console.log('V58_STUDENT_STAGE nav width='+width);
+  await expect(page.locator('#teacher-student-manager')).toBeVisible({timeout:10000});
   const manage=page.locator('#teacher-student-list [data-action="manage-student"]').first();
   await expect(manage).toBeVisible();
-  await manage.click();
-  await expect(page.locator('#student-management-modal')).toBeVisible();
+  await manage.click({timeout:10000});
+  console.log('V58_STUDENT_STAGE manage width='+width);
+  await expect(page.locator('#student-management-modal')).toBeVisible({timeout:10000});
   await expect(page.locator('#student-management-basics-form')).toBeVisible();
   const student=page.locator('#managed-student-disclosure');
   const guardian=page.locator('#managed-guardian-disclosure');
   await expect(student).not.toHaveAttribute('open','');
   await expect(guardian).not.toHaveAttribute('open','');
-  await student.locator('summary').click();
+  await student.locator('summary').click({timeout:10000});
+  console.log('V58_STUDENT_STAGE student disclosure width='+width);
   await expect(student).toHaveAttribute('open','');
   await expect(page.locator('#managed-student-invite-form')).toBeVisible();
-  await guardian.locator('summary').click();
+  await guardian.locator('summary').click({timeout:10000});
+  console.log('V58_STUDENT_STAGE guardian disclosure width='+width);
   await expect(guardian).toHaveAttribute('open','');
   await expect(page.locator('#managed-guardian-invite-form')).toBeVisible();
   await page.locator('#student-management-modal [data-close="student-management-modal"]').first().click();
