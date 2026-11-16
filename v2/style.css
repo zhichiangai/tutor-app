@@ -8,6 +8,12 @@
 #manage-schedules{white-space:nowrap;min-height:34px;padding:8px 11px}
 .schedule-sheet{max-width:600px}
 .schedule-sheet .modal-inner{gap:17px}
+.schedule-manage-view,.schedule-editor-fields{display:grid;gap:15px;min-width:0}
+.schedule-manage-view.hidden,.schedule-editor-fields.hidden{display:none}
+.schedule-manage-toolbar{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.schedule-manage-toolbar strong{font-size:14px}
+.schedule-manage-toolbar .secondary-button{min-height:42px}
+.schedule-editor-fields .schedule-back-to-list{justify-self:start;min-height:40px;padding:6px 0}
 .schedule-sheet .modal-head h2{font-size:22px}
 .schedule-sheet .lesson-row{flex-wrap:wrap;align-items:flex-start}
 .schedule-sheet .row-actions{flex-wrap:wrap;justify-content:flex-start;width:100%;padding-left:18px}
