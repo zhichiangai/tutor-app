@@ -1,0 +1,132 @@
+name: V5.8 project finance 62-to-63 isolated promotion gate
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/candidates/20261116100000_v5_8_parent_project_scoped_receivables.sql'
+      - 'supabase/migrations/**'
+      - 'tests/local/v58-parent-project-63-gate.mjs'
+      - 'tests/v58-parent-project-forward-rpc-preservation.mjs'
+      - '.github/workflows/v58-parent-project-migration63-isolated.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v58-parent-project-63-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-63-only:
+    name: disposable-43-plus-19-plus-1
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GITHUB_ACTIONS: 'true'
+      CI: 'true'
+      V4_E2E_LOCAL: '1'
+      V58_PROJECT_SQL_CANDIDATE: '1'
+      SUPABASE_TELEMETRY_DISABLED: '1'
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io
+      V4_E2E_FIXTURE_FILE: /tmp/v4-e2e-fixture.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.107.0
+      - name: Reject hosted project links and verify candidate source
+        run: |
+          set -euo pipefail
+          test "$(supabase --version)" = "2.107.0"
+          grep -q '^project_id = "tutor_v4_isolated"$' supabase/config.toml
+          test ! -f supabase/.temp/project-ref
+          test ! -f supabase/.branches/_current_branch
+          node --check tests/local/v58-parent-project-63-gate.mjs
+          node --test tests/v58-parent-project-forward-rpc-preservation.mjs
+      - name: Stage authentic Production 43-history sources without user rows
+        run: node tests/local/v5-real43-history-builder.mjs baseline
+      - name: Start clean, disposable 43-history local Supabase
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/v58-43-start.log"
+          trap 'rm -f "$log"' EXIT
+          if ! supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor >"$log" 2>&1; then
+            echo "::error::Disposable 43-history start failed; raw output suppressed"
+            exit 1
+          fi
+          if ! supabase db reset --local --no-seed >"$log" 2>&1; then
+            echo "::error::Disposable 43-history reset failed; raw output suppressed"
+            exit 1
+          fi
+      - name: Verify original 43-history before V5 forward replay
+        run: node tests/local/v5-real43-history-gate.mjs baseline
+      - name: Stage nineteen frozen V5 versions without modifying their sources
+        run: node tests/local/v5-real43-history-builder.mjs append-v5
+      - name: Apply original nineteen V5 migrations to isolated database
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/v58-to62.log"
+          trap 'rm -f "$log"' EXIT
+          supabase migration up --help | grep -q -- '--local'
+          if ! supabase migration up --local >"$log" 2>&1; then
+            echo "::error::Disposable V5 upgrade to 62 failed; raw output suppressed"
+            exit 1
+          fi
+          node tests/local/v5-real43-history-gate.mjs forward
+          node tests/local/v5-clean-bootstrap-gate.mjs
+      - name: Assert exact 62-version baseline and immutable financial contract
+        run: node tests/local/v58-parent-project-63-gate.mjs before
+      - name: Use pinned Supabase CLI to create exactly one local forward migration
+        run: |
+          set -euo pipefail
+          test ! -f supabase/.temp/project-ref
+          test -f supabase/candidates/20261116100000_v5_8_parent_project_scoped_receivables.sql
+          supabase migration new v58_parent_project_scoped_receivables > /dev/null
+          shopt -s nullglob
+          files=(supabase/migrations/*_v58_parent_project_scoped_receivables.sql)
+          test "${#files[@]}" -eq 1 || { echo "::error::Expected exactly one CLI-created 63rd file"; exit 1; }
+          file="${files[0]}"
+          name="${file##*/}"
+          version="${name%%_*}"
+          [[ "$version" =~ ^[0-9]{14}$ && "$version" > "20261110100000" ]] || exit 1
+          cp supabase/candidates/20261116100000_v5_8_parent_project_scoped_receivables.sql "$file"
+          echo "V58_LOCAL_MIGRATION_VERSION=$version" >> "$GITHUB_ENV"
+          echo "CLI generated disposable 63rd forward migration; no hosted credentials used"
+      - name: Upgrade disposable 62-history database by exactly one function migration
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/v58-to63.log"
+          trap 'rm -f "$log"' EXIT
+          if ! supabase migration up --local >"$log" 2>&1; then
+            echo "::error::Isolated forward migration 63 failed; raw output suppressed"
+            exit 1
+          fi
+          node tests/local/v58-parent-project-63-gate.mjs after
+          node tests/local/v5-clean-bootstrap-gate.mjs
+      - name: Install pinned synthetic Chromium test dependencies
+        run: |
+          npm install --no-save --no-package-lock @playwright/test@1.64.1 @supabase/supabase-js@2.76.1
+          npx playwright install --with-deps chromium
+      - name: Seed only synthetic three-role accounts
+        run: node tests/e2e/seed-v4-local.mjs
+      - name: Verify all synthetic browser roles with the installed 63rd migration
+        run: npx playwright test --config tests/e2e/playwright.config.mjs
+      - name: Remove ephemeral local credentials
+        if: always()
+        run: rm -f "$V4_E2E_FIXTURE_FILE" "$RUNNER_TEMP/v58-project-62-rowcounts.json"
+      - name: Upload sanitized synthetic failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v58-migration63-isolated-failures
+          path: |
+            tests/e2e/test-results/v4-e2e-report/
+            tests/e2e/test-results/v4-e2e-artifacts/
+          retention-days: 7
+          if-no-files-found: ignore
