@@ -111,7 +111,7 @@ test('parent Team ledger lists multiple independently authorised Team/student sc
 
 test('V5.8 per-project parent RPC extends JSON without altering V4 guardian live-scope guards',()=>{
  const original=src('supabase/migrations/20261110070000_v5_6_parent_finance_verified_bridge.sql');
- const extra=src('supabase/migrations/20261116100000_v5_8_parent_project_scoped_receivables.sql');
+ const extra=src('supabase/candidates/20261116100000_v5_8_parent_project_scoped_receivables.sql');
  const guard=text=>{
   const start=text.indexOf('if not exists(',text.indexOf('function public.v56_team_parent_finance_overview'));
   const end=text.indexOf("then raise exception '家長對此 Team 學生沒有有效連結'",start);
