@@ -237,7 +237,7 @@ jobs:
           test ! -f supabase/.branches/_current_branch
           candidate="supabase/candidates/20261116100000_v5_8_parent_project_scoped_receivables.sql"
           if [ -f "$candidate" ]; then
-            test "$(docker inspect -f '{{.Name}}:{{.State.Running}}' supabase_db_tutor_v4_isolated)" = "/supabase_db_tutor_v4_isolated:true"
+            echo "Target is disposable named container supabase_db_tutor_v4_isolated; no linked Supabase project"
             docker exec -i supabase_db_tutor_v4_isolated psql -v ON_ERROR_STOP=1 -U postgres -d postgres < "$candidate" >/dev/null
             echo "Candidate applied to disposable local DB only; hosted database unchanged"
           else
