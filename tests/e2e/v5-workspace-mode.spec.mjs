@@ -332,3 +332,32 @@ test('fixed schedule management opens a list before the create/edit form at 320/
   }finally{await page.close()}
  }
 });
+
+
+test('V5.8 student management keeps guardian links behind separate disclosure at 375/1440',async({browser})=>{
+ for(const width of [375,1440]){
+  const page=await browser.newPage({viewport:{width,height:844}});
+  try{
+   await signIn(page,'teacher');
+   const nav=page.locator(width<600?
+    '.mobile-nav .nav-standard[data-view="students"]':
+    '.side-nav .nav-standard[data-view="students"]');
+   await nav.click();
+   await expect(page.locator('#teacher-student-manager')).toBeVisible();
+   await page.locator('[data-action="manage-student"]').first().click();
+   await expect(page.locator('#student-management-modal')).toBeVisible();
+   const sections=page.locator('#student-management-modal .student-management-disclosure');
+   await expect(sections).toHaveCount(3);
+   await expect(sections.nth(0)).toHaveAttribute('open','');
+   await expect(sections.nth(1)).not.toHaveAttribute('open','');
+   await expect(sections.nth(2)).not.toHaveAttribute('open','');
+   await expect(page.locator('#managed-guardian-invite-form')).toBeHidden();
+   await sections.nth(2).locator('summary').click();
+   await expect(page.locator('#managed-guardian-invite-form')).toBeVisible();
+   await sections.nth(2).locator('summary').click();
+   await expect(page.locator('#managed-guardian-invite-form')).toBeHidden();
+   await page.locator('#student-management-modal [data-close="student-management-modal"]').click();
+   await expect(page.locator('#student-management-modal')).not.toBeVisible();
+  }finally{await page.close()}
+ }
+});
