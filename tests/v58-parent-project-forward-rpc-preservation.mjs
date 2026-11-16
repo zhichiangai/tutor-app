@@ -24,7 +24,7 @@ test('project candidate extends latest V5.6 parent finance RPC by precisely two 
  assert.equal(latest.split(label).length,2);
  assert.equal(latest.split(row).length,2);
  const expected=latest.replace(label,
-  "'lesson_id',f.lesson_id,'project_id',f.project_id,'project_name',pr.name,\n  'subject',f.subject,'lesson_start',f.lesson_start,")
+  "'lesson_id',f.lesson_id,'project_id',pr.id,'project_name',pr.name,\n  'subject',f.subject,'lesson_start',f.lesson_start,")
   .replace(row,row+' left join public.v5_team_projects pr on pr.id=f.project_id and pr.team_id=f.team_id\n');
  assert.equal(parentRpc(candidate),expected,'Candidate drifted from last authoritative parent RPC');
 });
