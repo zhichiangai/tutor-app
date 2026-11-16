@@ -72,7 +72,9 @@ test('parent Team ledger lists multiple independently authorised Team/student sc
    const a=args.p_team_id==='team-alpha',n=a?10000:25000;
    return {data:{team_id:mismatch?'wrong-team':args.p_team_id,
      student_id:args.p_team_student_id,month:args.p_month,currency:'TWD',bank_verified:false,
-     receivables:[{subject:a?'數學':'英文',fee_cents:n,outstanding_cents:n}],
+     receivables:a?[{project_id:'project-a1',project_name:'甲數學專案',subject:'數學',fee_cents:n,outstanding_cents:n},
+      {project_id:'project-a2',project_name:'甲理化專案',subject:'理化',fee_cents:5000,outstanding_cents:5000}]:
+      [{project_id:'project-b1',project_name:'乙英文專案',subject:'英文',fee_cents:n,outstanding_cents:n}],
      payments:[],correction_refund_history:[]},error:null};
   }
   throw Error('Unknown synthetic RPC');
@@ -86,6 +88,11 @@ test('parent Team ledger lists multiple independently authorised Team/student sc
   assert.equal(children.length,2);
   assert.match(flatten(children[0]),/孩子甲/);
   assert.match(flatten(children[0]),/數學/);
+  const projectsA=children[0].children.filter(x=>x.className==='v56-family-project');
+  assert.equal(projectsA.length,2);
+  assert.match(flatten(projectsA[0]),/甲數學專案/);
+  assert.doesNotMatch(flatten(projectsA[0]),/理化/);
+  assert.match(flatten(projectsA[1]),/甲理化專案/);
   assert.doesNotMatch(flatten(children[0]),/孩子乙|英文/);
   assert.match(flatten(children[1]),/孩子乙/);
   assert.match(flatten(children[1]),/英文/);
@@ -99,4 +106,22 @@ test('parent Team ledger lists multiple independently authorised Team/student sc
   assert.equal(elements.get('v56-parent-family-content').children.length,0);
   assert.equal(elements.get('v56-parent-family-panel').hiddenClass,true);
  }finally{widget.clear();globalThis.document=prev}
+});
+
+
+test('V5.8 per-project parent RPC extends JSON without altering V4 guardian live-scope guards',()=>{
+ const original=src('supabase/migrations/20261110070000_v5_6_parent_finance_verified_bridge.sql');
+ const extra=src('supabase/migrations/20261116100000_v5_8_parent_project_scoped_receivables.sql');
+ const guard=text=>{
+  const start=text.indexOf('if not exists(',text.indexOf('function public.v56_team_parent_finance_overview'));
+  const end=text.indexOf("then raise exception '家長對此 Team 學生沒有有效連結'",start);
+  assert.ok(start>=0&&end>start,'Missing complete live guardian authorization predicate');
+  return text.slice(start,end);
+ };
+ assert.equal(guard(extra),guard(original),'No relaxation of live guardian+acceptance+Team-plan guard');
+ assert.match(extra,/join public\.v5_team_projects pr on pr\.id=f\.project_id and pr\.team_id=f\.team_id/);
+ assert.match(extra,/'project_id',f\.project_id,'project_name',pr\.name/);
+ assert.match(extra,/revoke all on function public\.v56_team_parent_finance_overview/);
+ assert.match(extra,/grant execute on function public\.v56_team_parent_finance_overview/);
+ assert.doesNotMatch(extra,/hourly_rate_cents|teacher_user_id|service_role/);
 });
