@@ -6,6 +6,7 @@
 
 - Supabase Production `vctisuglfoxyuwlvyjee`：`ACTIVE_HEALTHY`、organization `rapid4grad` Free、PostgreSQL 17、正式 DB 約 17 MB、62 筆 Migration、last `20261110100000`。
 - Production metadata-only SELECT：`storage.buckets = 0`、`storage.objects = 0`、`auth.users = 5`、`vault.secrets = 0`、`cron.job` 表不存在。本次沒有讀取 Auth 個資或 Vault secret 本文。
+- 新增可在 Production 與**隔離還原後的測試 DB**分別執行的 **SELECT-only scalar inventory**：`supabase/diagnostics/v58_backup_restore_metadata_readonly.sql`，唯讀執行 PASS；目前 snapshot 為 Auth users 5、students 5、workspaces 4、guardian links 1、payment batches 3、Team projects / lessons / payments / refunds 目前均 0、storage 0、Migration 62、Parent RPC body MD5 `3569963e9d47af5d5e2acc728ccc8f17`。public / tutor_private ordinary tables 中 RLS 開啟 71、未開啟 5；這是**來源庫對照摘要**而非完整備份檔、還原測試或 RLS 安全證明，正式備份建立當下應重新擷取。
 - Supabase Free 沒有**可依賴的每日自動備份／PITR**。官方建議自行保護 DB dump：<https://supabase.com/docs/guides/platform/backups>。
 - GitHub Main `8cf48e3bfcd0f11638db3141bcf47d89e11e94fe`；V5.8 固定 SQL Review PR [#82](https://github.com/zhichiangai/tutor-app/pull/82) Head `04bd9337888a4f6348b3dc81e7b1b41ebce2118a`，截至本輪檢查其 isolated Node 440/440、兩套 Chromium 各 60/60 與 CLI 62→63 均 PASS。
 - Vercel domain API **已獨立取得** `tutor.rapid4grad.com` Verified，Project ID `prj_Mq14CrYpOh42Fe1yhOJ3Ksk1iLMq`，不是 `rapid4grad-website` 的 `prj_myh4jpWjhQKh4oSjSJmB0MDwLdq9`。
@@ -24,6 +25,8 @@ Supabase 官方：<https://supabase.com/docs/guides/platform/migrating-within-su
 5. 至少存兩份獨立故障域、加密、存取受限的備份。只有 **檔名、bytes、sha256、UTC 時間、DB 版本、備份工具版本、restore test PASS** 可用於交接；不可將原始 SQL 上傳公共或共享檔案。
 
 ## C. 真正隔離還原驗證：必需，尚未執行
+
+**對照報表：** 正式站與隔離還原庫使用同一份 `supabase/diagnostics/v58_backup_restore_metadata_readonly.sql`。比較 `counts` 內各表筆數、Migration、RPC MD5、RLS table count；除 `sample_time_utc`、`database_bytes` 等環境變動欄位外，資料摘要應一致。若不一致不得標記恢復成功。這僅是必要但不充分的驗證，還應檢查 FK／權限／資料一致性與外部副作用。
 
 - 建立可控、不能連接正式網域、不會對外寄信或寫入正式 API 的**獨立測試 Supabase/PostgreSQL**。若需要新雲端專案、付費加值或 Supabase branch，必須先取得使用者對費用的同意。可優先使用本機一次性 Docker。
 - **絕不**對 `vctisuglfoxyuwlvyjee` 執行 `restore_project`、`db reset`、`migration repair` 或 `db push`；也不得用其現存 Production 當還原目標。
@@ -51,7 +54,7 @@ Supabase 官方：<https://supabase.com/docs/guides/platform/migrating-within-su
 | Gate | 結果 |
 | --- | --- |
 | Repo 固定 63 SQL 及隔離 CI | PASS（PR #82 SHA `04bd9337...`） |
-| Production Source/RLS/Migration Metadata | PASS（62，data read-only） |
+| Production Source/RLS/Migration Metadata | PASS（62，固定 RPC + 20 類非敏感表筆數對照） |
 | Storage/Auth/Vault 只讀存在性與筆數 | PASS（快照，不是 backup） |
 | Backup 真正 SQL 檔案建立 | BLOCKED：現有連接沒有完整受保護 dump / private storage 的操作介面 |
 | 備份完整性／SHA-256 | NOT TESTED：待私密 SQL dump |
