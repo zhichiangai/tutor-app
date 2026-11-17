@@ -1,0 +1,102 @@
+name: V5.8 PostgreSQL17 synthetic consistent backup restore
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/release/v58-private-backup.sh'
+      - 'scripts/release/v58-pg17-credential-guard.mjs'
+      - 'scripts/release/v58-private-backup-manifest.mjs'
+      - 'tests/v58-pg17-credential-guard.test.mjs'
+      - '.github/workflows/v58-pg17-synthetic-dump-restore.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-pg17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Real pg_dump custom archive and pg_restore on disposable SYNTHETIC PostgreSQL 17 only
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This test must NEVER use real Supabase credentials or networks.
+          unset PGPASSWORD PGSERVICE PGSERVICEFILE V58_PRIVATE_DB_URL V58_PRIVATE_BACKUP_DIR
+          docker pull postgres:17
+          d="$(mktemp -d)"
+          chmod 700 "$d"
+          name="v58-synthetic-pg17-$$"
+          cleanup() { docker rm -f "$name" >/dev/null 2>&1 || true; rm -rf "$d"; }
+          trap cleanup EXIT
+          # This password and database contain SYNTHETIC fixtures only.
+          docker run -d --name "$name" -e POSTGRES_PASSWORD=synthetic_only_pg17 \
+            -p 127.0.0.1:54329:5432 postgres:17 >/dev/null
+          for i in $(seq 1 40); do
+            if docker exec "$name" pg_isready -U postgres -d postgres >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          docker exec "$name" pg_isready -U postgres -d postgres
+          docker exec "$name" createdb -U postgres v58_source
+          docker exec "$name" createdb -U postgres v58_restored
+          docker exec -i "$name" psql -X -U postgres -v ON_ERROR_STOP=1 -d v58_source <<'SQL'
+          CREATE SCHEMA auth;
+          CREATE SCHEMA storage;
+          CREATE SCHEMA tutor_private;
+          CREATE SCHEMA supabase_migrations;
+          CREATE TABLE public.students(id integer PRIMARY KEY, label text);
+          CREATE TABLE auth.users(id integer PRIMARY KEY);
+          CREATE TABLE storage.objects(id integer PRIMARY KEY);
+          CREATE TABLE tutor_private.v5_team_lesson_fees(id integer PRIMARY KEY, amount integer);
+          CREATE TABLE supabase_migrations.schema_migrations(version text PRIMARY KEY);
+          INSERT INTO public.students VALUES (1,'synthetic'),(2,'fake');
+          INSERT INTO auth.users VALUES (1);
+          INSERT INTO storage.objects VALUES (2);
+          INSERT INTO tutor_private.v5_team_lesson_fees VALUES (3,250);
+          INSERT INTO supabase_migrations.schema_migrations VALUES ('20261110100000');
+          ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
+          CREATE POLICY synthetic_only ON public.students FOR SELECT USING (id=1);
+          SQL
+          printf '%s\n' '127.0.0.1:54329:*:postgres:synthetic_only_pg17' > "$d/pgpass"
+          chmod 600 "$d/pgpass"
+          args=(--rm --network host -v "$d:/private" -e PGHOST=127.0.0.1
+            -e PGPORT=54329 -e PGUSER=postgres -e PGDATABASE=v58_source
+            -e PGSSLMODE=disable -e PGPASSFILE=/private/pgpass)
+          docker run "${args[@]}" postgres:17 pg_dumpall --globals-only \
+            --no-role-passwords --no-password --file=/private/roles.sql
+          docker run "${args[@]}" postgres:17 pg_dump --format=custom \
+            --no-password --file=/private/production.snapshot.dump
+          docker run "${args[@]}" postgres:17 pg_restore --list \
+            /private/production.snapshot.dump > "$d/toc"
+          for schema in auth storage tutor_private supabase_migrations; do
+            grep -Eq "[[:space:]]SCHEMA - $schema([[:space:]]|$)" "$d/toc"
+          done
+          # Isolated destination within same disposable PostgreSQL container.
+          docker exec "$name" psql -X -U postgres -v ON_ERROR_STOP=1 \
+            -d v58_restored -c 'DROP SCHEMA public CASCADE'
+          docker run --rm --network host -v "$d:/private" -e PGHOST=127.0.0.1 \
+            -e PGPORT=54329 -e PGUSER=postgres -e PGDATABASE=v58_restored \
+            -e PGSSLMODE=disable -e PGPASSFILE=/private/pgpass \
+            postgres:17 pg_restore --no-owner --no-acl --exit-on-error \
+            --dbname=v58_restored /private/production.snapshot.dump
+          for db in v58_source v58_restored; do
+            docker exec "$name" psql -X -U postgres -d "$db" -v ON_ERROR_STOP=1 -At <<'SQL'
+          SELECT 'PARITY ' ||
+            (SELECT count(*) FROM public.students) || '/' ||
+            (SELECT count(*) FROM auth.users) || '/' ||
+            (SELECT count(*) FROM storage.objects) || '/' ||
+            (SELECT count(*) FROM tutor_private.v5_team_lesson_fees) || '/' ||
+            (SELECT count(*) FROM supabase_migrations.schema_migrations) || '/' ||
+            (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='students');
+          SQL
+          done
+          # Synthetic fixture count and RLS policy must survive restore.
+          result="$(docker exec "$name" psql -X -U postgres -At -d v58_restored \
+            -c "SELECT (SELECT count(*) FROM public.students),(SELECT count(*) FROM auth.users),(SELECT count(*) FROM storage.objects),(SELECT count(*) FROM tutor_private.v5_team_lesson_fees),(SELECT count(*) FROM supabase_migrations.schema_migrations),(SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='students')")"
+          test "$result" = '2|1|1|1|1|1'
+          echo 'PASS: single PostgreSQL17 custom snapshot, synthetic managed-schema tables, roles and RLS restored'
+          echo 'LIMIT: this does NOT prove full live Supabase Auth, Storage, Vault, extensions or Production restore'
