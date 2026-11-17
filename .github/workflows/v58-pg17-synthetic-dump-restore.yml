@@ -117,7 +117,7 @@ jobs:
           # Synthetic fixture count and RLS policy must survive restore.
           result="$(docker exec "$name" psql -X -U postgres -At -d v58_restored \
             -c "SELECT (SELECT count(*) FROM public.students),(SELECT count(*) FROM auth.users),(SELECT count(*) FROM storage.objects),(SELECT count(*) FROM tutor_private.v5_team_lesson_fees),(SELECT count(*) FROM supabase_migrations.schema_migrations),(SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='students')")"
-          test "$result" = '2|1|1|1|1|1'
+          test "$result" = '3|1|1|1|1|1'
           # Simulate initialized Supabase-managed schemas in isolated databases.
           # Unfiltered archive must FAIL. No production data or credentials.
           for db in v58_managed_conflict v58_managed_safe; do
