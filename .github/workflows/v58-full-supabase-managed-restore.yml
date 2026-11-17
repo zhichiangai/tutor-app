@@ -1,0 +1,94 @@
+name: V5.8 disposable full Supabase managed restore smoke
+
+on:
+  pull_request:
+    paths:
+      - 'tests/local/v58-supabase-managed-stack-restore-smoke.sh'
+      - 'scripts/release/v58-managed-restore-plan.mjs'
+      - 'tests/v58-managed-restore-plan.test.mjs'
+      - '.github/workflows/v58-full-supabase-managed-restore.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-stack-synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      CI: 'true'
+      V58_MANAGED_STACK_LOCAL: '1'
+      SUPABASE_TELEMETRY_DISABLED: '1'
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.107.0
+      - name: Prepare brand-new unlinked localhost Supabase configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -f supabase/.temp/project-ref
+          test ! -f supabase/.branches/_current_branch
+          test -z "$(printenv SUPABASE_ACCESS_TOKEN || true)"
+          test "$V58_MANAGED_STACK_LOCAL" = '1'
+          mkdir -p "$RUNNER_TEMP/v58-full-stack/supabase"
+          cp supabase/config.toml "$RUNNER_TEMP/v58-full-stack/supabase/config.toml"
+          python3 - "$RUNNER_TEMP/v58-full-stack/supabase/config.toml" <<'PY'
+          from pathlib import Path
+          import re,sys
+          p=Path(sys.argv[1]); s=p.read_text()
+          old='project_id = "tutor_v4_isolated"'
+          assert s.count(old)==1
+          s=s.replace(old,'project_id = "tutor_v58_managed_restore"')
+          for section in ('db.migrations','db.seed'):
+              pat=r'(?m)(^\['+re.escape(section)+r'\]\n(?:#[^\n]*\n)*enabled = )true'
+              s,n=re.subn(pat,r'\1false',s,count=1)
+              assert n==1, section
+          for old,new in ((54320,55320),(54321,55321),(54322,55322),
+                          (54323,55323),(54324,55324),(54329,55329)):
+              s=s.replace('port = '+str(old),'port = '+str(new))
+          p.write_text(s)
+          PY
+          grep -q '^project_id = "tutor_v58_managed_restore"$' "$RUNNER_TEMP/v58-full-stack/supabase/config.toml"
+          test ! -f "$RUNNER_TEMP/v58-full-stack/supabase/.temp/project-ref"
+      - name: Start disposable local Supabase with Auth AND Storage API enabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/v58-full-stack"
+          startup="$RUNNER_TEMP/v58-local-start-private.log"
+          if ! supabase start -x realtime,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor >"$startup" 2>&1; then
+            echo 'FAIL: disposable Supabase Auth/Storage stack startup; raw output suppressed'
+            grep -iE '(error|failed|migration|timeout|rate limit)' "$startup" \
+              | sed -E 's/eyJ[A-Za-z0-9_.-]+/[JWT_REDACTED]/g; s#postgres(ql)?://[^ ]+#[DB_URI_REDACTED]#g; s/[A-Za-z0-9_+\/=:-]{60,}/[LONG_TOKEN_REDACTED]/g' \
+              | head -n 8 || true
+            exit 1
+          fi
+          echo 'PASS: disposable Supabase local startup, raw keys and local passwords suppressed'
+      - name: Confirm full Auth/Storage services and exercise selective restore
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n tests/local/v58-supabase-managed-stack-restore-smoke.sh
+          bash tests/local/v58-supabase-managed-stack-restore-smoke.sh
+      - name: Remove ONLY named disposable local CI Supabase stack
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          if [ -f "$RUNNER_TEMP/v58-full-stack/supabase/config.toml" ] &&
+            grep -q '^project_id = "tutor_v58_managed_restore"$' "$RUNNER_TEMP/v58-full-stack/supabase/config.toml"; then
+            cd "$RUNNER_TEMP/v58-full-stack"
+            supabase stop --no-backup >/dev/null 2>&1 || true
+            echo 'Removed only disposable local tutor_v58_managed_restore stack'
+          fi
+          rm -f "$RUNNER_TEMP/v58-local-start-private.log"
+          rm -rf "$RUNNER_TEMP/v58-full-stack"
