@@ -11,6 +11,9 @@ fi
 : "${V58_PRIVATE_DB_URL:?Set the Production DB URL in this private shell only; never paste it in ChatGPT}"
 command -v supabase >/dev/null || { echo "Missing Supabase CLI" >&2; exit 2; }
 command -v node >/dev/null || { echo "Missing Node 22+" >&2; exit 2; }
+# Resolve the checkout from this script, not the invoking shell directory.
+V58_BACKUP_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+export V58_BACKUP_REPO_ROOT
 node --input-type=module - <<'NODE'
 import {realpathSync,existsSync} from 'node:fs';
 import {resolve,relative,sep,isAbsolute,dirname,basename,join} from 'node:path';
@@ -19,7 +22,7 @@ if(!path||!isAbsolute(path)) throw Error('Absolute private output directory requ
 if(existsSync(path)) throw Error('Output exists: do not reuse or overwrite backups');
 const target=resolve(path);
 if(!existsSync(dirname(target))) throw Error('Create private parent directory first');
-const repo=realpathSync(process.cwd());
+const repo=realpathSync(process.env.V58_BACKUP_REPO_ROOT);
 const physicalParent=realpathSync(dirname(target));
 const physicalTarget=join(physicalParent,basename(target));
 const d=relative(repo,physicalTarget);
@@ -41,15 +44,26 @@ log="$V58_PRIVATE_BACKUP_DIR/local-private.log"
 touch "$log"
 chmod 600 "$log"
 printf '%s\n' "INCOMPLETE: do not release until private restore validation" > "$V58_PRIVATE_BACKUP_DIR/STATUS.txt"
+# Supabase CLI v2 uses --db-url; CLI v3 targets remote explicitly with
+# --remote=<url>. Do NOT rely on grepping --remote first: some versions
+# accept a flag but interpret it differently. CLI v4 is not reviewed.
+version="$(supabase --version 2>/dev/null)"
 help="$(supabase db dump --help 2>&1)"
-if grep -q -- '--remote' <<<"$help"; then
-  conn=("--remote=$V58_PRIVATE_DB_URL")
-elif grep -q -- '--db-url' <<<"$help"; then
+if [[ "$version" =~ ^2\.[0-9]+\.[0-9]+([+-][A-Za-z0-9.-]+)?$ ]]; then
+  grep -q -- '--db-url' <<<"$help" || {
+    echo "REFUSED: Supabase CLI v2 must support --db-url" >&2; exit 2;
+  }
   conn=("--db-url=$V58_PRIVATE_DB_URL")
+elif [[ "$version" =~ ^3\.[0-9]+\.[0-9]+([+-][A-Za-z0-9.-]+)?$ ]]; then
+  grep -q -- '--remote' <<<"$help" || {
+    echo "REFUSED: Supabase CLI v3 must support --remote" >&2; exit 2;
+  }
+  conn=("--remote=$V58_PRIVATE_DB_URL")
 else
-  echo "Unsupported CLI: db dump lacks --remote and --db-url" >&2
+  echo "REFUSED: Unreviewed Supabase CLI version; only v2/v3 supported" >&2
   exit 2
 fi
+echo "PASS: reviewed Supabase CLI major version; only explicit remote dump is allowed"
 dump(){
  local name="$1"; shift
  echo "Exporting private $name (no SQL contents logged)"
@@ -66,6 +80,7 @@ dump auth_data.sql --use-copy --data-only --schema auth
 dump storage_data.sql --use-copy --data-only --schema storage -x storage.buckets_vectors -x storage.vector_indexes
 dump history_schema.sql --schema supabase_migrations
 dump history_data.sql --use-copy --data-only --schema supabase_migrations
-node scripts/release/v58-private-backup-manifest.mjs create "$V58_PRIVATE_BACKUP_DIR"
+node "$V58_BACKUP_REPO_ROOT/scripts/release/v58-private-backup-manifest.mjs" create "$V58_PRIVATE_BACKUP_DIR"
+printf '%s\n' "INTEGRITY_VERIFIED_RESTORE_NOT_TESTED" > "$V58_PRIVATE_BACKUP_DIR/STATUS.txt"
 echo "Backup files and SHA-256 manifest created. Restore NOT tested; NO-GO for Production release."
 echo "Keep the directory private and encrypted. Unset V58_PRIVATE_DB_URL in this shell."
