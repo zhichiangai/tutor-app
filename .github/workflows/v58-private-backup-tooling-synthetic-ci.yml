@@ -5,6 +5,7 @@ on:
     paths:
       - 'scripts/release/v58-private-backup.sh'
       - 'scripts/release/v58-private-backup-manifest.mjs'
+      - 'scripts/release/v58-backup-target-flag.mjs'
       - 'tests/v58-private-backup-manifest.test.mjs'
       - '.github/workflows/v58-private-backup-tooling-synthetic-ci.yml'
   workflow_dispatch:
@@ -31,6 +32,7 @@ jobs:
           set -euo pipefail
           bash -n scripts/release/v58-private-backup.sh
           node --check scripts/release/v58-private-backup-manifest.mjs
+          node --check scripts/release/v58-backup-target-flag.mjs
           node --check tests/v58-private-backup-manifest.test.mjs
       - name: Run synthetic private checksum tests only
         run: node --test tests/v58-private-backup-manifest.test.mjs
