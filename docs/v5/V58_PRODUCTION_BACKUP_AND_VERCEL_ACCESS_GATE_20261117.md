@@ -76,3 +76,23 @@ Codex 2026-11-17 的**實際本機盤點**確認，先前 `v58-private-backup.sh
 | Vercel API 專案及部署讀取 | **PASS**：授權 `tutor-app-v2` 後，正式 READY、Main SHA / verified domain 獨立核對 |
 | Production Migration 63 | NOT TESTED / NO-GO |
 | Main Merge / Production Deployed V5.8 | NOT TESTED / NO-GO |
+
+## G. Codex Mac 本機隔離驗收交接（2026-11-17）
+
+目前已完成同一 Head `40a04ab1424bf5bcc12425c8b30157974e87304b` 的 GitHub Actions：
+
+- [V5.8 private backup tooling synthetic #44012266802](https://github.com/zhichiangai/tutor-app/actions/runs/44012266802)：PASS（僅合成環境與檔案）
+- [PostgreSQL 17 single custom archive → restored DB #44012266806](https://github.com/zhichiangai/tutor-app/actions/runs/44012266806)：PASS（合成 users、storage、fees、62-history-shaped sample、RLS；**不是**真實 Supabase）
+- [V4/V5 isolated Chromium #44012266819](https://github.com/zhichiangai/tutor-app/actions/runs/44012266819)：PASS（該 Head）
+
+**本機任務只驗證工具與合成受管 Schema，暫不使用正式密碼、不連正式 Database、不產真實備份。**
+
+1. 在 Mac 原獨立 worktree `/Users/fengfeng/.codex/worktrees/v58-backup-safety/家教小網站` 確認工作樹乾淨、PR #83 最新 Head 與本報告一致；若不一致，先安全同步，不覆寫其他工作。
+2. 確認 FileVault、至少 25 GiB 可用空間（若不足先停止，不自動刪檔）、Docker Desktop 狀態與原有 Volume/容器清單。**不啟動、不刪除、不重用原本 25 個停止容器及 13 個 Volumes**。
+3. 先檢查 `pg_dump --version`、`pg_restore --version`、`pg_dumpall --version`、`psql --version`。缺少才評估 Homebrew `postgresql@17` 客戶端或使用官方 PostgreSQL17 Docker image 的隔離命令；不可在 Mac 安裝未知來源的二進位檔或無故升級已運行環境。各客戶端需 Major **17**，避免將 17.6 與 Production 17.11 的 minor 差異誤當相同環境已驗證。
+4. 於**全新**且具獨立標記的臨時 Docker network/container/volume 建立只有合成數據的 PostgreSQL17 測試庫，執行 PR #83 `.github/workflows/v58-pg17-synthetic-dump-restore.yml` 等價測試：Custom Format 單次 dump、角色 metadata 分開匯出、`pg_restore --exit-on-error` 還原到新 DB、確認角色、Schema、資料、RLS。
+5. **另行檢驗 Supabase 受管物件衝突**：若使用 Supabase PostgreSQL image/本機 Supabase stack，先只對**新的一次性隔離環境**檢查 Auth/Storage/Extensions/roles 與自訂 trigger/RLS 的 restore 計畫；明確區分 `PostgreSQL17 synthetic PASS`、`Supabase managed schema PARTIAL/BLOCKED` 與 `REAL_PRODUCTION_RESTORE NOT TESTED`，不得以合成測試替代。
+6. 所有測試使用虛構本機憑證；任何測試指令／檔案不可引用 `vctisuglfoxyuwlvyjee` 的真實 DB URL、token 或 `PGPASSFILE`。若需要正式來源資料、建立付費雲端專案、動現有 Docker Volume 或任何 Production 寫入，停止該項並回報。
+7. 回傳安全摘要：Mac client versions、Docker image tag、工作樹 Head、合成測試 PASS/FAIL、受管 Schema 相容性（已證實／未證實）、錯誤原因、測試容器的處理狀態及可供 ChatGPT 追查的非敏感紀錄。**不貼真實資料／密碼／完整 DB dump**。
+
+完成本機受管 Schema 測試後，才能另行評估 Production 真實私密備份；通過之前，G0/G1/G2 維持 NO-GO。
