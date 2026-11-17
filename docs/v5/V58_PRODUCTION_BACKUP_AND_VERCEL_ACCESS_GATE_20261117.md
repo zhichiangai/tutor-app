@@ -96,3 +96,58 @@ Codex 2026-11-17 的**實際本機盤點**確認，先前 `v58-private-backup.sh
 7. 回傳安全摘要：Mac client versions、Docker image tag、工作樹 Head、合成測試 PASS/FAIL、受管 Schema 相容性（已證實／未證實）、錯誤原因、測試容器的處理狀態及可供 ChatGPT 追查的非敏感紀錄。**不貼真實資料／密碼／完整 DB dump**。
 
 完成本機受管 Schema 測試後，才能另行評估 Production 真實私密備份；通過之前，G0/G1/G2 維持 NO-GO。
+
+## H. Codex 第二輪發現：受管 Schema 直接還原衝突與分層回復策略（2026-11-17）
+
+### 本機實測依據（不是 Production 測試）
+
+- Codex 原始 worktree `00eaedeb99f034f312906aed5075f14f96d9444e`。FileVault On、約 43 GiB 空間；Mac 沒有 native `psql/pg_dump`，以 Docker `postgres:17`（17.12）與 Supabase PG `17.6.1.166` 做合成測試，Production PG 歷史摘要為 17.11。
+- 空白 PostgreSQL 17 → 單一 Custom Format Archive → 全部合成資料、RLS、Trigger、Extension、Migration、Audit：**PASS**。
+- 已初始化的 Supabase PG image 含 `auth` Schema、平台角色等；直接 `pg_restore --exit-on-error`：**FAIL（預期且已重現 `schema "auth" already exists`）**。
+- Codex 未使用真實憑證，沒有正式備份、沒有完整 Supabase Stack 還原；原有 Docker volumes/containers 未動。
+- GitHub CI 新增 [app-only 選擇性還原測試 #44067404622](https://github.com/zhichiangai/tutor-app/actions/runs/44067404622)：**PASS（合成 PostgreSQL managed-like fixture）**；故意執行全量還原可重現已存在受管 Schema 的錯誤，產生 App-only TOC 目錄後，保留受管 `auth`／`storage`／Migration 模擬資料而成功還原 `public`／`tutor_private`，**不代表完整 Supabase Restore PASS**。獨立 Node TOC 合成契約 [#44067404491](https://github.com/zhichiangai/tutor-app/actions/runs/44067404491) **6/6 PASS**。
+
+### 不能採用的做法
+
+1. 不可直接將 `production.snapshot.dump` 整包套進已初始化的 Supabase。也不可用 `--clean`／`DROP SCHEMA auth`／`DROP OWNED` 繞開衝突。
+2. 不可直接執行 `roles.sql`：它可能包含 `CREATE ROLE postgres`、`supabase_admin`、`anon`、`authenticated`、`service_role` 等重複的受管角色；角色檔**僅供隔離環境比對／審查**。
+3. 不可直接還原 Extension DDL；先比對版本、Namespace、安裝狀態、Owner 與其相依 Function／Type。Production PG 17.11 和 Mac Supabase image PG 17.6 **次版本不同**，平台 Auth/Storage migrations 也未核對一致。
+4. 不可為求順利而對已存在的 `auth`／`storage` 表直接 `pg_restore --clean`。原有加密、Auth、Storage trigger、RLS/GRANT 與 dependency 必須受保護。
+5. 不能把 `--no-owner --no-acl` 的成功視為權限與 RLS 通過。即使資料表與 Policy 被還原，GRANT、SECURITY DEFINER、預設權限、角色繼承、Auth claims 仍需**實測**。
+
+### 分層還原方案（全部限全新、斷網隔離環境）
+
+**P0 — 完整 archive 證據：** 保留單一 `pg_dump -Fc` 的一致資料快照，加上獨立角色 Metadata、實際 Storage object 本體（若有）及 Supabase 設定清單。SHA-256 是完整性證據；不代表可還原。
+
+**P1 — 空白 PostgreSQL Scratch Restore：** 以 `pg_restore --exit-on-error` 完整回放 archive，確認一般 PostgreSQL 17 的資料、Extension 與 FK 可成立。這僅測原始 archive 的可讀性，不代表 Supabase 還原。
+
+**P2 — 已初始化 Supabase Managed Target 的 App-only 部分：**
+
+- 在私密工作站執行 `pg_restore --list ABS_PRIVATE_ARCHIVE > ABS_PRIVATE_TOC`（檔案 0600，Git Repo 外）。
+- 使用 `node scripts/release/v58-managed-restore-plan.mjs ABS_PRIVATE_TOC ABS_PRIVATE_APP_ONLY_LIST` 產生**供人工審核的候選** `pg_restore -L` 清單。程式會排除 `auth`、`storage`、`supabase_migrations`、`vault`、`extensions` 等受管 Schema、全域 Role、Extension、ACL／DEFAULT ACL 等條目，只選取 `public`、`tutor_private` 的已知 App 類型，遇不明物件／Schema 即 BLOCKED。它**不會連資料庫、執行 SQL、下載或上傳資料**。
+- 在**全新隔離 Supabase DB**，確認目標受管 Schema 已初始化、平台版本與 extensions 相容、必要依賴可滿足後，**由操作員審核清單**，才可嘗試 `pg_restore --use-list=<private reviewed list> --no-owner --no-acl --exit-on-error`。任何 App object 名稱衝突／缺少 Auth FK 目標／RLS/GRANT 不一致即 FAIL。此階段成功只表示 `APP_SCHEMA_RESTORE_PARTIAL`。
+- 此 list 包含 App Schema、Table、Data、Index、Policy、Trigger 等 TOC 條目，**不含 Auth/Storage rows、Migration rows、Roles 或 Extension；更不是完整 Restore 的執行指令**。不允許未審核的 Script 自動套用。
+
+**P3 — 受管與平台層另外處理：**
+
+- **Auth：** 在與 Production Auth schema 相容的全新 Supabase Stack 中，比對 `auth.users`、`auth.identities`、sessions、平台 migration/schema 版本；官方建議使用 Supabase CLI 的平台過濾還原流程。涉及資料寫入前確認目標不是 Production。必要的 Auth data 必須遵守 FK 與加密 Trigger 規則，不可依靠 App-only TOC。
+- **Storage：** 分開還原 `storage` metadata 與**物件本體**，校驗 Bucket、object count 和引用。上一輪來源 bucket/object 均為 0，但正式操作前要重新查核。
+- **Migration History：** 對照 `supabase_migrations.schema_migrations` 原本的 62 entries 與目標中的歷史，審核重複/缺漏及版本衝突，再在隔離環境復原；**禁止對 Production 執行 `db push`／`migration repair`**。
+- **Roles／Grants／Extension／Custom Trigger：** 對既有受管角色只比對，不直接 `CREATE ROLE`；自訂角色逐一審核。Extension 的安裝與版本由平台相容性決定。若 Production 有在 `auth`／`storage` 自訂 RLS 或 Trigger，依官方 CLI 指引單獨 diff，絕不把預設受管物件覆寫。
+- **平台外配置：** OAuth、SMTP、JWT secret、Edge Functions、Storage API 物件、第三方 API 與正式網域**不包含在單純 DB 還原中**，另外確認。
+
+**P4 — 完整 Release Gate：** 必須有同一實際來源的 Production 受保護備份和本機隔離 Supabase 全流程還原、20 類資料摘要、角色/RLS/JWT、業務帳務核對、FK/Trigger/Extension、Auth 使用者與 Storage 檔案驗證、外部通知被阻斷的證據。否則標示 `SUPABASE_FULL_RESTORE_BLOCKED`，不因 P1/P2 PASS 改變。
+
+依據：官方 [Restore from Platform](https://supabase.com/docs/guides/self-hosting/restore-from-platform) 明確說明原生 `pg_dump` 不具 Supabase 受管物件過濾；[Supabase CLI Backup/Restore](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore) 提醒 Migration History、Custom `auth`／`storage` 變更需分別處理；PostgreSQL 17 [pg_restore TOC](https://www.postgresql.org/docs/17/app-pgrestore.html) 允許選擇性清單，但不會自動解決權限／FK。
+
+### 本階段驗收表
+
+| Gate | Status |
+| --- | --- |
+| 普通 PostgreSQL 17 synthetic complete archive restore | PASS |
+| 已初始化 managed-like Synthetic DB 全量還原衝突再現 | PASS（**預期失敗**的測試） |
+| App-only TOC 保留 managed schemas 的合成還原 | PASS（Synthetic only） |
+| GitHub TOC fail-closed Node contract | PASS |
+| 真正 Supabase Stack 的 Auth/Storage/Extensions 完整相容還原 | NOT TESTED |
+| 真實 Production SQL dump/私密 SHA/完整隔離還原 | BLOCKED |
+| Migration 63 / Main / Production deploy | NO-GO |
