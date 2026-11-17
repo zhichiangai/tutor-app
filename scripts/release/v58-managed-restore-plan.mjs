@@ -49,7 +49,7 @@ export function buildManagedAppRestorePlan(toc) {
   if(type==='SCHEMA'){
    const name=object;
    if(name==='tutor_private'){app.push(line);seenPrivate=true;}
-   else if(name==='public'||MANAGED.has(name)){held.push(type);}
+   else if(name==='public'||MANAGED.has(name)){if(MANAGED.has(name))seenManaged=true;held.push(type);}
    else unknown.push('unreviewed_schema');
    continue;
   }
@@ -75,7 +75,7 @@ export function buildManagedAppRestorePlan(toc) {
  if(!seenPublicTable)unknown.push('missing_public_table');
  if(!seenPrivate)unknown.push('missing_tutor_private_schema');
  if(!seenManaged)unknown.push('missing_managed_schema_entries');
- if(!seenExtension)unknown.push('missing_extension');
+ // Not every database has a non-default extension; record but do not require one.
  return {
   status:unknown.length?'BLOCKED_UNREVIEWED_TOC':'APP_ONLY_RESTORE_PROPOSAL_NOT_EXECUTABLE',
   selected_count:app.length,held_count:held.length,
