@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'scripts/release/v58-private-backup.sh'
+      - 'docs/v5/V58_PRODUCTION_BACKUP_AND_VERCEL_ACCESS_GATE_20261117.md'
       - 'scripts/release/v58-private-backup-manifest.mjs'
       - 'scripts/release/v58-backup-target-flag.mjs'
       - 'tests/v58-private-backup-manifest.test.mjs'
