@@ -56,6 +56,15 @@ jobs:
           CREATE SCHEMA tutor_private;
           CREATE SCHEMA supabase_migrations;
           CREATE TABLE public.students(id integer PRIMARY KEY, label text);
+          CREATE TABLE public.student_audit(id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY, student_id integer);
+          CREATE FUNCTION public.audit_student() RETURNS trigger LANGUAGE plpgsql AS $FN$
+          BEGIN
+            INSERT INTO public.student_audit(student_id) VALUES (NEW.id);
+            RETURN NEW;
+          END
+          $FN$;
+          CREATE TRIGGER student_audit AFTER INSERT ON public.students
+            FOR EACH ROW EXECUTE FUNCTION public.audit_student();
           CREATE TABLE auth.users(id integer PRIMARY KEY);
           CREATE TABLE storage.objects(id integer PRIMARY KEY);
           CREATE TABLE tutor_private.v5_team_lesson_fees(id integer PRIMARY KEY, amount integer);
@@ -67,6 +76,7 @@ jobs:
           INSERT INTO supabase_migrations.schema_migrations VALUES ('20261110100000');
           ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
           CREATE POLICY synthetic_only ON public.students FOR SELECT USING (id=1);
+          INSERT INTO public.students VALUES (3,'trigger-proof');
           SQL
           printf '%s\n' '127.0.0.1:54329:*:postgres:synthetic_only_pg17' > "$d/pgpass"
           chmod 600 "$d/pgpass"
@@ -114,6 +124,14 @@ jobs:
             docker exec -i "$name" psql -X -U postgres -v ON_ERROR_STOP=1 -d "$db" <<'SQL'
           CREATE SCHEMA auth;
           CREATE TABLE auth.users(id integer PRIMARY KEY);
+          CREATE TABLE auth.auth_audit(id integer PRIMARY KEY);
+          CREATE FUNCTION auth.managed_user_guard() RETURNS trigger LANGUAGE plpgsql AS $FN$
+          BEGIN
+            RETURN NEW;
+          END
+          $FN$;
+          CREATE TRIGGER managed_user_guard BEFORE INSERT ON auth.users
+            FOR EACH ROW EXECUTE FUNCTION auth.managed_user_guard();
           INSERT INTO auth.users VALUES (99);
           CREATE SCHEMA storage;
           CREATE TABLE storage.objects(id integer PRIMARY KEY);
@@ -121,6 +139,7 @@ jobs:
           CREATE SCHEMA supabase_migrations;
           CREATE TABLE supabase_migrations.schema_migrations(version text PRIMARY KEY);
           INSERT INTO supabase_migrations.schema_migrations VALUES ('managed-baseline');
+          CREATE EXTENSION IF NOT EXISTS pgcrypto;
           SQL
           done
           if docker run --rm --network host -v "$d:/private" -e PGHOST=127.0.0.1 \
@@ -152,8 +171,8 @@ jobs:
             postgres:17 pg_restore --use-list=/private/app-only.list --no-owner --no-acl \
             --exit-on-error --dbname=v58_managed_safe /private/production.snapshot.dump
           result="$(docker exec "$name" psql -X -U postgres -At -d v58_managed_safe \
-            -c "SELECT (SELECT count(*) FROM public.students),(SELECT count(*) FROM tutor_private.v5_team_lesson_fees),(SELECT count(*) FROM auth.users),(SELECT count(*) FROM storage.objects),(SELECT count(*) FROM supabase_migrations.schema_migrations),(SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='students')")"
-          test "$result" = '2|1|1|1|1|1'
+            -c "SELECT (SELECT count(*) FROM public.students),(SELECT count(*) FROM tutor_private.v5_team_lesson_fees),(SELECT count(*) FROM auth.users),(SELECT count(*) FROM storage.objects),(SELECT count(*) FROM supabase_migrations.schema_migrations),(SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='students'),(SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='auth' AND c.relname='users' AND NOT t.tgisinternal),(SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='students' AND NOT t.tgisinternal),(SELECT count(*) FROM pg_extension WHERE extname='pgcrypto'),(SELECT count(*) FROM public.student_audit)")"
+          test "$result" = '3|1|1|1|1|1|1|1|1|1'
           echo 'PASS: app-only restore kept pre-existing auth/storage/migrations intact (synthetic)'
           echo 'BLOCKED: full managed auth/storage data, extension, roles and triggers need separate review'
           echo 'PASS: single PostgreSQL17 custom snapshot and RLS restored; global roles exported separately'
