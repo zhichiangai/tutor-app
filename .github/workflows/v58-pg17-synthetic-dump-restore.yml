@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'scripts/release/v58-private-backup.sh'
+      - 'scripts/release/v58-managed-restore-plan.mjs'
+      - 'tests/v58-managed-restore-plan.test.mjs'
       - 'docs/v5/V58_PRODUCTION_BACKUP_AND_VERCEL_ACCESS_GATE_20261117.md'
       - 'scripts/release/v58-pg17-credential-guard.mjs'
       - 'scripts/release/v58-private-backup-manifest.mjs'
@@ -44,8 +46,11 @@ jobs:
           docker exec "$name" pg_isready -U postgres -d postgres
           docker exec "$name" createdb -U postgres v58_source
           docker exec "$name" createdb -U postgres v58_restored
+          docker exec "$name" createdb -U postgres v58_managed_conflict
+          docker exec "$name" createdb -U postgres v58_managed_safe
           docker exec -i "$name" psql -X -U postgres -v ON_ERROR_STOP=1 -d v58_source <<'SQL'
           CREATE ROLE v58_synthetic_archive_reader NOLOGIN;
+          CREATE EXTENSION IF NOT EXISTS pgcrypto;
           CREATE SCHEMA auth;
           CREATE SCHEMA storage;
           CREATE SCHEMA tutor_private;
@@ -103,5 +108,53 @@ jobs:
           result="$(docker exec "$name" psql -X -U postgres -At -d v58_restored \
             -c "SELECT (SELECT count(*) FROM public.students),(SELECT count(*) FROM auth.users),(SELECT count(*) FROM storage.objects),(SELECT count(*) FROM tutor_private.v5_team_lesson_fees),(SELECT count(*) FROM supabase_migrations.schema_migrations),(SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='students')")"
           test "$result" = '2|1|1|1|1|1'
+          # Simulate initialized Supabase-managed schemas in isolated databases.
+          # Unfiltered archive must FAIL. No production data or credentials.
+          for db in v58_managed_conflict v58_managed_safe; do
+            docker exec -i "$name" psql -X -U postgres -v ON_ERROR_STOP=1 -d "$db" <<'SQL'
+          CREATE SCHEMA auth;
+          CREATE TABLE auth.users(id integer PRIMARY KEY);
+          INSERT INTO auth.users VALUES (99);
+          CREATE SCHEMA storage;
+          CREATE TABLE storage.objects(id integer PRIMARY KEY);
+          INSERT INTO storage.objects VALUES (98);
+          CREATE SCHEMA supabase_migrations;
+          CREATE TABLE supabase_migrations.schema_migrations(version text PRIMARY KEY);
+          INSERT INTO supabase_migrations.schema_migrations VALUES ('managed-baseline');
+          SQL
+          done
+          if docker run --rm --network host -v "$d:/private" -e PGHOST=127.0.0.1 \
+            -e PGPORT=54329 -e PGUSER=postgres -e PGDATABASE=v58_managed_conflict \
+            -e PGSSLMODE=disable -e PGPASSFILE=/private/pgpass \
+            postgres:17 pg_restore --no-owner --no-acl --exit-on-error \
+            --dbname=v58_managed_conflict /private/production.snapshot.dump \
+            > "$d/direct-restore.out" 2>&1; then
+            echo 'FAIL: direct archive unexpectedly restored over initialized managed schemas'
+            exit 1
+          fi
+          grep -Eq 'schema "(auth|storage|supabase_migrations)" already exists' "$d/direct-restore.out"
+          echo 'PASS: full archive correctly reproduces managed-Schema collision (expected negative)'
+          # Pure TOC proposal. Never apply it on Production or a real project.
+          node --input-type=module - "$d/toc" "$d/app-only.list" <<'JS'
+          import {readFileSync,writeFileSync} from 'node:fs';
+          import {buildManagedAppRestorePlan} from './scripts/release/v58-managed-restore-plan.mjs';
+          const r=buildManagedAppRestorePlan(readFileSync(process.argv[2],'utf8'));
+          if(r.status!=='APP_ONLY_RESTORE_PROPOSAL_NOT_EXECUTABLE') {
+            throw Error('TOC requires manual review: '+r.unreviewed_categories.join(','));
+          }
+          writeFileSync(process.argv[3],r.toc,{mode:0o600,flag:'wx'});
+          if(r.managed_auth_storage_data_restored||r.role_sql_restored||r.full_supabase_restore_verified)
+            throw Error('Unsafe completeness claim');
+          JS
+          docker run --rm --network host -v "$d:/private" -e PGHOST=127.0.0.1 \
+            -e PGPORT=54329 -e PGUSER=postgres -e PGDATABASE=v58_managed_safe \
+            -e PGSSLMODE=disable -e PGPASSFILE=/private/pgpass \
+            postgres:17 pg_restore --use-list=/private/app-only.list --no-owner --no-acl \
+            --exit-on-error --dbname=v58_managed_safe /private/production.snapshot.dump
+          result="$(docker exec "$name" psql -X -U postgres -At -d v58_managed_safe \
+            -c "SELECT (SELECT count(*) FROM public.students),(SELECT count(*) FROM tutor_private.v5_team_lesson_fees),(SELECT count(*) FROM auth.users),(SELECT count(*) FROM storage.objects),(SELECT count(*) FROM supabase_migrations.schema_migrations),(SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='students')")"
+          test "$result" = '2|1|1|1|1|1'
+          echo 'PASS: app-only restore kept pre-existing auth/storage/migrations intact (synthetic)'
+          echo 'BLOCKED: full managed auth/storage data, extension, roles and triggers need separate review'
           echo 'PASS: single PostgreSQL17 custom snapshot and RLS restored; global roles exported separately'
           echo 'LIMIT: this does NOT prove full live Supabase Auth, Storage, Vault, extensions or Production restore'
