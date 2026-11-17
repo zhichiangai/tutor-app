@@ -9,11 +9,7 @@ import {fileURLToPath} from 'node:url';
 
 const root=realpathSync(fileURLToPath(new URL('../../',import.meta.url)));
 const project='vctisuglfoxyuwlvyjee';
-const required=[
- 'roles.sql','schema.sql','data.sql',
- 'auth_data.sql','storage_data.sql',
- 'history_schema.sql','history_data.sql'
-];
+const required=['roles.sql','production.snapshot.dump'];
 const [mode,target]=process.argv.slice(2);
 assert.ok(['create','verify'].includes(mode),'Usage: node v58-private-backup-manifest.mjs create|verify ABS_PRIVATE_DIR');
 assert.equal(process.argv.length,4,'Exactly two arguments required');
@@ -26,7 +22,7 @@ assert.ok(!process.env.GITHUB_ACTIONS&&!process.env.CI,
 assert.equal((lstatSync(dir).mode & 0o077),0,'Private backup directory must not be accessible by group/others');
 
 function scan(name){
- assert.ok(/^[a-z_]+\.sql$/.test(name),'Unexpected backup filename');
+ assert.ok(required.includes(name),'Unexpected backup filename');
  const p=join(dir,name);
  assert.ok(existsSync(p),'Missing backup file: '+name);
  const s=lstatSync(p);
@@ -44,24 +40,24 @@ function assertTimestamp(value){
 const path=join(dir,'manifest.json');
 if(mode==='create'){
  assert.ok(!existsSync(path),'Refuse to overwrite prior backup manifest');
- const cli=process.env.V58_SUPABASE_CLI_VERSION||'';
+ const cli=process.env.V58_PGDUMP_VERSION||'';
  const started=process.env.V58_BACKUP_STARTED_UTC||'';
  const finished=process.env.V58_BACKUP_FINISHED_UTC||'';
- assert.match(cli,/^[23]\.[0-9]+\.[0-9]+(?:[+-][A-Za-z0-9.-]+)?$/,
-  'Missing reviewed Supabase CLI version');
+ assert.match(cli,/^pg_dump \(PostgreSQL\) 17\.[0-9]+(?:\.[0-9]+)?(?:[+-][A-Za-z0-9.-]+)?$/,
+  'Missing PostgreSQL 17 client version');
  assertTimestamp(started);assertTimestamp(finished);
  assert.ok(Date.parse(finished)>=Date.parse(started),'Backup completion precedes start');
  const out={
   schema_version:1,project_ref:project,
   purpose:'private_logical_backup_integrity_only',
   backup_started_utc:started,backup_completed_utc:finished,
-  supabase_cli_version:cli,
+  pg_dump_client_version:cli,
   restore_verified:false,production_writes:0,
   sql_files:items
  };
  writeFileSync(path,JSON.stringify(out,null,2)+'\n',{flag:'wx',mode:0o600});
  console.log(JSON.stringify({status:'BACKUP_FILES_INTEGRITY_PASS_RESTORE_NOT_TESTED',
-  project_ref:project,file_count:items.length,manifest_file:'manifest.json',
+  project_ref:project,file_count:items.length,archive_format:'pg_dump_custom_single_snapshot',manifest_file:'manifest.json',
   sql_contents_emitted:false,restore_verified:false}));
 }else{
  assert.ok(existsSync(path),'Missing manifest.json');
@@ -72,7 +68,7 @@ if(mode==='create'){
  assertTimestamp(original.backup_started_utc);
  assertTimestamp(original.backup_completed_utc);
  assert.ok(Date.parse(original.backup_completed_utc)>=Date.parse(original.backup_started_utc));
- assert.match(original.supabase_cli_version,/^[23]\.[0-9]+\.[0-9]+(?:[+-][A-Za-z0-9.-]+)?$/);
+ assert.match(original.pg_dump_client_version,/^pg_dump \(PostgreSQL\) 17\.[0-9]+(?:\.[0-9]+)?(?:[+-][A-Za-z0-9.-]+)?$/);
  assert.equal(original.restore_verified,false);
  assert.equal(original.sql_files.length,items.length);
  assert.deepEqual(original.sql_files,items,'Backup checksum or file set differs');
