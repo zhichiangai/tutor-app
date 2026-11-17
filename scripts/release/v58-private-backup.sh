@@ -8,7 +8,7 @@ set +x
 umask 077
 
 if [[ -n "${CI:-}" || -n "${GITHUB_ACTIONS:-}" ]]; then
-  echo 'REFUSED: CI is not a private Production backup workstation' >&2
+  echo 'REFUSED: CI environments are not private backup destinations' >&2
   exit 2
 fi
 command -v node >/dev/null || { echo 'REFUSED: Node 22+ required' >&2; exit 2; }
