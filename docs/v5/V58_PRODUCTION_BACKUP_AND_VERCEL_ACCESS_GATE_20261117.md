@@ -186,3 +186,34 @@ Codex 2026-11-17 的**實際本機盤點**確認，先前 `v58-private-backup.sh
 | Migration 63、Main Merge、Production V5.8 | **NO-GO** |
 
 本輪 CLI 合成目標不包含使用者真實帳戶或金流資料。Mac 上原有 25 containers／13 volumes 未由 CI 存取；CI runner 和使用者的 Mac 是兩個不同環境。下一步先在不連 Production 的條件下，以完整本機 Stack 合成 Auth identity、Storage metadata／object 與 Migration History 相容性驗證；任何數據遺失、權限不一致、重複受管物件均阻止正式發布。
+
+
+## J. 第四輪：兩套真正本機 Supabase Stack 的受管資料合成遷移（2026-11-17）
+
+本輪新增以下**合成資料專用**檔案：
+
+- `tests/local/v58-managed-state-transfer.mjs`：透過兩套本機 GoTrue Auth／Storage API 建立與恢復一個**虛構** Email 使用者，建立 Identity、Password Session、Refresh Token；從來源端 Storage API 下載真正的合成物件**位元組**到 GitHub runner 的私密暫存目錄，在另一套獨立目的端透過 Storage API 上傳，重新下載後比較 SHA-256。來源下載檔案不會上傳 PR 或 Github Artifact。
+- `tests/local/v58-managed-state-data-list.mjs`：只允許 `auth.users`、`auth.identities`、`auth.sessions`、`auth.refresh_tokens`、`supabase_migrations.schema_migrations` 這 **5** 個受管表的 `TABLE DATA` 項目，不包含 platform DDL、extensions、roles、Storage metadata 直接寫入；無效、缺漏或重複條目即拒絕。
+- `tests/local/v58-managed-state-two-stack.sh`、`.github/workflows/v58-managed-state-two-stack.yml`：透過 Supabase CLI v2.107.0、兩套不相同 Project ID/port 的 **實際 Auth + Storage API + PostgreSQL Stack** 做 Source → Archive → Target；source 以 fake migration 名稱建立 62 筆歷史並導出，target 轉入後重新登入，成功後用 Storage API 重建 bucket+object。全程禁止 hosted access token、PGPASSWORD 與 Production DB URL；測試結束只停止並清理當次 CI 自己的兩套 stack。
+- `tests/v58-managed-state-data-list.test.mjs`：TOC allowlist 的單元與拒絕案例。
+
+**首輪測試實際發現的錯誤**：
+1. 新開的目的端匯入 `auth.refresh_tokens` 資料列後，若序列不跟進，GoTrue 新登入會 HTTP 500。這不是帳號已成功恢復的證據；目前在**合成目的端**明確 `setval(pg_get_serial_sequence('auth.refresh_tokens','id'),MAX(id),true)` 後重新登入成功。
+2. SQL 範例的區塊分隔符有提交時損壞風險，已改用單純的 `SELECT setval(...)`，避免 Shell/CI 轉義。
+3. Storage 測試不得只讓兩端各自從寫死的測試字串產生同內容；已改為**來源端 Storage API 的下載檔**經 runner 私密目錄轉移，再由目的端 Storage API 上傳並比對 digest。
+
+**驗收證據**：[雙 Stack 合成資料遷移 #44124680346](https://github.com/zhichiangai/tutor-app/actions/runs/44124680346)：**PASS**（匯入 Auth users/identities/sessions/refresh tokens、目的端重新登入、62 筆**合成** Migration History 與 Storage API metadata/byte digest）。此 Run 為 Storage API 檔案保存策略最終補強之前的 SHA；後續最新 Head 重新 CI 結果應獨立核對。
+
+### 不能誤判的範圍
+
+- 來源的 62 筆 migration 是**虛構的相同筆數**，**不是**正式庫的真實 62 個版本、DDL 或狀態。
+- `auth.sessions`／refresh tokens 的資料列搬遷不是跨獨立 JWT 簽章金鑰保證舊 Token 仍可繼續使用；目前證明的是**目的端重新登入並新建 Session**。Google OAuth provider、Signing Keys、身份憑證安全仍需正式環境稽核。
+- Storage 實際物件一定要走 API；資料庫的 `storage.objects` 只有 metadata，單純 `pg_dump` 不會保存檔案本體。本輪只搬運一個**合成物件**，未證實大量檔案、超大檔案、S3 同步或正式桶的完整還原。
+- 目前仍無任何**真正 Production dump、SHA 或隔離完整 Restore**，正式 62-history、角色／Extension／Auth 平台版本／RLS／外部服務設定未經真正還原驗證。**G0/G1/G2 保持 NO-GO**。
+
+### 真正 Production 備份開始前必備
+
+1. Codex 在 Mac 私密環境重新讀本文件與 `AI_DEVELOPMENT_MASTER_RULES.md`，安全同步 **PR #83 最終通過的 Head**；不能引用舊 `00eaedeb` 工作樹執行老腳本。
+2. 確認 FileVault ON、加密備份資料夾 0700、`PGPASSFILE` 0600 且在 Git repo 外、至少有足夠備份及還原空間；Mac PG17 原生客戶端尚未證實存在，可安裝可信 PostgreSQL 17 工具後先執行 `--version` 和純合成驗證。
+3. 先驗證 Source 受管 Schema、RLS/RPC、Auth 使用者／Storage 桶／物件筆數與 Migration 62 基準；`v58-private-backup.sh` 需符合 CLI/PG17 現況，且安全失敗時 **禁止繞過**。
+4. 只有備份確實寫入 Mac 的加密目錄、SHA 驗證通過，才可在完全獨立的本機還原目標驗證 Auth/Storage／JWT／Migration／RLS／帳務；若未完成，不可對第 63 筆正式 SQL 或 Main/Production 發布做任何動作。
