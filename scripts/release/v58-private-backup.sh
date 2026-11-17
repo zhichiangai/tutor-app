@@ -53,9 +53,15 @@ if ! pg_restore --list "$out/production.snapshot.dump" > "$out/private-toc.txt" 
 fi
 chmod 600 "$out/private-toc.txt"
 # Fail closed if core managed/custom schemas were not archived.
-for schema in public tutor_private auth storage supabase_migrations; do
+# The built-in "public" schema may be omitted from archive DDL.
+# Its production TABLE entries are sufficient proof of public data inclusion.
+if ! grep -Eq '[[:space:]](TABLE|TABLE DATA) public ' "$out/private-toc.txt"; then
+  echo 'FAIL: public tables absent from custom archive' >&2
+  exit 2
+fi
+for schema in tutor_private auth storage supabase_migrations; do
   if ! grep -Eq "[[:space:]]SCHEMA - $schema([[:space:]]|$)" "$out/private-toc.txt"; then
-    echo "FAIL: required schema missing from archive: $schema" >&2
+    echo "FAIL: required custom/managed schema missing from archive: $schema" >&2
     exit 2
   fi
 done
