@@ -16,6 +16,17 @@ test "$(docker exec "$db" psql -X -U postgres -d postgres -At -c 'select current
 # This requires the platform-managed Auth/Storage tables to exist in the target.
 ready="$(docker exec "$db" psql -X -U postgres -d postgres -At -c "select (to_regclass('auth.users') is not null)::int,(to_regclass('storage.objects') is not null)::int")"
 test "$ready" = '1|1' || { echo 'FAIL: initialized Auth/Storage schemas are absent' >&2; exit 1; }
+# Verify BOTH actual local services, not merely similarly named database schemas.
+for service in auth storage; do
+  container="supabase_${service}_tutor_v58_managed_restore"
+  docker inspect "$container" >/dev/null 2>&1 || {
+    echo "FAIL: local Supabase $service service container missing" >&2; exit 1;
+  }
+  [[ "$(docker inspect -f '{{.State.Running}}' "$container")" == true ]] || {
+    echo "FAIL: local Supabase $service service is not running" >&2; exit 1;
+  }
+done
+echo 'PASS: disposable GoTrue Auth and Storage API service containers running'
 work="$(mktemp -d)"
 chmod 700 "$work"
 cleanup() {
@@ -61,6 +72,18 @@ CREATE POLICY v58_synthetic_allow_first ON public.v58_synthetic_restore_items
 SQL
 docker exec "$db" pg_dump -U postgres -d v58_synthetic_source --format=custom   --no-owner --no-acl --file=/tmp/v58-synthetic.archive
 docker exec "$db" pg_restore --list /tmp/v58-synthetic.archive > "$work/source.toc"
+# Negative proof against the real initialized LOCAL Supabase target:
+# raw schema restore MUST fail on platform Auth schema; a single transaction
+# ensures this synthetic attempt cannot leave partial DDL in target.
+if docker exec "$db" pg_restore -U postgres -d postgres --schema-only      --no-owner --no-acl --single-transaction --exit-on-error      /tmp/v58-synthetic.archive >"$work/raw-restore-expected-failure.log" 2>&1; then
+  echo 'FAIL: unfiltered archive unexpectedly accepted by initialized platform' >&2
+  exit 1
+fi
+if ! grep -q 'schema "auth" already exists' "$work/raw-restore-expected-failure.log"; then
+  echo 'FAIL: unexpected unfiltered restore failure reason' >&2
+  exit 1
+fi
+echo 'PASS: full Supabase target rejects raw managed-schema DDL atomically (expected negative)'
 node --input-type=module - "$work/source.toc" "$work/app-only.list" <<'JS'
 import {readFileSync,writeFileSync} from 'node:fs';
 import {buildManagedAppRestorePlan} from './scripts/release/v58-managed-restore-plan.mjs';
