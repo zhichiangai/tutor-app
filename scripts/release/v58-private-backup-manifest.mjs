@@ -37,12 +37,25 @@ function scan(name){
  return {name,bytes:s.size,sha256:hash};
 }
 const items=required.map(scan);
+function assertTimestamp(value){
+ assert.match(value,/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$/,'Missing UTC backup timestamp');
+ assert.ok(!Number.isNaN(Date.parse(value)),'Invalid UTC backup timestamp');
+}
 const path=join(dir,'manifest.json');
 if(mode==='create'){
  assert.ok(!existsSync(path),'Refuse to overwrite prior backup manifest');
+ const cli=process.env.V58_SUPABASE_CLI_VERSION||'';
+ const started=process.env.V58_BACKUP_STARTED_UTC||'';
+ const finished=process.env.V58_BACKUP_FINISHED_UTC||'';
+ assert.match(cli,/^[23]\\.[0-9]+\\.[0-9]+(?:[+-][A-Za-z0-9.-]+)?$/,
+  'Missing reviewed Supabase CLI version');
+ assertTimestamp(started);assertTimestamp(finished);
+ assert.ok(Date.parse(finished)>=Date.parse(started),'Backup completion precedes start');
  const out={
   schema_version:1,project_ref:project,
   purpose:'private_logical_backup_integrity_only',
+  backup_started_utc:started,backup_completed_utc:finished,
+  supabase_cli_version:cli,
   restore_verified:false,production_writes:0,
   sql_files:items
  };
@@ -56,6 +69,10 @@ if(mode==='create'){
  const original=JSON.parse(readFileSync(path,'utf8'));
  assert.equal(original.schema_version,1);
  assert.equal(original.project_ref,project);
+ assertTimestamp(original.backup_started_utc);
+ assertTimestamp(original.backup_completed_utc);
+ assert.ok(Date.parse(original.backup_completed_utc)>=Date.parse(original.backup_started_utc));
+ assert.match(original.supabase_cli_version,/^[23]\\.[0-9]+\\.[0-9]+(?:[+-][A-Za-z0-9.-]+)?$/);
  assert.equal(original.restore_verified,false);
  assert.equal(original.sql_files.length,items.length);
  assert.deepEqual(original.sql_files,items,'Backup checksum or file set differs');
