@@ -31,6 +31,8 @@ Supabase 官方：<https://supabase.com/docs/guides/platform/migrating-within-su
 - 建立可控、不能連接正式網域、不會對外寄信或寫入正式 API 的**獨立測試 Supabase/PostgreSQL**。若需要新雲端專案、付費加值或 Supabase branch，必須先取得使用者對費用的同意。可優先使用本機一次性 Docker。
 - **絕不**對 `vctisuglfoxyuwlvyjee` 執行 `restore_project`、`db reset`、`migration repair` 或 `db push`；也不得用其現存 Production 當還原目標。
 - 依官方文件依角色、Schema、Data 及必要 Auth／Storage Data 與 62 筆 `supabase_migrations` 歷史還原，確認其中 managed schemas 重複匯入、platform extensions 與 FK/trigger 的相依順序。若有自定 `auth`/ `storage` triggers/policies，單獨檢查。禁止複製任何可能導致外部寄信、webhooks、收款、排程的啟動設定。
+- **跨七份 dump 的一致性限制：** `roles.sql`、`schema.sql`、`data.sql`、`auth_data.sql` 等是分別執行的 CLI 指令，彼此**不是同一個 PostgreSQL snapshot**。正式備份時應避免有新的課程、授權、付款或其他寫入；若無法限制寫入，必須在備份前後各做資料計數／業務摘要對帳，出現漂移就停止發布。多個檔案 SHA-256 一致不代表它們出自同一時刻。
+- **私密隔離還原比對工具：** 在受保護、已裝有 `psql` 的操作環境，以 `umask 077` 並將 `supabase/diagnostics/v58_backup_restore_metadata_readonly.sql` 分別用 `psql -X -A -t -v ON_ERROR_STOP=1 --file ... --dbname <SOURCE_OR_ISOLATED_URL>` 執行，輸出至 Git repository 外、0600 的兩份純 JSON 檔 `source-inventory.json` 與 `isolated-inventory.json`。將獨立測試庫地址確認為**非 Production** 後，執行 `node scripts/release/v58-private-restore-parity.mjs ABS_SOURCE_JSON ABS_ISOLATED_JSON`；結果為 `SCALAR_RESTORE_PARITY_PASS_FULL_RESTORE_NOT_VERIFIED` 時僅代表 20 類表筆數、Migration、RPC 與 RLS 表數一致，仍需完整 Auth、FK、RLS/JWT、退款帳務與外部副作用驗證。工具拒絕 CI 與 Git 內／非私人 JSON，失敗不輸出原始列或金額。
 - 復原驗證要比較還原前 Production 的安全摘要：migration **62**、末版 `20261110100000`、Auth user **5**、Storage bucket/object **0**（這是本次快照，正式試驗時需重查）、主要工作區、學生／家長連結、課程、帳務／退款各類資料筆數與金額總和、RLS policy、匿名權限、RPC body hash、索引/約束；**只保留不含真實資料的摘要**。
 - 恢復端 RLS、Team/Guardian 存取權限測試 PASS，實測資料彙總守恆，合格且有可追溯非敏感證據後，才可標記 `BACKUP_RESTORE_PASS`。存檔和 checksum-only 成功不得標記還原 PASS。
 - 如果還原仍有遺漏：停在 NO-GO，找出 schema/roles/auth/history 缺口，不得直接升級 Production。
