@@ -13,15 +13,18 @@ command -v supabase >/dev/null || { echo "Missing Supabase CLI" >&2; exit 2; }
 command -v node >/dev/null || { echo "Missing Node 22+" >&2; exit 2; }
 node --input-type=module - <<'NODE'
 import {realpathSync,existsSync} from 'node:fs';
-import {resolve,relative,sep,isAbsolute,dirname} from 'node:path';
-import {fileURLToPath} from 'node:url';
+import {resolve,relative,sep,isAbsolute,dirname,basename,join} from 'node:path';
 const project='vctisuglfoxyuwlvyjee',path=process.env.V58_PRIVATE_BACKUP_DIR;
 if(!path||!isAbsolute(path)) throw Error('Absolute private output directory required');
 if(existsSync(path)) throw Error('Output exists: do not reuse or overwrite backups');
-const target=resolve(path),root=realpathSync(fileURLToPath(new URL('./',import.meta.url)));
-const d=relative(process.cwd(),target);
-if(!d.startsWith('..'+sep)&&d!=='..') throw Error('Never write backup inside the working tree');
+const target=resolve(path);
 if(!existsSync(dirname(target))) throw Error('Create private parent directory first');
+const repo=realpathSync(process.cwd());
+const physicalParent=realpathSync(dirname(target));
+const physicalTarget=join(physicalParent,basename(target));
+const d=relative(repo,physicalTarget);
+if(!d.startsWith('..'+sep)&&d!=='..')
+ throw Error('Never write backup inside the Git working tree, including symlinked parent directories');
 let u;try{u=new URL(process.env.V58_PRIVATE_DB_URL||'');}
 catch{throw Error('Invalid private DB connection URL');}
 const user=decodeURIComponent(u.username);
