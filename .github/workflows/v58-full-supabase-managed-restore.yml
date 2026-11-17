@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'tests/local/v58-supabase-managed-stack-restore-smoke.sh'
+      - 'docs/v5/V58_PRODUCTION_BACKUP_AND_VERCEL_ACCESS_GATE_20261117.md'
       - 'scripts/release/v58-managed-restore-plan.mjs'
       - 'tests/v58-managed-restore-plan.test.mjs'
       - '.github/workflows/v58-full-supabase-managed-restore.yml'
