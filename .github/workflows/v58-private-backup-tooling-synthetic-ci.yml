@@ -1,0 +1,47 @@
+name: V5.8 private backup tooling synthetic contract only
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/release/v58-private-backup.sh'
+      - 'scripts/release/v58-private-backup-manifest.mjs'
+      - 'tests/v58-private-backup-manifest.test.mjs'
+      - '.github/workflows/v58-private-backup-tooling-synthetic-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CI: 'true'
+      GITHUB_ACTIONS: 'true'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Syntax-check private operator-only scripts
+        run: |
+          set -euo pipefail
+          bash -n scripts/release/v58-private-backup.sh
+          node --check scripts/release/v58-private-backup-manifest.mjs
+          node --check tests/v58-private-backup-manifest.test.mjs
+      - name: Run synthetic private checksum tests only
+        run: node --test tests/v58-private-backup-manifest.test.mjs
+      - name: Verify that the backup operator script refuses CI and never emits a dump
+        run: |
+          set -euo pipefail
+          set +e
+          bash scripts/release/v58-private-backup.sh > /tmp/ci-refusal.txt 2>&1
+          result="$?"
+          set -e
+          test "$result" -eq 2
+          grep -q "REFUSED: CI environments" /tmp/ci-refusal.txt
+          rm -f /tmp/ci-refusal.txt
+          echo "PASS: no production network, no credentials, no SQL, no data artifacts"
