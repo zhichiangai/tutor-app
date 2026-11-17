@@ -21,7 +21,7 @@ Supabase 官方：<https://supabase.com/docs/guides/platform/migrating-within-su
 1. 啟用 Mac FileVault 或使用加密私密磁碟。私人工作樹另開乾淨的 Terminal（不能使用 GitHub Actions），事先安裝官方 Supabase CLI **v2/v3（v4 及未知版本拒絕執行）**、Node 22；使用 **Supabase Dashboard → Database → Connect** 的 Session Pooler `5432`，組裝指向 `vctisuglfoxyuwlvyjee` 的、`sslmode=require` 連線 URL。密碼從安全密碼管理器取得，僅在私密 Terminal session 的 env 設定；**不要**貼到 PR/聊天或 shell history。
 2. 進入本 PR Review Branch 的 repository root。設定 `V58_PRIVATE_BACKUP_DIR` 為 **不存在、Git repository 之外**的加密位置絕對路徑（父目錄先建立、權限僅操作者），`V58_PRIVATE_DB_URL` 為**僅限這次私密操作**的 Supabase 連線 URL。此環境變數仍會傳遞給 CLI；CLI 連線字串可能在本機程序清單可見，因此僅在受信任單一使用者電腦操作，結束立即 unset。啟用 SQL 日誌時，只寫入受保護的備份資料夾。
 3. 執行 `bash scripts/release/v58-private-backup.sh`：先核驗 ref／TLS／DB 名稱／port／新資料夾／禁止 CI。**CLI v2** 明確使用 `--db-url`、**CLI v3** 明確使用 `--remote=<url>`；已以安全的純邏輯測試檢查版本選擇，腳本不會直接將完整 URL 印在標準輸出。此後由官方 CLI 分別備份 `roles.sql`、`schema.sql`、`data.sql`、`auth_data.sql`、`storage_data.sql`、`history_schema.sql`、`history_data.sql`。如有失敗直接停止，不得誤標 PASS。
-4. 驗證 **全部來源有實際 `auth.users`、Migration 62 筆、Schema/RLS/RPC/自訂權限、必要資料**，並確認重複來源表不造成還原時重複匯入。執行 `node scripts/release/v58-private-backup-manifest.mjs verify ABS_PRIVATE_BACKUP_DIR` 檢查 7 份 SQL SHA-256 與權限。這項檢查成功只代表**檔案完整性**，不是還原成功。
+4. 驗證 **全部來源有實際 `auth.users`、Migration 62 筆、Schema/RLS/RPC/自訂權限、必要資料**，並確認重複來源表不造成還原時重複匯入。執行 `node scripts/release/v58-private-backup-manifest.mjs verify ABS_PRIVATE_BACKUP_DIR` 檢查 7 份 SQL SHA-256 與權限。Manifest 同時鎖定**正式開始／結束 UTC 時間**及**使用的 Supabase CLI 版本**；如果此資訊遺漏、格式有誤或時間倒退，檢查 FAIL。這項檢查成功只代表**檔案完整性與可追溯性**，不是還原成功。
 5. 至少存兩份獨立故障域、加密、存取受限的備份。只有 **檔名、bytes、sha256、UTC 時間、DB 版本、備份工具版本、restore test PASS** 可用於交接；不可將原始 SQL 上傳公共或共享檔案。
 
 ## C. 真正隔離還原驗證：必需，尚未執行
