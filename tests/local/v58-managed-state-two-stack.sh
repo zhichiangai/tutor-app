@@ -53,7 +53,8 @@ for kind,project,offset in [('source','tutor_v58_state_source',2000),
 PY
 
 start_stack(){
-  local kind="$1" name="$2" logfile="$base/private/$kind-start.log"
+  local kind="$1" name="$2"
+  local logfile="$base/private/$kind-start.log"
   local folder="$base/$kind"
   test ! -f "$folder/supabase/.temp/project-ref"
   test ! -f "$folder/supabase/.branches/_current_branch"
