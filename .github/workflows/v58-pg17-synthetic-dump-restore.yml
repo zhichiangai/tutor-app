@@ -183,7 +183,8 @@ jobs:
             --exit-on-error --dbname=v58_managed_safe /private/production.snapshot.dump
           result="$(docker exec "$name" psql -X -U postgres -At -d v58_managed_safe \
             -c "SELECT (SELECT count(*) FROM public.students),(SELECT count(*) FROM tutor_private.v5_team_lesson_fees),(SELECT count(*) FROM auth.users),(SELECT count(*) FROM storage.objects),(SELECT count(*) FROM supabase_migrations.schema_migrations),(SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='students'),(SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='auth' AND c.relname='users' AND NOT t.tgisinternal),(SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='students' AND NOT t.tgisinternal),(SELECT count(*) FROM pg_extension WHERE extname='pgcrypto'),(SELECT count(*) FROM public.student_audit)")"
-          test "$result" = '3|1|1|1|1|1|1|1|1|1'
+          echo "Synthetic managed-safe tuple: $result"
+          test "$result" = '3|1|1|1|1|1|1|1|1|3'
           echo 'PASS: app-only restore kept pre-existing auth/storage/migrations intact (synthetic)'
           echo 'BLOCKED: full managed auth/storage data, extension, roles and triggers need separate review'
           echo 'PASS: single PostgreSQL17 custom snapshot and RLS restored; global roles exported separately'
