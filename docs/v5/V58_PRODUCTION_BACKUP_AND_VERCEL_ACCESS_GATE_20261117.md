@@ -151,3 +151,38 @@ Codex 2026-11-17 的**實際本機盤點**確認，先前 `v58-private-backup.sh
 | 真正 Supabase Stack 的 Auth/Storage/Extensions 完整相容還原 | NOT TESTED |
 | 真實 Production SQL dump/私密 SHA/完整隔離還原 | BLOCKED |
 | Migration 63 / Main / Production deploy | NO-GO |
+
+
+## I. 第三輪：真正 CLI 本機 Full Supabase Stack 的合成選擇性還原驗證（2026-11-17）
+
+> **PASS 僅限 GitHub runner 的一次性本機測試環境；不代表任何 Production 資料、密碼、完整 Auth/Storage 內容或 Migration History 已備份／復原。**
+
+新增工作：
+
+- [`tests/local/v58-supabase-managed-stack-restore-smoke.sh`](../../tests/local/v58-supabase-managed-stack-restore-smoke.sh)：合成來源在全新本機 Supabase 容器內建立**獨立來源 DB**，以 PostgreSQL 原生 Custom Archive 匯出；在 CLI 已初始化的**另一個 target DB**（同一個一次性 Supabase Stack），測試 raw schema-only restore 預期因 `schema "auth" already exists` **FAIL**，採 `--single-transaction --exit-on-error` 防止殘留半套 DDL。
+- [`.github/workflows/v58-full-supabase-managed-restore.yml`](../../.github/workflows/v58-full-supabase-managed-restore.yml)：使用 Supabase CLI **2.107.0** 建立專屬本機 `tutor_v58_managed_restore` config，停用 repository migrations／seed，保留 GoTrue Auth 與 Storage API，其他不需要的服務排除；**沒有 host/project link、沒有正式連線字串／密碼、沒有讀取任何真實資料**。測試後只清理本條 CI 的 disposable Stack。
+- 此測試也使用 `v58-managed-restore-plan.mjs` 產生 **public/tutor_private App-only TOC 提案**，對 local stack 執行 `pg_restore --use-list --single-transaction --no-owner --no-acl`，並確認：合成 App tables 2 筆、Audit 2 筆、Team fee 1 筆、RLS 1、Trigger 1；已初始化的 `auth.users`、`storage.objects` 筆數、Auth/Storage 表數、Auth Trigger 數及 Extension 數在還原前後**完全相同**。
+
+最新 CI：[**Run #44120172126 — SUCCESS**](https://github.com/zhichiangai/tutor-app/actions/runs/44120172126)，在 Head `1019da4b5d3470349ea80fbbdb869e8ddb36aa0a`。實際日誌包含：
+
+- `PASS: disposable GoTrue Auth and Storage API service containers running`
+- `PASS: full Supabase target rejects raw managed-schema DDL atomically (expected negative)`
+- `PASS: reviewed app-only TOC proposal; managed objects intentionally excluded`
+- `PASS: initialized local Supabase Auth/Storage tables remained intact`
+- `PASS: app-only data, trigger, RLS and audit restored into disposable full-stack database`
+
+### 仍未完成，不可誤列 PASS
+
+| Gate | 狀態 |
+| --- | --- |
+| PostgreSQL 17 一般合成完整還原 | PASS |
+| CLI 啟動真正本機 Auth + Storage 服務 | PASS |
+| 已初始化本機 Stack 的 raw managed-schema 衝突與 rollback | PASS（預期拒絕的負面測試） |
+| 本機 Stack 的 App-only synthetic restore 與受管物件保留 | PASS |
+| 真正 Auth 使用者、Identity、Sessions 跨平台完整還原 | **NOT TESTED** |
+| Storage metadata／API 物件本體實際移轉 | **NOT TESTED** |
+| 完整 62-history 重建、Production roles／Extensions／JWT／RLS parity | **NOT TESTED** |
+| Production 真實私密備份、SHA、隔離完整還原 | **BLOCKED** |
+| Migration 63、Main Merge、Production V5.8 | **NO-GO** |
+
+本輪 CLI 合成目標不包含使用者真實帳戶或金流資料。Mac 上原有 25 containers／13 volumes 未由 CI 存取；CI runner 和使用者的 Mac 是兩個不同環境。下一步先在不連 Production 的條件下，以完整本機 Stack 合成 Auth identity、Storage metadata／object 與 Migration History 相容性驗證；任何數據遺失、權限不一致、重複受管物件均阻止正式發布。
