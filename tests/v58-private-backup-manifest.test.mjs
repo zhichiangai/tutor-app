@@ -9,11 +9,11 @@ import {fileURLToPath} from 'node:url';
 import {selectDumpTargetFlag} from '../scripts/release/v58-backup-target-flag.mjs';
 
 const script=fileURLToPath(new URL('../scripts/release/v58-private-backup-manifest.mjs',import.meta.url));
-const files=['roles.sql','schema.sql','data.sql','auth_data.sql','storage_data.sql','history_schema.sql','history_data.sql'];
+const files=['roles.sql','production.snapshot.dump'];
 const runner=(mode,dir,{ci=false}={})=>{
  const env={...process.env};
  // Fake timestamps and CLI version belong only to the synthetic fixture.
- env.V58_SUPABASE_CLI_VERSION='2.107.0';
+ env.V58_PGDUMP_VERSION='pg_dump (PostgreSQL) 17.6';
  env.V58_BACKUP_STARTED_UTC='2026-11-17T00:00:00Z';
  env.V58_BACKUP_FINISHED_UTC='2026-11-17T00:02:00Z';
  if(ci){env.CI='true';env.GITHUB_ACTIONS='true';}
@@ -33,17 +33,17 @@ test('private restore manifest detects tampering and refuses any public output',
   assert.equal(c.sql_contents_emitted,false);
   assert.equal(c.restore_verified,false);
   const manifest=JSON.parse(readFileSync(join(dir,'manifest.json'),'utf8'));
-  assert.equal(manifest.sql_files.length,7);
+  assert.equal(manifest.sql_files.length,2);
   assert.equal(manifest.project_ref,'vctisuglfoxyuwlvyjee');
-  assert.equal(manifest.supabase_cli_version,'2.107.0');
+  assert.equal(manifest.pg_dump_client_version,'pg_dump (PostgreSQL) 17.6');
   assert.equal(manifest.backup_started_utc,'2026-11-17T00:00:00Z');
   assert.equal(manifest.backup_completed_utc,'2026-11-17T00:02:00Z');
   assert.equal(runner('verify',dir).status,0);
   assert.notEqual(runner('create',dir).status,0,'must not overwrite previous archive');
   assert.notEqual(runner('verify',dir,{ci:true}).status,0,'real checker must refuse CI');
-  writeFileSync(join(dir,'data.sql'),'-- synthetic only: changed data\n',{mode:0o600});
+  writeFileSync(join(dir,'production.snapshot.dump'),'-- synthetic only: changed data\n',{mode:0o600});
   assert.notEqual(runner('verify',dir).status,0,'tampered SQL must be rejected');
-  chmodSync(join(dir,'data.sql'),0o644);
+  chmodSync(join(dir,'production.snapshot.dump'),0o644);
   assert.notEqual(runner('verify',dir).status,0,'group/world-readable SQL must be rejected');
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
