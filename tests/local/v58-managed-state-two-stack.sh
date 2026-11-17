@@ -141,16 +141,11 @@ echo 'PASS: target local Auth identities, sessions, refresh-token metadata and 6
 # A newly created GoTrue session can otherwise collide with imported
 # auth.refresh_tokens.id. This is a disposable local target ONLY.
 docker exec -i "$target_db" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
-DO $
-DECLARE seq text;
-BEGIN
- seq := pg_get_serial_sequence('auth.refresh_tokens','id');
- IF seq IS NULL THEN
-   RAISE EXCEPTION 'Synthetic target refresh token ID sequence missing';
- END IF;
- PERFORM setval(seq::regclass,
-   GREATEST((SELECT COALESCE(MAX(id),0) FROM auth.refresh_tokens),1),true);
-END $;
+SELECT setval(
+ pg_get_serial_sequence('auth.refresh_tokens','id')::regclass,
+ GREATEST((SELECT COALESCE(MAX(id),0) FROM auth.refresh_tokens),1),
+ true
+);
 SQL
 echo 'PASS: local target Auth refresh token sequence reconciled before new login'
 
