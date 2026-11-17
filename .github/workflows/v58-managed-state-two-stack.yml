@@ -1,0 +1,50 @@
+name: V5.8 two-stack synthetic Auth Storage migration
+
+on:
+  pull_request:
+    paths:
+      - 'tests/local/v58-managed-state-transfer.mjs'
+      - 'tests/local/v58-managed-state-data-list.mjs'
+      - 'tests/local/v58-managed-state-two-stack.sh'
+      - '.github/workflows/v58-managed-state-two-stack.yml'
+      - 'docs/v5/V58_PRODUCTION_BACKUP_AND_VERCEL_ACCESS_GATE_20261117.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-two-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: 'true'
+      V58_MANAGED_STATE_LOCAL: '1'
+      SUPABASE_TELEMETRY_DISABLED: '1'
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.107.0
+      - name: Confirm synthetic-only environment and scripts before containers start
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CI" = true
+          test "$V58_MANAGED_STATE_LOCAL" = 1
+          test -z "${SUPABASE_ACCESS_TOKEN:-}"
+          test ! -f supabase/.temp/project-ref
+          test ! -f supabase/.branches/_current_branch
+          grep -Fqx 'project_id = "tutor_v4_isolated"' supabase/config.toml
+          bash -n tests/local/v58-managed-state-two-stack.sh
+          node --check tests/local/v58-managed-state-transfer.mjs
+          node --check tests/local/v58-managed-state-data-list.mjs
+      - name: Migrate synthetic Auth users identities sessions and 62 history plus Storage object between isolated stacks
+        shell: bash
+        run: bash tests/local/v58-managed-state-two-stack.sh
