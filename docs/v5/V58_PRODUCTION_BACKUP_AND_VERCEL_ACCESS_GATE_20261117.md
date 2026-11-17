@@ -44,6 +44,7 @@ Codex 2026-11-17 的**實際本機盤點**確認，先前 `v58-private-backup.sh
 1. **先跑 GitHub 一次性 PostgreSQL 17 合成資料完整 `pg_dump -Fc → pg_restore` 測試**：包含 `public`、`auth`、`storage`、`tutor_private`、`supabase_migrations` 合成表及 RLS，目標是完全不同的 disposable database。此測試僅證明核心 PostgreSQL 工具鏈，不代表真實 Supabase Managed Schema 100% 還原。
 2. 真實 Production archive（目前尚無）建立後，才能在 Mac **獨立本機 Supabase／Postgres 環境**測試還原；嚴禁把 Production 當目標，禁止接正式 DNS、外部信件、Webhook、付款／通知。若需新的付費雲端實例，先由使用者核准。既有 25 個停止容器與 13 個 Volume 禁止擅自重用、清理、改寫。
 3. 還原時先檢查 `pg_restore --list`、roles／extensions、Auth/Storage 自訂 Trigger 與 RLS、現成 Supabase managed Schema 的相依衝突，遵循官方 restore 指引。**不要對已有 Supabase Managed 物件不加審查直接 `--clean`／`--create`／`DROP SCHEMA`。**
+   **受管 Schema 注意：** Supabase 官方 [Platform → Self-hosted Restore](https://supabase.com/docs/guides/self-hosting/restore-from-platform) 明確指出，原生 `pg_dump` 會包含 Supabase 受管內部物件，直接還原到既有 Supabase Schema 可能產生權限或重複物件衝突。此單次 Custom Archive 是一致的資料庫快照來源，**不是已經證明可直接部署到新的 Supabase 專案的還原包**；必須在本機隔離 Supabase 做平台層拆分、相依及角色驗證。
 4. 來源與隔離庫使用 `supabase/diagnostics/v58_backup_restore_metadata_readonly.sql` 產生 **owner-only 0600 JSON**，運行 `scripts/release/v58-private-restore-parity.mjs`；檢查 62 個歷史版本、20 類 Auth／學生／課程／帳務等筆數、RPC MD5、RLS 數量。此合約只是**必要條件**；另需驗證 FK、真實 business 金額守恆、RBAC/JWT/RLS、使用者身份資料及外部副作用防護。
 5. 備份與還原的同樣內容出現在獨立環境、RLS/JWT 確實隔離且完整相關數據無漂移，才可寫 `RESTORE PASS`；否則維持 `PARTIAL/BLOCKED`。任何證據不得包含真實姓名、Email、密碼或帳務原始明細。
 
