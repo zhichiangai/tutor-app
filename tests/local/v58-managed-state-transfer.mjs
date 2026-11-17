@@ -2,7 +2,7 @@
 // No production URLs, SQL rows, JWTs, service keys or real identities are logged.
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {readFileSync,writeFileSync} from 'node:fs';
+import {readFileSync,writeFileSync,statSync} from 'node:fs';
 import {resolve} from 'node:path';
 
 if(process.env.CI!=='true'||process.env.V58_MANAGED_STATE_LOCAL!=='1'||
@@ -47,13 +47,14 @@ async function signin(){
 async function storageCreate(){
  await req('POST','/storage/v1/bucket',{data:JSON.stringify({name:bucket,id:bucket,public:false})});
 }
-async function upload(){
- await req('POST','/storage/v1/object/'+bucket+'/'+key,{data:body,mime:'text/plain'});
- const data=await req('GET','/storage/v1/object/authenticated/'+bucket+'/'+key,{expectBinary:true});
- assert.equal(sha(data),sha(body),'Storage file content is not equal to uploaded fixture');
- return sha(data);
+async function upload(bytes){
+ await req('POST','/storage/v1/object/'+bucket+'/'+key,{data:bytes,mime:'text/plain'});
+ const downloaded=await req('GET','/storage/v1/object/authenticated/'+bucket+'/'+key,{expectBinary:true});
+ assert.equal(sha(downloaded),sha(bytes),'Storage file content differs from source bytes');
+ return downloaded;
 }
 const stateFile=resolve(privateDir,'synthetic-state.json');
+const sourceObjectFile=resolve(privateDir,'source-storage-object.bin');
 if(phase==='source'){
  const created=await req('POST','/auth/v1/admin/users',{data:JSON.stringify({
   email,password,email_confirm:true
@@ -64,7 +65,11 @@ if(phase==='source'){
  assert.equal(login.user?.id,id,'Auth login must keep original id');
  assert.ok(login.access_token&&login.refresh_token,'Auth session must be generated');
  await storageCreate();
- const objectHash=await upload();
+ const sourceBytes=await upload(body);
+ const objectHash=sha(sourceBytes);
+ // Preserve bytes returned by the SOURCE Storage API, not a second copy
+ // reconstructed from our hardcoded fixture in the TARGET phase.
+ writeFileSync(sourceObjectFile,sourceBytes,{flag:'wx',mode:0o600});
  const state={sourceUserId:id,bucket,key,objectSha256:objectHash};
  writeFileSync(stateFile,JSON.stringify(state)+'\n',{flag:'wx',mode:0o600});
  console.log('PASS: source local GoTrue user, identity/login session and actual Storage object created');
@@ -76,8 +81,11 @@ if(phase==='source'){
  assert.equal(login.user?.id,state.sourceUserId,'Auth identity id drift after managed-table migration');
  assert.ok(login.access_token&&login.refresh_token,'Restored Auth user cannot create session');
  await storageCreate();
- const objectHash=await upload();
- assert.equal(objectHash,state.objectSha256,'Storage object bytes differ after transfer');
+ assert.equal(statSync(sourceObjectFile).mode&0o077,0,'Source export is not private');
+ const sourceBytes=readFileSync(sourceObjectFile);
+ assert.equal(sha(sourceBytes),state.objectSha256,'Source export was changed or corrupted');
+ const transferred=await upload(sourceBytes);
+ assert.equal(sha(transferred),state.objectSha256,'Target Storage object bytes differ from source export');
  console.log('PASS: target local GoTrue login uses original synthetic user identity and creates fresh session');
  console.log('PASS: target Storage API creates metadata and exact-content transferred object');
  console.log('LIMIT: old session tokens cannot be assumed valid after changing JWT signing secrets');
