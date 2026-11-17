@@ -55,8 +55,12 @@ export function buildManagedAppRestorePlan(toc) {
   }
   // For pg_restore entries like EXTENSION - pgcrypto, COMMENT - ...
   // or ACL with special role targets, leave out of the app-only subset.
+  if(type==='EVENT TRIGGER') {
+   unknown.push('global_event_trigger_requires_review');
+   continue;
+  }
   if(schema==='-'||type==='ACL'||type==='DEFAULT ACL'||
-     type==='EXTENSION'||type==='EVENT TRIGGER'||
+     type==='EXTENSION'||
      type==='PUBLICATION'||type==='SUBSCRIPTION'){
    held.push(type);continue;
   }
