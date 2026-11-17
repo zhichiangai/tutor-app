@@ -52,6 +52,7 @@ target_flag="$(printf '%s' "$help" | node "$V58_BACKUP_REPO_ROOT/scripts/release
  echo "REFUSED: CLI major/remote flag not reviewed" >&2; exit 2;
 }
 conn=("${target_flag}=$V58_PRIVATE_DB_URL")
+export V58_SUPABASE_CLI_VERSION="$version"
 echo "PASS: reviewed CLI v2/v3 explicit remote target selected (no URL printed)"
 dump(){
  local name="$1"; shift
@@ -62,6 +63,7 @@ dump(){
  fi
  chmod 600 "$V58_PRIVATE_BACKUP_DIR/$name"
 }
+export V58_BACKUP_STARTED_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 dump roles.sql --role-only
 dump schema.sql
 dump data.sql --use-copy --data-only -x storage.buckets_vectors -x storage.vector_indexes
@@ -69,6 +71,7 @@ dump auth_data.sql --use-copy --data-only --schema auth
 dump storage_data.sql --use-copy --data-only --schema storage -x storage.buckets_vectors -x storage.vector_indexes
 dump history_schema.sql --schema supabase_migrations
 dump history_data.sql --use-copy --data-only --schema supabase_migrations
+export V58_BACKUP_FINISHED_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 node "$V58_BACKUP_REPO_ROOT/scripts/release/v58-private-backup-manifest.mjs" create "$V58_PRIVATE_BACKUP_DIR"
 printf '%s\n' "INTEGRITY_VERIFIED_RESTORE_NOT_TESTED" > "$V58_PRIVATE_BACKUP_DIR/STATUS.txt"
 echo "Backup files and SHA-256 manifest created. Restore NOT tested; NO-GO for Production release."
