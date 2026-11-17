@@ -7,6 +7,9 @@ on:
       - 'docs/v5/V58_PRODUCTION_BACKUP_AND_VERCEL_ACCESS_GATE_20261117.md'
       - 'scripts/release/v58-private-backup-manifest.mjs'
       - 'scripts/release/v58-backup-target-flag.mjs'
+      - 'scripts/release/v58-private-restore-parity.mjs'
+      - 'supabase/diagnostics/v58_backup_restore_metadata_readonly.sql'
+      - 'tests/v58-private-restore-parity.test.mjs'
       - 'tests/v58-private-backup-manifest.test.mjs'
       - '.github/workflows/v58-private-backup-tooling-synthetic-ci.yml'
   workflow_dispatch:
@@ -34,9 +37,11 @@ jobs:
           bash -n scripts/release/v58-private-backup.sh
           node --check scripts/release/v58-private-backup-manifest.mjs
           node --check scripts/release/v58-backup-target-flag.mjs
+          node --check scripts/release/v58-private-restore-parity.mjs
+          node --check tests/v58-private-restore-parity.test.mjs
           node --check tests/v58-private-backup-manifest.test.mjs
       - name: Run synthetic private checksum tests only
-        run: node --test tests/v58-private-backup-manifest.test.mjs
+        run: node --test tests/v58-private-backup-manifest.test.mjs tests/v58-private-restore-parity.test.mjs
       - name: Verify that the backup operator script refuses CI and never emits a dump
         run: |
           set -euo pipefail
