@@ -76,8 +76,8 @@ jobs:
             grep -Eq "[[:space:]]SCHEMA - $schema([[:space:]]|$)" "$d/toc"
           done
           # Isolated destination within same disposable PostgreSQL container.
-          docker exec "$name" psql -X -U postgres -v ON_ERROR_STOP=1 \
-            -d v58_restored -c 'DROP SCHEMA public CASCADE'
+          # PostgreSQL's default public schema is not necessarily dumped as
+          # an archive schema object. Leave the clean target's public schema.
           docker run --rm --network host -v "$d:/private" -e PGHOST=127.0.0.1 \
             -e PGPORT=54329 -e PGUSER=postgres -e PGDATABASE=v58_restored \
             -e PGSSLMODE=disable -e PGPASSFILE=/private/pgpass \
