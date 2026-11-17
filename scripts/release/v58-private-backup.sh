@@ -44,26 +44,15 @@ log="$V58_PRIVATE_BACKUP_DIR/local-private.log"
 touch "$log"
 chmod 600 "$log"
 printf '%s\n' "INCOMPLETE: do not release until private restore validation" > "$V58_PRIVATE_BACKUP_DIR/STATUS.txt"
-# Supabase CLI v2 uses --db-url; CLI v3 targets remote explicitly with
-# --remote=<url>. Do NOT rely on grepping --remote first: some versions
-# accept a flag but interpret it differently. CLI v4 is not reviewed.
+# The helper is a pure, unit-tested version/flag selector. It receives
+# only the CLI version and --help text; NEVER the DB URL or password.
 version="$(supabase --version 2>/dev/null)"
 help="$(supabase db dump --help 2>&1)"
-if [[ "$version" =~ ^2\.[0-9]+\.[0-9]+([+-][A-Za-z0-9.-]+)?$ ]]; then
-  grep -q -- '--db-url' <<<"$help" || {
-    echo "REFUSED: Supabase CLI v2 must support --db-url" >&2; exit 2;
-  }
-  conn=("--db-url=$V58_PRIVATE_DB_URL")
-elif [[ "$version" =~ ^3\.[0-9]+\.[0-9]+([+-][A-Za-z0-9.-]+)?$ ]]; then
-  grep -q -- '--remote' <<<"$help" || {
-    echo "REFUSED: Supabase CLI v3 must support --remote" >&2; exit 2;
-  }
-  conn=("--remote=$V58_PRIVATE_DB_URL")
-else
-  echo "REFUSED: Unreviewed Supabase CLI version; only v2/v3 supported" >&2
-  exit 2
-fi
-echo "PASS: reviewed Supabase CLI major version; only explicit remote dump is allowed"
+target_flag="$(printf '%s' "$help" | node "$V58_BACKUP_REPO_ROOT/scripts/release/v58-backup-target-flag.mjs" "$version")" || {
+ echo "REFUSED: CLI major/remote flag not reviewed" >&2; exit 2;
+}
+conn=("${target_flag}=$V58_PRIVATE_DB_URL")
+echo "PASS: reviewed CLI v2/v3 explicit remote target selected (no URL printed)"
 dump(){
  local name="$1"; shift
  echo "Exporting private $name (no SQL contents logged)"
