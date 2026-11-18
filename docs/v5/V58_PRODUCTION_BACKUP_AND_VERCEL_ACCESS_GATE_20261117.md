@@ -228,3 +228,14 @@ Codex 2026-11-17 的**實際本機盤點**確認，先前 `v58-private-backup.sh
 新方向、憑證隔離、OAuth 專用 App、保留政策、正式備份安全門檻，詳見 [`V58_GOOGLE_DRIVE_ENCRYPTED_BACKUP_POC_20261118.md`](V58_GOOGLE_DRIVE_ENCRYPTED_BACKUP_POC_20261118.md)。
 
 **這不是將本文件先前的 Mac 執行規則作廢**；在 GitHub Actions 使用獨立 Drive OAuth 並完成加密合成 SQL 端到端還原前，雲端備份只是候選替代流程。正式 Production Dump、完整 Supabase Restore、Migration 63、Main/Production 部署全部 NO-GO。後續要改此發布 Gate 須有新的實測與正式授權。
+
+
+## L. 2026-11-18 新決策：GitHub Free + Google Drive、7／4／6 保留
+
+使用者已確認未來採用 **GitHub Actions 執行 + Google Drive 加密保存**；現階段維持 Supabase Free / GitHub Free，營利後升級 Supabase Pro 作為官方第一份備份，Google Drive 保存平台以外第二份密文。**目前只是設計決策及合成程式準備，正式連線與資料庫實際備份尚未 PASS。**
+
+- 備份保留為最近 **7 個每日、4 個每週、6 個每月代表版本（去重聯集）**。Migration 前專用備份不受日常清理；實際刪除機制尚未授權。
+- 已新增不讀取 Production、也不能刪除 Drive 檔案的 7／4／6 離線規劃工具與單元測試。僅「最新驗證備份距今不超過 36 小時＋隔離還原驗收距今不超過 45 天」時才列出人工審查的退休候選。
+- **正式每日排程還未啟用**：需要受控環境、獨立 Google OAuth、加密合成 PostgreSQL17 真實 Drive 上傳/下載/還原及對實際 Supabase 存取權限的核實。
+- 在上述證據完善之前，B、C 節的既有實體備份與還原要求**沒有取消**，本輪不能以新策略取代 G0 安全門檻。仍禁止 Production SQL 63、Main 合併或 Production 部署。
+- 設計和測試來源：[V58_GDRIVE_BACKUP_7_4_6_POLICY_20261118.md](V58_GDRIVE_BACKUP_7_4_6_POLICY_20261118.md)，[Google Drive PoC](V58_GOOGLE_DRIVE_ENCRYPTED_BACKUP_POC_20261118.md)。
