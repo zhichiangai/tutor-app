@@ -79,7 +79,7 @@ User Type、Publishing Status、OAuth Client 更換、新增權限需另外明�
 | protected-synthetic-oauth-readonly | main + workflow_dispatch + READINESS_NO_DB_ACCESS | 使用合成 Environment Secret 做 OAuth Refresh + Drive Folder GET |
 | protected-production-env-metadata-only | main + workflow_dispatch + READINESS_NO_DB_ACCESS | 只讀取非機密 Environment Variables 進行格式/隔離檢查；NO DB 憑證、NO Drive OAuth Secret、NO 網路備份 |
 
-Production metadata validator 核對 Supabase Ref、固定 DB host/port/user、verify-full、age 公鑰格式、**精確對照已驗證的正式與合成 Drive Folder ID**（不僅是格式及彼此不同），以及人工保護確認。輸出永遠顯示 production_connection_attempted=false、credentials_inspected=false、production_backup_created=false、restore_tested=false。**Metadata PASS 不等於 Release GO**。程式明確回傳 private_key_recovery_evidence_verified=false、actual_drive_folder_access_probed=false、production_backup_authorized=false；單次 Metadata-only CI 不驗證 GitHub 規則 API、私鑰雙份實際恢復或真實 DB TLS 連線。
+Production metadata validator 核對 Supabase Ref、固定 DB host/port/user、verify-full、**精確比對 Codex 提供且使用者確認過的 age 公鑰**（不是只檢查格式；若要輪替需另審）、**精確對照已驗證的正式與合成 Drive Folder ID**（不僅是格式及彼此不同），以及人工保護確認。輸出永遠顯示 production_connection_attempted=false、credentials_inspected=false、production_backup_created=false、restore_tested=false。**Metadata PASS 不等於 Release GO**。程式明確回傳 private_key_recovery_evidence_verified=false、actual_drive_folder_access_probed=false、production_backup_authorized=false；單次 Metadata-only CI 不驗證 GitHub 規則 API、私鑰雙份實際恢復或真實 DB TLS 連線。
 
 PR CI 通過不授權合併 Main；Main 自動部署 Vercel，仍需要當次獨立授權。
 
