@@ -17,7 +17,7 @@ async function jsonResponse(response, failure) {
   return response.json();
 }
 
-export async function ensureProductionEncryptedFolder({oauth, syntheticFolderId, request = fetch}) {
+export async function ensureProductionEncryptedFolder({oauth, syntheticFolderId, request = fetch, onStage = () => {}}) {
   assert.match(syntheticFolderId ?? '', OPAQUE_ID, 'Synthetic folder ID missing');
   for (const key of ['clientId', 'clientSecret', 'refreshToken']) {
     assert.ok(typeof oauth?.[key] === 'string' && oauth[key].length > 5,
@@ -29,6 +29,7 @@ export async function ensureProductionEncryptedFolder({oauth, syntheticFolderId,
     refresh_token: oauth.refreshToken,
     grant_type: 'refresh_token'
   });
+  onStage('oauth-refresh');
   const tokenResponse = await request('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: {'content-type': 'application/x-www-form-urlencoded'},
@@ -40,6 +41,7 @@ export async function ensureProductionEncryptedFolder({oauth, syntheticFolderId,
   const headers = {Authorization: 'Bearer ' + token.access_token};
 
   // Confirm we are using the SAME app-accessible synthetic folder as the prior test.
+  onStage('synthetic-folder-read');
   const syntheticResponse = await request(
     'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(syntheticFolderId) +
     '?fields=id%2Cname%2CmimeType%2Ctrashed', {method: 'GET', headers, redirect: 'error'}
@@ -55,6 +57,7 @@ export async function ensureProductionEncryptedFolder({oauth, syntheticFolderId,
   const listUrl = 'https://www.googleapis.com/drive/v3/files?fields=' +
     encodeURIComponent('nextPageToken,files(id,name,mimeType,appProperties,trashed)') +
     '&pageSize=100&q=' + encodeURIComponent(query);
+  onStage('production-folder-search');
   const list = await jsonResponse(await request(listUrl, {
     method: 'GET', headers, redirect: 'error'
   }), 'Production backup folder lookup failed');
@@ -78,6 +81,7 @@ export async function ensureProductionEncryptedFolder({oauth, syntheticFolderId,
     name: FOLDER_NAME, mimeType: FOLDER_MIME,
     appProperties: {v58_kind: KIND, v58_delete_allowed: 'false'}
   };
+  onStage('production-folder-create');
   const create = await jsonResponse(await request(
     'https://www.googleapis.com/drive/v3/files?ignoreDefaultVisibility=true&fields=' +
     encodeURIComponent('id,name,mimeType,appProperties'), {
@@ -91,6 +95,7 @@ export async function ensureProductionEncryptedFolder({oauth, syntheticFolderId,
   assert.equal(create.mimeType, FOLDER_MIME);
   assert.equal(create.appProperties?.v58_kind, KIND);
 
+  onStage('production-folder-readback');
   const readback = await jsonResponse(await request(
     'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(create.id) +
     '?fields=id%2Cname%2CmimeType%2CappProperties%2Ctrashed', {
@@ -107,6 +112,7 @@ export async function ensureProductionEncryptedFolder({oauth, syntheticFolderId,
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  let safeStage = 'input-guard';
   try {
     assert.equal(process.env.GITHUB_ACTIONS, 'true');
     assert.equal(process.env.GITHUB_REF, 'refs/heads/main');
@@ -119,6 +125,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     }
     const result = await ensureProductionEncryptedFolder({
       syntheticFolderId: process.env.GDRIVE_SYNTHETIC_FOLDER_ID,
+      onStage: stage => { safeStage = stage; },
       oauth: {
         clientId: process.env.GDRIVE_CLIENT_ID,
         clientSecret: process.env.GDRIVE_CLIENT_SECRET,
@@ -134,7 +141,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       production_database_accessed: false
     }) + '\n');
   } catch {
-    process.stderr.write('NO_GO: empty encrypted production Drive folder bootstrap failed\n');
+    process.stderr.write('NO_GO: empty encrypted production Drive folder bootstrap failed at stage=' + safeStage + '\n');
     process.exitCode = 2;
   }
 }
