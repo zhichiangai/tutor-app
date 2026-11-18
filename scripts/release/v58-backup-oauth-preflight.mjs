@@ -13,6 +13,9 @@ const VERIFIED_PRODUCTION_DRIVE_FOLDER_ID = '1BI0K6xk604y2mclqC1QVcjbMgJaWHVg8';
 const VERIFIED_SYNTHETIC_DRIVE_FOLDER_ID = '1hPG9jKIbCmTF6Xo1S1SUmVynug3mljEK';
 const OPAQUE_ID = /^[A-Za-z0-9_-]{5,150}$/;
 const AGE_RECIPIENT = /^age1[a-z0-9]{30,100}$/;
+// Public recipient supplied by Codex and confirmed against the GitHub variable by the operator.
+// Rotation requires separate documented re-key/recovery review; this is NOT a private key.
+const VERIFIED_AGE_RECIPIENT = 'age1egjmrjvv7g3p4rp2udc5xtz62wfndzqz2jm67xqfa5mjpvlhxfqqr6z49j';
 
 export function assessOAuthPolicy(input) {
   const issues = [];
@@ -46,6 +49,8 @@ export function assessProductionMetadata(input) {
   if (input.pgSslMode !== 'verify-full') issues.push('TLS_HOSTNAME_VERIFICATION_REQUIRED');
   if (typeof input.ageRecipient !== 'string' || !AGE_RECIPIENT.test(input.ageRecipient)) {
     issues.push('AGE_PUBLIC_RECIPIENT_MISSING_OR_INVALID');
+  } else if (input.ageRecipient !== VERIFIED_AGE_RECIPIENT) {
+    issues.push('AGE_PUBLIC_RECIPIENT_NOT_OPERATOR_VERIFIED');
   }
   if (typeof input.driveFolderId !== 'string' || !OPAQUE_ID.test(input.driveFolderId)) {
     issues.push('PRODUCTION_DRIVE_FOLDER_UNVERIFIED');
