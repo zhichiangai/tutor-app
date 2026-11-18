@@ -28,7 +28,7 @@ function fixture(){
   {proposal_id:'pa',team_id:'team-AAA123',team_student_id:'student-A',display_name:'合成學生甲',status:'accepted'},
   {proposal_id:'pb',team_id:'team-BBB456',team_student_id:'student-B',display_name:'合成學生乙',status:'accepted'}
  ];
- let role='parent',mismatch=false;
+ let role='parent',mismatch=false,projectMode='named';
  const db={
   rpc:async(name,args)=>{
    if(name==='v56_my_team_family_proposals')return {data:{proposals:teams},error:null};
@@ -36,10 +36,14 @@ function fixture(){
    const p=teams.find(x=>x.team_id===args.p_team_id);
    assert.ok(p,'Unknown Team must not be queried');
    const amount=p.team_id===teams[0].team_id?10000:20000;
+   const projectFields=projectMode==='legacy'?{}:projectMode==='unassigned'?
+    {project_id:null,project_name:null}:projectMode==='unnamed'?
+    {project_id:'synthetic-hidden-project-id',project_name:null}:
+    {project_id:p.team_id===teams[0].team_id?'project-A':'project-B',
+     project_name:p.team_id===teams[0].team_id?'合成專案甲':'合成專案乙'};
    return {data:{team_id:mismatch&&p.team_id===teams[1].team_id?'other-team':p.team_id,
     student_id:p.team_student_id,month:monthKey,currency:'TWD',bank_verified:false,
-    receivables:[{project_id:p.team_id===teams[0].team_id?'project-A':'project-B',
-     project_name:p.team_id===teams[0].team_id?'合成專案甲':'合成專案乙',
+    receivables:[{...projectFields,
      subject:'合成科目',fee_cents:amount,outstanding_cents:amount}],
     payments:[],correction_refund_history:[]},error:null};
   }
@@ -47,6 +51,7 @@ function fixture(){
  const ui=createV56FamilyUI({getClient:()=>db,getUser:()=>({id:'qa-parent'}),
   getRole:()=>role,isReady:()=>true,notify:()=>{}});
  return {ui,elements,teams,setMismatch:v=>{mismatch=v},setRole:v=>{role=v},
+  setProjectMode:v=>{projectMode=v},
   cleanup:()=>{globalThis.document=old}};
 }
 test('multi-Team parent renders only the two separately authorised children and correct amounts',async()=>{
@@ -83,5 +88,27 @@ test('a single mismatched Team overview clears all family finance without stale 
   f.ui.render();
   assert.equal(f.elements.get('v56-parent-family-panel').classes.has('hidden'),true);
   assert.equal(f.elements.get('v56-parent-family-content').children.length,0);
+ }finally{f.cleanup()}
+});
+
+test('unassigned lessons are distinguished from a legacy Team-only response',async()=>{
+ const f=fixture();
+ try{
+  f.setProjectMode('unassigned');
+  await f.ui.refresh();
+  let text=allText(f.elements.get('v56-parent-family-content'));
+  assert.match(text,/尚未指定專案的課程/);
+  assert.doesNotMatch(text,/此 Team 尚未提供逐專案拆分/);
+  assert.match(text,/應收/);
+  f.setProjectMode('legacy');
+  await f.ui.refresh();
+  text=allText(f.elements.get('v56-parent-family-content'));
+  assert.match(text,/此 Team 尚未提供逐專案拆分/);
+  assert.doesNotMatch(text,/尚未指定專案的課程/);
+  f.setProjectMode('unnamed');
+  await f.ui.refresh();
+  text=allText(f.elements.get('v56-parent-family-content'));
+  assert.match(text,/專案名稱尚未提供/);
+  assert.doesNotMatch(text,/synthetic-hidden-project-id/);
  }finally{f.cleanup()}
 });
