@@ -96,6 +96,20 @@ test('fails closed if OAuth expires or folder readback differs',async()=>{
   }),/Expected values to be strictly equal|strictly equal/);
 });
 
+test('emits only fixed safe stage markers without OAuth credentials or raw API errors',async()=>{
+  const stages=[];
+  const mock=createMock({wrongReadback:true});
+  await assert.rejects(ensureProductionEncryptedFolder({
+    oauth,syntheticFolderId:syntheticId,request:mock.request,
+    onStage:s=>stages.push(s)
+  }));
+  assert.deepEqual(stages,[
+    'oauth-refresh','synthetic-folder-read','production-folder-search',
+    'production-folder-create','production-folder-readback'
+  ]);
+  assert.ok(stages.every(s=>!/token|secret|access|password|id=/i.test(s)));
+});
+
 test('rejects missing token fields or a malformed synthetic folder ID',async()=>{
   await assert.rejects(ensureProductionEncryptedFolder({oauth,syntheticFolderId:'',request:createMock().request}));
   await assert.rejects(ensureProductionEncryptedFolder({
