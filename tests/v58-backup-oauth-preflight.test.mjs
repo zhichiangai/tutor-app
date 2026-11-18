@@ -15,7 +15,7 @@ const goodMetadata = () => ({
   pgPort: '5432',
   pgUser: 'postgres',
   pgSslMode: 'verify-full',
-  ageRecipient: 'age1' + 'q'.repeat(58),
+  ageRecipient: 'age1egjmrjvv7g3p4rp2udc5xtz62wfndzqz2jm67xqfa5mjpvlhxfqqr6z49j',
   driveFolderId: '1BI0K6xk604y2mclqC1QVcjbMgJaWHVg8',
   syntheticFolderId: '1hPG9jKIbCmTF6Xo1S1SUmVynug3mljEK',
   privateKeyOfflineConfirmed: true
@@ -58,6 +58,11 @@ test('Production metadata has strict project, PG17 host, TLS, age and folder sep
   ));
   const noTls = {...goodMetadata(), pgSslMode: 'disable'};
   assert.ok(assessProductionMetadata(noTls).issues.includes('TLS_HOSTNAME_VERIFICATION_REQUIRED'));
+  const unrecognizedAge = {...goodMetadata(), ageRecipient: 'age1' + 'q'.repeat(58)};
+  assert.equal(assessProductionMetadata(unrecognizedAge).metadata_pass, false);
+  assert.ok(assessProductionMetadata(unrecognizedAge).issues.includes(
+    'AGE_PUBLIC_RECIPIENT_NOT_OPERATOR_VERIFIED'
+  ));
   const wrongHost = {...goodMetadata(), pgHost: 'db.otherproject.supabase.co'};
   assert.ok(assessProductionMetadata(wrongHost).issues.includes('UNAPPROVED_DATABASE_HOST'));
   assert.equal(assessProductionMetadata({
