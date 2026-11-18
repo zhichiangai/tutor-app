@@ -128,3 +128,57 @@ test('synthetic Team settings and project navigation across six viewports',async
  await expect(page.locator('body')).toHaveClass(/teacher-team-workspace/);
  for(const width of widths)await assertViewport(page,'team',width);
 });
+
+
+async function assertReadableDialog(page,selector,width,buttonSelector){
+ const dialog=page.locator(selector);
+ await expect(dialog).toBeVisible();
+ // A tall dialog can scroll vertically. Its horizontal edges must remain
+ // inside the viewport, with no sideways content scroll.
+ const rect=await dialog.evaluate(el=>{
+  const r=el.getBoundingClientRect();
+  return {left:r.left,right:r.right,clientWidth:el.clientWidth,scrollWidth:el.scrollWidth};
+ });
+ expect(rect.left,selector+' clipped at left edge for '+width).toBeGreaterThanOrEqual(-2);
+ expect(rect.right,selector+' clipped at right edge for '+width).toBeLessThanOrEqual(width+2);
+ expect(rect.scrollWidth,selector+' has internal horizontal overflow for '+width)
+  .toBeLessThanOrEqual(rect.clientWidth+2);
+ const button=page.locator(buttonSelector);
+ await expect(button).toBeVisible();
+ // Trial click proves the actual interactive surface can be reached without
+ // submitting any synthetic form, rather than only appearing in the DOM.
+ await button.click({trial:true});
+ mkdirSync(evidenceDir,{recursive:true});
+ await page.screenshot({path:join(evidenceDir,
+  'v58-teacher-overlay-'+selector.replace(/[^a-z0-9]/gi,'')+'-'+width+'.png'),
+  animations:'disabled',caret:'hide'});
+}
+
+test('synthetic teacher lesson and recurring schedule overlays fit all six viewport widths',async({page})=>{
+ test.setTimeout(210_000);
+ await localLogin(page,'teacher');
+ for(const width of widths){
+  await page.setViewportSize({width,height});
+  await openReadOnlySection(page,'teacher');
+  // The disposable fixture seeds this lesson on the current local date.
+  const lesson=page.locator('#calendar-grid .calendar-event[data-id="'+fixture.ids.lesson+'"]');
+  await expect(lesson).toBeVisible();
+  await lesson.click();
+  await expect(page.locator('#lesson-teacher-readonly')).toBeVisible();
+  await assertReadableDialog(page,'#lesson-modal',width,'#lesson-open-editor');
+  await page.locator('#lesson-open-editor').click();
+  await expect(page.locator('#lesson-teacher-actions')).toBeVisible();
+  await assertReadableDialog(page,'#lesson-modal',width,'#lesson-save');
+  await page.locator('#lesson-modal [data-close="lesson-modal"]').click();
+  await expect(page.locator('#lesson-modal')).not.toBeVisible();
+
+  await page.locator('#manage-schedules').click();
+  await expect(page.locator('#schedule-manage-view')).toBeVisible();
+  await assertReadableDialog(page,'#schedule-modal',width,'#schedule-create-new');
+  await page.locator('#schedule-create-new').click();
+  await expect(page.locator('#schedule-editor-fields')).toBeVisible();
+  await assertReadableDialog(page,'#schedule-modal',width,'#schedule-save');
+  await page.locator('#schedule-modal [data-close="schedule-modal"]').click();
+  await expect(page.locator('#schedule-modal')).not.toBeVisible();
+ }
+});
