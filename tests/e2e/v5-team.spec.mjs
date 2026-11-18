@@ -821,6 +821,10 @@ test('V5.3 shared calendar shows two teachers; assigned teacher has no manager c
  await expect(page.locator('#v5-learning-lessons')).toContainText(
   '老師 · '+teacherActor.id.slice(-6));
  await expect(page.locator('#v5-learning-calendar')).toContainText('Cross Teacher English GUI');
+ // Validate permission labels only after lesson CRUD to keep the existing fixture stable.
+ await page.locator('.side-nav [data-team-section="projects"]').click();
+ await expect(page.locator('#v5-team-role-scope')).toContainText('現任 Team 管理者');
+ await expect(page.locator('#v5-team-owner-controls')).toBeVisible();
 
  await signOutFromTeam(page);
  await expect(page.locator('#v5-learning-students')).toBeEmpty();
@@ -835,6 +839,9 @@ test('V5.3 shared calendar shows two teachers; assigned teacher has no manager c
  assert.deepEqual((await rows(teacherJwt,'v5_team_students',
   '&team_id=eq.'+oldTeam)).data,[],
   'Assigned Teacher B may not read their former Team A students');
+ await page.locator('.side-nav [data-team-section="projects"]').click();
+ await expect(page.locator('#v5-team-role-scope')).toContainText('Team 一般老師');
+ await expect(page.locator('#v5-team-owner-controls')).toBeHidden();
  await signOutFromTeam(page);
  await expect(page.locator('#v5-learning-card')).toBeHidden();
  await expect(page.locator('#v5-learning-calendar')).toBeEmpty();

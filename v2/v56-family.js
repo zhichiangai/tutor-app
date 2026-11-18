@@ -49,9 +49,9 @@ export function createV56FamilyUI({getClient,getUser,getRole,isReady,notify}){
   for(const p of proposals){
    if(!p.proposal_id||!p.team_id||!p.team_student_id)continue;
    const wrapper=node('div',undefined,'v5-billing-row');
-   wrapper.append(node('strong',String(p.display_name||'學生')+' · '+({
-    pending:'等待家長同意',accepted:'已授權',revoked:'已撤回授權'
-   })[p.status]||'無法核對'));
+   const statusLabel={pending:'等待家長同意',accepted:'已授權',revoked:'已撤回授權'}[p.status]||'無法核對';
+   wrapper.append(node('strong',String(p.display_name||'學生')+' · '+statusLabel));
+   wrapper.append(node('small','Team 末碼 '+String(p.team_id).slice(-6)+' · 僅顯示這位孩子在本 Team 已授權的帳務','section-sub'));
    if(p.status==='pending')
     wrapper.append(action('同意查看這位孩子的 Team 帳務','accept',p.proposal_id));
    if(p.status==='accepted'){

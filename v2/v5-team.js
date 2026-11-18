@@ -28,6 +28,7 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
  function clear(){
   generation++;identity='';loading=false;ready=false;error='';data=null;writing=false;selectedManagedWorkspace='';
   $('v5-team-card')?.classList.add('hidden');
+  if($('v5-team-role-scope'))$('v5-team-role-scope').textContent='';
   $('v5-team-owner-controls')?.classList.add('hidden');
   for(const id of ['v5-team-invite-list','v5-team-project-list',
    'v5-team-members-list','v5-team-assignments','v5-team-message',
@@ -47,6 +48,7 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
    card.classList.remove('hidden');
    $('v5-team-message').textContent=loading?
     '正在確認 Team 權限與專案資料…':error;
+   if($('v5-team-role-scope'))$('v5-team-role-scope').textContent='尚未驗證目前權限，因此不顯示管理者操作。';
    $('v5-team-owner-controls')?.classList.add('hidden');
    for(const key of ['v5-team-invite-list','v5-team-project-list',
     'v5-team-members-list','v5-team-assignments','v5-team-transfer-list'])
@@ -76,6 +78,12 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
   msg.textContent=loading?'正在確認 Team 權限與專案資料…':error||
     (isOwner?'你可以管理自己的 Team 專案及邀請。':
     '你只能開啟被指派的專案；加入團隊不會自動開放學費與課程資料。');
+  const roleScope=$('v5-team-role-scope');
+  if(roleScope)roleScope.textContent=isOwner?
+   '目前權限：現任 Team 管理者。可管理此 Team 的專案、老師邀請與指派；帳務須經後端再次核實權限。':
+   assigned.length||memberOfTeam?
+    '目前權限：Team 一般老師。只可查看後端授權並指派的專案；無法使用管理者帳務、時薪或管理權操作。':
+    '目前權限：尚未加入 Team，僅能處理本人收到的邀請。';
   const controls=$('v5-team-owner-controls');
   controls?.classList.toggle('hidden',!isOwner);
   const managedSelect=$('v5-team-manage-select');
