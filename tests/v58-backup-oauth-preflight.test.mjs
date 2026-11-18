@@ -16,8 +16,8 @@ const goodMetadata = () => ({
   pgUser: 'postgres',
   pgSslMode: 'verify-full',
   ageRecipient: 'age1' + 'q'.repeat(58),
-  driveFolderId: 'prod-folder-opaque-1234567',
-  syntheticFolderId: 'synth-folder-opaque-123456',
+  driveFolderId: '1BI0K6xk604y2mclqC1QVcjbMgJaWHVg8',
+  syntheticFolderId: '1hPG9jKIbCmTF6Xo1S1SUmVynug3mljEK',
   privateKeyOfflineConfirmed: true
 });
 
@@ -63,6 +63,18 @@ test('Production metadata has strict project, PG17 host, TLS, age and folder sep
   assert.equal(assessProductionMetadata({
     ...goodMetadata(), mainOnlyConfirmed: false
   }).metadata_pass, false);
+  const switchedToOtherValidFolder = assessProductionMetadata({
+    ...goodMetadata(), driveFolderId: '1BI0K6xk604y2mclqC1QVcjbMgJaWHVg9'
+  });
+  assert.equal(switchedToOtherValidFolder.metadata_pass, false);
+  assert.ok(switchedToOtherValidFolder.issues.includes(
+    'PRODUCTION_DRIVE_FOLDER_ID_NOT_BOOTSTRAP_VERIFIED'
+  ));
+  const replacedSynthetic = assessProductionMetadata({
+    ...goodMetadata(), syntheticFolderId: '1hPG9jKIbCmTF6Xo1S1SUmVynug3mljEL'
+  });
+  assert.equal(replacedSynthetic.metadata_pass, false);
+  assert.ok(replacedSynthetic.issues.includes('SYNTHETIC_DRIVE_FOLDER_ID_NOT_RESTORE_VERIFIED'));
 });
 
 test('Even complete metadata never authorizes Production backup or claims restore', () => {
@@ -73,6 +85,9 @@ test('Even complete metadata never authorizes Production backup or claims restor
   assert.equal(result.production_backup_created, false);
   assert.equal(result.restore_tested, false);
   assert.equal(result.environment_protection_api_verified, false);
+  assert.equal(result.private_key_recovery_evidence_verified, false);
+  assert.equal(result.actual_drive_folder_access_probed, false);
+  assert.equal(result.production_backup_authorized, false);
 });
 
 test('Synthetic probe only refreshes OAuth and GETs its existing folder', async () => {
