@@ -8,6 +8,9 @@ import {resolve} from 'node:path';
 const PROJECT = 'vctisuglfoxyuwlvyjee';
 const SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const SYNTHETIC_NAME = 'tutor-app-v58-synthetic-only';
+// Pinned to independently verified GitHub Drive bootstrap / synthetic restore evidence.
+const VERIFIED_PRODUCTION_DRIVE_FOLDER_ID = '1BI0K6xk604y2mclqC1QVcjbMgJaWHVg8';
+const VERIFIED_SYNTHETIC_DRIVE_FOLDER_ID = '1hPG9jKIbCmTF6Xo1S1SUmVynug3mljEK';
 const OPAQUE_ID = /^[A-Za-z0-9_-]{5,150}$/;
 const AGE_RECIPIENT = /^age1[a-z0-9]{30,100}$/;
 
@@ -46,10 +49,15 @@ export function assessProductionMetadata(input) {
   }
   if (typeof input.driveFolderId !== 'string' || !OPAQUE_ID.test(input.driveFolderId)) {
     issues.push('PRODUCTION_DRIVE_FOLDER_UNVERIFIED');
+  } else if (input.driveFolderId !== VERIFIED_PRODUCTION_DRIVE_FOLDER_ID) {
+    issues.push('PRODUCTION_DRIVE_FOLDER_ID_NOT_BOOTSTRAP_VERIFIED');
   }
   if (typeof input.syntheticFolderId !== 'string' || !OPAQUE_ID.test(input.syntheticFolderId)) {
     issues.push('SYNTHETIC_DRIVE_FOLDER_UNVERIFIED');
-  } else if (input.driveFolderId === input.syntheticFolderId) {
+  } else if (input.syntheticFolderId !== VERIFIED_SYNTHETIC_DRIVE_FOLDER_ID) {
+    issues.push('SYNTHETIC_DRIVE_FOLDER_ID_NOT_RESTORE_VERIFIED');
+  }
+  if (input.driveFolderId === input.syntheticFolderId) {
     issues.push('PRODUCTION_AND_SYNTHETIC_FOLDERS_MUST_DIFFER');
   }
   if (input.privateKeyOfflineConfirmed !== true) issues.push('OFFLINE_RECOVERY_KEY_NOT_CONFIRMED');
@@ -60,7 +68,10 @@ export function assessProductionMetadata(input) {
     credentials_inspected: false,
     production_backup_created: false,
     restore_tested: false,
-    environment_protection_api_verified: false
+    environment_protection_api_verified: false,
+    private_key_recovery_evidence_verified: false,
+    actual_drive_folder_access_probed: false,
+    production_backup_authorized: false
   };
 }
 
