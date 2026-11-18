@@ -1,0 +1,159 @@
+// Synthetic, no Production: family records are grouped per authorised Team/student.
+// The real PostgreSQL/JWT/RLS consent and unlink suite lives in tests/e2e/v5-team.spec.mjs.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const source=readFileSync(new URL('../v2/v56-family.js',import.meta.url),'utf8');
+const {createV56FamilyUI}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+
+function node(){
+ const o={children:[],textContent:'',className:'',dataset:{},classes:new Set()};
+ o.classList={toggle:(key,on)=>{if(on)o.classes.add(key);else o.classes.delete(key)},
+  add:key=>o.classes.add(key)};
+ o.append=(...args)=>o.children.push(...args);
+ o.replaceChildren=(...args)=>{o.children=[...args];o.textContent=''};
+ return o;
+}
+const allText=n=>[n.textContent,...n.children.map(allText)].join(' ');
+function fixture(){
+ const elements=new Map();
+ const old=globalThis.document;
+ globalThis.document={
+  getElementById:id=>{if(!elements.has(id))elements.set(id,node());return elements.get(id)},
+  createElement:()=>node()
+ };
+ const month=new Date();
+ const monthKey=String(month.getFullYear())+'-'+String(month.getMonth()+1).padStart(2,'0')+'-01';
+ const teams=[
+  {proposal_id:'pa',team_id:'team-AAA123',team_student_id:'student-A',display_name:'合成學生甲',status:'accepted'},
+  {proposal_id:'pb',team_id:'team-BBB456',team_student_id:'student-B',display_name:'合成學生乙',status:'accepted'}
+ ];
+ let role='parent',mismatch=false,projectMode='named',firstProposalGate=null,proposalCalls=0;
+ const db={
+  rpc:async(name,args)=>{
+   if(name==='v56_my_team_family_proposals'){
+    proposalCalls++;
+    if(firstProposalGate&&proposalCalls===1)return firstProposalGate;
+    return {data:{proposals:teams},error:null};
+   }
+   assert.equal(name,'v56_team_parent_finance_overview');
+   const p=teams.find(x=>x.team_id===args.p_team_id);
+   assert.ok(p,'Unknown Team must not be queried');
+   const amount=p.team_id===teams[0].team_id?10000:20000;
+   const projectFields=projectMode==='legacy'?{}:projectMode==='unassigned'?
+    {project_id:null,project_name:null}:projectMode==='unnamed'?
+    {project_id:'synthetic-hidden-project-id',project_name:null}:
+    {project_id:p.team_id===teams[0].team_id?'project-A':'project-B',
+     project_name:p.team_id===teams[0].team_id?'合成專案甲':'合成專案乙'};
+   return {data:{team_id:mismatch&&p.team_id===teams[1].team_id?'other-team':p.team_id,
+    student_id:p.team_student_id,month:monthKey,currency:'TWD',bank_verified:false,
+    receivables:[{...projectFields,
+     subject:'合成科目',fee_cents:amount,outstanding_cents:amount}],
+    payments:[],correction_refund_history:[]},error:null};
+  }
+ };
+ const ui=createV56FamilyUI({getClient:()=>db,getUser:()=>({id:'qa-parent'}),
+  getRole:()=>role,isReady:()=>true,notify:()=>{}});
+ return {ui,elements,teams,setMismatch:v=>{mismatch=v},setRole:v=>{role=v},
+  setProjectMode:v=>{projectMode=v},setFirstProposalGate:v=>{firstProposalGate=v;proposalCalls=0},
+  cleanup:()=>{globalThis.document=old}};
+}
+test('multi-Team parent renders only the two separately authorised children and correct amounts',async()=>{
+ const f=fixture();
+ try{
+  await f.ui.refresh();
+  const panel=f.elements.get('v56-parent-family-panel');
+  const text=allText(f.elements.get('v56-parent-family-content'));
+  assert.equal(panel.classes.has('hidden'),false);
+  for(const p of f.teams){
+   assert.ok(text.includes(p.display_name));
+   assert.ok(text.includes(p.team_id.slice(-6)));
+  }
+  assert.ok(text.includes('100'),'First synthetic Team summary missing');
+  assert.ok(text.includes('200'),'Second synthetic Team summary missing');
+  assert.ok(text.includes('專案：合成專案甲'));
+  assert.ok(text.includes('專案：合成專案乙'));
+  assert.equal(text.match(/專案：合成專案甲/g)?.length,1);
+  assert.equal(text.match(/專案：合成專案乙/g)?.length,1);
+  assert.ok(!text.includes('other-team'));
+ }finally{f.cleanup()}
+});
+test('a single mismatched Team overview clears all family finance without stale rows',async()=>{
+ const f=fixture();
+ try{
+  await f.ui.refresh();
+  assert.match(allText(f.elements.get('v56-parent-family-content')),/合成學生甲/);
+  f.setMismatch(true);
+  await f.ui.refresh();
+  const text=allText(f.elements.get('v56-parent-family-content'));
+  assert.match(text,/無法驗證/);
+  assert.doesNotMatch(text,/合成學生甲|合成學生乙|100|200/);
+  f.setRole('student');
+  f.ui.render();
+  assert.equal(f.elements.get('v56-parent-family-panel').classes.has('hidden'),true);
+  assert.equal(f.elements.get('v56-parent-family-content').children.length,0);
+ }finally{f.cleanup()}
+});
+
+test('unassigned lessons are distinguished from a legacy Team-only response',async()=>{
+ const f=fixture();
+ try{
+  f.setProjectMode('unassigned');
+  await f.ui.refresh();
+  let text=allText(f.elements.get('v56-parent-family-content'));
+  assert.match(text,/尚未指定專案的課程/);
+  assert.doesNotMatch(text,/此 Team 尚未提供逐專案拆分/);
+  assert.match(text,/應收/);
+  f.setProjectMode('legacy');
+  await f.ui.refresh();
+  text=allText(f.elements.get('v56-parent-family-content'));
+  assert.match(text,/此 Team 尚未提供逐專案拆分/);
+  assert.doesNotMatch(text,/尚未指定專案的課程/);
+  f.setProjectMode('unnamed');
+  await f.ui.refresh();
+  text=allText(f.elements.get('v56-parent-family-content'));
+  assert.match(text,/專案名稱尚未提供/);
+  assert.doesNotMatch(text,/synthetic-hidden-project-id/);
+ }finally{f.cleanup()}
+});
+
+test('switching away from parent immediately discards cached family finance before role return',async()=>{
+ const f=fixture();
+ try{
+  await f.ui.refresh();
+  assert.match(allText(f.elements.get('v56-parent-family-content')),/合成學生甲/);
+  f.setRole('student');
+  f.ui.render();
+  assert.equal(f.elements.get('v56-parent-family-panel').classes.has('hidden'),true);
+  assert.equal(f.elements.get('v56-parent-family-content').children.length,0);
+  f.setRole('parent');
+  f.ui.render();
+  // A new authorisation request may start, but previous data must not render
+  // before the response is verified again.
+  assert.doesNotMatch(allText(f.elements.get('v56-parent-family-content')),
+   /合成學生甲|合成學生乙|合成專案甲|應收 NT/);
+  // render() also starts a background refetch. Await an explicit newer refresh
+  // before restoring the fake document, so no test work survives teardown.
+  await f.ui.refresh();
+  assert.match(allText(f.elements.get('v56-parent-family-content')),/合成學生甲/);
+ }finally{f.cleanup()}
+});
+test('late failure of older family request cannot erase newer successful finance',async()=>{
+ const f=fixture();
+ try{
+  let rejectOld;
+  const firstRequest=new Promise((resolve,reject)=>{rejectOld=reject});
+  f.setFirstProposalGate(firstRequest);
+  const stale=f.ui.refresh();
+  await f.ui.refresh();
+  let content=allText(f.elements.get('v56-parent-family-content'));
+  assert.match(content,/合成學生甲/);
+  rejectOld(Error('Synthetic previous request failed after a newer success'));
+  await stale;
+  f.ui.render();
+  content=allText(f.elements.get('v56-parent-family-content'));
+  assert.match(content,/合成學生甲/);
+  assert.match(content,/專案：合成專案甲/);
+  assert.doesNotMatch(content,/暫時無法驗證/);
+ }finally{f.cleanup()}
+});

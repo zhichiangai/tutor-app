@@ -301,3 +301,72 @@ test('missing V5 Team backend shows explicit unavailable state, not empty projec
  await page.locator('.side-nav .nav-standard[data-view="calendar"]').click();
  await expect(page.locator('#view-calendar')).toBeVisible();
 });
+
+
+test('fixed schedule management opens a list before the create/edit form at 320/390/1280',async({browser})=>{
+ for(const width of [320,390,1280]){
+  const page=await browser.newPage({viewport:{width,height:844}});
+  try{
+   await signIn(page,'teacher');
+   const nav=page.locator(width<=430?
+    '.mobile-nav .nav-standard[data-view="calendar"]':
+    '.side-nav .nav-standard[data-view="calendar"]');
+   await nav.click();
+   await expect(page.locator('#view-calendar')).toBeVisible();
+   await page.locator('#manage-schedules').click();
+   await expect(page.locator('#schedule-modal')).toBeVisible();
+   await expect(page.locator('#schedule-form-title')).toHaveText('管理固定課表');
+   await expect(page.locator('#schedule-manage-view')).toBeVisible();
+   await expect(page.locator('#schedule-editor-fields')).toBeHidden();
+   await expect(page.locator('#schedule-save')).toBeHidden();
+   await page.locator('#schedule-create-new').click();
+   await expect(page.locator('#schedule-form-title')).toHaveText('新增固定課表');
+   await expect(page.locator('#schedule-manage-view')).toBeHidden();
+   await expect(page.locator('#schedule-editor-fields')).toBeVisible();
+   await expect(page.locator('#schedule-save')).toBeVisible();
+   await page.locator('#schedule-back-to-list').click();
+   await expect(page.locator('#schedule-manage-view')).toBeVisible();
+   await expect(page.locator('#schedule-editor-fields')).toBeHidden();
+   await page.locator('#schedule-modal [data-close="schedule-modal"]').first().click();
+   await expect(page.locator('#schedule-modal')).not.toBeVisible();
+  }finally{await page.close()}
+ }
+});
+
+
+for(const width of [320,390,768]){
+ test('V5.8 student and parent account disclosures are grouped at '+width+'px',async({page})=>{
+  test.setTimeout(100_000);
+  await page.setViewportSize({width,height:844});
+  await signIn(page,'teacher');
+  console.log('V58_STUDENT_STAGE login width='+width);
+  // The site's mobile-nav breakpoint is wider than 430px; follow actual visibility.
+  const mobileNav=page.locator('.mobile-nav .nav-standard[data-view="students"]');
+  const nav=(await mobileNav.isVisible())?mobileNav:
+   page.locator('.side-nav .nav-standard[data-view="students"]');
+  await expect(nav).toBeVisible();
+  await nav.click({timeout:10000});
+  console.log('V58_STUDENT_STAGE nav width='+width);
+  await expect(page.locator('#teacher-student-manager')).toBeVisible({timeout:10000});
+  const manage=page.locator('#teacher-student-list [data-action="manage-student"]').first();
+  await expect(manage).toBeVisible();
+  await manage.click({timeout:10000});
+  console.log('V58_STUDENT_STAGE manage width='+width);
+  await expect(page.locator('#student-management-modal')).toBeVisible({timeout:10000});
+  await expect(page.locator('#student-management-basics-form')).toBeVisible();
+  const student=page.locator('#managed-student-disclosure');
+  const guardian=page.locator('#managed-guardian-disclosure');
+  await expect(student).not.toHaveAttribute('open','');
+  await expect(guardian).not.toHaveAttribute('open','');
+  await student.locator('summary').click({timeout:10000});
+  console.log('V58_STUDENT_STAGE student disclosure width='+width);
+  await expect(student).toHaveAttribute('open','');
+  await expect(page.locator('#managed-student-invite-form')).toBeVisible();
+  await guardian.locator('summary').click({timeout:10000});
+  console.log('V58_STUDENT_STAGE guardian disclosure width='+width);
+  await expect(guardian).toHaveAttribute('open','');
+  await expect(page.locator('#managed-guardian-invite-form')).toBeVisible();
+  await page.locator('#student-management-modal [data-close="student-management-modal"]').first().click();
+  await expect(page.locator('#student-management-modal')).not.toBeVisible();
+ });
+}

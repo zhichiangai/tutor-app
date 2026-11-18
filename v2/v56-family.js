@@ -31,7 +31,9 @@ export function createV56FamilyUI({getClient,getUser,getRole,isReady,notify}){
   if(!panel||!content)return;
   const allowed=valid();
   panel.classList.toggle('hidden',!allowed);
-  if(!allowed){content.replaceChildren();return}
+  // Switching away from parent invalidates cached private finance, not just its DOM.
+  // A later role switch must refetch the current guardian/Team authorisation.
+  if(!allowed){clear();return}
   const label=$('v56-parent-family-month');
   if(label)label.textContent=new Intl.DateTimeFormat('zh-TW',{year:'numeric',month:'long'}).format(month);
   content.replaceChildren();
@@ -46,12 +48,16 @@ export function createV56FamilyUI({getClient,getUser,getRole,isReady,notify}){
    content.append(node('p','目前沒有待確認或已授權的 Team 家長帳務對應。','section-sub'));
    return;
   }
-  for(const p of proposals){
+  // Each authorised Team/student is its own ledger scope, even when the
+  // same guardian has children across multiple Teams and projects.
+  for(const [index,p] of proposals.entries()){
    if(!p.proposal_id||!p.team_id||!p.team_student_id)continue;
-   const wrapper=node('div',undefined,'v5-billing-row');
-   wrapper.append(node('strong',String(p.display_name||'學生')+' · '+({
-    pending:'等待家長同意',accepted:'已授權',revoked:'已撤回授權'
-   })[p.status]||'無法核對'));
+   const wrapper=node('details',undefined,'v5-billing-row v56-family-scope');
+   wrapper.open=proposals.length===1||index===0;
+   const status=({pending:'等待家長同意',accepted:'已授權',revoked:'已撤回授權'})[p.status]||'無法核對';
+   wrapper.append(node('summary','Team（末碼 '+String(p.team_id).slice(-6)+'） · '+
+    String(p.display_name||'學生')+' · '+status));
+   wrapper.append(node('p','每組 Team／學生帳務獨立顯示；課程包含此 Team 下的相關專案，不會合併其他 Team 的金額。','helper-note'));
    if(p.status==='pending')
     wrapper.append(action('同意查看這位孩子的 Team 帳務','accept',p.proposal_id));
    if(p.status==='accepted'){
@@ -60,11 +66,36 @@ export function createV56FamilyUI({getClient,getUser,getRole,isReady,notify}){
     if(statement&&statement.currency==='TWD'&&statement.month===monthKey()&&
      Array.isArray(statement.receivables)&&Array.isArray(statement.payments)&&
      Array.isArray(statement.correction_refund_history)){
+     const projects=new Map();
      for(const lesson of statement.receivables){
-      if(!Number.isSafeInteger(lesson.fee_cents)||!Number.isSafeInteger(lesson.outstanding_cents))continue;
-      wrapper.append(node('span',String(lesson.subject||'課程')+
-       ' · 應收 '+money(lesson.fee_cents)+' · 尚欠 '+money(lesson.outstanding_cents),'section-sub'));
+      if(!Number.isSafeInteger(lesson.fee_cents)||lesson.fee_cents<0||
+       !Number.isSafeInteger(lesson.outstanding_cents)||lesson.outstanding_cents<0)continue;
+      // After the optional V5.8 forward migration, an authorised receivable
+      // includes project_id/name. Never infer projects from unscoped APIs.
+      const projectId=typeof lesson.project_id==='string'?lesson.project_id.trim():'';
+      const hasProjectField=Object.prototype.hasOwnProperty.call(lesson,'project_id');
+      // A null project_id after V5.8 means no project was assigned to this
+      // lesson. A missing field means the old Team-only RPC is still active.
+      const key=projectId?'project:'+projectId:hasProjectField?'unassigned':'legacy';
+      if(!projects.has(key))projects.set(key,{
+       label:projectId?
+        (typeof lesson.project_name==='string'&&lesson.project_name.trim()?
+         '專案：'+lesson.project_name.trim():'專案名稱尚未提供'):
+        (hasProjectField?'尚未指定專案的課程':'此 Team 尚未提供逐專案拆分'),rows:[]
+      });
+      projects.get(key).rows.push(lesson);
      }
+     for(const group of projects.values()){
+      const section=node('section',undefined,'v56-family-project');
+      section.append(node('strong',group.label));
+      for(const lesson of group.rows){
+       section.append(node('span',String(lesson.subject||'課程')+
+        ' · 應收 '+money(lesson.fee_cents)+' · 尚欠 '+money(lesson.outstanding_cents),'section-sub'));
+      }
+      wrapper.append(section);
+     }
+     if(statement.payments.length||statement.correction_refund_history.length)
+      wrapper.append(node('strong','Team 付款及更正紀錄（未按專案個別歸屬）'));
      for(const payment of statement.payments)
       wrapper.append(node('span','付款 '+String(payment.received_on||'')+
        ' · '+money(payment.amount_cents)+' · 已人工確認','section-sub'));
@@ -87,7 +118,8 @@ export function createV56FamilyUI({getClient,getUser,getRole,isReady,notify}){
    const {data,error:failure}=await client.rpc('v56_my_team_family_proposals');
    if(ticket!==serial||!valid()||getUser()?.id!==userId)return;
    if(failure||!Array.isArray(data?.proposals))throw failure||Error('Invalid family bridge list');
-   const list=data.proposals.slice(0,20);
+   if(data.proposals.length>100)throw Error('Too many authorised Team scopes for one page');
+   const list=data.proposals;
    if(list.some(p=>!p.proposal_id||!p.team_id||!p.team_student_id||
     !['pending','accepted','revoked'].includes(p.status)))throw Error('Invalid scoped proposals');
    const accepted=list.filter(p=>p.status==='accepted');
@@ -102,6 +134,8 @@ export function createV56FamilyUI({getClient,getUser,getRole,isReady,notify}){
     rec.currency!=='TWD'||rec.bank_verified!==false))throw Error('Mismatched family finance scope');
    proposals=list;statements=records;loaded=true;
   }catch{
+   // An older failed request must not clear newer, already-authorised results.
+   if(ticket!==serial||!valid()||getUser()?.id!==userId)return;
    proposals=[];statements=[];loaded=false;
    error='Team 家長帳務尚未啟用、連結已解除，或權限暫時無法驗證；未顯示任何財務資料。';
   }finally{if(ticket===serial&&valid()&&getUser()?.id===userId){loading=false;render()}}
