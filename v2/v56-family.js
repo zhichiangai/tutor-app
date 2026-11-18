@@ -70,11 +70,16 @@ export function createV56FamilyUI({getClient,getUser,getRole,isReady,notify}){
        !Number.isSafeInteger(lesson.outstanding_cents)||lesson.outstanding_cents<0)continue;
       // After the optional V5.8 forward migration, an authorised receivable
       // includes project_id/name. Never infer projects from unscoped APIs.
-      const projectId=typeof lesson.project_id==='string'?lesson.project_id:'';
-      const key=projectId||'undivided';
+      const projectId=typeof lesson.project_id==='string'?lesson.project_id.trim():'';
+      const hasProjectField=Object.prototype.hasOwnProperty.call(lesson,'project_id');
+      // A null project_id after V5.8 means no project was assigned to this
+      // lesson. A missing field means the old Team-only RPC is still active.
+      const key=projectId?'project:'+projectId:hasProjectField?'unassigned':'legacy';
       if(!projects.has(key))projects.set(key,{
-       label:projectId&&typeof lesson.project_name==='string'&&lesson.project_name.trim()?
-        '專案：'+lesson.project_name:'此 Team 尚未提供逐專案拆分',rows:[]
+       label:projectId?
+        (typeof lesson.project_name==='string'&&lesson.project_name.trim()?
+         '專案：'+lesson.project_name.trim():'專案名稱尚未提供'):
+        (hasProjectField?'尚未指定專案的課程':'此 Team 尚未提供逐專案拆分'),rows:[]
       });
       projects.get(key).rows.push(lesson);
      }
