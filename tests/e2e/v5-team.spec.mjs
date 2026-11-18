@@ -821,6 +821,10 @@ test('V5.3 shared calendar shows two teachers; assigned teacher has no manager c
  await expect(page.locator('#v5-learning-lessons')).toContainText(
   '老師 · '+teacherActor.id.slice(-6));
  await expect(page.locator('#v5-learning-calendar')).toContainText('Cross Teacher English GUI');
+ // Validate permission labels only after lesson CRUD to keep the existing fixture stable.
+ await page.locator('.side-nav [data-team-section="projects"]').click();
+ await expect(page.locator('#v5-team-role-scope')).toContainText('現任 Team 管理者');
+ await expect(page.locator('#v5-team-owner-controls')).toBeVisible();
 
  await signOutFromTeam(page);
  await expect(page.locator('#v5-learning-students')).toBeEmpty();
@@ -835,6 +839,9 @@ test('V5.3 shared calendar shows two teachers; assigned teacher has no manager c
  assert.deepEqual((await rows(teacherJwt,'v5_team_students',
   '&team_id=eq.'+oldTeam)).data,[],
   'Assigned Teacher B may not read their former Team A students');
+ await page.locator('.side-nav [data-team-section="projects"]').click();
+ await expect(page.locator('#v5-team-role-scope')).toContainText('Team 一般老師');
+ await expect(page.locator('#v5-team-owner-controls')).toBeHidden();
  await signOutFromTeam(page);
  await expect(page.locator('#v5-learning-card')).toBeHidden();
  await expect(page.locator('#v5-learning-calendar')).toBeEmpty();
@@ -2549,6 +2556,16 @@ test('V5.6 P0-E live V4 guardian consent allows only mapped Team student and rev
  assert.equal(view.data.currency,'TWD');
  assert.equal(view.data.bank_verified,false);
  assert.ok(Array.isArray(view.data.receivables));
+ // The original 62-history RPC is still verified by historical replay.
+ // Extra project labels are compulsory ONLY after the 63rd candidate has actually
+ // been applied to the disposable browser-test database (never Production).
+ if(process.env.V58_PROJECT_SQL_CANDIDATE==='1'){
+  assert.ok(view.data.receivables.length>0,
+   'Candidate test must seed at least one project receivable');
+  assert.ok(view.data.receivables.every(x=>typeof x.project_id==='string'&&
+   typeof x.project_name==='string'&&x.project_name.length>0),
+   'Candidate must return authorised, project-scoped labels');
+ }
  assert.ok(Array.isArray(view.data.correction_refund_history));
  assert.equal(JSON.stringify(view.data).includes('hourly_rate_cents'),false);
  assert.equal(JSON.stringify(view.data).includes('teacher_user_id'),false);
