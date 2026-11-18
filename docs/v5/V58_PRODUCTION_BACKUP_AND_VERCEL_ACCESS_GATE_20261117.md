@@ -217,3 +217,14 @@ Codex 2026-11-17 的**實際本機盤點**確認，先前 `v58-private-backup.sh
 2. 確認 FileVault ON、加密備份資料夾 0700、`PGPASSFILE` 0600 且在 Git repo 外、至少有足夠備份及還原空間；Mac PG17 原生客戶端尚未證實存在，可安裝可信 PostgreSQL 17 工具後先執行 `--version` 和純合成驗證。
 3. 先驗證 Source 受管 Schema、RLS/RPC、Auth 使用者／Storage 桶／物件筆數與 Migration 62 基準；`v58-private-backup.sh` 需符合 CLI/PG17 現況，且安全失敗時 **禁止繞過**。
 4. 只有備份確實寫入 Mac 的加密目錄、SHA 驗證通過，才可在完全獨立的本機還原目標驗證 Auth/Storage／JWT／Migration／RLS／帳務；若未完成，不可對第 63 筆正式 SQL 或 Main/Production 發布做任何動作。
+
+
+## K. 雲端 Google Drive 加密備份替代方向（2026-11-18，實驗中）
+
+使用者決定優先評估「Google Drive 加密備份」，避免 Mac 長期存放正式資料及反覆進行本機工具安裝。
+
+已取得兩項**獨立**合成證據：GitHub Actions 使用 PostgreSQL17 + age 成功加密、模擬儲存、解密、實際還原（[#44227148202](https://github.com/zhichiangai/tutor-app/actions/runs/44227148202)）；連接的 Google Drive 也已將 AES-256-GCM 加密的**合成**檔案真正上傳、重新下載、驗證 SHA-256 並解密（[測試檔](https://drive.google.com/file/d/1rmpyGtYJgoUmdtbuZjsWposKZR4OTC9n/view)）。**尚未**取得 GitHub Actions → Google Drive 專用 OAuth 的完整接線與真正 Production 還原證據。
+
+新方向、憑證隔離、OAuth 專用 App、保留政策、正式備份安全門檻，詳見 [`V58_GOOGLE_DRIVE_ENCRYPTED_BACKUP_POC_20261118.md`](V58_GOOGLE_DRIVE_ENCRYPTED_BACKUP_POC_20261118.md)。
+
+**這不是將本文件先前的 Mac 執行規則作廢**；在 GitHub Actions 使用獨立 Drive OAuth 並完成加密合成 SQL 端到端還原前，雲端備份只是候選替代流程。正式 Production Dump、完整 Supabase Restore、Migration 63、Main/Production 部署全部 NO-GO。後續要改此發布 Gate 須有新的實測與正式授權。
