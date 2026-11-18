@@ -84,6 +84,13 @@ export function createV5PlanUI({getClient,getUser,getRole,isReady}){
    '學生名額已滿，歷史課程仍可查看；刪除學生也不會釋放已使用名額，新增學生需調整方案或名額。':
    '歷史學生也計入名額。刪除學生不會釋放已使用名額。';
   summary.append(strong,student,teachers,note);
+  if(used>=limit){
+   const action=document.createElement('p');
+   action.className='v5-quota-next-step';
+   action.setAttribute('role','status');
+   action.textContent='下一步：已建立的學生與課程可繼續使用。如需新增學生，請聯絡網站管理員申請調整方案或測試名額；Plus／Team 目前尚未開放線上購買。';
+   summary.append(action);
+  }
   root.append(summary);
 
   appendPlanOptions(root,data.plan);
