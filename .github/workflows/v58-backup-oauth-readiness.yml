@@ -1,0 +1,96 @@
+name: V5.8 backup OAuth and environment readiness (NO PROD DB ACCESS)
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v58-backup-oauth-readiness.yml'
+      - 'scripts/release/v58-backup-oauth-preflight.mjs'
+      - 'tests/v58-backup-oauth-preflight.test.mjs'
+      - 'docs/v5/V58_PRODUCTION_BACKUP_ENV_OAUTH_READINESS_20261118.md'
+  workflow_dispatch:
+    inputs:
+      safety_ack:
+        description: 'Read-only readiness check; never dumps Production or mutates Google Drive'
+        required: true
+        type: choice
+        options:
+          - READINESS_NO_DB_ACCESS
+      operation:
+        description: 'Choose ONE non-destructive readiness check'
+        required: true
+        type: choice
+        options:
+          - SYNTHETIC_OAUTH_READONLY
+          - PRODUCTION_ENV_METADATA
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v58-oauth-readiness-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  offline-no-secrets:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Node offline policy and no-production contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/v58-backup-oauth-preflight.test.mjs
+
+  protected-synthetic-oauth-readonly:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.safety_ack == 'READINESS_NO_DB_ACCESS' && inputs.operation == 'SYNTHETIC_OAUTH_READONLY'
+    environment: v58-gdrive-synthetic
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      V58_READINESS_OPERATION: SYNTHETIC_OAUTH_READONLY
+      GDRIVE_CLIENT_ID: ${{ secrets.V58_GDRIVE_CLIENT_ID }}
+      GDRIVE_CLIENT_SECRET: ${{ secrets.V58_GDRIVE_CLIENT_SECRET }}
+      GDRIVE_REFRESH_TOKEN: ${{ secrets.V58_GDRIVE_REFRESH_TOKEN }}
+      GDRIVE_FOLDER_ID: ${{ vars.V58_GDRIVE_SYNTHETIC_FOLDER_ID }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Read-only OAuth token refresh and existing synthetic folder identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          node scripts/release/v58-backup-oauth-preflight.mjs synthetic-oauth-readonly
+
+  protected-production-env-metadata-only:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.safety_ack == 'READINESS_NO_DB_ACCESS' && inputs.operation == 'PRODUCTION_ENV_METADATA'
+    environment: v58-production-backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      V58_READINESS_OPERATION: PRODUCTION_ENV_METADATA
+      V58_BACKUP_PROJECT_REF: ${{ vars.V58_BACKUP_PROJECT_REF }}
+      V58_MAIN_ONLY_PROTECTION_CONFIRMED: ${{ vars.V58_MAIN_ONLY_PROTECTION_CONFIRMED }}
+      V58_PGHOST: ${{ vars.V58_PGHOST }}
+      V58_PGPORT: ${{ vars.V58_PGPORT }}
+      V58_PGUSER: ${{ vars.V58_PGUSER }}
+      V58_PGSSLMODE: ${{ vars.V58_PGSSLMODE }}
+      V58_AGE_RECIPIENT: ${{ vars.V58_AGE_RECIPIENT }}
+      V58_PRODUCTION_DRIVE_FOLDER_ID: ${{ vars.V58_PRODUCTION_DRIVE_FOLDER_ID }}
+      V58_SYNTHETIC_DRIVE_FOLDER_ID: ${{ vars.V58_SYNTHETIC_DRIVE_FOLDER_ID }}
+      V58_PRIVATE_KEY_OFFLINE_CONFIRMED: ${{ vars.V58_PRIVATE_KEY_OFFLINE_CONFIRMED }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Validate metadata only (NO OAuth secrets or Production DB credentials)
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          node scripts/release/v58-backup-oauth-preflight.mjs production-metadata
