@@ -8,7 +8,7 @@
 
 PostgreSQL 17 合成資料庫 → 單次 pg_dump -Fc → age/X25519 加密 →
 同一受控 OAuth App 的真實 Google Drive API 上傳 → 重新下載並 SHA-256 校驗 →
-僅在 GitHub-hosted Runner 解密 → 新建立且與來源隔離的 PostgreSQL17 資料庫 pg_restore →
+僅在 GitHub-hosted Runner 解密 → 銷毀來源 PostgreSQL 17 容器 → 全新、獨立且禁用網路的 PostgreSQL 17 容器 pg_restore →
 比對五類資料、帳務金額及 RLS 政策。
 
 這與前一輪「真實 Drive 233-byte 虛構文字加密」及「模擬 Drive 的 PG17 還原」不同：這次測試使用真正 PostgreSQL archive 穿過真正的 Google Drive API。
@@ -27,14 +27,15 @@ PostgreSQL 17 合成資料庫 → 單次 pg_dump -Fc → age/X25519 加密 →
 2. .github/workflows/v58-pg17-real-drive-isolated-restore.yml：PR 可跑無 OAuth 憑證的 mock Docker 隔離還原；main 的 workflow_dispatch 才能使用受保護 Secret 進行真實 Drive 傳輸
 3. 本操作手冊
 
-不可在 PR 上使用 production Secrets；env 中有 Supabase 連線/Access Token/PGHOST/PGPASSFILE 等，測試必須拒絕。Docker 僅執行 postgres:17、使用 --network none；合成資料只有虛構名字、假帳務、假 Auth/Storage metadata 與假 Migration。**沒有正式 Storage 物件，不能用此測試證明 Supabase Storage 復原。**
+不可在 PR 上使用 production Secrets；env 中有 Supabase 連線/Access Token/PGHOST/PGPASSFILE 等，測試必須拒絕。Docker 只啟動兩個不共用磁碟或網路的 postgres:17 容器，皆設 --network none；來源容器在傳輸前即銷毀，目標容器在解密校驗後才建立。合成資料只有虛構名字、假帳務、假 Auth/Storage metadata 與假 Migration。**沒有正式 Storage 物件，不能用此測試證明 Supabase Storage 復原。**
 
 加密金鑰是在 Runner 每次暫時生成，私鑰只留在該 Runner 的暫存工作目錄；測試結束刪除暫存資料。只有 .age 密文進入 Google Drive 合成資料夾；不刪除上次測試檔。
 
 ## 在 PR 上能實際驗證什麼？
 
-pull_request 工作會跑：真正 PostgreSQL17 合成 pg_dump → age 加密 → mock 複製 → 解密 → 新隔離資料庫 pg_restore → fingerprint 完全一致。
+pull_request 工作會跑：第一個 PostgreSQL17 容器合成 pg_dump → age 加密 → 刪除來源容器 → mock 複製 → 解密 → 第二個全新 PostgreSQL17 容器 pg_restore → fingerprint 完全一致。此設計證明復原不依賴來源資料庫仍存活。
 
+- 來源與還原目標必須是兩個不同 PostgreSQL 17 實例，且來源在解密還原前已停止與刪除
 - 需通過 PG17 版本檢查
 - 五類測試 schema／table 及帳務合計 450 分必須一致
 - public.students RLS 啟用且政策保留
