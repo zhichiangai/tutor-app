@@ -1,0 +1,63 @@
+name: V5.8 ONE-TIME encrypted Production Drive FOLDER ONLY (NO PROD DB)
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v58-gdrive-production-folder-bootstrap.yml'
+      - 'scripts/release/v58-gdrive-production-folder-bootstrap.mjs'
+      - 'tests/v58-gdrive-production-folder-bootstrap.test.mjs'
+      - 'docs/v5/V58_PRODUCTION_DRIVE_EMPTY_FOLDER_GATE_20261118.md'
+  workflow_dispatch:
+    inputs:
+      safety_ack:
+        description: 'CREATE_EMPTY_FOLDER_ONLY; absolutely no Production DB access, backup upload, or deletion'
+        required: true
+        type: choice
+        options:
+          - CREATE_EMPTY_FOLDER_ONLY
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v58-production-drive-folder-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  offline-bootstrap-contract-no-secrets:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Run fail-closed mocked Drive bootstrap tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/v58-gdrive-production-folder-bootstrap.test.mjs
+
+  protected-empty-folder-bootstrap:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.safety_ack == 'CREATE_EMPTY_FOLDER_ONLY'
+    environment: v58-gdrive-synthetic
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    env:
+      V58_DRIVE_EMPTY_FOLDER_ACK: ${{ inputs.safety_ack }}
+      GDRIVE_CLIENT_ID: ${{ secrets.V58_GDRIVE_CLIENT_ID }}
+      GDRIVE_CLIENT_SECRET: ${{ secrets.V58_GDRIVE_CLIENT_SECRET }}
+      GDRIVE_REFRESH_TOKEN: ${{ secrets.V58_GDRIVE_REFRESH_TOKEN }}
+      GDRIVE_SYNTHETIC_FOLDER_ID: ${{ vars.V58_GDRIVE_SYNTHETIC_FOLDER_ID }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Create or read back EMPTY dedicated production encrypted Drive folder ONLY
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          node scripts/release/v58-gdrive-production-folder-bootstrap.mjs
+          echo 'NEXT: manually set V58_PRODUCTION_DRIVE_FOLDER_ID in the separate v58-production-backup Environment'
+          echo 'NO Production DB credentials, backup data, schedule, sharing, or deletion was used'
