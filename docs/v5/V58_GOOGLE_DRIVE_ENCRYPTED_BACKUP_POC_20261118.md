@@ -53,3 +53,15 @@
 - [Supabase Free Backup FAQ](https://supabase.com/kb/faqs/platform/free-plan-backups)；[Supabase GitHub Actions 自動備份](https://supabase.com/docs/guides/deployment/ci/backups)；[Supabase 平台還原限制](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore)
 - [Google Drive 最小 OAuth 範圍](https://developers.google.com/workspace/drive/api/guides/api-specific-auth)；[OAuth Testing 狀態 Refresh Token 有效期](https://developers.google.com/identity/protocols/oauth2)；[Google Drive Resumable Upload](https://developers.google.com/workspace/drive/api/guides/manage-uploads)
 - [GitHub Actions compromised runners](https://docs.github.com/en/actions/concepts/security/compromised-runners)
+
+
+## 2026-11-18 使用者已確認：免費方案與 7／4／6 保留（開發中）
+
+**決策已確認，執行仍未啟用。** 使用 Supabase Free＋GitHub Free＋Google Drive；未來轉 Supabase Pro 時，保留官方 DB 備份及 Google Drive 加密異地副本，避免單一平台故障。GitHub Actions 是執行引擎，不是正式備份儲存庫。初期不引入 GAS 備份引擎，也不新增固定費用的 Cloud Run。
+
+- 每日保留 7 個不同 UTC 日期、每週 4 個不同 ISO 週、每月 6 個 UTC 月份的最新版；三組取聯集，重大 Migration 快照與人工保留標記不自動淘汰。
+- 已新增 scripts/release/v58-gdrive-retention-plan.mjs：**純離線、無刪除 API** 的 fail-closed 計畫器。尚未連上 Drive，不能宣稱已經自動執行 7／4／6 清理。
+- 只有最近 36 小時有完整加密上傳校驗成功的備份，且 45 天內通過隔離真實還原，才可產生供人工審閱的退休候選；任何不符條件均 KEEP。預設不刪除。
+- 對真正的 Production 備份，仍需專用 Google OAuth、受保護 GitHub Secrets、端到端合成 SQL Drive 傳輸測試、真實資料庫唯讀導出授權、真實隔離還原證據。**PR #83、Migration 63 與正式部署仍 NO-GO。**
+
+完整規格與還原優先序：[V58_GDRIVE_BACKUP_7_4_6_POLICY_20261118.md](V58_GDRIVE_BACKUP_7_4_6_POLICY_20261118.md)。
