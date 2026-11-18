@@ -31,7 +31,9 @@ export function createV56FamilyUI({getClient,getUser,getRole,isReady,notify}){
   if(!panel||!content)return;
   const allowed=valid();
   panel.classList.toggle('hidden',!allowed);
-  if(!allowed){content.replaceChildren();return}
+  // Switching away from parent invalidates cached private finance, not just its DOM.
+  // A later role switch must refetch the current guardian/Team authorisation.
+  if(!allowed){clear();return}
   const label=$('v56-parent-family-month');
   if(label)label.textContent=new Intl.DateTimeFormat('zh-TW',{year:'numeric',month:'long'}).format(month);
   content.replaceChildren();
@@ -132,6 +134,8 @@ export function createV56FamilyUI({getClient,getUser,getRole,isReady,notify}){
     rec.currency!=='TWD'||rec.bank_verified!==false))throw Error('Mismatched family finance scope');
    proposals=list;statements=records;loaded=true;
   }catch{
+   // An older failed request must not clear newer, already-authorised results.
+   if(ticket!==serial||!valid()||getUser()?.id!==userId)return;
    proposals=[];statements=[];loaded=false;
    error='Team 家長帳務尚未啟用、連結已解除，或權限暫時無法驗證；未顯示任何財務資料。';
   }finally{if(ticket===serial&&valid()&&getUser()?.id===userId){loading=false;render()}}
