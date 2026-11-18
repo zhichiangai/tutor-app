@@ -132,6 +132,10 @@ test('switching away from parent immediately discards cached family finance befo
   // before the response is verified again.
   assert.doesNotMatch(allText(f.elements.get('v56-parent-family-content')),
    /合成學生甲|合成學生乙|合成專案甲|應收 NT/);
+  // render() also starts a background refetch. Await an explicit newer refresh
+  // before restoring the fake document, so no test work survives teardown.
+  await f.ui.refresh();
+  assert.match(allText(f.elements.get('v56-parent-family-content')),/合成學生甲/);
  }finally{f.cleanup()}
 });
 test('late failure of older family request cannot erase newer successful finance',async()=>{
