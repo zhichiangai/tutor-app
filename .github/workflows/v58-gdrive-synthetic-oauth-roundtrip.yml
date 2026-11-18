@@ -1,0 +1,59 @@
+name: V5.8 Google Drive synthetic OAuth roundtrip (MANUAL ONLY / NO PROD)
+
+on:
+  workflow_dispatch:
+    inputs:
+      safety_ack:
+        description: "Only SYNTHETIC_ONLY is accepted. No Production DB or real data."
+        type: choice
+        required: true
+        options:
+          - SYNTHETIC_ONLY
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v58-gdrive-synthetic-oauth
+  cancel-in-progress: false
+
+jobs:
+  synthetic-drive-only:
+    if: github.ref == 'refs/heads/main' && inputs.safety_ack == 'SYNTHETIC_ONLY'
+    environment: v58-gdrive-synthetic
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GDRIVE_CLIENT_ID: ${{ secrets.V58_GDRIVE_CLIENT_ID }}
+      GDRIVE_CLIENT_SECRET: ${{ secrets.V58_GDRIVE_CLIENT_SECRET }}
+      GDRIVE_REFRESH_TOKEN: ${{ secrets.V58_GDRIVE_REFRESH_TOKEN }}
+      GDRIVE_FOLDER_ID: ${{ vars.V58_GDRIVE_SYNTHETIC_FOLDER_ID }}
+      V58_DRIVE_MODE: synthetic-only
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install age
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age >/dev/null
+      - name: Encrypt SYNTHETIC ONLY, real Drive transfer, local decrypt equality
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          umask 077
+          [[ -n "${GDRIVE_CLIENT_ID:-}" && -n "${GDRIVE_CLIENT_SECRET:-}" && -n "${GDRIVE_REFRESH_TOKEN:-}" && -n "${GDRIVE_FOLDER_ID:-}" ]] || { echo 'NO_GO: missing dedicated synthetic-only OAuth'; exit 2; }
+          dir="$(mktemp -d)"
+          chmod 700 "$dir"
+          trap 'rm -rf "$dir"; rm -f "/tmp/v58-gdrive-cipher-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.age"' EXIT
+          printf 'V58_SYNTHETIC_ONLY_%s_%s\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$dir/source.txt"
+          age-keygen -o "$dir/ephemeral-key.txt" >/dev/null 2>&1
+          age -r "$(age-keygen -y "$dir/ephemeral-key.txt")" -o "$dir/source.age" "$dir/source.txt"
+          export V58_SYNTHETIC_DOWNLOAD_PATH="/tmp/v58-gdrive-cipher-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.age"
+          node scripts/release/v58-gdrive-synthetic-roundtrip.mjs "$dir/source.age"
+          age -d -i "$dir/ephemeral-key.txt" -o "$dir/recovered.txt" "$V58_SYNTHETIC_DOWNLOAD_PATH"
+          cmp -s "$dir/source.txt" "$dir/recovered.txt"
+          echo 'PASS: real Drive ciphertext roundtrip and age decrypt; NO PROD DATA'

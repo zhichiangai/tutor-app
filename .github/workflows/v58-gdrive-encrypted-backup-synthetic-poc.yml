@@ -1,0 +1,48 @@
+name: V5.8 encrypted Google Drive design synthetic PoC
+
+on:
+  pull_request:
+    paths:
+      - 'tests/local/v58-gdrive-encrypted-backup-poc.sh'
+      - '.github/workflows/v58-gdrive-encrypted-backup-synthetic-poc.yml'
+      - 'docs/v5/V58_GOOGLE_DRIVE_ENCRYPTED_BACKUP_POC_20261118.md'
+      - 'docs/v5/V58_GDRIVE_BACKUP_7_4_6_POLICY_20261118.md'
+      - 'scripts/release/v58-gdrive-retention-plan.mjs'
+      - 'tests/v58-gdrive-retention-plan.test.mjs'
+      - 'scripts/release/v58-gdrive-synthetic-roundtrip.mjs'
+      - 'tests/v58-gdrive-synthetic-roundtrip.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CI: 'true'
+      GITHUB_ACTIONS: 'true'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install distribution-maintained age (synthetic only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age >/dev/null
+          age --version
+      - name: Run synthetic PostgreSQL17 encryption, mock Drive transport and actual restore
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n tests/local/v58-gdrive-encrypted-backup-poc.sh
+          bash tests/local/v58-gdrive-encrypted-backup-poc.sh
+
+      - name: Verify offline 7 daily / 4 weekly / 6 monthly retention planner (NO DRIVE / NO PROD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/v58-gdrive-retention-plan.test.mjs tests/v58-gdrive-synthetic-roundtrip.test.mjs
