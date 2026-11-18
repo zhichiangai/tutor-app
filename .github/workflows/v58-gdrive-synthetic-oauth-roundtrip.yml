@@ -1,0 +1,106 @@
+name: V5.8 Drive OAuth synthetic-only isolated gate (NO PROD)
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v58-gdrive-synthetic-oauth-roundtrip.yml'
+      - 'scripts/release/v58-gdrive-synthetic-roundtrip.mjs'
+      - 'tests/v58-gdrive-synthetic-roundtrip.test.mjs'
+  workflow_dispatch:
+    inputs:
+      safety_ack:
+        description: 'Only SYNTHETIC_ONLY is accepted; absolutely no Production DB access'
+        required: true
+        type: choice
+        options:
+          - SYNTHETIC_ONLY
+      operation:
+        description: 'First create a folder; then set its id in Environment Variable before roundtrip'
+        required: true
+        type: choice
+        options:
+          - BOOTSTRAP_FOLDER
+          - SYNTHETIC_ROUNDTRIP
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v58-gdrive-synthetic-gate
+  cancel-in-progress: false
+
+jobs:
+  mock-contract-no-secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Run offline mocked OAuth/Drive tests ONLY
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          node --test tests/v58-gdrive-synthetic-roundtrip.test.mjs
+
+  protected-manual-synthetic-drive:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.safety_ack == 'SYNTHETIC_ONLY'
+    environment: v58-gdrive-synthetic
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GDRIVE_CLIENT_ID: ${{ secrets.V58_GDRIVE_CLIENT_ID }}
+      GDRIVE_CLIENT_SECRET: ${{ secrets.V58_GDRIVE_CLIENT_SECRET }}
+      GDRIVE_REFRESH_TOKEN: ${{ secrets.V58_GDRIVE_REFRESH_TOKEN }}
+      GDRIVE_FOLDER_ID: ${{ vars.V58_GDRIVE_SYNTHETIC_FOLDER_ID }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Ensure dedicated OAuth credentials exist (no secrets logged)
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          [[ -n "${GDRIVE_CLIENT_ID:-}" && -n "${GDRIVE_CLIENT_SECRET:-}" && -n "${GDRIVE_REFRESH_TOKEN:-}" ]] || {
+            echo 'NO_GO: dedicated synthetic OAuth credentials unavailable'; exit 2;
+          }
+      - name: Bootstrap app-owned synthetic Drive folder, log only opaque folder ID
+        if: inputs.operation == 'BOOTSTRAP_FOLDER'
+        shell: bash
+        env:
+          V58_DRIVE_MODE: synthetic-folder-bootstrap
+        run: |
+          set -euo pipefail
+          set +x
+          node scripts/release/v58-gdrive-synthetic-roundtrip.mjs
+          echo 'NEXT: set Environment Variable V58_GDRIVE_SYNTHETIC_FOLDER_ID to the returned folder_id'
+      - name: Install age for SYNTHETIC encrypted roundtrip
+        if: inputs.operation == 'SYNTHETIC_ROUNDTRIP'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age >/dev/null
+      - name: Real Google Drive encrypted SYNTHETIC upload-download and age decrypt
+        if: inputs.operation == 'SYNTHETIC_ROUNDTRIP'
+        shell: bash
+        env:
+          V58_DRIVE_MODE: synthetic-only
+        run: |
+          set -euo pipefail
+          set +x
+          umask 077
+          [[ -n "${GDRIVE_FOLDER_ID:-}" ]] || { echo 'NO_GO: missing synthetic Drive folder ID'; exit 2; }
+          dir="$(mktemp -d)"
+          chmod 700 "$dir"
+          trap 'rm -rf "$dir"; rm -f "/tmp/v58-gdrive-cipher-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.age"' EXIT
+          printf 'V58_SYNTHETIC_ONLY_%s_%s\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$dir/source.txt"
+          age-keygen -o "$dir/ephemeral-key.txt" >/dev/null 2>&1
+          age -r "$(age-keygen -y "$dir/ephemeral-key.txt")" -o "$dir/source.age" "$dir/source.txt"
+          export V58_SYNTHETIC_DOWNLOAD_PATH="/tmp/v58-gdrive-cipher-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.age"
+          node scripts/release/v58-gdrive-synthetic-roundtrip.mjs "$dir/source.age"
+          age -d -i "$dir/ephemeral-key.txt" -o "$dir/recovered.txt" "$V58_SYNTHETIC_DOWNLOAD_PATH"
+          cmp -s "$dir/source.txt" "$dir/recovered.txt"
+          echo 'PASS: real Drive ciphertext download SHA and ephemeral age decrypt; ONLY SYNTHETIC BYTES'
