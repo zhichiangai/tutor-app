@@ -591,8 +591,14 @@
   </dialog>
   <dialog class="modal schedule-sheet" id="schedule-modal">
     <form class="modal-inner" id="schedule-form">
-      <div class="modal-head"><div><p class="eyebrow">RECURRING LESSONS</p><h2 id="schedule-form-title">設定每週固定課表</h2><p class="modal-description">只設定一次，就能自動出現在未來月曆。</p></div><button type="button" class="close-modal" data-close="schedule-modal" aria-label="關閉">×</button></div>
-      <div id="schedule-rules-list"></div>
+      <div class="modal-head"><div><p class="eyebrow">RECURRING LESSONS</p><h2 id="schedule-form-title">設定每週固定課表</h2><p class="modal-description" id="schedule-dialog-description">選擇要查看、調整或新增的固定課表。</p></div><button type="button" class="close-modal" data-close="schedule-modal" aria-label="關閉">×</button></div>
+      <section id="schedule-manage-view" class="schedule-manage-view hidden" aria-label="目前固定課表">
+        <div class="schedule-manage-toolbar"><strong>已建立的固定課表</strong><button type="button" class="secondary-button" id="schedule-create-new">＋ 新增固定課表</button></div>
+        <div id="schedule-rules-list"></div>
+        <p class="helper-note">可查看並編輯既有時段；「停止」僅影響後續排課，歷史上課與付款紀錄會保留。</p>
+      </section>
+      <div id="schedule-editor-fields" class="schedule-editor-fields hidden">
+      <button type="button" class="text-link schedule-back-to-list" id="schedule-back-to-list">← 返回固定課表列表</button>
       <label>學生<select id="schedule-student" required></select></label>
       <label>上課科目<input id="schedule-subject" maxlength="80" list="schedule-subject-options" required placeholder="例如：數學"><datalist id="schedule-subject-options"></datalist></label>
       <div><span class="form-label">每週上課日（可複選）</span><div class="weekday-selector" id="schedule-weekdays">
@@ -603,6 +609,7 @@
       <div class="form-row"><label>鐘點費（NT$／小時）<input id="schedule-rate" type="number" min="0" step="1" value="500" list="schedule-rate-options" required><datalist id="schedule-rate-options"></datalist></label><label>結束日期（可空白）<input id="schedule-end-date" type="date"></label></div>
       <div id="schedule-scope" class="scope-choice hidden"><strong>修改固定課表的範圍</strong><label><input type="radio" name="schedule-scope" value="future" checked> 自指定日期起變更（保留過去課程）</label><label><input type="radio" name="schedule-scope" value="all"> 修改這組固定規則（已完成紀錄不變）</label></div>
       <div class="form-actions"><button type="button" class="secondary-button" data-close="schedule-modal">取消</button><button type="submit" class="primary-button" id="schedule-save">儲存固定課表</button></div>
+      </div>
     </form>
   </dialog>
   <dialog class="modal schedule-sheet" id="cancel-modal">
