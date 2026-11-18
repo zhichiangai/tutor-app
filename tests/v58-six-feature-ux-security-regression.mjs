@@ -54,6 +54,8 @@ test('lesson details open read-only for teachers and require explicit edit actio
  assert.match(app,/\$\("#lesson-open-editor"\)\.addEventListener\("click",\(\)=>setLessonEditorMode\(true\)\)/);
  assert.match(app,/\$\("#lesson-teacher-actions"\)\.classList\.toggle\("hidden",!editing\)/);
  assert.match(app,/\$\("#lesson-readonly-learning"\)\.textContent=/);
+ assert.match(html,/點選月曆中的課程先查看詳情，需要修改時再進入編輯/);
+ assert.doesNotMatch(html,/點月曆中的課程直接開啟編輯方框/);
 });
 
 test('student basics and relationship-changing student/guardian actions are separate',()=>{
