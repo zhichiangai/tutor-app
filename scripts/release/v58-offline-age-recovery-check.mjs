@@ -12,10 +12,14 @@ import {spawnSync} from 'node:child_process';
 
 const repoRoot = realpathSync(fileURLToPath(new URL('../../', import.meta.url)));
 const x25519 = /^age1[023456789acdefghjklmnpqrstuvwxyz]{58}$/;
+// Non-secret recipient pinned to main's v58-backup-oauth-preflight.mjs.
+// Any rotation requires an independent release/security review.
+const pinnedProductionRecipient = 'age1egjmrjvv7g3p4rp2udc5xtz62wfndzqz2jm67xqfa5mjpvlhxfqqr6z49j';
 
 export function assertExpectedRecipient(recipient) {
   assert.equal(typeof recipient, 'string', 'A public age recipient is required');
   assert.match(recipient, x25519, 'Expected X25519 age recipient (public key only)');
+  assert.equal(recipient, pinnedProductionRecipient, 'Recipient must match pinned Production public recipient');
   return recipient;
 }
 export function assertLocalOnly(env) {
