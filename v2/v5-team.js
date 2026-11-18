@@ -28,6 +28,7 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
  function clear(){
   generation++;identity='';loading=false;ready=false;error='';data=null;writing=false;selectedManagedWorkspace='';
   $('v5-team-card')?.classList.add('hidden');
+  $('v5-team-access-role').textContent='';
   $('v5-team-owner-controls')?.classList.add('hidden');
   for(const id of ['v5-team-invite-list','v5-team-project-list',
    'v5-team-members-list','v5-team-assignments','v5-team-message',
@@ -48,6 +49,7 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
    $('v5-team-message').textContent=loading?
     '正在確認 Team 權限與專案資料…':error;
    $('v5-team-owner-controls')?.classList.add('hidden');
+   $('v5-team-access-role').textContent='';
    for(const key of ['v5-team-invite-list','v5-team-project-list',
     'v5-team-members-list','v5-team-assignments','v5-team-transfer-list'])
     $(key)?.replaceChildren();
@@ -71,7 +73,10 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
   const show=loading||!!error||isOwner||incoming.length>0||
     assigned.length>0||memberOfTeam||hasIncomingTransfer;
   card.classList.toggle('hidden',!show);
-  if(!show)return;
+  if(!show){$('v5-team-access-role').textContent='';return}
+  $('v5-team-access-role').textContent=isOwner?
+   '目前身分：Team 管理者。可管理所選 Team 的專案、邀請、指派與人工帳務；其他 Team 的授課權限不會自動變成管理權。':
+   '目前身分：Team 一般老師。僅可查看被指派的專案及相關課程，無法管理老師、查看 Team 應收或其他人的時薪。';
   const msg=$('v5-team-message');
   msg.textContent=loading?'正在確認 Team 權限與專案資料…':error||
     (isOwner?'你可以管理自己的 Team 專案及邀請。':
@@ -90,15 +95,21 @@ export function createV5TeamUI({getClient,getUser,getRole,isReady,getOwnWorkspac
    render();
   };
   const ownProjects=current.projects.filter(p=>p.workspace_id===ws?.id);
-  const visibleProjects=isOwner?ownProjects:assigned;
+  // A manager can also teach in another Team. Keep those projects visible
+  // without granting that Team's management controls or financial ledger.
+  const visibleProjects=isOwner?ownProjects.concat(
+   assigned.filter(p=>p.workspace_id!==ws?.id)):assigned;
   const projectList=$('v5-team-project-list');
   projectList.replaceChildren();
   if(!visibleProjects.length)projectList.append(node('p','section-sub','目前沒有可查看的 Team 專案。'));
   for(const p of visibleProjects){
    const wrap=node('div','v5-team-row');
-   const title=node('strong','',p.name+(p.status==='archived'?' · 已封存':''));
+   const ownManagedProject=isOwner&&p.workspace_id===ws?.id;
+   const title=node('strong','',p.name+
+    (ownManagedProject?' · 管理專案':' · 授課專案')+
+    (p.status==='archived'?' · 已封存':''));
    wrap.append(title);
-   if(isOwner&&p.status==='active'){
+   if(ownManagedProject&&p.status==='active'){
     const button=node('button','secondary-button','封存');
     button.type='button';button.dataset.v5TeamAction='archive';
     button.dataset.id=p.id;wrap.append(button);

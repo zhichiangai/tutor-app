@@ -602,6 +602,9 @@ export function createV5BillingUI({getClient,getUser,getRole,isReady,notify}){
    if(managed.error||teams.error)throw managed.error||teams.error;
    const workspaces=new Set((managed.data||[]).map(x=>x.workspace_id));
    availableTeams=(teams.data||[]).filter(t=>workspaces.has(t.anchor_workspace_id));
+   // An assigned teacher is not a manager. If management was transferred or
+   // removed, remove any previously rendered finance data immediately.
+   if(!availableTeams.length){reset();return}
    if(!availableTeams.some(t=>t.id===teamId))teamId=availableTeams[0]?.id||'';
    if(teamId){
     const first=[month.getFullYear(),String(month.getMonth()+1).padStart(2,'0'),'01'].join('-');

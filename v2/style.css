@@ -8,6 +8,12 @@
 #manage-schedules{white-space:nowrap;min-height:34px;padding:8px 11px}
 .schedule-sheet{max-width:600px}
 .schedule-sheet .modal-inner{gap:17px}
+.schedule-manage-view,.schedule-editor-fields{display:grid;gap:15px;min-width:0}
+.schedule-manage-view.hidden,.schedule-editor-fields.hidden{display:none}
+.schedule-manage-toolbar{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.schedule-manage-toolbar strong{font-size:14px}
+.schedule-manage-toolbar .secondary-button{min-height:42px}
+.schedule-editor-fields .schedule-back-to-list{justify-self:start;min-height:40px;padding:6px 0}
 .schedule-sheet .modal-head h2{font-size:22px}
 .schedule-sheet .lesson-row{flex-wrap:wrap;align-items:flex-start}
 .schedule-sheet .row-actions{flex-wrap:wrap;justify-content:flex-start;width:100%;padding-left:18px}
@@ -1009,3 +1015,33 @@ body.preview-readonly.preview-team-shell .side-nav .nav-team{display:flex!import
 body.preview-readonly.preview-team-shell #view-settings .settings-grid{display:none!important}
 @media(max-width:900px){body.preview-readonly.preview-team-shell .mobile-nav .nav-team{display:flex!important}}
 @media(max-width:650px){body.preview-readonly .preview-plans{grid-template-columns:1fr}}
+
+
+/* V5.8: lesson read-only opening; existing save/RPC logic remains unchanged. */
+.lesson-detail-summary{display:none;gap:9px;padding:16px;background:#faf7f2;border:1px solid #ebe0d4;border-radius:14px}
+.lesson-detail-summary h3{font-size:15px;margin:0}
+.lesson-detail-summary p{margin:0;overflow-wrap:anywhere;white-space:pre-wrap}
+.lesson-detail-summary .secondary-button{min-height:44px;justify-self:start}
+#lesson-modal.lesson-detail-view .lesson-detail-summary{display:grid}
+#lesson-modal.lesson-detail-view #lesson-time-editor,
+#lesson-modal.lesson-detail-view #lesson-learning-editor,
+#lesson-modal.lesson-detail-view #lesson-parent-note-wrap,
+#lesson-modal.lesson-detail-view #lesson-lock-hint,
+#lesson-modal.lesson-detail-view #lesson-teacher-actions,
+#lesson-modal.lesson-detail-view #lesson-parent-actions{display:none!important}
+/* Student/guardian links are deliberate, separate disclosures; no hidden write is triggered. */
+.student-management-disclosure{border:1px solid #e9e1d8;border-radius:14px;overflow:hidden;margin-bottom:12px;min-width:0}
+.student-management-disclosure>summary{cursor:pointer;display:flex;flex-wrap:wrap;gap:5px 12px;align-items:center;min-height:48px;padding:12px 14px;background:#faf8f4;font-weight:700}
+.student-management-disclosure>summary span{color:#837c75;font-size:12px;font-weight:400}
+.student-management-disclosure>summary:focus-visible{outline:3px solid #bb7461;outline-offset:-3px}
+.student-management-disclosure[open]>.student-management-section{padding:14px}
+.student-management-disclosure[open]>form.student-management-section{padding:14px}
+.student-management-disclosure .student-account-actions{flex-wrap:wrap}
+@media(max-width:430px){.student-management-disclosure>summary{align-items:flex-start;flex-direction:column}}
+
+
+/* Family access can span Teams; each authorised Team/student has its own scope. */
+#v56-parent-family-content .v56-family-scope{display:block;min-width:0;margin:10px 0;border:1px solid #eadfd4;border-radius:12px;padding:10px 12px}
+.v56-family-scope>summary{cursor:pointer;font-weight:700;min-height:36px;align-content:center;overflow-wrap:anywhere}
+.v56-family-scope>summary:focus-visible{outline:2px solid #b27a64;outline-offset:2px}
+.v56-family-scope[open]>:not(summary){margin-top:9px}

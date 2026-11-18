@@ -211,6 +211,7 @@
               <h3 id="v5-team-heading">Team 團隊與專案</h3>
               <p class="section-sub">每位老師只會看到被指派的專案；加入 Team 不會自動開放其他老師的學費、學生與課程。</p>
               <p id="v5-team-message" class="section-sub" role="status" aria-live="polite"></p>
+              <p id="v5-team-access-role" class="helper-note" role="status" aria-live="polite"></p>
               <div class="v5-team-panel">
                 <h4>我的專案</h4><div id="v5-team-project-list"></div>
                 <h4>Team 邀請</h4><div id="v5-team-invite-list"></div>
@@ -538,6 +539,13 @@
         <strong id="lesson-planned-time">17:00 – 19:00</strong>
         <small id="lesson-status-hint">未確認上課</small>
       </div>
+      <section id="lesson-detail-summary" class="lesson-detail-summary" aria-label="課程檢視">
+        <h3>課程概要</h3>
+        <p id="lesson-detail-actual" class="section-sub"></p>
+        <p id="lesson-detail-learning" class="section-sub"></p>
+        <p class="helper-note">目前為檢視模式；不會修改課程。若要完成上課、填寫紀錄或提出更正，請先點「進入操作」。</p>
+        <button type="button" class="secondary-button" id="lesson-detail-edit">進入操作</button>
+      </section>
       <div id="lesson-time-editor" class="lesson-time-editor">
         <div class="section-row"><div><h3 id="lesson-actual-heading">實際上課時間</h3>
           <p class="section-sub">沒有變動就保留預定時間；有變動可以直接修改。</p></div></div>
@@ -591,8 +599,14 @@
   </dialog>
   <dialog class="modal schedule-sheet" id="schedule-modal">
     <form class="modal-inner" id="schedule-form">
-      <div class="modal-head"><div><p class="eyebrow">RECURRING LESSONS</p><h2 id="schedule-form-title">設定每週固定課表</h2><p class="modal-description">只設定一次，就能自動出現在未來月曆。</p></div><button type="button" class="close-modal" data-close="schedule-modal" aria-label="關閉">×</button></div>
-      <div id="schedule-rules-list"></div>
+      <div class="modal-head"><div><p class="eyebrow">RECURRING LESSONS</p><h2 id="schedule-form-title">設定每週固定課表</h2><p class="modal-description" id="schedule-dialog-description">選擇要查看、調整或新增的固定課表。</p></div><button type="button" class="close-modal" data-close="schedule-modal" aria-label="關閉">×</button></div>
+      <section id="schedule-manage-view" class="schedule-manage-view hidden" aria-label="目前固定課表">
+        <div class="schedule-manage-toolbar"><strong>已建立的固定課表</strong><button type="button" class="secondary-button" id="schedule-create-new">＋ 新增固定課表</button></div>
+        <div id="schedule-rules-list"></div>
+        <p class="helper-note">可查看並編輯既有時段；「停止」僅影響後續排課，歷史上課與付款紀錄會保留。</p>
+      </section>
+      <div id="schedule-editor-fields" class="schedule-editor-fields hidden">
+      <button type="button" class="text-link schedule-back-to-list" id="schedule-back-to-list">← 返回固定課表列表</button>
       <label>學生<select id="schedule-student" required></select></label>
       <label>上課科目<input id="schedule-subject" maxlength="80" list="schedule-subject-options" required placeholder="例如：數學"><datalist id="schedule-subject-options"></datalist></label>
       <div><span class="form-label">每週上課日（可複選）</span><div class="weekday-selector" id="schedule-weekdays">
@@ -603,6 +617,7 @@
       <div class="form-row"><label>鐘點費（NT$／小時）<input id="schedule-rate" type="number" min="0" step="1" value="500" list="schedule-rate-options" required><datalist id="schedule-rate-options"></datalist></label><label>結束日期（可空白）<input id="schedule-end-date" type="date"></label></div>
       <div id="schedule-scope" class="scope-choice hidden"><strong>修改固定課表的範圍</strong><label><input type="radio" name="schedule-scope" value="future" checked> 自指定日期起變更（保留過去課程）</label><label><input type="radio" name="schedule-scope" value="all"> 修改這組固定規則（已完成紀錄不變）</label></div>
       <div class="form-actions"><button type="button" class="secondary-button" data-close="schedule-modal">取消</button><button type="submit" class="primary-button" id="schedule-save">儲存固定課表</button></div>
+      </div>
     </form>
   </dialog>
   <dialog class="modal schedule-sheet" id="cancel-modal">
@@ -622,6 +637,7 @@
     <div class="modal-inner">
       <div class="modal-head"><div><p class="eyebrow">學生資料與帳號</p><h2 id="student-management-heading">學生資料</h2><p class="modal-description">資料、時薪、學生帳號與家長帳號，都可以在這裡管理。</p></div>
         <button type="button" class="close-modal" data-close="student-management-modal" aria-label="關閉學生資料">×</button></div>
+      <details class="student-management-disclosure" open><summary>學生基本資料 <span>姓名、科目、未來時薪</span></summary>
       <form id="student-management-basics-form" class="student-management-section">
         <h3>基本資料</h3>
         <p class="section-sub">修改預設時薪不會改動先前已建立的課程與收款。</p>
@@ -632,7 +648,8 @@
         <label>未來課程預設時薪（NT$／小時）<input id="managed-student-rate" name="hourly_rate" type="number" min="0" max="999999" step="0.01" required></label>
         <label><input id="managed-student-qa" type="checkbox"> 標記為 QA 測試學生；正式帳務總計預設排除其課程和付款</label>
         <button type="submit" class="secondary-button">儲存基本資料</button>
-      </form>
+      </form></details>
+      <details class="student-management-disclosure"><summary>學生帳號與邀請 <span>查看連結狀態、邀請或撤銷</span></summary>
       <section class="student-management-section">
         <h3>學生登入帳號</h3>
         <p class="section-sub">學生接受邀請後，就能用自己的 Google 帳號查看課程與學習紀錄，不會看到付款資料。</p>
@@ -641,7 +658,8 @@
           <label>學生 Google Email<input id="managed-student-email" type="email" maxlength="254" autocomplete="off" placeholder="student@gmail.com" required></label>
           <button type="submit" class="secondary-button">邀請學生</button>
         </form>
-      </section>
+      </section></details>
+      <details class="student-management-disclosure"><summary>家長帳號與邀請 <span>查看連結狀態、邀請或解除連結</span></summary>
       <section class="student-management-section">
         <h3>家長登入帳號</h3>
         <p class="section-sub">可以邀請多位家長；已連結的家長可查看這位孩子的課程與付款。</p>
@@ -650,7 +668,8 @@
           <label>家長 Google Email<input id="managed-guardian-email" type="email" maxlength="254" autocomplete="off" placeholder="parent@gmail.com" required></label>
           <button type="submit" class="secondary-button">邀請家長</button>
         </form>
-      </section>
+      </section></details>
+      <p class="helper-note">解除帳號連結會立即影響資料可見範圍；請先確認對象。此視窗不會自動儲存任何更動。</p>
       <div class="form-actions"><button type="button" class="secondary-button" data-close="student-management-modal">完成</button></div>
     </div>
   </dialog>

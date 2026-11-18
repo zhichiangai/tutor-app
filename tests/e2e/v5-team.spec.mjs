@@ -220,6 +220,8 @@ test('Team settings shows authorized projects and hides private Team UI on logou
  await openTeamSection(page,'projects');
  await expect(page.locator('#v5-team-card')).toBeVisible();
  await expect(page.locator('#v5-team-owner-controls')).toBeVisible();
+ await expect(page.locator('#v5-team-access-role')).toContainText('Team 管理者');
+ await expect(page.locator('#v5-team-project-list')).toContainText('管理專案');
  await expect(page.locator('#v5-team-project-list')).toContainText('Project Alpha');
  await expect(page.locator('#v5-team-project-list')).toContainText('Project Beta');
  await page.locator('#v5-team-project-name').fill('Project Gamma via GUI');
@@ -228,6 +230,7 @@ test('Team settings shows authorized projects and hides private Team UI on logou
  await signOutFromTeam(page);
  await expect(page.locator('body')).toHaveClass(/login-required/);
  await expect(page.locator('#v5-team-card')).toBeHidden();
+ await expect(page.locator('#v5-team-access-role')).toBeEmpty();
  await expect(page.locator('#v5-team-project-list')).toBeEmpty();
 });
 
