@@ -7,6 +7,14 @@
 
 > `v2/` 是現行正式前端，名稱是歷史沿用，不代表目前使用舊版 V2。所有即時狀態須以 GitHub、Vercel、Supabase 實查為準，本頁的版本資訊只是有日期的快照。
 
+## V5.8 開發中的雲端備份策略（2026-11-18，**尚未上線**）
+
+- 使用者已確認：現階段 **Supabase Free＋GitHub Free＋Google Drive**，以 GitHub Actions 執行 PostgreSQL 17 備份，先用 age 加密後才上傳 Drive。
+- 保留政策：**7 個每日、4 個每週、6 個每月版本**（各取代表版本、重疊取聯集），Migration 前特殊快照不自動刪除；目前只有離線保留規劃，**沒有**啟用實際自動刪除或正式排程。
+- 營利後規劃：**Supabase Pro 官方備份＋Google Drive 獨立加密備份**。日常還原優先官方備份；Drive 副本作異地救援，任何正式還原必須先在隔離環境驗證。
+- 備份設計與測試仍在 [Draft PR #83](https://github.com/zhichiangai/tutor-app/pull/83)，不能當成 Main 已具備備份能力。**Production DB 真備份、完整隔離還原、正式 Migration 63 與 Main/Production 發布均 NO-GO**。
+- 文件：[7／4／6 與雙備份設計](docs/v5/V58_GDRIVE_BACKUP_7_4_6_POLICY_20261118.md)、[Google Drive 加密 PoC](docs/v5/V58_GOOGLE_DRIVE_ENCRYPTED_BACKUP_POC_20261118.md)、[OAuth 與還原手冊](docs/v5/V58_GDRIVE_OAUTH_SETUP_AND_RESTORE_RUNBOOK_20261118.md)。
+
 ## 現行架構
 
 ```text
