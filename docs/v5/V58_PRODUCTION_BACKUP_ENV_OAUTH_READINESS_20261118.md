@@ -4,18 +4,22 @@
 
 ## 1. 已有證據與尚未驗證
 
-- GitHub Main：647f54f3c9dd2d09f0805e3dd2a5c59caf698c06。
-- Actions Run 44255250974：PostgreSQL 17 **合成資料**經 age 加密、真實 Google Drive 上傳／下載、全新容器還原 PASS。
+- GitHub Main：6903029c412116eeac03962373cd6cdf040aaed6（PR #89 合併後核實）。
+- Actions Run [44257696039](https://github.com/zhichiangai/tutor-app/actions/runs/44257696039)：切換 OAuth Internal 後，PostgreSQL17 **合成資料**的 age 加密、真實 Google Drive 上傳／下載、全新容器還原 PASS。
 - Production：Supabase PostgreSQL17、62 筆 Migration；Vercel READY。
 - **上述 PASS 不等於正式 DB 已備份，不等於 Supabase managed Auth/Storage 可還原。**
 - 現有受保護合成測試 GitHub Environment：v58-gdrive-synthetic。
-- 先前 Google Cloud 交接記錄：專案 tutor-app-backup、OAuth App Tutor App Backup、Client tutor-app-backup-drive、External + Testing、scope drive.file。**必須在 Google Cloud Console 再次核對當前狀態**。
+- 2026-11-18 使用者提供的 Google Cloud Console 截圖：專案 tutor-app-backup 位於 rapid4grad.com 組織，OAuth 使用者類型已改為 **Internal**；原有 OAuth 憑證在切換後的真實 Drive 合成還原測試仍可用。此紀錄是當時畫面與一次測試，**不是對永久 Token 有效的保證**。
+- 2026-11-18 GitHub Action [44285408986](https://github.com/zhichiangai/tutor-app/actions/runs/44285408986) 已建立 app-owned、空白正式 Drive Folder：1BI0K6xk604y2mclqC1QVcjbMgJaWHVg8；synthetic Folder：1hPG9jKIbCmTF6Xo1S1SUmVynug3mljEK；Drive 連接器先前唯讀確認正式 Folder 沒有其他人分享、內容為 0 檔案。
+- 使用者在 GitHub v58-production-backup Environment 設定十個非機密 Variables；其中 V58_PRIVATE_KEY_OFFLINE_CONFIRMED=true **僅為使用者聲明**，兩份互相獨立的私鑰備份從副本取回並實際解密的 Codex 證據尚未提供，不能將此欄位視為已驗收。
 
-## 2. OAuth 長期授權：現階段 NO-GO
+## 2. OAuth 已切換 Internal，長期運行仍需健康監測
 
 Google 官方文件明定：External + Testing 的 OAuth App，使用非基本身份 scope 時，refresh token 一般 7 天到期。Drive Scope https://www.googleapis.com/auth/drive.file 不是基本身份 scope。**一次成功換 Token 或寫入／讀取 Drive，不代表 7 天後還能使用。**
 
-待使用者選擇的安全路線（本 PR 不擅自切換）：
+過去是 External + Testing；這項 7 天風險在此次 User Type 切換為 Internal 後不再直接適用。但任何 Refresh Token 仍可能因帳號、管理政策、撤銷及配額等因素失效。**仍需定期監控與失敗告警**。未來若再調整使用者類型、Workspace 管理政策或 OAuth Scope，須重新評估。
+
+替代路線（記錄供未來 OAuth 架構變更參考，本 PR 不執行）：
 
 1. **Internal**：只有 Google Cloud 專案與備份帳號確實屬於同一 Google Workspace 組織才可行；持有自訂網域不等於具備 Workspace Internal 資格。
 2. **External + In production**：若使用個人 Google 帳號，評估正式發布備份專用 OAuth App。維持最小 drive.file scope，依當時 Google 的品牌及 scope 規則確認驗證義務。
@@ -38,7 +42,7 @@ User Type、Publishing Status、OAuth Client 更換、新增權限需另外明�
 
 需具有 Repo Settings 權限者透過 GitHub GUI 建立，因現有連接工具不能建立或安全設定 GitHub Environment Secrets：
 
-GitHub → zhichiangai/tutor-app → Settings → Environments → New environment。
+現有 GitHub Environment 已由使用者透過 GUI 建立：v58-production-backup；下列是其維護／複核規則。
 
 - **名稱**：v58-production-backup；不要替換已存在的 v58-gdrive-synthetic。
 - **Deployment branches**：Selected branches and tags → Branch main，禁止其他 Branch/PR/tags。
@@ -75,7 +79,7 @@ GitHub → zhichiangai/tutor-app → Settings → Environments → New environme
 | protected-synthetic-oauth-readonly | main + workflow_dispatch + READINESS_NO_DB_ACCESS | 使用合成 Environment Secret 做 OAuth Refresh + Drive Folder GET |
 | protected-production-env-metadata-only | main + workflow_dispatch + READINESS_NO_DB_ACCESS | 只讀取非機密 Environment Variables 進行格式/隔離檢查；NO DB 憑證、NO Drive OAuth Secret、NO 網路備份 |
 
-Production metadata validator 核對 Supabase Ref、固定 DB host/port/user、verify-full、age 公鑰格式、正式/合成資料夾必須不同，以及人工保護確認。輸出永遠顯示 production_connection_attempted=false、credentials_inspected=false、production_backup_created=false、restore_tested=false。**Metadata PASS 不等於 Release GO**。
+Production metadata validator 核對 Supabase Ref、固定 DB host/port/user、verify-full、age 公鑰格式、**精確對照已驗證的正式與合成 Drive Folder ID**（不僅是格式及彼此不同），以及人工保護確認。輸出永遠顯示 production_connection_attempted=false、credentials_inspected=false、production_backup_created=false、restore_tested=false。**Metadata PASS 不等於 Release GO**。程式明確回傳 private_key_recovery_evidence_verified=false、actual_drive_folder_access_probed=false、production_backup_authorized=false；單次 Metadata-only CI 不驗證 GitHub 規則 API、私鑰雙份實際恢復或真實 DB TLS 連線。
 
 PR CI 通過不授權合併 Main；Main 自動部署 Vercel，仍需要當次獨立授權。
 
