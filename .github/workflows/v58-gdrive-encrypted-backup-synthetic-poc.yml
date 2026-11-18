@@ -9,6 +9,8 @@ on:
       - 'docs/v5/V58_GDRIVE_BACKUP_7_4_6_POLICY_20261118.md'
       - 'scripts/release/v58-gdrive-retention-plan.mjs'
       - 'tests/v58-gdrive-retention-plan.test.mjs'
+      - 'scripts/release/v58-gdrive-synthetic-roundtrip.mjs'
+      - 'tests/v58-gdrive-synthetic-roundtrip.test.mjs'
   workflow_dispatch:
 
 permissions:
@@ -43,4 +45,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node --test tests/v58-gdrive-retention-plan.test.mjs
+          node --test tests/v58-gdrive-retention-plan.test.mjs tests/v58-gdrive-synthetic-roundtrip.test.mjs
