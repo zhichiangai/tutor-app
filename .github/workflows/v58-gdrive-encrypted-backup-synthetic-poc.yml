@@ -6,6 +6,9 @@ on:
       - 'tests/local/v58-gdrive-encrypted-backup-poc.sh'
       - '.github/workflows/v58-gdrive-encrypted-backup-synthetic-poc.yml'
       - 'docs/v5/V58_GOOGLE_DRIVE_ENCRYPTED_BACKUP_POC_20261118.md'
+      - 'docs/v5/V58_GDRIVE_BACKUP_7_4_6_POLICY_20261118.md'
+      - 'scripts/release/v58-gdrive-retention-plan.mjs'
+      - 'tests/v58-gdrive-retention-plan.test.mjs'
   workflow_dispatch:
 
 permissions:
@@ -35,3 +38,9 @@ jobs:
           set -euo pipefail
           bash -n tests/local/v58-gdrive-encrypted-backup-poc.sh
           bash tests/local/v58-gdrive-encrypted-backup-poc.sh
+
+      - name: Verify offline 7 daily / 4 weekly / 6 monthly retention planner (NO DRIVE / NO PROD)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/v58-gdrive-retention-plan.test.mjs
