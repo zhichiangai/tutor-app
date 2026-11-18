@@ -29,7 +29,9 @@ repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 scratch="$(mktemp -d /tmp/v58-pg17-iso-XXXXXX)"
 chmod 700 "$scratch"
 name="v58-pg17-iso-${GITHUB_RUN_ID:-0}-${GITHUB_RUN_ATTEMPT:-0}"
+restore_name="${name}-restore"
 cleanup() {
+  docker rm -f "$restore_name" >/dev/null 2>&1 || true
   docker rm -f "$name" >/dev/null 2>&1 || true
   rm -rf "$scratch"
 }
@@ -98,6 +100,9 @@ if grep -aFq 'SYNTHETIC_ONLY_NO_REAL_PII' "$scratch/archive.age"; then
 fi
 ciphertext_sha="$(sha256sum "$scratch/archive.age" | cut -d' ' -f1)"
 rm -f "$scratch/clear.dump"
+# Destroy the source PostgreSQL cluster before any transport or restore.
+# This ensures that restored data can only come from the encrypted archive.
+docker rm -f "$name" >/dev/null
 
 if [[ "$mode" == real ]]; then
   export V58_DRIVE_MODE='synthetic-only'
@@ -114,11 +119,25 @@ age -d -i "$scratch/test-only-private-key.txt" -o "$scratch/restore.dump" "$scra
 [[ "$(sha256sum "$scratch/restore.dump" | cut -d' ' -f1)" == "$plaintext_sha" ]] ||
   { echo 'NO_GO: decrypted PostgreSQL17 dump SHA mismatch' >&2; exit 2; }
 
-docker exec "$name" createdb -U postgres v58_synthetic_restore
-docker cp "$scratch/restore.dump" "$name:/tmp/v58-restore.dump" >/dev/null
-docker exec "$name" pg_restore -U postgres -d v58_synthetic_restore \
+# Restore into an entirely new PostgreSQL cluster; never reuse the source cluster.
+docker run -d --network none --name "$restore_name" \
+  -e POSTGRES_PASSWORD=synthetic_ci_only -e POSTGRES_DB=postgres postgres:17 >/dev/null
+restore_ready=0
+for n in $(seq 1 60); do
+  if docker exec "$restore_name" pg_isready -U postgres >/dev/null 2>&1 &&
+     docker exec "$restore_name" psql -X -U postgres -d postgres -At -c 'SELECT 1' >/dev/null 2>&1; then
+    restore_ready=1
+    break
+  fi
+  sleep 1
+done
+[[ "$restore_ready" == 1 ]] || { echo 'NO_GO: isolated PG17 restore cluster not ready' >&2; exit 2; }
+[[ "$(docker exec "$restore_name" pg_restore --version)" =~ 17\. ]] ||
+  { echo 'NO_GO: PostgreSQL17 restore client required' >&2; exit 2; }
+docker cp "$scratch/restore.dump" "$restore_name:/tmp/v58-restore.dump" >/dev/null
+docker exec "$restore_name" pg_restore -U postgres -d postgres \
   --no-owner --no-acl --exit-on-error /tmp/v58-restore.dump >/dev/null
-restore_fingerprint="$(docker exec "$name" psql -X -U postgres -d v58_synthetic_restore -At -v ON_ERROR_STOP=1 -c "$fingerprint_sql")"
+restore_fingerprint="$(docker exec "$restore_name" psql -X -U postgres -d postgres -At -v ON_ERROR_STOP=1 -c "$fingerprint_sql")"
 [[ "$source_fingerprint" == "$restore_fingerprint" && "$restore_fingerprint" == '1|450|1|1|1|1|1' ]] ||
   { echo 'NO_GO: restored synthetic rows, accounting or RLS mismatch' >&2; exit 2; }
 echo "PASS: PostgreSQL17 synthetic dump -> age -> ${mode^^} transport -> age decrypt -> isolated PG17 restore"
