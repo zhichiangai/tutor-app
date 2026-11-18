@@ -99,6 +99,6 @@ test('fails closed if OAuth expires or folder readback differs',async()=>{
 test('rejects missing token fields or a malformed synthetic folder ID',async()=>{
   await assert.rejects(ensureProductionEncryptedFolder({oauth,syntheticFolderId:'',request:createMock().request}));
   await assert.rejects(ensureProductionEncryptedFolder({
-    oauth:{...oauth,refreshToken:''},syntheticFolderId,request:createMock().request
+    oauth:{...oauth,refreshToken:''},syntheticFolderId:syntheticId,request:createMock().request
   }));
 });
