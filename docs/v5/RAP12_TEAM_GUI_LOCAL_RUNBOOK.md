@@ -10,7 +10,7 @@
 
 - tests/e2e/seed-rap12-team-local.mjs：在本機建立三個真正獨立的合成 Auth 身分、兩個 Team、三個 Project、三筆學生、三堂完成課程及管理者確認費用，並實際使用不同 JWT 核對跨 Team、私人課程及帳務 RLS。
 - tests/e2e/rap12-local-host.mjs：只監聽 127.0.0.1:3000，提供本機原網站以及 /__rap12/ 合成身分選擇頁。可用 GUI 選擇 Team A 管理者、Team A 一般老師或 Team B 管理者，不需 Google OAuth，測試憑證不出現在畫面或網址。
-- tests/e2e/rap12-team-gui.spec.mjs、rap12.config.mjs：390 與 1440px 使用真正獨立本機帳號的 Chromium GUI 驗證。
+- tests/e2e/rap12-team-gui.spec.mjs、rap12.config.mjs：320／375／390／430／1440px 使用真正獨立本機帳號的 Chromium GUI 驗證；雲端 CI 額外輸出 102 張合成 PNG，供 Codex 只針對尚未人工審查的圖片複核。
 
 ## Mac 的安全 Gate
 
@@ -54,7 +54,7 @@
 
 Codex IAB 打開：http://127.0.0.1:3000/__rap12/
 
-只測 390×844 與 1440×844。依序選擇三種身分並查看相同網站；不同身分必須具有不同 GoTrue User ID。若 IAB 無法連本機 loopback，明確報 BLOCKED，不可改用 Production 網域假裝已測本機權限。
+若另行獲准使用 Mac 本機隔離站做 IAB，依需要測 320／375／390／430／1440（高度 844），不要重複已通過的 102 張 CI 靜態圖片複核。**方案 A 預設只使用 GitHub Actions 合成環境＋Codex 圖片人工驗收，Mac Docker 啟動並非必要步驟。** 如選擇本機 IAB，依序選擇三種身分並查看相同網站；不同身分必須具有不同 GoTrue User ID。若 IAB 無法連本機 loopback，明確報 BLOCKED，不可改用 Production 網域假裝已測本機權限。
 
 合成帳號密碼只會存放在本機 OS 暫存目錄中的 RAP12_FIXTURE_FILE，權限 0600；不能貼入聊天、公開 PR、截圖或日誌。localhost QA 角色選擇頁不輸出密碼或 Token。
 
@@ -77,3 +77,9 @@ Codex IAB 打開：http://127.0.0.1:3000/__rap12/
 2. 只刪自己產生的憑證檔：rm -f "$RAP12_FIXTURE_FILE"。
 3. 若要停掉 Supabase，只對確定的 tutor_v4_isolated 可拋棄專案使用 CLI；不得全域 stop/prune 其他 Docker 專案。
 4. 報告各角色與尺寸、登入安全、權限差異、RLS/GUI 各自證據、是否修改正式資料。不得把本機測試當成正式 Production PASS。
+
+## PR #94 追加的安全驗收關卡
+
+- 合成資料 seed 在三個獨立 GoTrue JWT 下，直接透過 PostgREST 測試 `v5_team_billing_overview`：Team A 管理者查 Team B 帳務必須拒絕、Team B 管理者查 Team A 帳務必須拒絕、Team A 一般老師查自己 Team 帳務也必須拒絕；兩個 Team 各自的管理者合法帳務查詢要成功。這是隔離合成環境測試，不是 Production 權限通過證據。
+- CI 即使因非 RAP-12 舊瀏覽器回歸失敗，仍僅在獨立 schema catalog **及** restore probe 都成功的條件下，才建立 RAP-12 fixture／照片；任何前置測試 FAIL 仍讓整體 Workflow FAIL，不能用照片 Artifact 蓋過。
+- CI 的 `rap12-isolated-team-gui` 只上傳 102 張合成 PNG，不上傳 credential fixture、HTML report、Trace 或原始 headers。Production 權限、Migration 63、正式帳號與付款資料維持獨立 Gate。

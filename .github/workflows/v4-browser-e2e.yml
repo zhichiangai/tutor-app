@@ -269,9 +269,10 @@ jobs:
           }
       - name: Prepare RAP-12 disposable three-account Team GUI fixture
         id: rap12_fixture
-        # An unrelated browser regression must not hide RAP-12 evidence, but
-        # a failed isolated DB/schema gate must still prevent any fixture.
-        if: ${{ always() && steps.v5_catalog_probe.outcome == 'success' }}
+        # A pre-existing browser regression must not hide RAP-12 evidence.
+        # However, do not produce screenshots if the disposable schema or
+        # restore safety probe failed; the overall job must still fail.
+        if: ${{ always() && steps.v5_catalog_probe.outcome == 'success' && steps.v5_restore_probe.outcome == 'success' }}
         env:
           RAP12_TEAM_GUI_LOCAL: '1'
           RAP12_FIXTURE_FILE: /tmp/rap12-team-gui-fixture.json

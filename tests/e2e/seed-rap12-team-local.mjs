@@ -173,6 +173,7 @@ for(const [token,id] of [[tA,la],[tA,lp],[tB,lb]]){
   {p_lesson_id:id,p_hourly_rate_cents:65000},200);
 }
 const teamIds=async token=>(await api(token,'GET','v5_teams?select=id')).map(x=>x.id);
+assert.deepEqual((await teamIds(tA)).sort(),[teamA]);
 assert.deepEqual((await teamIds(tMember)).sort(),[teamA]);
 assert.deepEqual((await teamIds(tB)).sort(),[teamB]);
 const teacherProjects=await api(tMember,'GET','v5_team_projects?select=id');
@@ -181,12 +182,23 @@ const teacherStudents=await api(tMember,'GET','v5_team_students?select=id');
 assert.deepEqual(teacherStudents.map(s=>s.id).sort(),[saShared]);
 const teacherLessons=await api(tMember,'GET','v5_team_lessons?select=id');
 assert.deepEqual(teacherLessons.map(x=>x.id).sort(),[la]);
+// Check the privileged SECURITY DEFINER billing RPC with three real, distinct
+// GoTrue JWTs. Cross-tenant managers must be denied even with a valid UUID.
+const billingMonth=month+'-01';
 await forbid(tMember,'POST','rpc/v5_team_billing_overview',
- {p_team_id:teamA,p_month:month+'-01'});
+ {p_team_id:teamA,p_month:billingMonth});
+await forbid(tA,'POST','rpc/v5_team_billing_overview',
+ {p_team_id:teamB,p_month:billingMonth});
+await forbid(tB,'POST','rpc/v5_team_billing_overview',
+ {p_team_id:teamA,p_month:billingMonth});
 await forbid(tMember,'GET','v5_team_lesson_fees?select=*');
 const billing=await api(tA,'POST','rpc/v5_team_billing_overview',
- {p_team_id:teamA,p_month:month+'-01'},200);
+ {p_team_id:teamA,p_month:billingMonth},200);
 assert.ok(billing.confirmed_count>=2,'Synthetic manager billing must be populated');
+const foreignManagerBilling=await api(tB,'POST','rpc/v5_team_billing_overview',
+ {p_team_id:teamB,p_month:billingMonth},200);
+assert.equal(foreignManagerBilling.confirmed_count,1,
+ 'Foreign Team manager can only review own synthetic lesson fee');
 // Store credentials privately on the local machine only. Never print actor emails, passwords,
 // API keys or IDs into CI logs, PRs, screenshots, or chatbot conversation.
 const fixture={environment:'local',apiUrl:local.API_URL,baseUrl:'http://127.0.0.1:3000',
@@ -196,4 +208,5 @@ writeFileSync(fixturePath,JSON.stringify(fixture),{mode:0o600,flag:'wx'});
 chmodSync(fixturePath,0o600);
 console.log(JSON.stringify({result:'PASS',scope:'disposable-local',actors:3,
  teams:2,projects:3,lessons:3,managerOnlyFinancialRows:3,
+ billingRpcCrossTeamDenied:2,billingRpcTeacherDenied:1,
  teacherAccessibleProjects:1,foreignTenantAccess:0,productionWrites:0}));
