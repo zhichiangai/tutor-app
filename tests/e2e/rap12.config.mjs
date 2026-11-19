@@ -10,4 +10,6 @@ export default defineConfig({
  reporter:[['list'],['html',{outputFolder:'test-results/rap12-e2e-report',open:'never'}]],
  outputDir:'test-results/rap12-e2e-artifacts',
  use:{...base.use,screenshot:'off',trace:'off'},
+ webServer:{command:'node tests/e2e/rap12-local-host.mjs',cwd:process.cwd(),
+  url:'http://127.0.0.1:3000/__rap12/',timeout:30_000,reuseExistingServer:false},
 });
