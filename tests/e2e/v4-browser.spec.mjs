@@ -118,6 +118,37 @@ test('teacher ledger excludes QA lesson from official summary',async ({page})=>{
  await expect(page.locator('#billing-summary')).toContainText('NT$ 1,000');
  await expect(page.locator('#billing-summary')).not.toContainText('NT$ 1,500');
 });
+test('parent can open and close full lesson learning notes on mobile and desktop without any payment write',async({page})=>{
+ test.setTimeout(90_000);
+ // Disposable GoTrue/DB only. Use synthetic lesson content and restore it after the test.
+ db("update public.lesson_records set lesson_content='CI geometry recap', remarks='CI practice exercise' where id='"+f.ids.lesson+"'");
+ try{
+  await login(page,'parent');
+  for(const width of [320,1440]){
+   await page.setViewportSize({width,height:844});
+   const nav=width<=650?'.mobile-nav [data-view="billing"]':'.side-nav [data-view="billing"]';
+   await page.locator(nav).click();
+   await expect(page.locator('#view-billing')).toBeVisible();
+   const toggle=page.locator('#billing-list .learning-payment-toggle').first();
+   const panel=page.locator('#billing-list .learning-payment-body').first();
+   await expect(toggle).toBeVisible();
+   await expect(toggle).toHaveAttribute('aria-expanded','false');
+   await expect(panel).toBeHidden();
+   await toggle.click();
+   await expect(toggle).toHaveAttribute('aria-expanded','true');
+   await expect(panel).toBeVisible();
+   await expect(panel).toContainText('CI geometry recap');
+   await expect(panel).toContainText('CI practice exercise');
+   // Keyboard activation must close the same disclosure, without a navigation or write.
+   await toggle.press('Enter');
+   await expect(toggle).toHaveAttribute('aria-expanded','false');
+   await expect(panel).toBeHidden();
+  }
+  expect(db("select lesson_content||'|'||remarks from public.lesson_records where id='"+f.ids.lesson+"'")).toBe('CI geometry recap|CI practice exercise');
+ }finally{
+  db("update public.lesson_records set lesson_content=null, remarks=null where id='"+f.ids.lesson+"'");
+ }
+});
 test('parent reports 600, teacher confirms, parent reports 400; no excess',async ({browser})=>{
  const p=await browser.newPage({timezoneId:'Asia/Taipei'});
  const t=await browser.newPage({timezoneId:'Asia/Taipei'});

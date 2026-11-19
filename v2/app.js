@@ -986,8 +986,8 @@ function learningPaymentLine(lesson,due=null){
   '<p class="learning-payment-content">'+esc(description)+'</p>'+
   '<div class="learning-payment-stars"><span>專注 '+esc(compactStars(lesson.focus_rating))+
   '</span><span>心情 '+esc(compactStars(lesson.mood_rating))+'</span></div>'+
-  (lesson.lesson_content||lesson.remarks?'<details class="learning-payment-expand"><summary>查看完整課後紀錄</summary>'+
-  '<div>上課內容：'+esc(description)+(lesson.remarks?'\n老師備註：'+esc(lesson.remarks):'')+'</div></details>':'')+
+  (lesson.lesson_content||lesson.remarks?'<div class="learning-payment-expand"><button type="button" class="learning-payment-toggle" data-learning-payment-toggle aria-expanded="false">查看完整課後紀錄</button>'+
+  '<div class="learning-payment-body" hidden>上課內容：'+esc(description)+(lesson.remarks?'\n老師備註：'+esc(lesson.remarks):'')+'</div></div>':'')+
   '</div><div class="learning-payment-total"><strong>'+money(outstanding)+'</strong>'+
   '<small>'+esc(statusLabel(lesson))+'</small></div></div>';
 }
@@ -3146,6 +3146,17 @@ function bindEvents(){
   if(ev.target.closest("[data-contact-action]")){await v4ContactsUI.handleClick(ev.target);return}
   const correctionPreview=ev.target.closest('[data-action="preview-correction"]');
   if(correctionPreview){await previewConfirmedBatchCorrection(correctionPreview.dataset.id);return}
+  // Keep the parent billing disclosure local and read-only; never re-render or write payments.
+  const recordToggle=ev.target.closest("[data-learning-payment-toggle]");
+  if(recordToggle){
+   const content=recordToggle.nextElementSibling;
+   if(!content?.classList.contains("learning-payment-body"))return;
+   const expanded=recordToggle.getAttribute("aria-expanded")!=="true";
+   recordToggle.setAttribute("aria-expanded",String(expanded));
+   recordToggle.textContent=expanded?"收合完整課後紀錄":"查看完整課後紀錄";
+   content.hidden=!expanded;
+   return;
+  }
   const star=ev.target.closest("[data-lesson-star]");
   if(star){
    const key=star.dataset.lessonStar,score=Number(star.dataset.starValue);
