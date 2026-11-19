@@ -268,6 +268,10 @@ jobs:
             exit 1
           }
       - name: Prepare RAP-12 disposable three-account Team GUI fixture
+        id: rap12_fixture
+        # An unrelated browser regression must not hide RAP-12 evidence, but
+        # a failed isolated DB/schema gate must still prevent any fixture.
+        if: ${{ always() && steps.v5_catalog_probe.outcome == 'success' }}
         env:
           RAP12_TEAM_GUI_LOCAL: '1'
           RAP12_FIXTURE_FILE: /tmp/rap12-team-gui-fixture.json
@@ -277,6 +281,8 @@ jobs:
           test ! -f supabase/.temp/project-ref
           node tests/e2e/seed-rap12-team-local.mjs
       - name: Verify RAP-12 true manager/teacher/foreign Team GUI and RLS
+        id: rap12_gui
+        if: ${{ always() && steps.rap12_fixture.outcome == 'success' }}
         env:
           RAP12_TEAM_GUI_LOCAL: '1'
           RAP12_FIXTURE_FILE: /tmp/rap12-team-gui-fixture.json
@@ -284,7 +290,8 @@ jobs:
           set -euo pipefail
           npx playwright test --config tests/e2e/rap12.config.mjs
       - name: Audit RAP-12 synthetic screenshots before upload
-        if: success()
+        id: rap12_artifact_audit
+        if: ${{ always() && steps.rap12_gui.outcome == 'success' }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -309,7 +316,7 @@ jobs:
           print(f'RAP12_ARTIFACT_AUDIT PASS png_count={len(files)} synthetic_only=true trace=false')
           PY
       - name: Upload RAP-12 synthetic-only three-identity screenshots
-        if: success()
+        if: ${{ always() && steps.rap12_artifact_audit.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: rap12-isolated-team-gui
