@@ -128,3 +128,73 @@ test('synthetic Team settings and project navigation across six viewports',async
  await expect(page.locator('body')).toHaveClass(/teacher-team-workspace/);
  for(const width of widths)await assertViewport(page,'team',width);
 });
+
+
+async function assertReadableDialog(page,selector,width,buttonSelector){
+ const dialog=page.locator(selector);
+ await expect(dialog).toBeVisible();
+ // A tall dialog can scroll vertically. Its horizontal edges must remain
+ // inside the viewport, with no sideways content scroll.
+ const rect=await dialog.evaluate(el=>{
+  const r=el.getBoundingClientRect();
+  return {left:r.left,right:r.right,clientWidth:el.clientWidth,scrollWidth:el.scrollWidth};
+ });
+ expect(rect.left,selector+' clipped at left edge for '+width).toBeGreaterThanOrEqual(-2);
+ expect(rect.right,selector+' clipped at right edge for '+width).toBeLessThanOrEqual(width+2);
+ expect(rect.scrollWidth,selector+' has internal horizontal overflow for '+width)
+  .toBeLessThanOrEqual(rect.clientWidth+2);
+ const button=page.locator(buttonSelector);
+ await expect(button).toBeVisible();
+ // Trial click proves the actual interactive surface can be reached without
+ // submitting any synthetic form, rather than only appearing in the DOM.
+ await button.click({trial:true,timeout:10_000});
+ mkdirSync(evidenceDir,{recursive:true});
+ await page.screenshot({path:join(evidenceDir,
+  'v58-teacher-overlay-'+selector.replace(/[^a-z0-9]/gi,'')+'-'+width+'.png'),
+  animations:'disabled',caret:'hide'});
+}
+
+test('synthetic teacher lesson and recurring schedule overlays fit all six viewport widths',async({page})=>{
+ test.setTimeout(210_000);
+ await localLogin(page,'teacher');
+ for(const width of widths){
+  await page.setViewportSize({width,height});
+  await openReadOnlySection(page,'teacher');
+  // The disposable fixture seeds this lesson on the current Taipei date.
+  // <=650px: compact month cells hide event chips and expose the daily agenda.
+  // >650px: the lower agenda is intentionally hidden; use the month event chip.
+  await page.locator('#jump-today').click();
+  await expect(page.locator('#calendar-grid .calendar-cell[data-day="'+fixture.day+'"]')).toBeVisible();
+  const entry=width<=650?
+   '#agenda-list .day-lesson-open[data-action="open-lesson"][data-id="'+fixture.ids.lesson+'"]':
+   '#calendar-grid .calendar-event[data-action="open-lesson"][data-id="'+fixture.ids.lesson+'"]';
+  const lesson=page.locator(entry);
+  await expect(lesson).toBeVisible();
+  await lesson.click();
+  await expect(page.locator('#lesson-teacher-readonly')).toBeVisible();
+  await assertReadableDialog(page,'#lesson-modal',width,'#lesson-open-editor');
+  await page.locator('#lesson-open-editor').click();
+  await expect(page.locator('#lesson-teacher-actions')).toBeVisible();
+  // The shared synthetic fixture may already have receipts from earlier
+  // E2E flows. Payment-locked lessons must block time/amount edits while
+  // keeping the separate learning feedback action accessible.
+  const paymentLocked=await page.locator('#lesson-save').isDisabled();
+  if(paymentLocked){
+   await expect(page.locator('#lesson-save')).toBeDisabled();
+   await expect(page.locator('#lesson-learning-save')).toBeEnabled();
+  }
+  await assertReadableDialog(page,'#lesson-modal',width,
+   paymentLocked?'#lesson-learning-save':'#lesson-save');
+  await page.locator('#lesson-modal [data-close="lesson-modal"]').click();
+  await expect(page.locator('#lesson-modal')).not.toBeVisible();
+
+  await page.locator('#manage-schedules').click();
+  await expect(page.locator('#schedule-manage-view')).toBeVisible();
+  await assertReadableDialog(page,'#schedule-modal',width,'#schedule-create-new');
+  await page.locator('#schedule-create-new').click();
+  await expect(page.locator('#schedule-editor-fields')).toBeVisible();
+  await assertReadableDialog(page,'#schedule-modal',width,'#schedule-save');
+  await page.locator('#schedule-modal .close-modal[data-close="schedule-modal"]').click();
+  await expect(page.locator('#schedule-modal')).not.toBeVisible();
+ }
+});
