@@ -60,6 +60,59 @@ async function captureTeamEvidence(page,testInfo,role,width,section,cardSelector
  await card.screenshot({path:testInfo.outputPath(filename+'-card.png'),
   animations:'disabled'});
 }
+// A fullPage screenshot may visually place a fixed mobile bar over content even
+// when a real user can scroll that content clear of the bar. Check the actual
+// 390px *viewport* after scrolling to the final visible control in each card.
+// This tests reachable geometry; it does not substitute for tap testing.
+async function checkMobileNavClearance(page,testInfo,role,width,section,cardSelector){
+ if(width>900)return;
+ const outcome=await page.evaluate(async(selector)=>{
+  const nav=document.querySelector('.mobile-nav');
+  const card=document.querySelector(selector);
+  if(!nav||!card)throw new Error('Missing Team navigation or card');
+  const candidates=Array.from(card.querySelectorAll('button,input,select,textarea,a[href]'));
+  const controls=candidates.filter(el=>{
+   const r=el.getBoundingClientRect();
+   return r.width>0&&r.height>0&&getComputedStyle(el).visibility!=='hidden';
+  });
+  const target=controls.at(-1)||card;
+  const scrollRoot=document.documentElement;
+  const previous=scrollRoot.style.scrollBehavior;
+  scrollRoot.style.scrollBehavior='auto';
+  try{
+   const navRect=nav.getBoundingClientRect();
+   const end=target.getBoundingClientRect().bottom+window.scrollY;
+   const maximum=Math.max(0,scrollRoot.scrollHeight-window.innerHeight);
+   const desired=Math.max(0,end-navRect.top+12);
+   window.scrollTo(0,Math.min(desired,maximum));
+   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+   const lower=nav.getBoundingClientRect();
+   const rect=target.getBoundingClientRect();
+   const x=(rect.left+rect.right)/2,y=(rect.top+rect.bottom)/2;
+   const hit=(y>=0&&y<window.innerHeight)?
+    document.elementFromPoint(x,y):null;
+   return{
+    navVisible:lower.width>0&&lower.height>0,
+    navTop:lower.top,navHeight:lower.height,
+    targetTop:rect.top,targetBottom:rect.bottom,
+    targetUnobscured:rect.top>=0&&rect.bottom<=lower.top-8,
+    targetHit:!!hit&&(hit===target||target.contains(hit)),
+    scrollY:window.scrollY,maxScroll:maximum,
+    docScrollWidth:scrollRoot.scrollWidth,docClientWidth:scrollRoot.clientWidth
+   };
+  }finally{scrollRoot.style.scrollBehavior=previous}
+ },cardSelector);
+ // Viewport-only screenshot (no fullPage) records the actual end-of-scroll state.
+ await page.screenshot({path:testInfo.outputPath(role+'-'+section+'-'+width+'-viewport-bottom.png'),
+  fullPage:false,animations:'disabled'});
+ console.log('RAP12_MOBILE_NAV_CLEARANCE '+JSON.stringify({role,section,width,...outcome}));
+ expect(outcome.navVisible).toBe(true);
+ expect(outcome.docScrollWidth).toBeLessThanOrEqual(outcome.docClientWidth);
+ expect(outcome.targetUnobscured,
+  'Last visible Team control must be scrollable above the fixed mobile navigation').toBe(true);
+ expect(outcome.targetHit,
+  'Last visible Team control must not be covered by another DOM element').toBe(true);
+}
 async function inspectManagerA(page,testInfo,width){
  await login(page,'managerA');
  await enterTeam(page);
@@ -72,17 +125,20 @@ async function inspectManagerA(page,testInfo,width){
  await expect(page.locator('#v5-team-project-list')).toContainText('RAP12 Alpha Manager Only');
  await expect(page.locator('#v5-team-project-list')).not.toContainText('RAP12 Beta Foreign');
  await captureTeamEvidence(page,testInfo,'managerA',width,'projects','#v5-team-card');
+ await checkMobileNavClearance(page,testInfo,'managerA',width,'projects','#v5-team-card');
  await teamSection(page,'learning');
  await expect(page.locator('#v5-learning-manager-controls')).toBeVisible();
  await page.locator('#v5-learning-team-select').selectOption(f.ids.teamA);
  await expect(page.locator('#v5-learning-project-select')).toBeVisible();
  await expect(page.locator('#v5-learning-lessons')).toContainText('RAP12 Shared Math');
  await captureTeamEvidence(page,testInfo,'managerA',width,'learning','#v5-learning-card');
+ await checkMobileNavClearance(page,testInfo,'managerA',width,'learning','#v5-learning-card');
  await teamSection(page,'billing');
  await expect(page.locator('#v5-billing-card')).toBeVisible();
  await page.locator('#v5-billing-team-select').selectOption(f.ids.teamA);
  await expect(page.locator('#v5-billing-confirmed')).toContainText('RAP12 Shared Math');
  await captureTeamEvidence(page,testInfo,'managerA',width,'billing','#v5-billing-card');
+ await checkMobileNavClearance(page,testInfo,'managerA',width,'billing','#v5-billing-card');
  await logout(page);
 }
 async function inspectTeacherA(page,testInfo,width){
@@ -96,6 +152,7 @@ async function inspectTeacherA(page,testInfo,width){
  await expect(page.locator('#v5-team-project-list')).not.toContainText('RAP12 Alpha Manager Only');
  await expect(page.locator('#v5-team-project-list')).not.toContainText('RAP12 Beta Foreign');
  await captureTeamEvidence(page,testInfo,'teacherA',width,'projects','#v5-team-card');
+ await checkMobileNavClearance(page,testInfo,'teacherA',width,'projects','#v5-team-card');
  await teamSection(page,'learning');
  await expect(page.locator('#v5-learning-manager-controls')).toBeHidden();
  // Team learning options are refreshed asynchronously from RLS-governed API calls.
@@ -111,6 +168,7 @@ async function inspectTeacherA(page,testInfo,width){
  await expect(page.locator('#v5-learning-lessons')).not.toContainText('RAP12 Private Science');
  await expect(page.locator('#v5-learning-lessons')).not.toContainText('RAP12 Foreign English');
  await captureTeamEvidence(page,testInfo,'teacherA',width,'learning','#v5-learning-card');
+ await checkMobileNavClearance(page,testInfo,'teacherA',width,'learning','#v5-learning-card');
  await teamSection(page,'billing');
  await expect(page.locator('#v5-billing-card')).toBeHidden();
  // The billing card is forbidden and hidden: document this through the
@@ -125,13 +183,16 @@ async function inspectManagerB(page,testInfo,width){
  await page.locator('#v5-team-manage-select').selectOption(f.ids.wsB);
  await expect(page.locator('#v5-team-project-list')).toContainText('RAP12 Beta Foreign');
  await expect(page.locator('#v5-team-project-list')).not.toContainText('RAP12 Alpha Shared');
+ await expect(page.locator('#v5-team-project-list')).not.toContainText('RAP12 Alpha Manager Only');
  await captureTeamEvidence(page,testInfo,'managerB',width,'projects','#v5-team-card');
+ await checkMobileNavClearance(page,testInfo,'managerB',width,'projects','#v5-team-card');
  await teamSection(page,'learning');
  await expect(page.locator('#v5-learning-team-select option[value="'+f.ids.teamB+'"]'))
   .toHaveCount(1);
  await page.locator('#v5-learning-team-select').selectOption(f.ids.teamB);
  await expect(page.locator('#v5-learning-lessons')).toContainText('RAP12 Foreign English');
  await captureTeamEvidence(page,testInfo,'managerB',width,'learning','#v5-learning-card');
+ await checkMobileNavClearance(page,testInfo,'managerB',width,'learning','#v5-learning-card');
  await logout(page);
 }
 for(const width of [390,1440]){
