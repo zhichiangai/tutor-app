@@ -22,20 +22,20 @@
 
 **寬度**：320、375、390、430、1440 px（高度均 844 px）。每個寬度執行完整七個場景的三身分獨立 BrowserContext 測試。
 
-**基準高細節圖片**：390 與 1440 各七場景，分別儲存 `-page.png` 全頁與 `-card.png` 卡片特寫，共 28 張。
+**完整頁面與關鍵卡片圖片**：320／375／390／430／1440 各七場景，分別儲存 `-page.png` 全頁與 `-card.png` 卡片特寫，共 **70 張**。保留原本 390／1440 的 28 張組合，新增 320／375／430 的 **42 張**；這次應優先人工複核新增 42 張。
 
 **手機真實 viewport**：320／375／390／430 各七場景，捲動到該卡片最後一個可見控制項，儲存 `-viewport-bottom.png`，共 28 張；同時記錄固定導覽幾何、控制項 hit-test、水平溢出。
 
 **Billing 說明文字**：320／375／390／430 各一張 `managerA-billing-<寬度>-viewport-copy-end.png`，捲至文件底部，核對最後一段退款說明文字**整段**位於固定導覽上方，記錄 `RAP12_BILLING_COPY_CLEARANCE`，共 4 張。
 
-**預期 Artifact 數量**：28 + 28 + 4 = **60 張 PNG**，且**只能包含 PNG**。工作流程在上傳前檢查檔案數量、PNG header、viewport 寬高及禁止 `trace.zip`；不保留原始 Auth token、HTML、Trace 或包含敏感 Header 的網路紀錄。PNG 仍應視為受控合成測試證據，不公開真實帳密。
+**預期 Artifact 數量**：70 + 28 + 4 = **102 張 PNG**（比原本 60 張增加 42 張），且**只能上傳 PNG**。工作流程在上傳前檢查精確七場景 × 五尺寸 × 圖片種類的檔名集合、PNG header、完整頁面寬高、viewport 寬高、沒有多餘檔案與禁止 `trace.zip`；只允許 Playwright 私有 `.last-run.json` 暫存在 CI runner，透過 PNG-only glob 排除，不上傳原始 Auth token、HTML、Trace 或包含敏感 Header 的網路紀錄。PNG 仍應視為受控合成測試證據，不公開真實帳密。
 
 ## Codex 人工驗收順序
 
 1. 核對 PR #94 最新 Head SHA 與最新 CI Run 的 Commit **完全相同**，檢查 Node、既有 Chromium 62/62、RAP-12 五種寬度測試與 screenshots audit 是否成功；不可用舊 SHA 的 PASS 替代新版本。
-2. 優先看四張 Billing 說明文字的 `-viewport-copy-end.png`，檢查說明文字末行在底部導覽上方完整可讀；若文字仍遮蓋，列出檔名／遮蓋位置。
-3. 檢查 320／375／430 共 21 張新的 mobile viewport 圖，尤其 Team 專案、Learning 月曆與 Billing 表單的最後控制項、回應式換行、固定底部導覽是否重疊。
-4. 上一輪已完成的 390 圖（6 PASS、1 Billing PARTIAL）及 1440 圖（7 PASS）不需無故重測；但若最新 HEAD 的視覺結果改變，必須重新記錄。
+2. **本輪人工優先範圍是新增 42 張**：`{managerA,teacherA,managerB}-{projects,learning,billing}-{320,375,430}-{page,card}.png` 中僅七個合法場景（無一般老師 Billing）。逐尺寸核對完整頁面、對應卡片內的文字換行、表單、月曆、按鈕、內容與管理權差異，列出場景 × 尺寸的 PASS/PARTIAL/FAIL。
+3. 將新增 `-page`／`-card` 與原已驗收的 21 張 `-viewport-bottom` 圖交叉核對：fullPage 固定底部導覽可能出現在中段，應以真正 viewport 捲動位置和 hit-test 判定可觸及性，不將截圖疊影自行當成產品 FAIL。
+4. 四張 Billing `-viewport-copy-end.png` 已有人工作業 4/4 PASS，390px 七場景和 1440px 七場景此前也 7/7 PASS；除非最新 Commit 修改了產品 UI 或出現新證據，不重新人工複核這些舊圖。
 5. 將「Playwright/JWT/RLS **自動化 PASS**」、「合成 PNG **人工視覺 PASS/PARTIAL/FAIL**」、「Codex IAB 即時點擊 **NOT TESTED**」、「Production 雙帳號 GUI/RLS **NOT TESTED**」分欄。
 6. 若有 FAIL，必須提供圖檔、角色、viewport、預期／實際結果與可重現步驟；不得猜測不存在的操作缺陷，也不得將合成測試當作正式資料庫授權證明。
 
@@ -46,3 +46,11 @@
 - 不要求 Codex 修 Mac Docker Desktop 或 CLI；不要求登入正式帳號。測試附件可能過期，Codex 應以最新相符 SHA 的 Action Artifact 為準。
 - PR #94 保持 Draft；Production Main/Vercel/Supabase/Migration 63 的發布、改權限、資料改寫**均須另外授權**。
 - 即使 CI 與合成畫面均 PASS，Linear RAP-12 正式 GUI 驗收仍維持 In Progress，直到實際 Production 對應關卡完成。
+
+## PR Review Ready 與正式站安全門檻（2026-11-19 補充）
+
+- **只評估，不自動切換 GitHub Draft 狀態或合併。** 同一最新 HEAD 必須 Node／既有 Chromium／五尺寸 RAP-12／Billing／固定導覽幾何、102 PNG 安全稽核全部 PASS，且新增 42 張已由 Codex 人工逐張審查並回報具名檔案和結論，才能建議「測試 PR 可供 Review」。未過時維持 Draft。
+- PR #94 僅增補隔離測試、CI 與文件，**不需要 Migration 63 才能審查本身的測試程式**。候選 Migration 63 是家長逐 Project 應收 RPC 的獨立發布 Gate，不得偷渡到 RAP-12；此 PR 的通過不授權正式 SQL、RLS 修改或 Main 合併。
+- **Production Team 實際 GUI 尚欠獨立的合法角色身分**：Team A 管理者、Team A 一般老師、Team B 管理者三種不同 Google／Supabase User ID，各自確實具有效成員關係。必須在合法授權工作階段做唯讀觀察：管理者專案／課表／帳務、一般老師受指派項目及禁止管理區、跨 Team 不可見項目。不可用同一登入切換頁面或合成截圖假冒三個 JWT；不可建立虛構課程／付款或曝光真實學生資料。
+- **正式 RLS 不能只看「已啟用」**：另需具體授權範圍與對應資料隔離測試、PR/RPC 權限檢視。若 Production 不具安全、可授權的三身分與匿名化證據，標記 NOT TESTED/BLOCKED，保留 RAP-12 In Progress。
+- 本次工作不清除任何 Google Drive／Actions Artifact、正式資料、Mac 本機 Docker volume 或測試帳號；所有獨立 Production 合併、部署、Migration 或 Auth/RLS 變更需新授權及備份/回復確認。

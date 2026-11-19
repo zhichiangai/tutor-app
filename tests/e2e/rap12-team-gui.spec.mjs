@@ -55,9 +55,9 @@ async function captureTeamEvidence(page,testInfo,role,width,section,cardSelector
  await expect(page.locator('#toast')).toBeHidden({timeout:10000});
  const card=page.locator(cardSelector);
  await expect(card).toBeVisible();
- // Preserve high-detail full-page/card images at the two baseline widths.
- // Other mobile widths receive viewport evidence without duplicating huge pages.
- if(width!==390&&width!==1440)return;
+ // Keep the 390/1440 baseline and add full-page plus key-card evidence
+ // for 320/375/430. Only synthetic Team fixtures are captured.
+ if(![320,375,390,430,1440].includes(width))return;
  const filename=role+'-'+section+'-'+width;
  await page.screenshot({path:testInfo.outputPath(filename+'-page.png'),
   fullPage:true,animations:'disabled'});
@@ -66,7 +66,7 @@ async function captureTeamEvidence(page,testInfo,role,width,section,cardSelector
 }
 // A fullPage screenshot may visually place a fixed mobile bar over content even
 // when a real user can scroll that content clear of the bar. Check the actual
-// 390px *viewport* after scrolling to the final visible control in each card.
+// mobile *viewport* after scrolling to the final visible control in each card.
 // This tests reachable geometry; it does not substitute for tap testing.
 async function checkMobileNavClearance(page,testInfo,role,width,section,cardSelector){
  if(width>900)return;
