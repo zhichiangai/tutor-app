@@ -267,6 +267,30 @@ jobs:
             echo "::error::Synthetic application-owned schema/ACL restore failed or was skipped"
             exit 1
           }
+      - name: Prepare RAP-12 disposable three-account Team GUI fixture
+        env:
+          RAP12_TEAM_GUI_LOCAL: '1'
+          RAP12_FIXTURE_FILE: /tmp/rap12-team-gui-fixture.json
+        run: |
+          set -euo pipefail
+          test "$V4_E2E_LOCAL" = "1"
+          test ! -f supabase/.temp/project-ref
+          node tests/e2e/seed-rap12-team-local.mjs
+      - name: Verify RAP-12 true manager/teacher/foreign Team GUI and RLS
+        env:
+          RAP12_TEAM_GUI_LOCAL: '1'
+          RAP12_FIXTURE_FILE: /tmp/rap12-team-gui-fixture.json
+        run: |
+          set -euo pipefail
+          npx playwright test --config tests/e2e/rap12.config.mjs
+      - name: Upload RAP-12 synthetic-only three-identity screenshots
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rap12-isolated-team-gui
+          path: tests/e2e/test-results/rap12-e2e-artifacts/
+          retention-days: 7
+          if-no-files-found: error
       - name: Upload synthetic-only V5 Alpha multi-role RWD evidence
         if: success()
         uses: actions/upload-artifact@v4
@@ -277,7 +301,7 @@ jobs:
           if-no-files-found: error
       - name: Remove ephemeral auth fixture
         if: always()
-        run: rm -f "$V4_E2E_FIXTURE_FILE"
+        run: rm -f "$V4_E2E_FIXTURE_FILE" /tmp/rap12-team-gui-fixture.json
       - name: Upload sanitized failure screenshots and report
         if: failure()
         uses: actions/upload-artifact@v4
