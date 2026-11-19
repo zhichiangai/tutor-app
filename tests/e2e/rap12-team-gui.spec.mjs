@@ -81,6 +81,10 @@ async function inspectTeacherA(page,testInfo,width){
  await expect(page.locator('#v5-team-project-list')).not.toContainText('RAP12 Beta Foreign');
  await teamSection(page,'learning');
  await expect(page.locator('#v5-learning-manager-controls')).toBeHidden();
+ // Team learning options are refreshed asynchronously from RLS-governed API calls.
+ // Wait for the concrete permitted Team instead of reading the select before load finishes.
+ await expect(page.locator('#v5-learning-team-select option[value="'+f.ids.teamA+'"]'))
+  .toHaveCount(1);
  const ids=await page.locator('#v5-learning-team-select option').evaluateAll(
   options=>options.map(x=>x.value));
  assert.ok(ids.includes(f.ids.teamA));
