@@ -892,8 +892,11 @@ test('V5.3 manager safely renames Team student, edits lesson, archives without l
  await page.locator('#v5-learning-team-select').selectOption(teamId);
  await expect(page.locator('[data-v5-learning-edit-student="'+student+'"]')).toBeAttached();
  const studentForm=page.locator('[data-v5-learning-edit-student="'+student+'"]');
- await page.locator('#v5-learning-students details.v5-learning-edit > summary').click();
- await studentForm.locator('input[name="display_name"]').fill('Renamed Team Student GUI');
+ // Fail at the blocked control (not only at the 120s whole-test timeout).
+ // Keep the actual user click, so we do not conceal a genuine GUI bug.
+ await page.locator('#v5-learning-students details.v5-learning-edit > summary').click({timeout:15000});
+ await expect(studentForm.locator('input[name="display_name"]')).toBeVisible({timeout:15000});
+ await studentForm.locator('input[name="display_name"]').fill('Renamed Team Student GUI',{timeout:15000});
  await studentForm.locator('button[type="submit"]').click();
  await expect(page.locator('#v5-learning-students')).toContainText('Renamed Team Student GUI');
  assert.equal(db("select display_name from public.v5_team_students where id='"+
@@ -901,7 +904,8 @@ test('V5.3 manager safely renames Team student, edits lesson, archives without l
 
  const form=page.locator('[data-v5-learning-edit-lesson="'+lesson+'"]');
  await expect(form).toBeAttached();
- await page.locator('[data-v5-lesson-id="'+lesson+'"] details.v5-learning-edit > summary').click();
+ await page.locator('[data-v5-lesson-id="'+lesson+'"] details.v5-learning-edit > summary').click({timeout:15000});
+ await expect(form.locator('input[name="subject"]')).toBeVisible({timeout:15000});
  const month=await page.evaluate(()=>{
   const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
  });
