@@ -283,6 +283,31 @@ jobs:
         run: |
           set -euo pipefail
           npx playwright test --config tests/e2e/rap12.config.mjs
+      - name: Audit RAP-12 synthetic screenshots before upload
+        if: success()
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,struct
+          folder=Path('tests/e2e/test-results/rap12-e2e-artifacts')
+          assert folder.is_dir(), 'Missing RAP-12 evidence directory'
+          files=[p for p in folder.rglob('*') if p.is_file()]
+          expected=60  # 28 full-page/card + 28 mobile viewport + 4 billing copy
+          assert len(files)==expected, f'Expected {expected} synthetic PNGs, found {len(files)}'
+          widths={'320','375','390','430','1440'}
+          for file in files:
+           assert file.suffix=='.png', f'Non-PNG evidence blocked: {file.name}'
+           assert re.match(r'^(managerA|teacherA|managerB)-(projects|learning|billing)-(320|375|390|430|1440)-',file.name), f'Unexpected screenshot name: {file.name}'
+           with file.open('rb') as stream: head=stream.read(24)
+           assert head[:8]==bytes.fromhex('89504e470d0a1a0a'),f'Invalid PNG signature: {file.name}'
+           width,height=struct.unpack('>II',head[16:24])
+           if '-viewport-' in file.name:
+            expected_width=int(file.name.split('-')[2])
+            assert width==expected_width and height==844,f'Unexpected viewport dimensions: {file.name} ({width}x{height})'
+          assert not list(folder.rglob('trace.zip')), 'Raw Playwright trace must never be uploaded'
+          print(f'RAP12_ARTIFACT_AUDIT PASS png_count={len(files)} synthetic_only=true trace=false')
+          PY
       - name: Upload RAP-12 synthetic-only three-identity screenshots
         if: success()
         uses: actions/upload-artifact@v4
