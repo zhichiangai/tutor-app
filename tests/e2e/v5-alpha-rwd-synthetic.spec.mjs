@@ -147,7 +147,7 @@ async function assertReadableDialog(page,selector,width,buttonSelector){
  await expect(button).toBeVisible();
  // Trial click proves the actual interactive surface can be reached without
  // submitting any synthetic form, rather than only appearing in the DOM.
- await button.click({trial:true});
+ await button.click({trial:true,timeout:10_000});
  mkdirSync(evidenceDir,{recursive:true});
  await page.screenshot({path:join(evidenceDir,
   'v58-teacher-overlay-'+selector.replace(/[^a-z0-9]/gi,'')+'-'+width+'.png'),
@@ -175,7 +175,16 @@ test('synthetic teacher lesson and recurring schedule overlays fit all six viewp
   await assertReadableDialog(page,'#lesson-modal',width,'#lesson-open-editor');
   await page.locator('#lesson-open-editor').click();
   await expect(page.locator('#lesson-teacher-actions')).toBeVisible();
-  await assertReadableDialog(page,'#lesson-modal',width,'#lesson-save');
+  // The shared synthetic fixture may already have receipts from earlier
+  // E2E flows. Payment-locked lessons must block time/amount edits while
+  // keeping the separate learning feedback action accessible.
+  const paymentLocked=await page.locator('#lesson-save').isDisabled();
+  if(paymentLocked){
+   await expect(page.locator('#lesson-save')).toBeDisabled();
+   await expect(page.locator('#lesson-learning-save')).toBeEnabled();
+  }
+  await assertReadableDialog(page,'#lesson-modal',width,
+   paymentLocked?'#lesson-learning-save':'#lesson-save');
   await page.locator('#lesson-modal [data-close="lesson-modal"]').click();
   await expect(page.locator('#lesson-modal')).not.toBeVisible();
 
