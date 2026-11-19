@@ -194,7 +194,7 @@ test('synthetic teacher lesson and recurring schedule overlays fit all six viewp
   await page.locator('#schedule-create-new').click();
   await expect(page.locator('#schedule-editor-fields')).toBeVisible();
   await assertReadableDialog(page,'#schedule-modal',width,'#schedule-save');
-  await page.locator('#schedule-modal [data-close="schedule-modal"]').click();
+  await page.locator('#schedule-modal .close-modal[data-close="schedule-modal"]').click();
   await expect(page.locator('#schedule-modal')).not.toBeVisible();
  }
 });
