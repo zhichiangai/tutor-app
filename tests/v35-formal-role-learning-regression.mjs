@@ -103,6 +103,25 @@ test("parent sees a compact learning row in monthly and pre-payment lists",()=>{
  assert.ok(app.includes("learningPaymentLine(lesson,allocation.available)"));
  assert.ok(css.includes(".learning-payment-line"));
 });
+test("parent billing learning details use an accessible, read-only inline toggle",()=>{
+ const begin=app.indexOf("function learningPaymentLine(");
+ const end=app.indexOf("function renderBilling(){",begin);
+ assert.ok(begin>=0&&end>begin);
+ const row=app.slice(begin,end);
+ assert.ok(row.includes('class="learning-payment-toggle" data-learning-payment-toggle aria-expanded="false"'));
+ assert.ok(row.includes('class="learning-payment-body" hidden'));
+ assert.ok(!row.includes('<summary>'),'Do not regress to inaccessible generic summary text');
+ assert.ok(row.includes("esc(lesson.remarks)"),"Notes must remain HTML-escaped");
+ const clickStart=app.indexOf('const recordToggle=ev.target.closest("[data-learning-payment-toggle]")');
+ const clickEnd=app.indexOf('const star=ev.target.closest("[data-lesson-star]")',clickStart);
+ assert.ok(clickStart>=0&&clickEnd>clickStart);
+ const click=app.slice(clickStart,clickEnd);
+ assert.ok(click.includes('recordToggle.setAttribute("aria-expanded",String(expanded))'));
+ assert.ok(click.includes("content.hidden=!expanded"));
+ assert.ok(!/client\.|persist\(|renderBilling\(/.test(click),"Toggling details must never write or replace billing data");
+ assert.ok(css.includes(".learning-payment-expand .learning-payment-toggle:focus-visible"));
+ assert.ok(css.includes(".learning-payment-body[hidden]{display:none}"));
+});
 test("compact 5-star summary is correct and blank is not rated",()=>{
  const i=app.indexOf("function compactStars(");
  const j=app.indexOf("function learningPaymentLine(",i);
