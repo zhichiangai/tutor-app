@@ -160,8 +160,12 @@ test('synthetic teacher lesson and recurring schedule overlays fit all six viewp
  for(const width of widths){
   await page.setViewportSize({width,height});
   await openReadOnlySection(page,'teacher');
-  // The disposable fixture seeds this lesson on the current local date.
-  const lesson=page.locator('#calendar-grid .calendar-event[data-id="'+fixture.ids.lesson+'"]');
+  // The disposable fixture seeds this lesson on the current Taipei date.
+  // Small calendars intentionally hide lesson chips (<=650px); the readable
+  // daily agenda is the actual mobile entry point for lesson details.
+  await page.locator('#jump-today').click();
+  await expect(page.locator('#calendar-grid .calendar-cell[data-day="'+fixture.day+'"]')).toBeVisible();
+  const lesson=page.locator('#agenda-list .day-lesson-open[data-action="open-lesson"][data-id="'+fixture.ids.lesson+'"]');
   await expect(lesson).toBeVisible();
   await lesson.click();
   await expect(page.locator('#lesson-teacher-readonly')).toBeVisible();
