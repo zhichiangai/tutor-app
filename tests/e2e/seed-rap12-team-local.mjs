@@ -98,8 +98,8 @@ const actors={
  managerB:await createActor('manager-b')
 };
 // Synthetic users only. Never use a Production login identity or service-role key.
-for(const [label,actor] of Object.entries(actors)){
- if(label==='teacherA')continue;
+for(const actor of Object.values(actors)){
+ // Every synthetic teacher has an independent personal workspace. Only A/B managers get Team grants.
  db("insert into public.workspaces(owner_id) values ('"+actor.id+"');");
 }
 db("insert into public.profiles(id,display_name,last_role,enabled_roles,roles_configured) values "+
