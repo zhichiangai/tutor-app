@@ -15,6 +15,7 @@ assert.equal(f.apiUrl,'http://127.0.0.1:54321');
 assert.equal(f.baseUrl,'http://127.0.0.1:3000');
 assert.notEqual(f.actors.managerA.id,f.actors.teacherA.id);
 assert.notEqual(f.actors.managerA.id,f.actors.managerB.id);
+assert.notEqual(f.actors.teacherA.id,f.actors.managerB.id);
 
 async function login(page,role){
  const actor=f.actors[role];
@@ -54,6 +55,9 @@ async function captureTeamEvidence(page,testInfo,role,width,section,cardSelector
  await expect(page.locator('#toast')).toBeHidden({timeout:10000});
  const card=page.locator(cardSelector);
  await expect(card).toBeVisible();
+ // Preserve high-detail full-page/card images at the two baseline widths.
+ // Other mobile widths receive viewport evidence without duplicating huge pages.
+ if(width!==390&&width!==1440)return;
  const filename=role+'-'+section+'-'+width;
  await page.screenshot({path:testInfo.outputPath(filename+'-page.png'),
   fullPage:true,animations:'disabled'});
@@ -66,6 +70,7 @@ async function captureTeamEvidence(page,testInfo,role,width,section,cardSelector
 // This tests reachable geometry; it does not substitute for tap testing.
 async function checkMobileNavClearance(page,testInfo,role,width,section,cardSelector){
  if(width>900)return;
+ await expect(page.locator('#toast')).toBeHidden({timeout:10000});
  const outcome=await page.evaluate(async(selector)=>{
   const nav=document.querySelector('.mobile-nav');
   const card=document.querySelector(selector);
@@ -113,6 +118,46 @@ async function checkMobileNavClearance(page,testInfo,role,width,section,cardSele
  expect(outcome.targetHit,
   'Last visible Team control must not be covered by another DOM element').toBe(true);
 }
+// Billing's final refund disclaimer appears BELOW the last interactive button.
+// Reachability of the button alone cannot prove every line of this copy is
+// readable. Scroll to the document end in a real mobile viewport and check the
+// entire note against fixed navigation; capture one viewport per mobile width.
+async function checkBillingExplanatoryCopy(page,testInfo,width){
+ if(width>900)return;
+ const selector='#v56-adjustments-panel > p.helper-note:last-child';
+ const note=page.locator(selector);
+ await expect(note).toBeVisible();
+ await expect(note).toContainText('銀行');
+ const outcome=await page.evaluate(async(css)=>{
+  const paragraph=document.querySelector(css);
+  const nav=document.querySelector('.mobile-nav');
+  if(!paragraph||!nav)throw new Error('Billing disclaimer/nav unavailable');
+  const root=document.documentElement;
+  const prev=root.style.scrollBehavior;
+  root.style.scrollBehavior='auto';
+  try{
+   window.scrollTo(0,Math.max(0,root.scrollHeight-window.innerHeight));
+   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+   const r=paragraph.getBoundingClientRect();
+   const n=nav.getBoundingClientRect();
+   const x=(r.left+r.right)/2,y=r.bottom-2;
+   const hit=y>=0&&y<window.innerHeight?document.elementFromPoint(x,y):null;
+   return{
+    copyTop:r.top,copyBottom:r.bottom,navTop:n.top,
+    scrollY:window.scrollY,maxScroll:root.scrollHeight-window.innerHeight,
+    fullCopyVisible:r.top>=0&&r.bottom<=n.top-8,
+    bottomLineUncovered:!!hit&&(hit===paragraph||paragraph.contains(hit)),
+    docScrollWidth:root.scrollWidth,docClientWidth:root.clientWidth
+   };
+  }finally{root.style.scrollBehavior=prev}
+ },selector);
+ await page.screenshot({path:testInfo.outputPath('managerA-billing-'+width+'-viewport-copy-end.png'),
+  fullPage:false,animations:'disabled'});
+ console.log('RAP12_BILLING_COPY_CLEARANCE '+JSON.stringify({width,...outcome}));
+ expect(outcome.fullCopyVisible,'All billing disclaimer lines must clear fixed nav').toBe(true);
+ expect(outcome.bottomLineUncovered,'The last billing disclaimer line cannot be overlaid').toBe(true);
+ expect(outcome.docScrollWidth).toBeLessThanOrEqual(outcome.docClientWidth);
+}
 async function inspectManagerA(page,testInfo,width){
  await login(page,'managerA');
  await enterTeam(page);
@@ -131,6 +176,8 @@ async function inspectManagerA(page,testInfo,width){
  await page.locator('#v5-learning-team-select').selectOption(f.ids.teamA);
  await expect(page.locator('#v5-learning-project-select')).toBeVisible();
  await expect(page.locator('#v5-learning-lessons')).toContainText('RAP12 Shared Math');
+ await expect(page.locator('#v5-learning-lessons')).not.toContainText('RAP12 Foreign English');
+ await expect(page.locator('#v5-learning-team-select option[value="'+f.ids.teamB+'"]')).toHaveCount(0);
  await captureTeamEvidence(page,testInfo,'managerA',width,'learning','#v5-learning-card');
  await checkMobileNavClearance(page,testInfo,'managerA',width,'learning','#v5-learning-card');
  await teamSection(page,'billing');
@@ -139,6 +186,7 @@ async function inspectManagerA(page,testInfo,width){
  await expect(page.locator('#v5-billing-confirmed')).toContainText('RAP12 Shared Math');
  await captureTeamEvidence(page,testInfo,'managerA',width,'billing','#v5-billing-card');
  await checkMobileNavClearance(page,testInfo,'managerA',width,'billing','#v5-billing-card');
+ await checkBillingExplanatoryCopy(page,testInfo,width);
  await logout(page);
 }
 async function inspectTeacherA(page,testInfo,width){
@@ -191,11 +239,16 @@ async function inspectManagerB(page,testInfo,width){
   .toHaveCount(1);
  await page.locator('#v5-learning-team-select').selectOption(f.ids.teamB);
  await expect(page.locator('#v5-learning-lessons')).toContainText('RAP12 Foreign English');
+ await expect(page.locator('#v5-learning-lessons')).not.toContainText('RAP12 Shared Math');
+ await expect(page.locator('#v5-learning-lessons')).not.toContainText('RAP12 Private Science');
+ await expect(page.locator('#v5-learning-team-select option[value="'+f.ids.teamA+'"]')).toHaveCount(0);
  await captureTeamEvidence(page,testInfo,'managerB',width,'learning','#v5-learning-card');
  await checkMobileNavClearance(page,testInfo,'managerB',width,'learning','#v5-learning-card');
  await logout(page);
 }
-for(const width of [390,1440]){
+// 320/375/430 cover smaller and larger mobile devices in addition to the
+// existing 390px baseline and 1440px desktop regression.
+for(const width of [320,375,390,430,1440]){
  test('RAP-12 isolated distinct Team manager, assigned teacher and foreign manager '+width+'px',async({browser},testInfo)=>{
   test.setTimeout(150000);
   for(const [role,inspect] of [
