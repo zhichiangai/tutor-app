@@ -18,28 +18,12 @@ assert.notEqual(f.actors.managerA.id,f.actors.managerB.id);
 
 async function login(page,role){
  const actor=f.actors[role];
- await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.js',
-  route=>route.fulfill({
-   path:'node_modules/@supabase/supabase-js/dist/umd/supabase.js',
-   contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}
-  }));
- await page.addInitScript(({url,key})=>{
-  window.V4_LOCAL_BACKEND={
-   environment:'local',isolated:true,projectRef:'local',url,publishableKey:key
-  };
- },{url:f.apiUrl,key:f.anonKey});
- await page.goto('/v2/index.html');
- await page.waitForFunction(()=>Boolean(window.supabase?.createClient),{timeout:20000});
- await page.evaluate(async ({url,key,email,password})=>{
-  const client=window.supabase.createClient(url,key,{
-   auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
-  });
-  const {error}=await client.auth.signInWithPassword({email,password});
-  if(error)throw Error('Disposable-local synthetic sign-in failed');
-  client.auth.stopAutoRefresh?.();
- },{url:f.apiUrl,key:f.anonKey,email:actor.email,password:actor.password});
- await page.evaluate(()=>localStorage.setItem('tutor_v4_explicit_logout','0'));
- await page.reload();
+ // Use the exact same localhost-only role chooser available to Codex IAB.
+ // No browser automation receives a real user password or external OAuth URL.
+ await page.goto('/__rap12/');
+ await expect(page.locator('h1')).toContainText('RAP-12');
+ await page.locator('button[data-role="'+role+'"]').click();
+ await expect(page).toHaveURL(/\/v2\/index\.html/);
  await expect(page.locator('body')).not.toHaveClass(/login-required/);
  await expect(page.locator('#account-current')).toHaveText(actor.email);
 }
