@@ -81,5 +81,5 @@ Codex IAB 打開：http://127.0.0.1:3000/__rap12/
 ## PR #94 追加的安全驗收關卡
 
 - 合成資料 seed 在三個獨立 GoTrue JWT 下，直接透過 PostgREST 測試 `v5_team_billing_overview`：Team A 管理者查 Team B 帳務必須拒絕、Team B 管理者查 Team A 帳務必須拒絕、Team A 一般老師查自己 Team 帳務也必須拒絕；兩個 Team 各自的管理者合法帳務查詢要成功。這是隔離合成環境測試，不是 Production 權限通過證據。
-- CI 即使因非 RAP-12 舊瀏覽器回歸失敗，仍僅在獨立 schema catalog **及** restore probe 都成功的條件下，才建立 RAP-12 fixture／照片；任何前置測試 FAIL 仍讓整體 Workflow FAIL，不能用照片 Artifact 蓋過。
+- CI 即使因非 RAP-12 舊瀏覽器回歸失敗，仍會獨立執行 schema catalog、Migration rollback/atomicity **及** app-owned ACL restore probe。僅當三個安全 Gate 全部成功才可建立 RAP-12 fixture／照片；舊瀏覽器測試 FAIL 仍會使**整體 Workflow FAIL**，不得以個別測試證據覆蓋總結論。
 - CI 的 `rap12-isolated-team-gui` 只上傳 102 張合成 PNG，不上傳 credential fixture、HTML report、Trace 或原始 headers。Production 權限、Migration 63、正式帳號與付款資料維持獨立 Gate。
