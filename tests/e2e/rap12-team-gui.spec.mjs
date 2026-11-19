@@ -47,6 +47,19 @@ async function logout(page){
  await page.locator('#sign-out').click();
  await expect(page.locator('body')).toHaveClass(/login-required/);
 }
+// Screenshots are captured after the workspace-switch toast disappears.
+// Full-page + card crops give Codex contextual and readable synthetic evidence.
+// No Playwright trace, real OAuth, or production credentials are captured.
+async function captureTeamEvidence(page,testInfo,role,width,section,cardSelector){
+ await expect(page.locator('#toast')).toBeHidden({timeout:10000});
+ const card=page.locator(cardSelector);
+ await expect(card).toBeVisible();
+ const filename=role+'-'+section+'-'+width;
+ await page.screenshot({path:testInfo.outputPath(filename+'-page.png'),
+  fullPage:true,animations:'disabled'});
+ await card.screenshot({path:testInfo.outputPath(filename+'-card.png'),
+  animations:'disabled'});
+}
 async function inspectManagerA(page,testInfo,width){
  await login(page,'managerA');
  await enterTeam(page);
@@ -58,15 +71,18 @@ async function inspectManagerA(page,testInfo,width){
  await expect(page.locator('#v5-team-project-list')).toContainText('RAP12 Alpha Shared');
  await expect(page.locator('#v5-team-project-list')).toContainText('RAP12 Alpha Manager Only');
  await expect(page.locator('#v5-team-project-list')).not.toContainText('RAP12 Beta Foreign');
+ await captureTeamEvidence(page,testInfo,'managerA',width,'projects','#v5-team-card');
  await teamSection(page,'learning');
  await expect(page.locator('#v5-learning-manager-controls')).toBeVisible();
  await page.locator('#v5-learning-team-select').selectOption(f.ids.teamA);
  await expect(page.locator('#v5-learning-project-select')).toBeVisible();
+ await expect(page.locator('#v5-learning-lessons')).toContainText('RAP12 Shared Math');
+ await captureTeamEvidence(page,testInfo,'managerA',width,'learning','#v5-learning-card');
  await teamSection(page,'billing');
  await expect(page.locator('#v5-billing-card')).toBeVisible();
  await page.locator('#v5-billing-team-select').selectOption(f.ids.teamA);
  await expect(page.locator('#v5-billing-confirmed')).toContainText('RAP12 Shared Math');
- await page.screenshot({path:testInfo.outputPath('managerA-'+width+'.png'),animations:'disabled'});
+ await captureTeamEvidence(page,testInfo,'managerA',width,'billing','#v5-billing-card');
  await logout(page);
 }
 async function inspectTeacherA(page,testInfo,width){
@@ -79,6 +95,7 @@ async function inspectTeacherA(page,testInfo,width){
  await expect(page.locator('#v5-team-project-list')).toContainText('RAP12 Alpha Shared');
  await expect(page.locator('#v5-team-project-list')).not.toContainText('RAP12 Alpha Manager Only');
  await expect(page.locator('#v5-team-project-list')).not.toContainText('RAP12 Beta Foreign');
+ await captureTeamEvidence(page,testInfo,'teacherA',width,'projects','#v5-team-card');
  await teamSection(page,'learning');
  await expect(page.locator('#v5-learning-manager-controls')).toBeHidden();
  // Team learning options are refreshed asynchronously from RLS-governed API calls.
@@ -93,9 +110,11 @@ async function inspectTeacherA(page,testInfo,width){
  await expect(page.locator('#v5-learning-lessons')).toContainText('RAP12 Shared Math');
  await expect(page.locator('#v5-learning-lessons')).not.toContainText('RAP12 Private Science');
  await expect(page.locator('#v5-learning-lessons')).not.toContainText('RAP12 Foreign English');
+ await captureTeamEvidence(page,testInfo,'teacherA',width,'learning','#v5-learning-card');
  await teamSection(page,'billing');
  await expect(page.locator('#v5-billing-card')).toBeHidden();
- await page.screenshot({path:testInfo.outputPath('teacherA-'+width+'.png'),animations:'disabled'});
+ // The billing card is forbidden and hidden: document this through the
+ // negative assertion, not by capturing an intentionally blank teacher page.
  await logout(page);
 }
 async function inspectManagerB(page,testInfo,width){
@@ -106,7 +125,13 @@ async function inspectManagerB(page,testInfo,width){
  await page.locator('#v5-team-manage-select').selectOption(f.ids.wsB);
  await expect(page.locator('#v5-team-project-list')).toContainText('RAP12 Beta Foreign');
  await expect(page.locator('#v5-team-project-list')).not.toContainText('RAP12 Alpha Shared');
- await page.screenshot({path:testInfo.outputPath('managerB-'+width+'.png'),animations:'disabled'});
+ await captureTeamEvidence(page,testInfo,'managerB',width,'projects','#v5-team-card');
+ await teamSection(page,'learning');
+ await expect(page.locator('#v5-learning-team-select option[value="'+f.ids.teamB+'"]'))
+  .toHaveCount(1);
+ await page.locator('#v5-learning-team-select').selectOption(f.ids.teamB);
+ await expect(page.locator('#v5-learning-lessons')).toContainText('RAP12 Foreign English');
+ await captureTeamEvidence(page,testInfo,'managerB',width,'learning','#v5-learning-card');
  await logout(page);
 }
 for(const width of [390,1440]){
