@@ -300,11 +300,17 @@ jobs:
           folder=Path('tests/e2e/test-results/rap12-e2e-artifacts')
           assert folder.is_dir(), 'Missing RAP-12 evidence directory'
           files=[p for p in folder.rglob('*') if p.is_file()]
+          pngs=[p for p in files if p.suffix=='.png']
+          # Playwright writes its own hidden .last-run.json into outputDir;
+          # this is runner metadata, NEVER included in the uploaded PNG glob.
+          metadata=[p for p in files if p.suffix!='.png']
+          unexpected=[p for p in metadata if p.name!='.last-run.json']
+          assert not unexpected,f'Unexpected non-PNG evidence: {[p.name for p in unexpected]}'
+          assert len(metadata)<=1,f'Unexpected runner metadata count: {len(metadata)}'
           expected=60  # 28 full-page/card + 28 mobile viewport + 4 billing copy
-          assert len(files)==expected, f'Expected {expected} synthetic PNGs, found {len(files)}'
+          assert len(pngs)==expected, f'Expected {expected} synthetic PNGs, found {len(pngs)}'
           widths={'320','375','390','430','1440'}
-          for file in files:
-           assert file.suffix=='.png', f'Non-PNG evidence blocked: {file.name}'
+          for file in pngs:
            assert re.match(r'^(managerA|teacherA|managerB)-(projects|learning|billing)-(320|375|390|430|1440)-',file.name), f'Unexpected screenshot name: {file.name}'
            with file.open('rb') as stream: head=stream.read(24)
            assert head[:8]==bytes.fromhex('89504e470d0a1a0a'),f'Invalid PNG signature: {file.name}'
@@ -313,14 +319,16 @@ jobs:
             expected_width=int(file.name.split('-')[2])
             assert width==expected_width and height==844,f'Unexpected viewport dimensions: {file.name} ({width}x{height})'
           assert not list(folder.rglob('trace.zip')), 'Raw Playwright trace must never be uploaded'
-          print(f'RAP12_ARTIFACT_AUDIT PASS png_count={len(files)} synthetic_only=true trace=false')
+          print(f'RAP12_ARTIFACT_AUDIT PASS png_count={len(pngs)} runner_metadata={len(metadata)} png_only_upload=true trace=false')
           PY
       - name: Upload RAP-12 synthetic-only three-identity screenshots
         if: ${{ always() && steps.rap12_artifact_audit.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: rap12-isolated-team-gui
-          path: tests/e2e/test-results/rap12-e2e-artifacts/
+          # Explicit PNG-only glob: do not upload the runner's .last-run.json,
+          # HTML reports, logs, tokens or Playwright traces.
+          path: tests/e2e/test-results/rap12-e2e-artifacts/**/*.png
           retention-days: 7
           if-no-files-found: error
       - name: Upload synthetic-only V5 Alpha multi-role RWD evidence
