@@ -251,9 +251,14 @@ jobs:
       - name: Verify real Chromium teacher-parent-student flows
         run: npx playwright test --config tests/e2e/playwright.config.mjs
       - name: Verify failed migration rollback, retry and idempotency
+        id: v5_atomicity_probe
+        # A flaky pre-existing Chromium flow must not suppress independent
+        # isolated migration/restore gates. Both must still pass for RAP-12.
+        if: ${{ always() && steps.v5_catalog_probe.outcome == 'success' }}
         run: bash tests/local/v5-migration-atomicity-smoke.sh
       - name: Rehearse strict app-owned ACL restore with platform owner limitations disclosed
         id: v5_restore_probe
+        if: ${{ always() && steps.v5_catalog_probe.outcome == 'success' }}
         continue-on-error: true
         run: bash tests/local/v5-disposable-backup-restore-smoke.sh
       - name: Enforce V5 schema catalog and application-scope restore probes
@@ -267,6 +272,91 @@ jobs:
             echo "::error::Synthetic application-owned schema/ACL restore failed or was skipped"
             exit 1
           }
+      - name: Prepare RAP-12 disposable three-account Team GUI fixture
+        id: rap12_fixture
+        # A pre-existing browser regression must not hide RAP-12 evidence.
+        # But the disposable schema, atomic migration and ACL restore probes
+        # must ALL succeed; an unrelated browser failure still fails this job.
+        if: ${{ always() && steps.v5_catalog_probe.outcome == 'success' && steps.v5_atomicity_probe.outcome == 'success' && steps.v5_restore_probe.outcome == 'success' }}
+        env:
+          RAP12_TEAM_GUI_LOCAL: '1'
+          RAP12_FIXTURE_FILE: /tmp/rap12-team-gui-fixture.json
+        run: |
+          set -euo pipefail
+          test "$V4_E2E_LOCAL" = "1"
+          test ! -f supabase/.temp/project-ref
+          node tests/e2e/seed-rap12-team-local.mjs
+      - name: Verify RAP-12 true manager/teacher/foreign Team GUI and RLS
+        id: rap12_gui
+        if: ${{ always() && steps.rap12_fixture.outcome == 'success' }}
+        env:
+          RAP12_TEAM_GUI_LOCAL: '1'
+          RAP12_FIXTURE_FILE: /tmp/rap12-team-gui-fixture.json
+        run: |
+          set -euo pipefail
+          npx playwright test --config tests/e2e/rap12.config.mjs
+      - name: Audit RAP-12 synthetic screenshots before upload
+        id: rap12_artifact_audit
+        if: ${{ always() && steps.rap12_gui.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,struct
+          folder=Path('tests/e2e/test-results/rap12-e2e-artifacts')
+          assert folder.is_dir(), 'Missing RAP-12 evidence directory'
+          files=[p for p in folder.rglob('*') if p.is_file()]
+          pngs=[p for p in files if p.suffix=='.png']
+          # Playwright writes its own hidden .last-run.json into outputDir;
+          # this is runner metadata, NEVER included in the uploaded PNG glob.
+          metadata=[p for p in files if p.suffix!='.png']
+          unexpected=[p for p in metadata if p.name!='.last-run.json']
+          assert not unexpected,f'Unexpected non-PNG evidence: {[p.name for p in unexpected]}'
+          assert len(metadata)<=1,f'Unexpected runner metadata count: {len(metadata)}'
+          # Seven allowed Team scenes x five widths x page/card (70).
+          # Four phone widths x seven bottom viewports (28) + four billing notes.
+          scenes=('managerA-projects','managerA-learning','managerA-billing',
+                  'teacherA-projects','teacherA-learning',
+                  'managerB-projects','managerB-learning')
+          widths=(320,375,390,430,1440)
+          mobile=(320,375,390,430)
+          allowed={f'{scene}-{width}-{kind}.png'
+                   for scene in scenes for width in widths for kind in ('page','card')}
+          allowed.update(f'{scene}-{width}-viewport-bottom.png'
+                         for scene in scenes for width in mobile)
+          allowed.update(f'managerA-billing-{width}-viewport-copy-end.png'
+                         for width in mobile)
+          expected=102
+          assert len(allowed)==expected,'RAP-12 expected screenshot matrix is inconsistent'
+          names=[p.name for p in pngs]
+          assert len(pngs)==expected, f'Expected {expected} synthetic PNGs, found {len(pngs)}'
+          assert len(set(names))==expected,'Duplicate RAP-12 PNG filenames are forbidden'
+          assert set(names)==allowed, (
+           f'RAP-12 screenshot matrix mismatch, missing={sorted(allowed-set(names))}, '
+           f'extra={sorted(set(names)-allowed)}')
+          for file in pngs:
+           with file.open('rb') as stream: head=stream.read(24)
+           assert head[:8]==bytes.fromhex('89504e470d0a1a0a'),f'Invalid PNG signature: {file.name}'
+           width,height=struct.unpack('>II',head[16:24])
+           expected_width=int(file.name.split('-')[2])
+           assert width>0 and height>0, f'Empty PNG geometry: {file.name}'
+           if '-viewport-' in file.name:
+            assert width==expected_width and height==844,f'Unexpected viewport dimensions: {file.name} ({width}x{height})'
+           elif file.name.endswith('-page.png'):
+            assert width==expected_width and height>=844,f'Unexpected full-page dimensions: {file.name} ({width}x{height})'
+          assert not list(folder.rglob('trace.zip')), 'Raw Playwright trace must never be uploaded'
+          print(f'RAP12_ARTIFACT_AUDIT PASS png_count={len(pngs)} runner_metadata={len(metadata)} png_only_upload=true trace=false')
+          PY
+      - name: Upload RAP-12 synthetic-only three-identity screenshots
+        if: ${{ always() && steps.rap12_artifact_audit.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: rap12-isolated-team-gui
+          # Explicit PNG-only glob: do not upload the runner's .last-run.json,
+          # HTML reports, logs, tokens or Playwright traces.
+          path: tests/e2e/test-results/rap12-e2e-artifacts/**/*.png
+          retention-days: 7
+          if-no-files-found: error
       - name: Upload synthetic-only V5 Alpha multi-role RWD evidence
         if: success()
         uses: actions/upload-artifact@v4
@@ -277,7 +367,7 @@ jobs:
           if-no-files-found: error
       - name: Remove ephemeral auth fixture
         if: always()
-        run: rm -f "$V4_E2E_FIXTURE_FILE"
+        run: rm -f "$V4_E2E_FIXTURE_FILE" /tmp/rap12-team-gui-fixture.json
       - name: Upload sanitized failure screenshots and report
         if: failure()
         uses: actions/upload-artifact@v4
