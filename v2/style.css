@@ -418,10 +418,10 @@
 .settings-role-disclosure[open] > form{display:grid;gap:14px}
 .learning-payment-content{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
 .learning-payment-expand{margin-top:4px;font-size:11px;color:#886c59}
-.learning-payment-expand summary{cursor:pointer;list-style:none;text-decoration:underline;text-underline-offset:3px}
-.learning-payment-expand summary::-webkit-details-marker{display:none}
-.learning-payment-expand[open]{padding:6px 0}
-.learning-payment-expand div{margin-top:8px;padding:9px 11px;background:#faf7f3;border-radius:8px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
+.learning-payment-expand .learning-payment-toggle{display:inline-flex;align-items:center;min-height:44px;border:0;padding:6px 0;background:transparent;color:inherit;font:inherit;text-align:left;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.learning-payment-expand .learning-payment-toggle:focus-visible{outline:2px solid #a45c4e;outline-offset:2px;border-radius:4px}
+.learning-payment-expand .learning-payment-body{margin-top:4px;padding:9px 11px;background:#faf7f3;border-radius:8px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
+.learning-payment-expand .learning-payment-body[hidden]{display:none}
 
 /* V3.5.2: five reachable stars per row on narrow touch devices. */
 @media (max-width:420px){
