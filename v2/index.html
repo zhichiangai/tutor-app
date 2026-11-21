@@ -461,8 +461,8 @@
                 <p class="helper-note">「登記人工退款已完成」必須在銀行／現金退款實際完成後操作；系統沒有直接驗證銀行轉帳。</p>
               </section>
             </article>
-            <article class="card settings-card"><h3>登入與安全</h3><p class="section-sub">使用 Google 管理登入，不會在網站儲存你的 Google 密碼。</p>
-              <button class="secondary-button wide" id="sign-out" type="button">登出 Google 帳號</button>
+            <article class="card settings-card"><h3>登入與安全</h3><p class="section-sub">支援 Google 或 Email／密碼登入，密碼交由 Supabase Auth 驗證。</p>
+              <button class="secondary-button wide" id="sign-out" type="button">登出目前帳號</button>
             </article>
           </div>
         </section>
@@ -717,6 +717,14 @@
         <div><strong id="login-progress-title">正在為你準備課程</strong><p id="login-progress-copy">稍等一下，馬上就能看到你的安排。</p></div>
       </div>
       <button class="google-button" id="google-login" type="button"><span class="google-g" aria-hidden="true">G</span>使用 Google 帳號繼續</button>
+      <div class="login-divider" aria-hidden="true"><span>或使用 Email 登入</span></div>
+      <form id="email-login-form" class="email-login-form" autocomplete="on">
+        <label for="email-login-email">電子郵件<input id="email-login-email" name="email" type="email" autocomplete="username" inputmode="email" maxlength="254" required placeholder="輸入已建立的帳號 Email"></label>
+        <label for="email-login-password">密碼<input id="email-login-password" name="password" type="password" autocomplete="current-password" minlength="8" required placeholder="輸入密碼"></label>
+        <button class="primary-button" id="email-login-submit" type="submit">使用 Email 登入</button>
+        <p id="email-login-error" class="email-login-error" role="alert" hidden></p>
+        <p class="email-login-hint">目前僅供已有帳號登入；不開放直接註冊。若需要建立帳號，請聯絡管理員。</p>
+      </form>
       <button class="secondary-button wide" id="login-retry" type="button" hidden>再試一次</button>
       <button class="secondary-button wide" id="login-preview-dismiss" type="button" hidden>查看無資料的預覽畫面</button>
       <p class="login-helper" id="login-help">第一次使用？老師先建立自己的教學空間，再新增學生；家長和學生收到老師邀請後，就能查看自己的課程。</p>
