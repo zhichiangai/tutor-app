@@ -491,7 +491,7 @@ test('parent signout clears account data before switching to student in same bro
  await expect(page.locator('#view-settings')).toBeVisible();
  await page.locator('#sign-out').click();
  await expect(page.locator('body')).toHaveClass(/login-required/);
- await expect(page.locator('#account-current')).toContainText('尚未使用 Google 登入');
+ await expect(page.locator('#account-current')).toContainText('尚未登入');
  await expect(page.locator('#student-grid')).not.toContainText('CI Student');
  await expect(page.locator('#v4-connection-content')).toBeEmpty();
  await expect(page.locator('#billing-summary')).not.toContainText('NT$ 1,000');
@@ -525,7 +525,7 @@ test('logout gate cannot be dismissed or reveal cached account data for parent a
  await page.locator('.side-nav .nav-standard[data-view="settings"]').click();
  await expect(page.locator('#view-settings')).toBeVisible();
  await page.locator('#sign-out').click();
- await expect(page.locator('#toast')).toContainText('已登出 Google 帳號');
+ await expect(page.locator('#toast')).toContainText('已登出帳號');
  await assertLockedGate();
  await page.reload();
  await assertLockedGate();
@@ -535,7 +535,7 @@ test('logout gate cannot be dismissed or reveal cached account data for parent a
  await expect(page.locator('#student-today-content')).not.toBeEmpty();
  await page.locator('.mobile-nav .nav-student[data-view="settings"]').click();
  await page.locator('#sign-out').click();
- await expect(page.locator('#toast')).toContainText('已登出 Google 帳號');
+ await expect(page.locator('#toast')).toContainText('已登出帳號');
  await assertLockedGate();
  await expect(page.locator('#student-today-content')).toBeEmpty();
  await page.reload();

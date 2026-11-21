@@ -1039,3 +1039,14 @@ body.preview-readonly.preview-team-shell #view-settings .settings-grid{display:n
 .v56-family-project{display:grid;gap:6px;margin-top:12px;padding:11px 12px;border-radius:10px;background:#faf7f3;min-width:0}
 .v56-family-project>strong{font-size:13px;overflow-wrap:anywhere}
 .v56-family-project>span{display:block;overflow-wrap:anywhere}
+
+/* RAP-48: existing-account Email/password alongside Google OAuth. */
+.login-divider{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:11px;text-align:center}
+.login-divider::before,.login-divider::after{content:"";height:1px;background:var(--border);flex:1}
+.email-login-form{display:grid;gap:12px;min-width:0}
+.email-login-form label{display:grid;gap:6px;color:var(--ink);font-size:12px;font-weight:600}
+.email-login-form input{width:100%;min-width:0;border:1px solid #ddd4ca;border-radius:10px;padding:12px 13px;background:#fff;color:var(--ink);font:inherit}
+.email-login-form button{width:100%;min-height:44px}
+.email-login-hint{margin:0;font-size:11px;color:var(--muted);line-height:1.6}
+.email-login-error{margin:0;font-size:12px;color:#af392e;line-height:1.5}
+.email-login-form[hidden]{display:none!important}
