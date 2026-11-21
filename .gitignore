@@ -3,3 +3,7 @@
 note/
 策略MD合集/
 
+# RAP-48: local QA identities and passwords cannot enter source control.
+/TEST_ACCOUNT_ROLES.md
+/QA_ACCOUNT_SECRETS.md
+/.qa-secrets/
