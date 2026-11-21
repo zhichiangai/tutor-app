@@ -694,7 +694,8 @@ function renderAuthUI(){
   oauthFailed?oauthCallbackIssue:
   "老師安排課程、家長了解孩子的學習、學生回顧每次進步。從這裡開始就好。";
  $("#login-progress").hidden=!waiting;
- $("#google-login").hidden=waiting||failed;
+ $("#google-login").hidden=waiting||failed||previewUnavailable;
+ $("#email-login-form").hidden=waiting||failed||previewUnavailable;
  $("#login-retry").hidden=!failed||previewUnavailable;
  $("#login-preview-dismiss").hidden=!previewUnavailable;
  $("#login-help").hidden=waiting||failed;
@@ -741,9 +742,9 @@ function render(){
   activeUser?"<i></i> 已登入":"<i></i> 尚未登入";
  renderAuthUI();
  $("#account-label").textContent=identity;
- $("#account-subtitle").textContent=authPhase==="checking"?"正在確認登入身分":identified?ROLE_TITLE[role]:"使用 Google 登入";
+ $("#account-subtitle").textContent=authPhase==="checking"?"正在確認登入身分":identified?ROLE_TITLE[role]:"尚未登入";
  $("#avatar").textContent=identity.slice(0,1);
- $("#account-current").textContent=identified?activeUser.email:"尚未使用 Google 登入";
+ $("#account-current").textContent=identified?activeUser.email:"尚未登入";
  if(document.activeElement!==$("#profile-display-name"))$("#profile-display-name").value=state.mode==="live"&&identified?userDisplayName():"";
  $("#profile-display-form").classList.toggle("hidden",!activeUser);
  renderRoleSettings();
@@ -3066,6 +3067,40 @@ async function initializeLive(){
   showModal("account-modal");
  }
 }
+// Existing-account Email/password sign-in. Supabase Auth verifies passwords.
+let emailLoginBusy=false;
+async function emailPasswordLogin(event){
+ event.preventDefault();
+ if(emailLoginBusy||authPhase==="checking"||authPhase==="ready")return;
+ const emailInput=$("#email-login-email"),passwordInput=$("#email-login-password");
+ const status=$("#email-login-error"),button=$("#email-login-submit");
+ const email=emailInput.value.trim().toLowerCase(),password=passwordInput.value;
+ status.hidden=true;status.textContent="";
+ if(!email||!password){status.textContent="請輸入 Email 和密碼。";status.hidden=false;return}
+ emailLoginBusy=true;button.disabled=true;
+ try{
+  const db=await ensureClient();
+  // A deliberate login unlocks the explicit-logout gate for either provider.
+  allowGoogleLogin();signOutRequested=false;oauthCallbackIssue="";
+  authPhase="checking";renderAuthUI();
+  const {data,error}=await db.auth.signInWithPassword({email,password});
+  if(error||!data?.session?.user)throw new Error("invalid_credentials");
+  passwordInput.value="";
+  state.mode="live";localStorage.setItem(MODE_STORAGE,"live");
+  // Password login obtains a session without OAuth redirect: reuse role/RLS bootstrap.
+  await initializeLive();
+ }catch{
+  passwordInput.value="";
+  markLogout();activeUser=null;clearUserSessionState();
+  authPhase="signedOut";render();
+  status.textContent="登入未完成，請確認 Email、密碼與帳號驗證狀態。";
+  status.hidden=false;
+  showModal("account-modal");
+ }finally{
+  passwordInput.value="";
+  emailLoginBusy=false;button.disabled=false;
+ }
+}
 async function googleLogin(){
  try{
   allowGoogleLogin();
@@ -3103,7 +3138,7 @@ async function signOut(){
    const {error}=await db.auth.signOut();
    if(error)throw error;
   }
-  toast("已登出 Google 帳號");
+  toast("已登出帳號");
  }catch(err){
   if(err?.name==="AuthSessionMissingError"){
    toast("此裝置已清除登入狀態，請重新使用 Google 登入");
@@ -3360,6 +3395,7 @@ function bindEvents(){
  $("#profile-button").onclick=()=>activeUser?(isTeamWorkspace()?setTeamSection("settings"):setView("settings")):showModal("account-modal");
  $("#account-action").onclick=()=>activeUser?(isTeamWorkspace()?setTeamSection("settings"):setView("settings")):showModal("account-modal");
  $("#google-login").onclick=googleLogin;
+ $("#email-login-form").addEventListener("submit",emailPasswordLogin);
  $("#login-retry").onclick=initializeLive;
  $("#login-preview-dismiss").onclick=()=>{if(!previewBackendUnavailable())return;enterPreviewReadOnly();closeModal("account-modal")};
  $("#preview-personal-shell").onclick=()=>selectPreviewShellMode("personal");
