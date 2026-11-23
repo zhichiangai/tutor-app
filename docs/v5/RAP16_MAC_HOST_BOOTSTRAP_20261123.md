@@ -1,5 +1,7 @@
 # RAP-16｜Mac 主機備份工具準備（2026-11-23）
 
+> **2026-11-23 雲端方案更新：本文件改為選用的 Mac 備援手冊，不再是正式備份 G0 的必要前置。** 正式方向請以 [GitHub Actions Cloud-First 備份候選](RAP16_CLOUD_BACKUP_ACTIONS_CANDIDATE_20261123.md) 為準；無須要求 Codex 安裝 PG17 或啟動 Docker。下面原有 Mac 工具步驟只供使用者日後*主動選擇*本機備援時參考。尚未獲授權的 Production dump／Migration／部署仍全部禁止。
+
 > 狀態：**HOST TOOLING BLOCKED / NO PRODUCTION DATABASE ACCESS**。  
 > 本文件只解除 Codex 2026-11-23 回報的執行環境阻礙；不是正式資料庫匯出、還原、Migration 63/64 或正式部署授權。
 
