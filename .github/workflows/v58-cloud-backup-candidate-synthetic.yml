@@ -7,6 +7,8 @@ on:
     paths:
       - '.github/workflows/v58-cloud-backup-candidate-synthetic.yml'
       - 'tests/v58-cloud-backup-candidate-policy.test.mjs'
+      - 'scripts/release/v58-gdrive-ciphertext-transport.mjs'
+      - 'tests/v58-gdrive-ciphertext-transport.test.mjs'
       - 'tests/local/v58-gdrive-encrypted-backup-poc.sh'
       - 'docs/v5/RAP16_CLOUD_BACKUP_ACTIONS_CANDIDATE_20261123.md'
   workflow_dispatch:
@@ -41,7 +43,7 @@ jobs:
       - name: Inspect no-production / no-secret contract
         run: |
           set -euo pipefail
-          node --test tests/v58-cloud-backup-candidate-policy.test.mjs
+          node --test tests/v58-cloud-backup-candidate-policy.test.mjs tests/v58-gdrive-ciphertext-transport.test.mjs
           bash -n tests/local/v58-gdrive-encrypted-backup-poc.sh
       - name: Install age for throwaway synthetic encryption only
         run: |
