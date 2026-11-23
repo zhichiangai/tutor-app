@@ -164,11 +164,12 @@ BEGIN
  SELECT lower(email) INTO v_email FROM auth.users
  WHERE id=v_actor AND email_confirmed_at IS NOT NULL;
  IF v_email IS NULL THEN RAISE EXCEPTION '請先驗證電子郵件' USING errcode='42501'; END IF;
+ -- Read the Team key first without a row lock, then lock the Team.
+ -- Invite replacement also locks Team before invitation; use one lock order
+ -- to prevent invite/accept deadlocks. Re-read the invite FOR UPDATE below.
  SELECT * INTO v_invite FROM tutor_private.v5_team_student_auth_invitations
- WHERE id=p_invitation_id FOR UPDATE;
+ WHERE id=p_invitation_id;
  IF NOT FOUND OR v_invite.recipient_email<>v_email
-  OR v_invite.accepted_at IS NOT NULL OR v_invite.revoked_at IS NOT NULL
-  OR v_invite.expires_at<=now()
  THEN RAISE EXCEPTION '邀請不存在、非本人或已失效' USING errcode='42501'; END IF;
  PERFORM 1 FROM public.v5_teams t
  JOIN public.v5_workspace_entitlements e ON e.workspace_id=t.anchor_workspace_id
@@ -176,6 +177,12 @@ BEGIN
  WHERE t.id=v_invite.team_id AND e.plan_code='team' AND NOT s.is_archived
  FOR UPDATE OF t;
  IF NOT FOUND THEN RAISE EXCEPTION 'Team 或學生已失效' USING errcode='42501'; END IF;
+ SELECT * INTO v_invite FROM tutor_private.v5_team_student_auth_invitations
+ WHERE id=p_invitation_id FOR UPDATE;
+ IF NOT FOUND OR v_invite.recipient_email<>v_email
+  OR v_invite.accepted_at IS NOT NULL OR v_invite.revoked_at IS NOT NULL
+  OR v_invite.expires_at<=now()
+ THEN RAISE EXCEPTION '邀請不存在、非本人或已失效' USING errcode='42501'; END IF;
  IF EXISTS(SELECT 1 FROM tutor_private.v5_team_student_auth_links l
   WHERE l.revoked_at IS NULL AND l.team_id=v_invite.team_id
     AND (l.student_id=v_invite.student_id OR l.auth_user_id=v_actor))
