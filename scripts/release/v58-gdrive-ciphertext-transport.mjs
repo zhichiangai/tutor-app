@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {createReadStream,createWriteStream,lstatSync,openSync,readSync,closeSync,existsSync,realpathSync} from 'node:fs';
 import {pipeline} from 'node:stream/promises';
-import {Readable} from 'node:stream';
+import {Readable,Transform} from 'node:stream';
 import {dirname,isAbsolute,resolve,relative,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -44,7 +44,7 @@ function assertAgeFile(p){
 function assertUrl(location){
   const u=new URL(location);
   assert.ok(u.protocol==='https:'&&u.hostname==='www.googleapis.com'&&
-    u.pathname.startsWith('/upload/drive/v3/files'),'Unsafe Drive upload session URL');
+    u.pathname==='/upload/drive/v3/files','Unsafe Drive upload session URL');
   return u.toString();
 }
 export async function uploadAndVerifyCiphertext({
@@ -113,7 +113,13 @@ export async function uploadAndVerifyCiphertext({
     });
   if(!download.ok||!download.body)throw new Error('Drive readback failed');
   // The destination is a private, caller-owned ephemeral directory. Never overwrite.
-  await pipeline(Readable.fromWeb(download.body),
+  let received=0;
+  const limit=new Transform({transform(chunk,_encoding,callback){
+    received+=chunk.length;
+    if(received>bytes || received>MAX_BYTES)callback(new Error('Drive readback exceeds declared size'));
+    else callback(null,chunk);
+  }});
+  await pipeline(Readable.fromWeb(download.body),limit,
     createWriteStream(downloadPath,{flags:'wx',mode:0o600}));
   const actualBytes=assertAgeFile(downloadPath);
   if(actualBytes!==bytes||await hashFile(downloadPath)!==expected){
@@ -155,7 +161,9 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
         clientSecret:process.env.GDRIVE_CLIENT_SECRET,
         refreshToken:process.env.GDRIVE_REFRESH_TOKEN}
     });
-    process.stdout.write(JSON.stringify(result)+'\n');
+    // Never expose opaque Drive file IDs in public Actions logs.
+    const {drive_id: _privateFileId,...publicStatus}=result;
+    process.stdout.write(JSON.stringify({...publicStatus,drive_file_created:true})+'\n');
   }catch{
     process.stderr.write('NO_GO: protected age ciphertext Drive transport failed; no secrets emitted\n');
     process.exitCode=2;
