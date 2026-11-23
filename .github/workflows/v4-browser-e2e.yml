@@ -367,6 +367,40 @@ jobs:
           assert not list(folder.rglob('trace.zip')), 'Raw Playwright trace must never be uploaded'
           print(f'RAP12_ARTIFACT_AUDIT PASS png_count={len(pngs)} runner_metadata={len(metadata)} png_only_upload=true trace=false')
           PY
+      - name: Verify RAP-49 Chromium Team student D/E/H GUI and first invitation acceptance
+        id: rap49_gui
+        if: ${{ always() && steps.rap12_artifact_audit.outcome == 'success' }}
+        env:
+          RAP12_TEAM_GUI_LOCAL: '1'
+          RAP49_STUDENT_LOCAL: '1'
+          RAP12_FIXTURE_FILE: /tmp/rap12-team-gui-fixture.json
+        run: |
+          set -euo pipefail
+          npx playwright test --config tests/e2e/rap49.config.mjs
+      - name: Audit and upload RAP-49 synthetic-only screenshots
+        if: ${{ always() && steps.rap49_gui.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('tests/e2e/test-results/rap49-e2e-artifacts')
+          expected={'studentA1-390.png','studentA1-1440.png',
+                    'studentA2-390.png','studentA2-1440.png',
+                    'studentB-first-accept-390.png','studentB-1440.png'}
+          images={p.name for p in root.rglob('*.png')}
+          assert images==expected,(images,expected)
+          assert not list(root.rglob('trace.zip'))
+          for name in expected:
+           with (root/name).open('rb') as f: assert f.read(8)==bytes.fromhex('89504e470d0a1a0a')
+          print('RAP49_GUI_SCREENSHOT_AUDIT PASS synthetic_only=6 production=0')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && steps.rap49_gui.outcome == 'success' }}
+        with:
+          name: rap49-isolated-student-gui
+          path: tests/e2e/test-results/rap49-e2e-artifacts/**/*.png
+          retention-days: 7
+          if-no-files-found: error
       - name: Upload RAP-12 synthetic-only three-identity screenshots
         if: ${{ always() && steps.rap12_artifact_audit.outcome == 'success' }}
         uses: actions/upload-artifact@v4
