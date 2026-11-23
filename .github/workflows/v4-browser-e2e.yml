@@ -286,9 +286,29 @@ jobs:
           test "$V4_E2E_LOCAL" = "1"
           test ! -f supabase/.temp/project-ref
           node tests/e2e/seed-rap12-team-local.mjs
+      - name: Apply RAP-49 candidate to disposable local DB (never hosted)
+        id: rap49_migration
+        if: ${{ always() && steps.rap12_fixture.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          test "$V4_E2E_LOCAL" = "1"
+          test ! -f supabase/.temp/project-ref
+          grep -qx 'project_id = "tutor_v4_isolated"' supabase/config.toml
+          test -f supabase/candidates/20261123010000_v5_9_team_student_auth_links.sql
+          docker exec -i supabase_db_tutor_v4_isolated psql -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/candidates/20261123010000_v5_9_team_student_auth_links.sql
+      - name: Verify RAP-49 eight actual local GoTrue JWTs, own lessons and student revocation
+        id: rap49_jwt
+        if: ${{ always() && steps.rap49_migration.outcome == 'success' }}
+        env:
+          RAP12_TEAM_GUI_LOCAL: '1'
+          RAP49_STUDENT_LOCAL: '1'
+          RAP12_FIXTURE_FILE: /tmp/rap12-team-gui-fixture.json
+        run: |
+          set -euo pipefail
+          node tests/e2e/verify-rap49-team-student-local.mjs
       - name: Verify RAP-12 true manager/teacher/foreign Team GUI and RLS
         id: rap12_gui
-        if: ${{ always() && steps.rap12_fixture.outcome == 'success' }}
+        if: ${{ always() && steps.rap49_jwt.outcome == 'success' }}
         env:
           RAP12_TEAM_GUI_LOCAL: '1'
           RAP12_FIXTURE_FILE: /tmp/rap12-team-gui-fixture.json
