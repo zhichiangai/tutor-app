@@ -984,7 +984,7 @@ body.preview-readonly .app-shell [aria-disabled="true"]{cursor:not-allowed}
 .teacher-team-workspace #view-settings #workspace-account,
 .teacher-team-workspace #view-settings #v5-plan-card{display:none!important}
 .teacher-team-workspace.team-section-projects #view-settings .settings-grid > :not(#v5-team-card):not(#team-workspace-intro){display:none!important}
-.teacher-team-workspace.team-section-learning #view-settings .settings-grid > :not(#v5-learning-card):not(#team-workspace-intro){display:none!important}
+.teacher-team-workspace.team-section-learning #view-settings .settings-grid > :not(#v5-learning-card):not(#v5-student-auth-admin-card):not(#team-workspace-intro){display:none!important}
 .teacher-team-workspace.team-section-billing #view-settings .settings-grid > :not(#v5-billing-card):not(#team-workspace-intro){display:none!important}
 .teacher-team-workspace.team-section-settings #view-settings #v5-team-card,
 .teacher-team-workspace.team-section-settings #view-settings #v5-learning-card,
