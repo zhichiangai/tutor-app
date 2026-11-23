@@ -56,6 +56,21 @@ jobs:
           node scripts/release/v58-cloud-production-gate.mjs
           node --test tests/v58-cloud-production-gate.test.mjs tests/v58-cloud-pgpass.test.mjs tests/v58-gdrive-ciphertext-transport.test.mjs
           bash -n scripts/release/v58-cloud-production-backup-once.sh
+      - name: Verify PostgreSQL 17 client and age BEFORE loading credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          export PATH="/usr/lib/postgresql/17/bin:$PATH"
+          for cmd in pg_dump pg_dumpall pg_restore; do
+            command -v "$cmd" >/dev/null
+            "$cmd" --version | grep -Eq '17[.]'
+          done
+          if ! command -v age >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq age >/dev/null
+          fi
+          age --version
       - name: Prepare private one-run scratch directory
         shell: bash
         run: |
