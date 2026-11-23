@@ -95,16 +95,24 @@ async function forbid(token,method,path,body){
 const actors={
  managerA:await createActor('manager-a'),
  teacherA:await createActor('teacher-a'),
- managerB:await createActor('manager-b')
+ unassignedA:await createActor('unassigned-a'),
+ studentA1:await createActor('student-a1'),
+ studentA2:await createActor('student-a2'),
+ managerB:await createActor('manager-b'),
+ teacherB:await createActor('teacher-b'),
+ studentB:await createActor('student-b')
 };
 // Synthetic users only. Never use a Production login identity or service-role key.
-for(const actor of Object.values(actors)){
- // Every synthetic teacher has an independent personal workspace. Only A/B managers get Team grants.
+for(const actor of [actors.managerA,actors.teacherA,actors.managerB]){
+ // Preserve existing synthetic GUI actors' workspaces; new students and unassigned teachers get none.
  db("insert into public.workspaces(owner_id) values ('"+actor.id+"');");
 }
 db("insert into public.profiles(id,display_name,last_role,enabled_roles,roles_configured) values "+
- Object.entries(actors).map(([label,a])=>"('"+a.id+"','RAP12 "+label+
-  "','teacher',array['teacher']::text[],true)").join(',')+
+ Object.entries(actors).map(([label,a])=>{
+  const role=label.startsWith('student')?'student':'teacher';
+  return "('"+a.id+"','RAP12 "+label+
+   "','"+role+"',array['"+role+"']::text[],true)";
+ }).join(',')+
  " on conflict(id) do update set display_name=excluded.display_name,"+
  "last_role=excluded.last_role,enabled_roles=excluded.enabled_roles,"+
  "roles_configured=excluded.roles_configured;");
@@ -121,6 +129,11 @@ assert.notEqual(teamA,teamB);
 const tA=await jwt(actors.managerA);
 const tB=await jwt(actors.managerB);
 const tMember=await jwt(actors.teacherA);
+const tUnassigned=await jwt(actors.unassignedA);
+const tTeacherB=await jwt(actors.teacherB);
+const tStudentA1=await jwt(actors.studentA1);
+const tStudentA2=await jwt(actors.studentA2);
+const tStudentB=await jwt(actors.studentB);
 async function project(token,workspace,creator,name){
  const d=await api(token,'POST','v5_team_projects?select=id',
   {workspace_id:workspace,created_by:creator,name},201);
@@ -134,6 +147,20 @@ const invited=await api(tA,'POST','v5_team_invitations?select=id',
   recipient_email:actors.teacherA.email.toLowerCase()},201);
 await api(tMember,'POST','rpc/v5_accept_team_invitation',
  {p_invitation_id:uid(invited[0].id)},200);
+// C is a legitimate Team A member without a project assignment.
+const inviteC=await api(tA,'POST','v5_team_invitations?select=id',{
+ workspace_id:wsA,invited_by:actors.managerA.id,
+ recipient_email:actors.unassignedA.email.toLowerCase()
+},201);
+await api(tUnassigned,'POST','rpc/v5_accept_team_invitation',
+ {p_invitation_id:uid(inviteC[0].id)},200);
+// G belongs only to Team B; this is deliberately a different tenant.
+const inviteG=await api(tB,'POST','v5_team_invitations?select=id',{
+ workspace_id:wsB,invited_by:actors.managerB.id,
+ recipient_email:actors.teacherB.email.toLowerCase()
+},201);
+await api(tTeacherB,'POST','rpc/v5_accept_team_invitation',
+ {p_invitation_id:uid(inviteG[0].id)},200);
 async function assign(token,workspace,projectId,userId){
  await api(token,'POST','v5_team_project_members?select=project_id',
   {workspace_id:workspace,project_id:projectId,user_id:userId},201);
@@ -142,6 +169,7 @@ await assign(tA,wsA,aShared,actors.managerA.id);
 await assign(tA,wsA,aPrivate,actors.managerA.id);
 await assign(tA,wsA,aShared,actors.teacherA.id);
 await assign(tB,wsB,bPrivate,actors.managerB.id);
+await assign(tB,wsB,bPrivate,actors.teacherB.id);
 async function learner(token,teamId,projectId,creator,name){
  const s=await api(token,'POST','v5_team_students?select=id',
   {team_id:teamId,display_name:name,created_by:creator},201);
