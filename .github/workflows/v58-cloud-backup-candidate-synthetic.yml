@@ -1,0 +1,69 @@
+name: RAP-16 cloud-first encrypted backup candidate (SYNTHETIC ONLY)
+
+# This is an UNPRIVILEGED review gate. There is no Production backup job,
+# no Production/Google OAuth secret, no schedule and no destructive operation.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v58-cloud-backup-candidate-synthetic.yml'
+      - 'tests/v58-cloud-backup-candidate-policy.test.mjs'
+      - 'scripts/release/v58-gdrive-ciphertext-transport.mjs'
+      - 'tests/v58-gdrive-ciphertext-transport.test.mjs'
+      - 'scripts/release/v58-cloud-production-gate.mjs'
+      - 'tests/v58-cloud-production-gate.test.mjs'
+      - 'scripts/release/v58-cloud-pgpass.mjs'
+      - 'tests/v58-cloud-pgpass.test.mjs'
+      - 'scripts/release/v58-cloud-production-backup-once.sh'
+      - 'tests/v58-cloud-production-workflow.test.mjs'
+      - '.github/workflows/v58-cloud-production-backup-candidate.yml'
+      - 'tests/local/v58-gdrive-encrypted-backup-poc.sh'
+      - 'docs/v5/RAP16_CLOUD_BACKUP_ACTIONS_CANDIDATE_20261123.md'
+  workflow_dispatch:
+    inputs:
+      safety_ack:
+        description: 'SYNTHETIC_ONLY (never production)'
+        required: true
+        type: choice
+        options:
+          - SYNTHETIC_ONLY
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rap16-cloud-candidate-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  cloud-backup-synthetic-only:
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.safety_ack == 'SYNTHETIC_ONLY')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: 'true'
+      GITHUB_ACTIONS: 'true'
+      V58_CLOUD_BACKUP_MODE: 'synthetic-only'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Inspect no-production / no-secret contract
+        run: |
+          set -euo pipefail
+          node --test tests/v58-cloud-backup-candidate-policy.test.mjs tests/v58-gdrive-ciphertext-transport.test.mjs tests/v58-cloud-production-gate.test.mjs tests/v58-cloud-pgpass.test.mjs tests/v58-cloud-production-workflow.test.mjs
+          bash -n tests/local/v58-gdrive-encrypted-backup-poc.sh
+          bash -n scripts/release/v58-cloud-production-backup-once.sh
+      - name: Install age for throwaway synthetic encryption only
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age >/dev/null
+      - name: Synthetic PG17 one-snapshot archive to age to MOCK Drive to independent restore
+        run: |
+          set -euo pipefail
+          bash tests/local/v58-gdrive-encrypted-backup-poc.sh
+      - name: Record explicit release limitation
+        run: |
+          echo 'PASS: isolated synthetic PG17 and age, MOCK Drive only'
+          echo 'NOT TESTED: Production DB, real Drive OAuth, managed Supabase full restore'
+          echo 'NO-GO: no Production backup/restore or Migration authorization'

@@ -1,0 +1,191 @@
+name: V5.8 PostgreSQL17 synthetic consistent backup restore
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/release/v58-private-backup.sh'
+      - 'scripts/release/v58-managed-restore-plan.mjs'
+      - 'tests/v58-managed-restore-plan.test.mjs'
+      - 'docs/v5/V58_PRODUCTION_BACKUP_AND_VERCEL_ACCESS_GATE_20261117.md'
+      - 'scripts/release/v58-pg17-credential-guard.mjs'
+      - 'scripts/release/v58-private-backup-manifest.mjs'
+      - 'tests/v58-pg17-credential-guard.test.mjs'
+      - '.github/workflows/v58-pg17-synthetic-dump-restore.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-pg17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Real pg_dump custom archive and pg_restore on disposable SYNTHETIC PostgreSQL 17 only
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This test must NEVER use real Supabase credentials or networks.
+          unset PGPASSWORD PGSERVICE PGSERVICEFILE V58_PRIVATE_DB_URL V58_PRIVATE_BACKUP_DIR
+          docker pull postgres:17
+          d="$(mktemp -d)"
+          chmod 700 "$d"
+          name="v58-synthetic-pg17-$$"
+          cleanup() { docker rm -f "$name" >/dev/null 2>&1 || true; rm -rf "$d"; }
+          trap cleanup EXIT
+          # This password and database contain SYNTHETIC fixtures only.
+          docker run -d --name "$name" -e POSTGRES_PASSWORD=synthetic_only_pg17 \
+            -p 127.0.0.1:54329:5432 postgres:17 >/dev/null
+          # Initializing postgres:17 can briefly accept a temporary bootstrap
+          # server, then restart. Require two successful checks spaced apart.
+          ready=0
+          for i in $(seq 1 60); do
+            if docker exec "$name" pg_isready -U postgres -d postgres >/dev/null 2>&1 &&
+               docker exec "$name" psql -X -U postgres -At -d postgres -c 'SELECT 1' >/dev/null 2>&1; then
+              sleep 2
+              if docker exec "$name" pg_isready -U postgres -d postgres >/dev/null 2>&1; then
+                ready=1
+                break
+              fi
+            fi
+            sleep 1
+          done
+          test "$ready" -eq 1
+          docker exec "$name" pg_isready -U postgres -d postgres
+          docker exec "$name" createdb -U postgres v58_source
+          docker exec "$name" createdb -U postgres v58_restored
+          docker exec "$name" createdb -U postgres v58_managed_conflict
+          docker exec "$name" createdb -U postgres v58_managed_safe
+          docker exec -i "$name" psql -X -U postgres -v ON_ERROR_STOP=1 -d v58_source <<'SQL'
+          CREATE ROLE v58_synthetic_archive_reader NOLOGIN;
+          CREATE EXTENSION IF NOT EXISTS pgcrypto;
+          CREATE SCHEMA auth;
+          CREATE SCHEMA storage;
+          CREATE SCHEMA tutor_private;
+          CREATE SCHEMA supabase_migrations;
+          CREATE TABLE public.students(id integer PRIMARY KEY, label text);
+          CREATE TABLE public.student_audit(id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY, student_id integer);
+          CREATE FUNCTION public.audit_student() RETURNS trigger LANGUAGE plpgsql AS $FN$
+          BEGIN
+            INSERT INTO public.student_audit(student_id) VALUES (NEW.id);
+            RETURN NEW;
+          END
+          $FN$;
+          CREATE TRIGGER student_audit AFTER INSERT ON public.students
+            FOR EACH ROW EXECUTE FUNCTION public.audit_student();
+          CREATE TABLE auth.users(id integer PRIMARY KEY);
+          CREATE TABLE storage.objects(id integer PRIMARY KEY);
+          CREATE TABLE tutor_private.v5_team_lesson_fees(id integer PRIMARY KEY, amount integer);
+          CREATE TABLE supabase_migrations.schema_migrations(version text PRIMARY KEY);
+          INSERT INTO public.students VALUES (1,'synthetic'),(2,'fake');
+          INSERT INTO auth.users VALUES (1);
+          INSERT INTO storage.objects VALUES (2);
+          INSERT INTO tutor_private.v5_team_lesson_fees VALUES (3,250);
+          INSERT INTO supabase_migrations.schema_migrations VALUES ('20261110100000');
+          ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
+          CREATE POLICY synthetic_only ON public.students FOR SELECT USING (id=1);
+          INSERT INTO public.students VALUES (3,'trigger-proof');
+          SQL
+          printf '%s\n' '127.0.0.1:54329:*:postgres:synthetic_only_pg17' > "$d/pgpass"
+          chmod 600 "$d/pgpass"
+          args=(--rm --network host -v "$d:/private" -e PGHOST=127.0.0.1
+            -e PGPORT=54329 -e PGUSER=postgres -e PGDATABASE=v58_source
+            -e PGSSLMODE=disable -e PGPASSFILE=/private/pgpass)
+          docker run "${args[@]}" postgres:17 pg_dumpall --globals-only \
+            --no-role-passwords --no-password --file=/private/roles.sql
+          grep -Fq 'v58_synthetic_archive_reader' "$d/roles.sql"
+          # Role SQL is exported separately; this integration test does NOT
+          # execute global role restoration into a Supabase-managed cluster.
+          docker run "${args[@]}" postgres:17 pg_dump --format=custom \
+            --no-password --file=/private/production.snapshot.dump
+          docker run "${args[@]}" postgres:17 pg_restore --list \
+            /private/production.snapshot.dump > "$d/toc"
+          for schema in auth storage tutor_private supabase_migrations; do
+            grep -Eq "[[:space:]]SCHEMA - $schema([[:space:]]|$)" "$d/toc"
+          done
+          # Isolated destination within same disposable PostgreSQL container.
+          # PostgreSQL's default public schema is not necessarily dumped as
+          # an archive schema object. Leave the clean target's public schema.
+          docker run --rm --network host -v "$d:/private" -e PGHOST=127.0.0.1 \
+            -e PGPORT=54329 -e PGUSER=postgres -e PGDATABASE=v58_restored \
+            -e PGSSLMODE=disable -e PGPASSFILE=/private/pgpass \
+            postgres:17 pg_restore --no-owner --no-acl --exit-on-error \
+            --dbname=v58_restored /private/production.snapshot.dump
+          for db in v58_source v58_restored; do
+            docker exec "$name" psql -X -U postgres -d "$db" -v ON_ERROR_STOP=1 -At <<'SQL'
+          SELECT 'PARITY ' ||
+            (SELECT count(*) FROM public.students) || '/' ||
+            (SELECT count(*) FROM auth.users) || '/' ||
+            (SELECT count(*) FROM storage.objects) || '/' ||
+            (SELECT count(*) FROM tutor_private.v5_team_lesson_fees) || '/' ||
+            (SELECT count(*) FROM supabase_migrations.schema_migrations) || '/' ||
+            (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='students');
+          SQL
+          done
+          # Synthetic fixture count and RLS policy must survive restore.
+          result="$(docker exec "$name" psql -X -U postgres -At -d v58_restored \
+            -c "SELECT (SELECT count(*) FROM public.students),(SELECT count(*) FROM auth.users),(SELECT count(*) FROM storage.objects),(SELECT count(*) FROM tutor_private.v5_team_lesson_fees),(SELECT count(*) FROM supabase_migrations.schema_migrations),(SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='students')")"
+          test "$result" = '3|1|1|1|1|1'
+          # Simulate initialized Supabase-managed schemas in isolated databases.
+          # Unfiltered archive must FAIL. No production data or credentials.
+          for db in v58_managed_conflict v58_managed_safe; do
+            docker exec -i "$name" psql -X -U postgres -v ON_ERROR_STOP=1 -d "$db" <<'SQL'
+          CREATE SCHEMA auth;
+          CREATE TABLE auth.users(id integer PRIMARY KEY);
+          CREATE TABLE auth.auth_audit(id integer PRIMARY KEY);
+          CREATE FUNCTION auth.managed_user_guard() RETURNS trigger LANGUAGE plpgsql AS $FN$
+          BEGIN
+            RETURN NEW;
+          END
+          $FN$;
+          CREATE TRIGGER managed_user_guard BEFORE INSERT ON auth.users
+            FOR EACH ROW EXECUTE FUNCTION auth.managed_user_guard();
+          INSERT INTO auth.users VALUES (99);
+          CREATE SCHEMA storage;
+          CREATE TABLE storage.objects(id integer PRIMARY KEY);
+          INSERT INTO storage.objects VALUES (98);
+          CREATE SCHEMA supabase_migrations;
+          CREATE TABLE supabase_migrations.schema_migrations(version text PRIMARY KEY);
+          INSERT INTO supabase_migrations.schema_migrations VALUES ('managed-baseline');
+          CREATE EXTENSION IF NOT EXISTS pgcrypto;
+          SQL
+          done
+          if docker run --rm --network host -v "$d:/private" -e PGHOST=127.0.0.1 \
+            -e PGPORT=54329 -e PGUSER=postgres -e PGDATABASE=v58_managed_conflict \
+            -e PGSSLMODE=disable -e PGPASSFILE=/private/pgpass \
+            postgres:17 pg_restore --no-owner --no-acl --exit-on-error \
+            --dbname=v58_managed_conflict /private/production.snapshot.dump \
+            > "$d/direct-restore.out" 2>&1; then
+            echo 'FAIL: direct archive unexpectedly restored over initialized managed schemas'
+            exit 1
+          fi
+          grep -Eq 'schema "(auth|storage|supabase_migrations)" already exists' "$d/direct-restore.out"
+          echo 'PASS: full archive correctly reproduces managed-Schema collision (expected negative)'
+          # Pure TOC proposal. Never apply it on Production or a real project.
+          node --input-type=module - "$d/toc" "$d/app-only.list" <<'JS'
+          import {readFileSync,writeFileSync} from 'node:fs';
+          import {buildManagedAppRestorePlan} from './scripts/release/v58-managed-restore-plan.mjs';
+          const r=buildManagedAppRestorePlan(readFileSync(process.argv[2],'utf8'));
+          if(r.status!=='APP_ONLY_RESTORE_PROPOSAL_NOT_EXECUTABLE') {
+            throw Error('TOC requires manual review: '+r.unreviewed_categories.join(','));
+          }
+          writeFileSync(process.argv[3],r.toc,{mode:0o600,flag:'wx'});
+          if(r.managed_auth_storage_data_restored||r.role_sql_restored||r.full_supabase_restore_verified)
+            throw Error('Unsafe completeness claim');
+          JS
+          docker run --rm --network host -v "$d:/private" -e PGHOST=127.0.0.1 \
+            -e PGPORT=54329 -e PGUSER=postgres -e PGDATABASE=v58_managed_safe \
+            -e PGSSLMODE=disable -e PGPASSFILE=/private/pgpass \
+            postgres:17 pg_restore --use-list=/private/app-only.list --no-owner --no-acl \
+            --exit-on-error --dbname=v58_managed_safe /private/production.snapshot.dump
+          result="$(docker exec "$name" psql -X -U postgres -At -d v58_managed_safe \
+            -c "SELECT (SELECT count(*) FROM public.students),(SELECT count(*) FROM tutor_private.v5_team_lesson_fees),(SELECT count(*) FROM auth.users),(SELECT count(*) FROM storage.objects),(SELECT count(*) FROM supabase_migrations.schema_migrations),(SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='students'),(SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='auth' AND c.relname='users' AND NOT t.tgisinternal),(SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='students' AND NOT t.tgisinternal),(SELECT count(*) FROM pg_extension WHERE extname='pgcrypto'),(SELECT count(*) FROM public.student_audit)")"
+          echo "Synthetic managed-safe tuple: $result"
+          test "$result" = '3|1|1|1|1|1|1|1|1|3'
+          echo 'PASS: app-only restore kept pre-existing auth/storage/migrations intact (synthetic)'
+          echo 'BLOCKED: full managed auth/storage data, extension, roles and triggers need separate review'
+          echo 'PASS: single PostgreSQL17 custom snapshot and RLS restored; global roles exported separately'
+          echo 'LIMIT: this does NOT prove full live Supabase Auth, Storage, Vault, extensions or Production restore'

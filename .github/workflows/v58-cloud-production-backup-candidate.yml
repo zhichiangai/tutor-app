@@ -1,0 +1,110 @@
+name: RAP-16 one-time Production encrypted Drive backup (CANDIDATE / NOT APPROVED)
+
+# Draft PR #83 only until Main is separately authorized; NEVER run from PR.
+# No schedule, pull_request, pull_request_target, delete, deploy or migration.
+on:
+  workflow_dispatch:
+    inputs:
+      safety_ack:
+        description: 'Requires separate owner approval, key recovery and Environment gates'
+        type: choice
+        required: true
+        options:
+          - ONE_TIME_PRODUCTION_READ_ONLY_BACKUP
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v58-production-once
+  cancel-in-progress: false
+
+jobs:
+  protected-manual-backup:
+    if: github.repository == 'zhichiangai/tutor-app' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.safety_ack == 'ONE_TIME_PRODUCTION_READ_ONLY_BACKUP'
+    environment: v58-production-backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      V58_CLOUD_BACKUP_AUTHORIZATION: ${{ inputs.safety_ack }}
+      V58_BACKUP_EXECUTION_MODE: ENCRYPTED_DRIVE_ONCE
+      V58_CLOUD_PRODUCTION_BACKUP_RELEASE_ENABLED: ${{ vars.V58_CLOUD_PRODUCTION_BACKUP_RELEASE_ENABLED }}
+      V58_REVIEWED_MAIN_SHA: ${{ vars.V58_REVIEWED_MAIN_SHA }}
+      V58_BACKUP_PROJECT_REF: ${{ vars.V58_BACKUP_PROJECT_REF }}
+      V58_MAIN_ONLY_PROTECTION_CONFIRMED: ${{ vars.V58_MAIN_ONLY_PROTECTION_CONFIRMED }}
+      V58_PRIVATE_KEY_OFFLINE_CONFIRMED: ${{ vars.V58_PRIVATE_KEY_OFFLINE_CONFIRMED }}
+      V58_AGE_RECIPIENT: ${{ vars.V58_AGE_RECIPIENT }}
+      V58_PRODUCTION_DRIVE_FOLDER_ID: ${{ vars.V58_PRODUCTION_DRIVE_FOLDER_ID }}
+      V58_SYNTHETIC_DRIVE_FOLDER_ID: ${{ vars.V58_SYNTHETIC_DRIVE_FOLDER_ID }}
+      PGHOST: ${{ vars.V58_PGHOST }}
+      PGPORT: ${{ vars.V58_PGPORT }}
+      PGUSER: ${{ vars.V58_PGUSER }}
+      PGSSLMODE: ${{ vars.V58_PGSSLMODE }}
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Authorize exact source-only metadata BEFORE any Production secret is loaded
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          node scripts/release/v58-cloud-production-gate.mjs
+          node --test tests/v58-cloud-production-gate.test.mjs tests/v58-cloud-pgpass.test.mjs tests/v58-gdrive-ciphertext-transport.test.mjs
+          bash -n scripts/release/v58-cloud-production-backup-once.sh
+      - name: Verify PostgreSQL 17 client and age BEFORE loading credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          export PATH="/usr/lib/postgresql/17/bin:$PATH"
+          for cmd in pg_dump pg_dumpall pg_restore; do
+            command -v "$cmd" >/dev/null
+            "$cmd" --version | grep -Eq '17[.]'
+          done
+          if ! command -v age >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq age >/dev/null
+          fi
+          age --version
+      - name: Prepare private one-run scratch directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          private="$RUNNER_TEMP/v58-prod-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          mkdir -m 700 "$private"
+          printf 'V58_RUN_PRIVATE_DIR=%s\nPGPASSFILE=%s\n' "$private" "$private/connection.pgpass" >> "$GITHUB_ENV"
+      - name: Prepare protected libpq credential file (no secret in argv or logs)
+        shell: bash
+        env:
+          V58_SECRET_DB_PASSWORD: ${{ secrets.V58_BACKUP_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          set +x
+          node scripts/release/v58-cloud-pgpass.mjs
+      - name: PostgreSQL 17 single custom archive, age, encrypted Drive readback
+        shell: bash
+        env:
+          GDRIVE_CLIENT_ID: ${{ secrets.V58_GDRIVE_CLIENT_ID }}
+          GDRIVE_CLIENT_SECRET: ${{ secrets.V58_GDRIVE_CLIENT_SECRET }}
+          GDRIVE_REFRESH_TOKEN: ${{ secrets.V58_GDRIVE_REFRESH_TOKEN }}
+        run: |
+          set -euo pipefail
+          set +x
+          export PATH="/usr/lib/postgresql/17/bin:$PATH"
+          bash scripts/release/v58-cloud-production-backup-once.sh
+      - name: Scrub ephemeral runner scratch (no Drive delete)
+        if: always()
+        shell: bash
+        run: |
+          set +x
+          private="$RUNNER_TEMP/v58-prod-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          if [[ "$private" == "$RUNNER_TEMP"/v58-prod-* && -d "$private" ]]; then
+            rm -rf -- "$private"
+          fi
+          echo 'Runner scratch cleanup only; Production DB and Drive unchanged by cleanup'
