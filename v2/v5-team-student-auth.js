@@ -57,7 +57,11 @@ export function createV5TeamStudentAuthUI({
  async function refresh(){
   if(!current()){clear();return}
   const id=getUser().id,stamp=++generation;
-  owner=id;loading=true;error='';render();
+  // Fail closed during refetch: do not leave an earlier account's or a
+  // freshly revoked student's lesson cards visible while RPCs are in flight.
+  owner=id;loading=true;error='';
+  invitations=[];links=[];lessons=[];manager={students:[],pending:[],links:[]};
+  render();
   try{
    const results=await Promise.all([
     rpc('v5_my_team_student_invitations'),
