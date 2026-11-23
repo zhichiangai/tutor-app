@@ -109,7 +109,9 @@ for(const actor of [actors.managerA,actors.teacherA,actors.managerB]){
 }
 db("insert into public.profiles(id,display_name,last_role,enabled_roles,roles_configured) values "+
  Object.entries(actors).map(([label,a])=>{
-  const role=label.startsWith('student')?'student':'teacher';
+  // H intentionally starts as a teacher-mode account without a V4/Team link.
+  // After accepting the verified invitation, the app must add student mode.
+  const role=label==='studentB'?'teacher':label.startsWith('student')?'student':'teacher';
   return "('"+a.id+"','RAP12 "+label+
    "','"+role+"',array['"+role+"']::text[],true)";
  }).join(',')+
