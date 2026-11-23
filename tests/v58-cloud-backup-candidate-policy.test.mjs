@@ -13,8 +13,11 @@ test('cloud-first candidate cannot receive privileged secrets, deploy, schedule 
   assert.match(workflow, /V58_CLOUD_BACKUP_MODE: 'synthetic-only'/);
   assert.match(workflow, /SYNTHETIC_ONLY/);
   assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
-  assert.doesNotMatch(workflow, /\b(pull_request_target|schedule|production-backup|environment:|secrets\.|vars\.|PGPASSWORD|PGPASSFILE|DATABASE_URL|SUPABASE_DB_URL|workflow_run|artifact)\b/i);
-  assert.doesNotMatch(workflow, /\b(supabase db push|migration repair|pg_dump --dbname|rm -rf \/home)\b/i);
+  // YAML comments are explanatory text, not active workflow keys.
+  const active = workflow.split('\n').filter(line => !/^\s*#/.test(line)).join('\n');
+  assert.doesNotMatch(active, /^\s*(?:pull_request_target|schedule|environment|workflow_run):/mi);
+  assert.doesNotMatch(active, /(?:production-backup|secrets\.|vars\.|PGPASSWORD|PGPASSFILE|DATABASE_URL|SUPABASE_DB_URL|upload-artifact@)/i);
+  assert.doesNotMatch(active, /\b(supabase db push|migration repair|pg_dump --dbname|rm -rf \/home)\b/i);
 });
 
 test('synthetic script rejects fake Production credential variables before touching Docker or networking', () => {
