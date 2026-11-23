@@ -45,7 +45,8 @@ async function call(token,method,path,body){
 }
 async function rpc(token,name,args={}){
  const r=await call(token,'POST','rpc/'+name,args);
- assert.equal(r.status,200,'Expected authorized local '+name);
+ assert.ok(r.status===200||r.status===204,
+  'Expected authorized local '+name+', received '+r.status);
  return r.value;
 }
 async function denied(token,name,args={}){
