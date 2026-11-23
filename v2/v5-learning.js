@@ -77,6 +77,14 @@ export function createV5LearningUI({getClient,getUser,getRole,isReady,notify}){
   const project=$('v5-learning-project-select');
   project.disabled=!possible.length;
   const studentList=$('v5-learning-students');
+  // Background Team/RLS refreshes can arrive while the manager is editing a
+  // student. Preserve the open editor and any unsaved text across DOM rebuilds.
+  const draftEdits=new Map();
+  studentList.querySelectorAll('details.v5-learning-edit[open]').forEach(details=>{
+   const form=details.querySelector('form[data-v5-learning-edit-student]');
+   const input=form?.querySelector('input[name="display_name"]');
+   if(form&&input)draftEdits.set(form.dataset.v5LearningEditStudent,input.value);
+  });
   studentList.replaceChildren();
   const related=projectStudents();
   if(!projectId)studentList.append(el('p','請先建立或選擇 Team 專案。','section-sub'));
@@ -92,6 +100,10 @@ export function createV5LearningUI({getClient,getUser,getRole,isReady,notify}){
     const label=el('label','學生名稱');
     const input=el('input');
     input.name='display_name';input.value=s.display_name;input.maxLength=100;input.required=true;
+    if(draftEdits.has(s.id)){
+     details.open=true;
+     input.value=draftEdits.get(s.id);
+    }
     label.append(input);
     const save=el('button','儲存名稱','secondary-button');
     save.type='submit';form.append(label,save);details.append(form);
