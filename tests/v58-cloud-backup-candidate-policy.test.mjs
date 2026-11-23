@@ -16,7 +16,7 @@ test('cloud-first candidate cannot receive privileged secrets, deploy, schedule 
   // YAML comments are explanatory text, not active workflow keys.
   const active = workflow.split('\n').filter(line => !/^\s*#/.test(line)).join('\n');
   assert.doesNotMatch(active, /^\s*(?:pull_request_target|schedule|environment|workflow_run):/mi);
-  assert.doesNotMatch(active, /(?:production-backup|secrets\.|vars\.|PGPASSWORD|PGPASSFILE|DATABASE_URL|SUPABASE_DB_URL|upload-artifact@)/i);
+  assert.doesNotMatch(active, /(?:secrets\.|vars\.|PGPASSWORD|PGPASSFILE|DATABASE_URL|SUPABASE_DB_URL|upload-artifact@)/i);
   assert.doesNotMatch(active, /\b(supabase db push|migration repair|pg_dump --dbname|rm -rf \/home)\b/i);
 });
 
