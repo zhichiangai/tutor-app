@@ -387,11 +387,14 @@ jobs:
           expected={'studentA1-390.png','studentA1-1440.png',
                     'studentA2-390.png','studentA2-1440.png',
                     'studentB-first-accept-390.png','studentB-1440.png'}
-          images={p.name for p in root.rglob('*.png')}
-          assert images==expected,(images,expected)
+          pngs=list(root.rglob('*.png'))
+          images={p.name:p for p in pngs}
+          assert len(images)==len(pngs),'Duplicate RAP-49 PNG filenames are forbidden'
+          assert set(images)==expected,(sorted(images),sorted(expected))
           assert not list(root.rglob('trace.zip'))
           for name in expected:
-           with (root/name).open('rb') as f: assert f.read(8)==bytes.fromhex('89504e470d0a1a0a')
+           with images[name].open('rb') as f:
+            assert f.read(8)==bytes.fromhex('89504e470d0a1a0a')
           print('RAP49_GUI_SCREENSHOT_AUDIT PASS synthetic_only=6 production=0')
           PY
       - uses: actions/upload-artifact@v4
