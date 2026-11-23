@@ -1,0 +1,131 @@
+name: RAP-49 ordered 62-to-63-to-64 isolated migrations
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v59-student-62-63-64-isolated.yml'
+      - 'supabase/release-candidates/**'
+      - 'supabase/candidates/20261123010000_v5_9_team_student_auth_links.sql'
+      - 'supabase/migrations/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v59-ordered-migration-gate
+  cancel-in-progress: true
+
+jobs:
+  disposable-upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      CI: 'true'
+      V4_E2E_LOCAL: '1'
+      V58_PROJECT_SQL_CANDIDATE: '1'
+      SUPABASE_TELEMETRY_DISABLED: '1'
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.107.0
+      - name: Reject hosted project and verify two fixed Git blobs
+        run: |
+          set -euo pipefail
+          test "$(supabase --version)" = "2.107.0"
+          grep -qx 'project_id = "tutor_v4_isolated"' supabase/config.toml
+          test ! -f supabase/.temp/project-ref
+          test ! -f supabase/.branches/_current_branch
+          test "$(git hash-object supabase/release-candidates/20261117010000_v58_parent_project_scoped_receivables.sql)" = '572dcbcaa0e2b6d1e7f1cb6fe0e078b93853846f'
+          test "$(git hash-object supabase/candidates/20261123010000_v5_9_team_student_auth_links.sql)" = '6bb730c8deb70645c97bdfbe2361ca5e3ecba786'
+          test ! -f supabase/migrations/20261117010000_v58_parent_project_scoped_receivables.sql
+          test ! -f supabase/migrations/20261123010000_v5_9_team_student_auth_links.sql
+      - name: Replay 43 original and 19 fixed V5 versions to 62
+        run: |
+          set -euo pipefail
+          node tests/local/v5-real43-history-builder.mjs baseline
+          log="$RUNNER_TEMP/rap49-43-start.log"
+          trap 'rm -f "$log"' EXIT
+          supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor >"$log" 2>&1 || { echo '::error::Disposable startup failed'; exit 1; }
+          supabase db reset --local --no-seed >"$log" 2>&1 || { echo '::error::Disposable reset failed'; exit 1; }
+          node tests/local/v5-real43-history-gate.mjs baseline
+          node tests/local/v5-real43-history-builder.mjs append-v5
+          supabase migration up --local >"$log" 2>&1 || { echo '::error::43-to-62 replay failed'; exit 1; }
+          node tests/local/v5-real43-history-gate.mjs forward
+          node tests/local/v5-clean-bootstrap-gate.mjs
+          node tests/local/v58-parent-project-63-gate.mjs before
+          count="$(docker exec supabase_db_tutor_v4_isolated psql -X -A -t -v ON_ERROR_STOP=1 -U postgres -d postgres -c 'select count(*) from supabase_migrations.schema_migrations')"
+          test "$count" = 62
+          echo 'MIGRATION_62_HISTORY_PASS'
+      - name: Promote pinned 63 locally and verify parent finance RPC
+        run: |
+          set -euo pipefail
+          test ! -f supabase/.temp/project-ref
+          supabase migration new v58_parent_project_scoped_receivables >/dev/null
+          from="$(find supabase/migrations -maxdepth 1 -name '*_v58_parent_project_scoped_receivables.sql' -print -quit)"
+          test -n "$from"
+          pinned='supabase/migrations/20261117010000_v58_parent_project_scoped_receivables.sql'
+          mv "$from" "$pinned"
+          cp supabase/release-candidates/20261117010000_v58_parent_project_scoped_receivables.sql "$pinned"
+          test "$(git hash-object "$pinned")" = '572dcbcaa0e2b6d1e7f1cb6fe0e078b93853846f'
+          log="$RUNNER_TEMP/rap49-63.log"
+          trap 'rm -f "$log"' EXIT
+          supabase migration up --local >"$log" 2>&1 || { echo '::error::Isolated 63 failed'; exit 1; }
+          node tests/local/v58-parent-project-63-gate.mjs after
+          count="$(docker exec supabase_db_tutor_v4_isolated psql -X -A -t -v ON_ERROR_STOP=1 -U postgres -d postgres -c 'select count(*) from supabase_migrations.schema_migrations')"
+          test "$count" = 63
+          hash="$(docker exec supabase_db_tutor_v4_isolated psql -X -A -t -v ON_ERROR_STOP=1 -U postgres -d postgres -c "select md5(prosrc) from pg_proc where oid='public.v56_team_parent_finance_overview(uuid,uuid,date)'::regprocedure")"
+          test -n "$hash"
+          echo "PARENT_RPC_MD5=$hash" >> "$GITHUB_ENV"
+          echo 'MIGRATION_63_PARENT_RPC_PASS'
+      - name: Promote student 64 locally, preserve 63, and check private ACL
+        run: |
+          set -euo pipefail
+          test ! -f supabase/.temp/project-ref
+          supabase migration new v5_9_team_student_auth_links >/dev/null
+          from="$(find supabase/migrations -maxdepth 1 -name '*_v5_9_team_student_auth_links.sql' -print -quit)"
+          test -n "$from"
+          pinned='supabase/migrations/20261123010000_v5_9_team_student_auth_links.sql'
+          mv "$from" "$pinned"
+          cp supabase/candidates/20261123010000_v5_9_team_student_auth_links.sql "$pinned"
+          test "$(git hash-object "$pinned")" = '6bb730c8deb70645c97bdfbe2361ca5e3ecba786'
+          log="$RUNNER_TEMP/rap49-64.log"
+          trap 'rm -f "$log"' EXIT
+          supabase migration up --local >"$log" 2>&1 || { echo '::error::Isolated 64 failed'; exit 1; }
+          count="$(docker exec supabase_db_tutor_v4_isolated psql -X -A -t -v ON_ERROR_STOP=1 -U postgres -d postgres -c 'select count(*) from supabase_migrations.schema_migrations')"
+          test "$count" = 64
+          hash="$(docker exec supabase_db_tutor_v4_isolated psql -X -A -t -v ON_ERROR_STOP=1 -U postgres -d postgres -c "select md5(prosrc) from pg_proc where oid='public.v56_team_parent_finance_overview(uuid,uuid,date)'::regprocedure")"
+          test "$hash" = "$PARENT_RPC_MD5"
+          docker exec -i supabase_db_tutor_v4_isolated psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres <<'SQL'
+          DO $gate$
+          DECLARE n integer;
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM supabase_migrations.schema_migrations WHERE version='20261117010000')
+              OR NOT EXISTS (SELECT 1 FROM supabase_migrations.schema_migrations WHERE version='20261123010000')
+            THEN RAISE EXCEPTION 'Ordered Migration 63/64 missing'; END IF;
+            SELECT count(*) INTO n FROM pg_class c JOIN pg_namespace s ON s.oid=c.relnamespace
+             WHERE s.nspname='tutor_private' AND c.relname IN
+             ('v5_team_student_auth_invitations','v5_team_student_auth_links','v5_team_student_auth_audit')
+             AND c.relrowsecurity;
+            IF n<>3 THEN RAISE EXCEPTION 'New private tables lack RLS'; END IF;
+            SELECT count(*) INTO n FROM pg_proc p JOIN pg_namespace s ON s.oid=p.pronamespace
+             WHERE s.nspname='public' AND p.proname IN
+             ('v5_invite_team_student','v5_my_team_student_invitations',
+              'v5_accept_team_student_invitation','v5_my_team_student_links',
+              'v5_my_team_student_lessons','v5_team_student_manager_overview',
+              'v5_revoke_team_student_invitation','v5_revoke_team_student_link') AND p.prosecdef;
+            IF n<>8 THEN RAISE EXCEPTION 'Student authorization RPCs missing'; END IF;
+            IF has_function_privilege('anon','public.v5_my_team_student_lessons(date)','EXECUTE')
+               OR has_function_privilege('anon','public.v5_invite_team_student(uuid,text)','EXECUTE')
+               OR has_table_privilege('authenticated','tutor_private.v5_team_student_auth_links','SELECT')
+            THEN RAISE EXCEPTION 'Private student access not default-deny'; END IF;
+          END $gate$;
+          SQL
+          echo 'ORDERED_62_TO_63_TO_64_PASS; PRODUCTION_WRITES=0'
