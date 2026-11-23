@@ -17,22 +17,22 @@
 - PR #83：`tests/local/v58-gdrive-encrypted-backup-poc.sh` 可在 Docker `--network none` 內以虛構資料完成 PG17 Custom Archive、age、mock Drive 與隔離 Restore；`tests/local/v58-managed-state-two-stack.sh` 已涵蓋合成 GoTrue/Auth、Storage API 物件與 Migration History 的部分跨 Stack 恢復。
 - 本輪補充 `.github/workflows/v58-cloud-backup-candidate-synthetic.yml`：未授權的 PR CI **只**跑安全契約測試和 synthetic mock-Drive 流程；`tests/v58-cloud-backup-candidate-policy.test.mjs` 證明不需任何 Production / Drive Secret，並驗證假憑證必被拒絕。**該 Workflow 不是已啟用的 Production 備份工作。**
 
-## 3. 將來正式雲端備份 Job 的安全設計（目前未建立或啟用）
+## 3. 已實作正式雲端備份候選（仍在 Draft、未合併／未啟用）
 
-正式 Job **不得**直接由 PR、pull_request_target、workflow_run 或排程讀取 Production Secret；不可在未經 Owner 審核前設定任何正式憑證。候選設計必須獨立再做安全審查，至少符合：
+在同一 Draft PR 中新增 `.github/workflows/v58-cloud-production-backup-candidate.yml`，僅允許 `workflow_dispatch`、main、人工確認、`v58-production-backup` Environment、精確核准 SHA 與非機密啟用變數。受保護 Secret 只在通過前置程式檢查後的工作步驟載入；沒有 Schedule、PR 驅動、Drive 刪除、正式 SQL 或部署。完整候選程式與 Codex 下一步見 [RAP16_CLOUD_PRODUCTION_CODEX_GATE_20261123.md](RAP16_CLOUD_PRODUCTION_CODEX_GATE_20261123.md)。**這是待審程式碼，不是已可執行且受控的 Production Job**；正式 Secrets 尚未設置或核實，不能自行執行。正式 Job **不得**直接由 PR、pull_request_target、workflow_run 或排程讀取 Production Secret；真正初次執行前仍須獨立安全審查，至少符合：
 
-1. **Repo／Environment 邊界**：首選獨立私密備份 Repo，或審核後的 `main` + `v58-production-backup` 受保護 Environment；核對 GitHub Free／Repo visibility 的 required reviewer、branch restriction 是否實際可用。預設不開 `schedule`；僅精確 `workflow_dispatch`、明確一次性授權後執行。PR 工作絕不可取得密鑰。
+1. **Repo／Environment 邊界**：目前先沿用既有 public Repo + `main` + `v58-production-backup` 受保護 Environment；**GitHub Free 的 Private Repo 不可假定具備同等 Required Reviewer 保護**，不因為私有就擅自遷移。由 Codex GUI 重新核實 reviewer、branch restriction、bypass 與可用方案。預設不開 `schedule`；僅精確 `workflow_dispatch`、明確一次性授權後執行。PR 工作絕不可取得密鑰。
 2. **執行碼鎖定**：工作樹來源只允許已核准的固定 SHA；第三方 Actions 固定檢查過的 SHA；`permissions: contents: read`、`persist-credentials: false`、無 PR 不受信程式碼、無 secrets 寫入檔案回傳或 Artifact。Job 自動發現未核准的 ref / host / project / role / folder 立即停止。
 3. **最小憑證與單一快照**：僅使用只讀最低權限 DB 連線；先以安全方式核對 DB Host、project ref、TLS verify-full（適用時 CA）、PG17 client version、`PGPASSFILE` 0600；不允許 URI/password 在 argv、命令列追蹤、公開 Log。執行**一份** `pg_dump --format=custom` 一致性 snapshot；`pg_dumpall --globals-only --no-role-passwords` 的 global metadata 不屬於相同 MVCC snapshot，要另做一致性審查。若資料庫角色無法合法備份 Auth/Storage/Managed Schema，必須 fail closed，不能誤稱全量。
 4. **加密先於傳輸**：Runner 暫存明文只能放 owner-only 短生命週期私密目錄，禁止 cache/Artifact/PR/console，並於加密驗證後立即刪除；runner 故障與系統層暫存風險仍須審查。使用經離線雙副本復原演練的**專用 age 公鑰 recipient**（SSH Ed25519 recipient 只作可選替代，不預設共用主 SSH 私鑰），Runner 不持有私鑰。
 5. **Drive 只存密文**：使用受保護專用 OAuth、`drive.file` 最小 scope、只存 `.age` 和無 PII manifest；獨立下載已上傳的密文、驗 SHA-256／大小；未完成回讀或有任何資料外洩跡象則 NO-GO。初期不啟用刪除 API、輪替／排程前另審。
 6. **完整還原不是只有 pg_restore**：在獨立、阻斷寄信/Webhook/付款的非正式 Supabase Stack，檢查 Auth identities/session 可重建、managed schema ownership/ACL、Storage 實際物件位元組、62 migrations、RLS/JWT、Finance RPC 指紋與金額守恆；各種非 SQL 平台設定仍須另外保護。既有 synthetic PASS **不代表**真人資料全量 Restore PASS。
 
-## 4. 逐 Gate 验收與授權
+## 4. 逐 Gate 驗收與授權
 
 | Gate | 內容 | 本輪狀態 |
 |---|---|---|
-| S0 | PR #83 未授權合成測試：PG17 → age → mock Drive → 獨立還原，以及假憑證拒絕 | 新 Workflow 待 GitHub CI 執行 |
+| S0 | PR #83 無憑證候選：PG17 → age → mock Drive → 獨立還原、假憑證／手動工作流程拒絕、密文 Drive mock 檢查 | 以最新 PR HEAD 的 Actions 為準，不能挪用前一 SHA 綠燈 |
 | S1 | Main 已存在的受保護 synthetic-only 真實 Drive 傳輸測試（不碰 Production） | 有既有流程；本輪未重新觸發 |
 | K0 | age 可恢復密鑰、分離雙份保存與實際試解密 | BLOCKED（需要 Owner 私密操作） |
 | P0 | 正式 runner 最小權限、環境保護與秘密邊界的獨立審查 | NOT TESTED / NO-GO |
