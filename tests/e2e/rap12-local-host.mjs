@@ -24,7 +24,11 @@ const localInit='<script>window.V4_LOCAL_BACKEND='+JSON.stringify({
  environment:'local',isolated:true,projectRef:'local',url:fixture.apiUrl,
  publishableKey:fixture.anonKey
 }).replace(/</g,'\\u003c')+';</script>';
-const roleLabels={managerA:'Team A 管理者',teacherA:'Team A 一般老師',managerB:'Team B 管理者'};
+const roleLabels={
+ managerA:'Team A 管理者',teacherA:'Team A 指派老師',unassignedA:'Team A 未指派老師',
+ studentA1:'Team A 學生 D',studentA2:'Team A 學生 E',
+ managerB:'Team B 管理者',teacherB:'Team B 指派老師',studentB:'Team B 學生 H'
+};
 const roleButtons=Object.entries(roleLabels).map(([key,name])=>
  '<button type="button" data-role="'+key+'">'+name+'</button>').join('\n');
 const chooser=[

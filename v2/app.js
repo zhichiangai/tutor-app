@@ -13,6 +13,7 @@ import { exactCents, prepareCorrection } from "./payment-correction.js";
 import { createV5PlanUI } from "./v5-plans.js";
 import { createV5TeamUI } from "./v5-team.js";
 import { createV5LearningUI } from "./v5-learning.js";
+import { createV5TeamStudentAuthUI } from "./v5-team-student-auth.js";
 import { createV5BillingUI } from "./v5-billing.js";
 import { createV56FamilyUI } from "./v56-family.js";
 // Backend settings are resolved before the first Auth request. Production is
@@ -124,6 +125,27 @@ const v5LearningUI=typeof createV5LearningUI==="function"?createV5LearningUI({
  isReady:()=>authPhase==="ready"&&state.mode==="live",
  notify:message=>toast(message)
 }):{render(){},refresh(){},clear(){},handleSubmit(){return false},handleClick(){return false}};
+const v5TeamStudentAuthUI=typeof createV5TeamStudentAuthUI==="function"?createV5TeamStudentAuthUI({
+ getClient:()=>client,getUser:()=>activeUser,
+ isReady:()=>authPhase==="ready"&&state.mode==="live",
+ getContext:()=>({role:state.role,view:state.view,workspaceMode:state.workspaceMode,
+  teamSection:state.teamSection}),
+ notify:message=>toast(message),
+ onAccepted:async()=>{
+  if(!activeUser||authPhase!=="ready")return;
+  const selected=normalizedRoles([...state.enabledRoles,"student"]);
+  const id=activeUser.id;
+  const {error}=await client.from("profiles").update({
+   enabled_roles:selected,roles_configured:true
+  }).eq("id",id).select("id").single();
+  if(error)throw error;
+  if(activeUser?.id!==id)return;
+  state.enabledRoles=selected;
+  setRole("student");
+  void v5TeamStudentAuthUI.refresh();
+ }
+}):{clear(){},refresh(){},render(){},readMyLinks:async()=>[],
+ handleSubmit:async()=>false,handleClick:async()=>false};
 const v5BillingUI=typeof createV5BillingUI==="function"?createV5BillingUI({
  getClient:()=>client,getUser:()=>activeUser,getRole:()=>state.role,
  isReady:()=>authPhase==="ready"&&state.mode==="live",
@@ -347,6 +369,8 @@ function setView(view){
  // only the currently selected, database-authorised section.
  refreshWorkspacePanels();
  if(state.view==="billing"&&state.role==="parent")void v56FamilyUI.refresh();
+ if(state.view==="settings"||state.role==="student")
+  void v5TeamStudentAuthUI.refresh();
 }
 const VALID_ROLES=["teacher","parent","student"];
 const ROLE_SUFFIX={teacher:"老師",parent:"家長",student:"同學"};
@@ -755,6 +779,7 @@ function render(){
  v5LearningUI.render();
  v5BillingUI.render();
  v56FamilyUI.render();
+ v5TeamStudentAuthUI.render();
  // The login gate is not a dashboard mode. Never rebuild payment summaries,
  // student records or lesson content when there is no verified active account.
  if(!identified){renderPreviewReadOnlyShell();return}
@@ -2825,6 +2850,7 @@ function clearUserSessionState(){
  v4ContactsUI.clear();
  v5PlanUI.clear();
  v5TeamUI.clear();v5LearningUI.clear();v5BillingUI.clear();v56FamilyUI.clear();
+ v5TeamStudentAuthUI.clear();
  for(const field of LIVE_FIELDS)state[field]=[];
  state.qaTags={qaBatchIds:[],qaLessonIds:[],qaLegacyReceiptLessonIds:[]};
  state.qaClassificationReady=false;
@@ -2976,7 +3002,10 @@ async function initializeLive(){
    const profile=state.profiles.find(p=>p.id===activeUser.id);
    const guardian=state.guardians.some(g=>g.guardian_id===activeUser.id);
    const invited=state.invites.some(i=>i.email===activeUser.email?.toLowerCase());
-   const isStudent=state.studentLinks.some(l=>l.user_id===activeUser.id)||
+   const teamStudentLinks=await v5TeamStudentAuthUI.readMyLinks();
+   if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
+   const isTeamStudent=teamStudentLinks.length>0;
+   const isStudent=isTeamStudent||state.studentLinks.some(l=>l.user_id===activeUser.id)||
      state.studentInvites.some(i=>i.email===activeUser.email?.toLowerCase());
    const roleKey=ROLE_STORAGE+"_"+activeUser.id;
    const pendingKey=ROLE_PENDING_STORAGE+"_"+activeUser.id;
@@ -2995,6 +3024,16 @@ async function initializeLive(){
     if(error)throw error;
     if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
    }else state.enabledRoles=normalizedRoles(profile.enabled_roles);
+   // A verified Team student link enables Student mode, but never grants
+   // any access by a frontend role flag. Backend RPCs re-check the link.
+   if(isTeamStudent&&!state.enabledRoles.includes("student")){
+    state.enabledRoles=normalizedRoles([...state.enabledRoles,"student"]);
+    const {error}=await client.from("profiles")
+      .update({enabled_roles:state.enabledRoles,roles_configured:true})
+      .eq("id",activeUser.id).select("id").single();
+    if(error)throw error;
+    if(activeUser?.id!==initializingUserId||authDataGeneration!==initializingGeneration)return;
+   }
    if(!state.enabledRoles.length)state.enabledRoles=["teacher"];
    state.role=resolveLoginRole({remote,cached,pending,isStudent,guardian,invited});
    restoreWorkspaceMode();
@@ -3029,6 +3068,7 @@ async function initializeLive(){
   render();
   if(activeUser){
    void v4ConnectionUI.refresh();void v4ContactsUI.refresh();
+   void v5TeamStudentAuthUI.refresh();
    if(state.role==="teacher")refreshWorkspacePanels();
   }
   if(!activeUser)showModal("account-modal");
@@ -3176,6 +3216,7 @@ function bindEvents(){
   if(ev.target.closest("[data-v4-action]")){await v4ConnectionUI.handleClick(ev.target);return}
   if(ev.target.closest("[data-v5-team-action]")){await v5TeamUI.handleClick(ev.target);return}
   if(ev.target.closest("[data-v5-learning-action]")){await v5LearningUI.handleClick(ev.target);return}
+  if(ev.target.closest("[data-v5-student-action]")){await v5TeamStudentAuthUI.handleClick(ev.target);return}
   if(ev.target.closest("[data-v56-family-action]")){await v56FamilyUI.handleClick(ev.target);return}
   if(ev.target.closest("[data-v5-billing-action], [data-v56-action]")){await v5BillingUI.handleClick(ev.target);return}
   if(ev.target.closest("[data-contact-action]")){await v4ContactsUI.handleClick(ev.target);return}
@@ -3386,7 +3427,7 @@ function bindEvents(){
   ["shared-course-weekdays","shared-weekday-hint","shared-course-date"]
  ])$("#"+group).addEventListener("change",()=>syncRecurringWeekdays(date,group,hint));
  $("#request-form").addEventListener("submit",submitRequest);
- document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e);if(e.target.id==="student-invite-form")saveStudentInvite(e);if(e.target.id==="v4-parent-request-form")void v4ConnectionUI.handleSubmit(e);if(e.target.id==="v4-account-contact-form")void v4ContactsUI.handleSubmit(e);if(["v5-team-project-form","v5-team-invite-form","v5-team-assign-form","v5-team-transfer-form"].includes(e.target.id))void v5TeamUI.handleSubmit(e);if(["v5-learning-student-form","v5-learning-enroll-form","v5-learning-lesson-form"].includes(e.target.id)||e.target?.dataset?.v5LearningEditStudent||e.target?.dataset?.v5LearningEditLesson)void v5LearningUI.handleSubmit(e);if(["v5-payment-report-form","v5-advance-report-form","v56-family-bridge-form"].includes(e.target.id))void v5BillingUI.handleSubmit(e)});
+ document.addEventListener("submit",e=>{if(e.target.id==="invite-form")saveInvite(e);if(e.target.id==="student-invite-form")saveStudentInvite(e);if(e.target.id==="v4-parent-request-form")void v4ConnectionUI.handleSubmit(e);if(e.target.id==="v4-account-contact-form")void v4ContactsUI.handleSubmit(e);if(["v5-team-project-form","v5-team-invite-form","v5-team-assign-form","v5-team-transfer-form"].includes(e.target.id))void v5TeamUI.handleSubmit(e);if(["v5-learning-student-form","v5-learning-enroll-form","v5-learning-lesson-form"].includes(e.target.id)||e.target?.dataset?.v5LearningEditStudent||e.target?.dataset?.v5LearningEditLesson)void v5LearningUI.handleSubmit(e);if(e.target.id==="v5-team-student-invite-form")void v5TeamStudentAuthUI.handleSubmit(e);if(["v5-payment-report-form","v5-advance-report-form","v56-family-bridge-form"].includes(e.target.id))void v5BillingUI.handleSubmit(e)});
  $("#invite-edit-form").addEventListener("submit",submitInviteEdit);
  $("#workspace-start").onclick=()=>setView("settings");
  $("#workspace-create").onclick=()=>saveMyWorkspace(false);

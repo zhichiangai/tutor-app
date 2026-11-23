@@ -56,6 +56,7 @@
           <section id="student-today-panel" class="student-view-panel" aria-label="學生今日首頁">
             <div class="section-row page-head"><div><h2>今天，看看我的課程</h2><p class="section-sub">下一堂課與最近的學習回饋，都在這裡。</p></div></div>
             <div id="student-today-content" class="student-today-grid" aria-live="polite"></div>
+            <article class="card hidden" id="v5-team-student-today-card" aria-label="我的 Team 課程"><h3>我的 Team 課程</h3><div id="v5-team-student-today-list" aria-live="polite"></div></article>
           </section>
           <section id="student-calendar-panel" class="student-view-panel hidden" aria-label="學生課表">
             <div class="section-row page-head"><div><h2>我的課表</h2><p class="section-sub">先看月份月曆，選日期查看課程；再管理後續安排。</p></div></div>
@@ -83,11 +84,13 @@
             </article>
             <article class="card shared-course-card" id="shared-student-card"><div class="section-row"><h2>課程管理與後續安排</h2></div><div id="shared-student-content"></div></article>
             <section id="student-recent-changes" class="recent-changes-card" aria-label="學生最近變更"></section>
+            <article class="card hidden" id="v5-team-student-calendar-card" aria-label="我的 Team 課表"><h3>我的 Team 課表</h3><p class="section-sub">只顯示你本人已接受連結的 Team 課程，課程時間均為臺灣時間。</p><div id="v5-team-student-calendar-list" aria-live="polite"></div></article>
           </section>
           <section id="student-learning-panel" class="student-view-panel hidden" aria-label="學生學習紀錄">
             <div class="section-row page-head"><div><h2>我的學習紀錄</h2><p class="section-sub">只顯示老師授權給我的課程與回饋，不包含帳務資料。</p></div></div>
             <article class="card"><div class="section-row"><h2>課程邀請</h2></div><div id="student-invites"></div></article>
             <article class="card"><div class="section-row"><h2>課程與老師回饋</h2></div><div id="student-portal-content"></div></article>
+            <article class="card hidden" id="v5-team-student-learning-card" aria-label="Team 學生個人課程"><h3>我的 Team 課程與學習</h3><p class="section-sub">只顯示本人獲授權的 Team 課程；不顯示老師私人備註、學費或收付款。</p><div id="v5-team-student-lesson-list" aria-live="polite"></div></article>
           </section>
         </section>
  <section id="view-home" class="page-view">
@@ -183,6 +186,13 @@
                 <button class="secondary-button" type="submit">儲存顯示名稱</button>
               </form>
             </article>
+            <article class="card settings-card hidden" id="v5-student-auth-card" aria-label="我的 Team 學習邀請">
+              <h3>我的 Team 學習邀請</h3>
+              <p class="section-sub">老師或 Team 管理者邀請後，請以受邀的 Email 本人確認。這不會開放任何學費或其他學生的資料。</p>
+              <div id="v5-student-auth-invitations" aria-live="polite"></div>
+              <div id="v5-student-auth-links" aria-live="polite"></div>
+              <button class="secondary-button" type="button" id="v5-student-auth-refresh" data-v5-student-action="refresh">重新檢查邀請</button>
+            </article>
             <details class="card settings-card settings-role-disclosure" id="settings-role-card"><summary class="settings-summary"><span><strong>角色與帳號</strong><small>點開選擇你要使用的模式</small></span><span aria-hidden="true">›</span></summary>
               <p class="section-sub">打勾後才會出現在上方模式切換。模式不代表取得其他學生的資料權限。</p>
               <form id="mode-settings-form">
@@ -260,6 +270,18 @@
                   </form>
                 </div>
               </div>
+            </article>
+            <article class="card settings-card hidden" id="v5-student-auth-admin-card" aria-label="Team 學生帳號邀請管理">
+              <h3>邀請 Team 學生查看自己的課程</h3>
+              <p class="section-sub">只有現任 Team 管理者可以邀請。學生須用本人已確認 Email 登入並接受後，才取得自己的 Team 課程存取權。</p>
+              <form id="v5-team-student-invite-form" class="v5-team-student-invite-form">
+                <label>Team 學生<select id="v5-student-auth-admin-select" required></select></label>
+                <label>學生登入 Email<input type="email" id="v5-student-auth-admin-email" maxlength="254" autocomplete="off" required placeholder="學生本人已確認的電子郵件"></label>
+                <button class="secondary-button" type="submit" id="v5-team-student-invite-submit">發出學生邀請</button>
+              </form>
+              <h4>待接受邀請</h4><div id="v5-student-auth-admin-pending" aria-live="polite"></div>
+              <h4>已連結的學生帳號</h4><div id="v5-student-auth-admin-links" aria-live="polite"></div>
+              <p class="helper-note">解除連結會立即停止後端資料存取，歷史操作仍保留稽核紀錄。</p>
             </article>
             <article class="card settings-card v5-plan-card hidden" id="v5-learning-card" aria-labelledby="v5-learning-heading">
               <div class="section-row">

@@ -95,16 +95,26 @@ async function forbid(token,method,path,body){
 const actors={
  managerA:await createActor('manager-a'),
  teacherA:await createActor('teacher-a'),
- managerB:await createActor('manager-b')
+ unassignedA:await createActor('unassigned-a'),
+ studentA1:await createActor('student-a1'),
+ studentA2:await createActor('student-a2'),
+ managerB:await createActor('manager-b'),
+ teacherB:await createActor('teacher-b'),
+ studentB:await createActor('student-b')
 };
 // Synthetic users only. Never use a Production login identity or service-role key.
-for(const actor of Object.values(actors)){
- // Every synthetic teacher has an independent personal workspace. Only A/B managers get Team grants.
+for(const actor of [actors.managerA,actors.teacherA,actors.managerB]){
+ // Preserve existing synthetic GUI actors' workspaces; new students and unassigned teachers get none.
  db("insert into public.workspaces(owner_id) values ('"+actor.id+"');");
 }
 db("insert into public.profiles(id,display_name,last_role,enabled_roles,roles_configured) values "+
- Object.entries(actors).map(([label,a])=>"('"+a.id+"','RAP12 "+label+
-  "','teacher',array['teacher']::text[],true)").join(',')+
+ Object.entries(actors).map(([label,a])=>{
+  // H intentionally starts as a teacher-mode account without a V4/Team link.
+  // After accepting the verified invitation, the app must add student mode.
+  const role=label==='studentB'?'teacher':label.startsWith('student')?'student':'teacher';
+  return "('"+a.id+"','RAP12 "+label+
+   "','"+role+"',array['"+role+"']::text[],true)";
+ }).join(',')+
  " on conflict(id) do update set display_name=excluded.display_name,"+
  "last_role=excluded.last_role,enabled_roles=excluded.enabled_roles,"+
  "roles_configured=excluded.roles_configured;");
@@ -121,6 +131,11 @@ assert.notEqual(teamA,teamB);
 const tA=await jwt(actors.managerA);
 const tB=await jwt(actors.managerB);
 const tMember=await jwt(actors.teacherA);
+const tUnassigned=await jwt(actors.unassignedA);
+const tTeacherB=await jwt(actors.teacherB);
+const tStudentA1=await jwt(actors.studentA1);
+const tStudentA2=await jwt(actors.studentA2);
+const tStudentB=await jwt(actors.studentB);
 async function project(token,workspace,creator,name){
  const d=await api(token,'POST','v5_team_projects?select=id',
   {workspace_id:workspace,created_by:creator,name},201);
@@ -134,6 +149,20 @@ const invited=await api(tA,'POST','v5_team_invitations?select=id',
   recipient_email:actors.teacherA.email.toLowerCase()},201);
 await api(tMember,'POST','rpc/v5_accept_team_invitation',
  {p_invitation_id:uid(invited[0].id)},200);
+// C is a legitimate Team A member without a project assignment.
+const inviteC=await api(tA,'POST','v5_team_invitations?select=id',{
+ workspace_id:wsA,invited_by:actors.managerA.id,
+ recipient_email:actors.unassignedA.email.toLowerCase()
+},201);
+await api(tUnassigned,'POST','rpc/v5_accept_team_invitation',
+ {p_invitation_id:uid(inviteC[0].id)},200);
+// G belongs only to Team B; this is deliberately a different tenant.
+const inviteG=await api(tB,'POST','v5_team_invitations?select=id',{
+ workspace_id:wsB,invited_by:actors.managerB.id,
+ recipient_email:actors.teacherB.email.toLowerCase()
+},201);
+await api(tTeacherB,'POST','rpc/v5_accept_team_invitation',
+ {p_invitation_id:uid(inviteG[0].id)},200);
 async function assign(token,workspace,projectId,userId){
  await api(token,'POST','v5_team_project_members?select=project_id',
   {workspace_id:workspace,project_id:projectId,user_id:userId},201);
@@ -142,6 +171,7 @@ await assign(tA,wsA,aShared,actors.managerA.id);
 await assign(tA,wsA,aPrivate,actors.managerA.id);
 await assign(tA,wsA,aShared,actors.teacherA.id);
 await assign(tB,wsB,bPrivate,actors.managerB.id);
+await assign(tB,wsB,bPrivate,actors.teacherB.id);
 async function learner(token,teamId,projectId,creator,name){
  const s=await api(token,'POST','v5_team_students?select=id',
   {team_id:teamId,display_name:name,created_by:creator},201);
@@ -176,12 +206,39 @@ const teamIds=async token=>(await api(token,'GET','v5_teams?select=id')).map(x=>
 assert.deepEqual((await teamIds(tA)).sort(),[teamA]);
 assert.deepEqual((await teamIds(tMember)).sort(),[teamA]);
 assert.deepEqual((await teamIds(tB)).sort(),[teamB]);
+assert.deepEqual((await teamIds(tUnassigned)).sort(),[teamA]);
+assert.deepEqual((await teamIds(tTeacherB)).sort(),[teamB]);
+for(const token of [tStudentA1,tStudentA2,tStudentB])
+ assert.deepEqual(await teamIds(token),[],'Unlinked student must not see Team identity');
 const teacherProjects=await api(tMember,'GET','v5_team_projects?select=id');
 assert.deepEqual(teacherProjects.map(p=>p.id).sort(),[aShared]);
+async function visibleIds(token,table){
+ const rows=await api(token,'GET',table+'?select=id');
+ return rows.map(x=>x.id).sort();
+}
+assert.deepEqual(await visibleIds(tA,'v5_team_projects'),[aShared,aPrivate].sort());
+assert.deepEqual(await visibleIds(tUnassigned,'v5_team_projects'),[]);
+assert.deepEqual(await visibleIds(tTeacherB,'v5_team_projects'),[bPrivate]);
+assert.deepEqual(await visibleIds(tB,'v5_team_projects'),[bPrivate]);
+for(const token of [tStudentA1,tStudentA2,tStudentB])
+ assert.deepEqual(await visibleIds(token,'v5_team_projects'),[],
+  'Unlinked student must not see Team projects');
 const teacherStudents=await api(tMember,'GET','v5_team_students?select=id');
 assert.deepEqual(teacherStudents.map(s=>s.id).sort(),[saShared]);
+assert.deepEqual(await visibleIds(tUnassigned,'v5_team_students'),[]);
+assert.deepEqual(await visibleIds(tTeacherB,'v5_team_students'),[sbPrivate]);
+for(const token of [tStudentA1,tStudentA2,tStudentB])
+ assert.deepEqual(await visibleIds(token,'v5_team_students'),[],
+  'Unlinked student must not see Team student records');
 const teacherLessons=await api(tMember,'GET','v5_team_lessons?select=id');
 assert.deepEqual(teacherLessons.map(x=>x.id).sort(),[la]);
+assert.deepEqual(await visibleIds(tUnassigned,'v5_team_lessons'),[]);
+assert.deepEqual(await visibleIds(tTeacherB,'v5_team_lessons'),[lb]);
+assert.deepEqual(await visibleIds(tA,'v5_team_lessons'),[la,lp].sort());
+assert.deepEqual(await visibleIds(tB,'v5_team_lessons'),[lb]);
+for(const token of [tStudentA1,tStudentA2,tStudentB])
+ assert.deepEqual(await visibleIds(token,'v5_team_lessons'),[],
+  'Student Auth user has no Team learning authorization without a verified link');
 // Check the privileged SECURITY DEFINER billing RPC with three real, distinct
 // GoTrue JWTs. Cross-tenant managers must be denied even with a valid UUID.
 const billingMonth=month+'-01';
@@ -192,6 +249,16 @@ await forbid(tA,'POST','rpc/v5_team_billing_overview',
 await forbid(tB,'POST','rpc/v5_team_billing_overview',
  {p_team_id:teamA,p_month:billingMonth});
 await forbid(tMember,'GET','v5_team_lesson_fees?select=*');
+for(const [token,target] of [[tUnassigned,teamA],[tTeacherB,teamB],
+ [tStudentA1,teamA],[tStudentA2,teamA],[tStudentB,teamB]])
+ await forbid(token,'POST','rpc/v5_team_billing_overview',
+  {p_team_id:target,p_month:billingMonth});
+// A second manager-only finance RPC must independently enforce access.
+for(const [token,target] of [[tMember,teamA],[tUnassigned,teamA],
+ [tTeacherB,teamB],[tStudentA1,teamA],[tStudentA2,teamA],
+ [tStudentB,teamB],[tA,teamB],[tB,teamA]])
+ await forbid(token,'POST','rpc/v5_team_payment_overview',
+  {p_team_id:target,p_month:billingMonth});
 const billing=await api(tA,'POST','rpc/v5_team_billing_overview',
  {p_team_id:teamA,p_month:billingMonth},200);
 assert.ok(billing.confirmed_count>=2,'Synthetic manager billing must be populated');
@@ -199,6 +266,12 @@ const foreignManagerBilling=await api(tB,'POST','rpc/v5_team_billing_overview',
  {p_team_id:teamB,p_month:billingMonth},200);
 assert.equal(foreignManagerBilling.confirmed_count,1,
  'Foreign Team manager can only review own synthetic lesson fee');
+const managerPaymentA=await api(tA,'POST','rpc/v5_team_payment_overview',
+ {p_team_id:teamA,p_month:billingMonth},200);
+const managerPaymentB=await api(tB,'POST','rpc/v5_team_payment_overview',
+ {p_team_id:teamB,p_month:billingMonth},200);
+assert.equal(typeof managerPaymentA,'object');
+assert.equal(typeof managerPaymentB,'object');
 // Store credentials privately on the local machine only. Never print actor emails, passwords,
 // API keys or IDs into CI logs, PRs, screenshots, or chatbot conversation.
 const fixture={environment:'local',apiUrl:local.API_URL,baseUrl:'http://127.0.0.1:3000',
@@ -206,7 +279,8 @@ const fixture={environment:'local',apiUrl:local.API_URL,baseUrl:'http://127.0.0.
  saShared,saPrivate,sbPrivate,la,lp,lb}};
 writeFileSync(fixturePath,JSON.stringify(fixture),{mode:0o600,flag:'wx'});
 chmodSync(fixturePath,0o600);
-console.log(JSON.stringify({result:'PASS',scope:'disposable-local',actors:3,
+console.log(JSON.stringify({result:'PASS',scope:'disposable-local',actors:8,
  teams:2,projects:3,lessons:3,managerOnlyFinancialRows:3,
- billingRpcCrossTeamDenied:2,billingRpcTeacherDenied:1,
+ billingRpcCrossTeamDenied:2,billingRpcTeacherDenied:3,
+ paymentRpcDenied:8,unassignedVisibleProjects:0,unlinkedStudentsDenied:3,
  teacherAccessibleProjects:1,foreignTenantAccess:0,productionWrites:0}));
