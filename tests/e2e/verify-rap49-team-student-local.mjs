@@ -2,6 +2,7 @@
 // Eight independent real GoTrue JWTs; never targets hosted Supabase.
 import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
 import {resolve,isAbsolute,relative,dirname} from 'node:path';
 import {tmpdir} from 'node:os';
 
@@ -143,21 +144,46 @@ assert.deepEqual(await rpc(D,'v5_my_team_student_links'),[]);
 assert.deepEqual(await ownerLesson(E),['RAP12 Private Science']);
 assert.deepEqual(await ownerLesson(H),['RAP12 Foreign English']);
 await denied(D,'v5_accept_team_student_invitation',{p_invitation_id:aD.invitation_id});
-// An expired invitation cannot be accepted: this uses only the disposable
-// instance's manager-facing revoke/reinvite flow, not Production Auth.
+// An expired invitation must fail, even with the matching logged-in JWT.
+// SQL adjustment is strictly inside disposable 127.0.0.1 Docker.
 const renewed=await rpc(A,'v5_invite_team_student',
  {p_student_id:ids.saShared,p_recipient_email:actors.studentA1.email});
-assert.ok(renewed.invitation_id);
-await rpc(A,'v5_revoke_team_student_invitation',
- {p_invitation_id:renewed.invitation_id});
+assert.match(renewed.invitation_id,/^[a-f0-9-]{36}$/i);
+execFileSync('docker',['exec','supabase_db_tutor_v4_isolated','psql',
+ '-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres','-c',
+ "UPDATE tutor_private.v5_team_student_auth_invitations "+
+ "SET created_at=now()-interval '20 days',expires_at=now()-interval '10 days' "+
+ "WHERE id='"+renewed.invitation_id+"';"],{encoding:'utf8',timeout:20000});
+assert.deepEqual(await rpc(D,'v5_my_team_student_invitations'),[]);
 await denied(D,'v5_accept_team_student_invitation',
  {p_invitation_id:renewed.invitation_id});
-const pendingAgain=await rpc(D,'v5_my_team_student_invitations');
-assert.deepEqual(pendingAgain,[]);
+// Manager may reissue an expired invitation, but a cancelled one cannot be used.
+const reissued=await rpc(A,'v5_invite_team_student',
+ {p_student_id:ids.saShared,p_recipient_email:actors.studentA1.email});
+await rpc(A,'v5_revoke_team_student_invitation',
+ {p_invitation_id:reissued.invitation_id});
+await denied(D,'v5_accept_team_student_invitation',
+ {p_invitation_id:reissued.invitation_id});
+assert.deepEqual(await rpc(D,'v5_my_team_student_invitations'),[]);
+// Restore D so the GUI can verify D and E simultaneously.
+const validD=await rpc(A,'v5_invite_team_student',
+ {p_student_id:ids.saShared,p_recipient_email:actors.studentA1.email});
+await rpc(D,'v5_accept_team_student_invitation',{p_invitation_id:validD.invitation_id});
+assert.deepEqual(await ownerLesson(D),['RAP12 Shared Math']);
+// Leave H with a genuine, verified-email pending invitation so Chromium tests
+// the first-login teacher-mode -> accept invite -> student-mode flow.
+const hLink=(await rpc(H,'v5_my_team_student_links'))[0];
+await rpc(F,'v5_revoke_team_student_link',{p_link_id:hLink.id});
+const guiH=await rpc(F,'v5_invite_team_student',
+ {p_student_id:ids.sbPrivate,p_recipient_email:actors.studentB.email});
+assert.ok(guiH.invitation_id);
+assert.equal((await rpc(H,'v5_my_team_student_invitations')).length,1);
+assert.deepEqual(await ownerLesson(H),[]);
 console.log(JSON.stringify({
  result:'PASS',scope:'disposable-local',signedGoTrueActors:8,
  linkedStudentReadPositive:3,isolatedStudentLessonViews:3,
  studentFinanceRpcDenied:6,foreignAcceptDenied:3,
  crossTeamRevokeDenied:2,revokedSameJwtDenied:true,
+ expiredInviteDenied:true,cancelledInviteDenied:true,pendingGuiAcceptance:1,
  fullLessonTableAccess:0,productionWrites:0
 }));
