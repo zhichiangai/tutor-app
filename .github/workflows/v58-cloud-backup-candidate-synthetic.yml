@@ -9,6 +9,13 @@ on:
       - 'tests/v58-cloud-backup-candidate-policy.test.mjs'
       - 'scripts/release/v58-gdrive-ciphertext-transport.mjs'
       - 'tests/v58-gdrive-ciphertext-transport.test.mjs'
+      - 'scripts/release/v58-cloud-production-gate.mjs'
+      - 'tests/v58-cloud-production-gate.test.mjs'
+      - 'scripts/release/v58-cloud-pgpass.mjs'
+      - 'tests/v58-cloud-pgpass.test.mjs'
+      - 'scripts/release/v58-cloud-production-backup-once.sh'
+      - 'tests/v58-cloud-production-workflow.test.mjs'
+      - '.github/workflows/v58-cloud-production-backup-candidate.yml'
       - 'tests/local/v58-gdrive-encrypted-backup-poc.sh'
       - 'docs/v5/RAP16_CLOUD_BACKUP_ACTIONS_CANDIDATE_20261123.md'
   workflow_dispatch:
@@ -43,8 +50,9 @@ jobs:
       - name: Inspect no-production / no-secret contract
         run: |
           set -euo pipefail
-          node --test tests/v58-cloud-backup-candidate-policy.test.mjs tests/v58-gdrive-ciphertext-transport.test.mjs
+          node --test tests/v58-cloud-backup-candidate-policy.test.mjs tests/v58-gdrive-ciphertext-transport.test.mjs tests/v58-cloud-production-gate.test.mjs tests/v58-cloud-pgpass.test.mjs tests/v58-cloud-production-workflow.test.mjs
           bash -n tests/local/v58-gdrive-encrypted-backup-poc.sh
+          bash -n scripts/release/v58-cloud-production-backup-once.sh
       - name: Install age for throwaway synthetic encryption only
         run: |
           set -euo pipefail
