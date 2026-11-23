@@ -78,7 +78,7 @@ jobs:
           log="$RUNNER_TEMP/rap49-63.log"
           trap 'rm -f "$log"' EXIT
           supabase migration up --local >"$log" 2>&1 || { echo '::error::Isolated 63 failed'; exit 1; }
-          node tests/local/v58-parent-project-63-gate.mjs after
+          V58_LOCAL_MIGRATION_VERSION=20261117010000 node tests/local/v58-parent-project-63-gate.mjs after
           count="$(docker exec supabase_db_tutor_v4_isolated psql -X -A -t -v ON_ERROR_STOP=1 -U postgres -d postgres -c 'select count(*) from supabase_migrations.schema_migrations')"
           test "$count" = 63
           hash="$(docker exec supabase_db_tutor_v4_isolated psql -X -A -t -v ON_ERROR_STOP=1 -U postgres -d postgres -c "select md5(prosrc) from pg_proc where oid='public.v56_team_parent_finance_overview(uuid,uuid,date)'::regprocedure")"
