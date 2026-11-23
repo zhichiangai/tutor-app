@@ -16,7 +16,7 @@ export function createPrivatePgpass({target,runnerDir,host,port,user,password}){
   assert.equal(host,'db.vctisuglfoxyuwlvyjee.supabase.co');
   assert.equal(port,'5432');
   assert.equal(user,'postgres');
-  assert.ok(typeof password==='string'&&password.length>=8&&password.length<=1024,
+  assert.ok(typeof password==='string'&&password.length>=12&&password.length<=1024,
     'Credential missing');
   assert.ok(!/[\r\n\0]/.test(password),'Unsafe multiline credential');
   const esc=x=>x.replace(/\\/g,'\\\\').replace(/:/g,'\\:');
